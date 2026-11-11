@@ -362,6 +362,18 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   const collectionsLoadRef = React.useRef<Promise<void> | null>(null);
   const collectionsNextLoadRef = React.useRef<Promise<void> | null>(null);
   const collectionsNextUseCacheRef = React.useRef(true);
+  // Sessao de login atual: muda quando o usuario logado muda (logout, troca
+  // de pessoa). Uma carga guarda a sessao em que comecou e, se ela mudou ate
+  // o fim, descarta o resultado em vez de publica-lo -- senao uma resposta
+  // lenta da sessao anterior podia aparecer na tela do proximo usuario.
+  const sessaoRef = React.useRef(0);
+  const sessaoUserIdRef = React.useRef<string | null>(null);
+  // Usuario da ULTIMA renderizacao. A carga le daqui, e nao do `user` da
+  // closure: uma recarga enfileirada numa sessao (fila de fetchCollections,
+  // realtime) roda com a funcao daquela renderizacao, e com o `user` antigo
+  // buscaria o recorte do usuario anterior.
+  const currentUserRef = React.useRef(user);
+  currentUserRef.current = user;
   // Só publica progresso enquanto a tela de loading do boot está no ar. Num
   // refresh em segundo plano (realtime, pos-importacao) isso abriria o overlay
   // de tela cheia por cima do app em uso.
@@ -909,11 +921,20 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
   useEffect(() => {
     let realtimeChannel: any = null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
     // Wait for AuthContext to finish loading before making any decisions
     if (isAuthLoading) {
       console.log("Aguardando autenticação carregar...");
       return;
+    }
+
+    // Nova sessao so quando muda QUEM esta logado (o objeto `user` pode ser
+    // recriado para a mesma pessoa sem que as cargas dela devam ser perdidas).
+    const userIdAtual = user?.id ?? null;
+    if (userIdAtual !== sessaoUserIdRef.current) {
+      sessaoUserIdRef.current = userIdAtual;
+      sessaoRef.current += 1;
     }
 
     if (user) {
@@ -975,7 +996,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       // com `allCollections` ainda vazio: era a origem do "conteudo some por
       // alguns segundos". Hoje a carga paralela leva ~12s; 60s so e atingido se
       // a rede realmente empacou, e ai a tela ja tem os lotes parciais.
-      const timeoutId = setTimeout(() => {
+      timeoutId = setTimeout(() => {
         console.warn(
           "Tempo limite excedido ao carregar dados. Liberando o estado de carregamento.",
         );
@@ -990,7 +1011,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           setError("Erro ao carregar dados. Tente novamente.");
         })
         .finally(() => {
-          clearTimeout(timeoutId); // Clear the timeout
+          if (timeoutId) clearTimeout(timeoutId); // Clear the timeout
           reportLoadProgressRef.current = false;
           setGlobalLoading(false);
           setLoading(false);
@@ -1077,6 +1098,13 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       setCollectionsRequested(false);
       requestCollectionsPromiseRef.current = null;
       applyCollectionsScope("active");
+      // Travas de "carga em andamento": a carga da sessao anterior que ainda
+      // estiver em voo nao as libera mais (ver sessaoRef), e presas em true
+      // fariam o proximo login achar que ja tem carga rodando.
+      loadingFullScopeRef.current = false;
+      setLoadingFullScope(false);
+      loadingSettledCollectionsRef.current = false;
+      setLoadingSettledCollections(false);
       setUsers([]);
       setSalePayments([]);
       setScheduledVisits([]);
@@ -1086,6 +1114,15 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
     // Cleanup: remover listener quando o componente for desmontado ou usuário mudar
     return () => {
+      // Recarga do realtime agendada (8 s apos o ultimo evento) e a valvula
+      // de 60 s do boot pertencem a esta sessao: disparadas depois do logout
+      // recarregariam a carteira ou derrubariam o loading da proxima.
+      if (timeoutId) clearTimeout(timeoutId);
+      if (realtimeRefreshTimer.current) {
+        clearTimeout(realtimeRefreshTimer.current);
+        realtimeRefreshTimer.current = null;
+        realtimeBurstStartRef.current = null;
+      }
       if (realtimeChannel) {
         console.log("Removendo listener em tempo real...");
         try {
@@ -1161,10 +1198,20 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     useCache: boolean,
     requestedScope: CollectionsScope,
   ) => {
+    // Usuario e sessao de AGORA (ver currentUserRef/sessaoRef). `user` aqui
+    // sombreia o da closure de proposito: tudo abaixo usa o atual.
+    const user = currentUserRef.current;
+    const sessao = sessaoRef.current;
+    const sessaoAtiva = () => sessao === sessaoRef.current;
+
     // Cobrador nunca usa a view: a carteira dele ja e o recorte, e ele precisa
     // do historico completo em maos para trabalhar offline.
     const scope: CollectionsScope =
       user?.type === "collector" ? "all" : requestedScope;
+
+    // Recarga que sobrou na fila depois do logout: sem ninguem logado, nao
+    // ha recorte a buscar (e a sessao anonima nao tem leitura nessas tabelas).
+    if (!user) return;
 
     try {
       setError(null);
@@ -1329,7 +1376,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         for (const row of batchRows)
           buffer.push(mapRowToCollection(row, registry));
 
-        if (total && reportLoadProgressRef.current) {
+        if (total && reportLoadProgressRef.current && sessaoAtiva()) {
           setGlobalLoading(
             true,
             `Carregando títulos... ${loadedCount.toLocaleString("pt-BR")} de ${total.toLocaleString("pt-BR")}`,
@@ -1364,6 +1411,13 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       // do OFFSET antigo, que podia repetir linha sob escrita concorrente).
       const transformedData = buffer;
 
+      // Sessao trocou durante a carga: o resultado e de outro usuario (ou de
+      // ninguem). Nao publica, nao guarda em cache, nao mexe no escopo.
+      if (!sessaoAtiva()) {
+        console.log("Carga de collections de uma sessão anterior descartada.");
+        return;
+      }
+
       if (transformedData.length === 0) {
         console.warn("Nenhum dado retornado do Supabase");
         setAllCollections([]);
@@ -1389,11 +1443,14 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       );
     } catch (err) {
       console.error("Erro ao carregar collections:", err);
+      // Falha de uma sessao que ja acabou (tipico: o logout derrubou a
+      // permissao no meio da carga) nao e erro da sessao atual.
+      if (!sessaoAtiva()) return;
       setError(
         "Não foi possível carregar todos os títulos (instabilidade na conexão). Atualize a página em instantes.",
       );
     } finally {
-      setLoading(false);
+      if (sessaoAtiva()) setLoading(false);
     }
   };
 
@@ -1421,12 +1478,17 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     // fetchCollections so baixa o loading no finally e nunca o sobe — sem isto
     // o botao nao teria como indicar que a consulta esta em andamento.
     setLoading(true);
+    const sessao = sessaoRef.current;
     const promise = (async () => {
       try {
         await fetchCollections();
       } finally {
-        setCollectionsRequested(true);
-        requestCollectionsPromiseRef.current = null;
+        // Logout no meio: o logout ja zerou estas travas para a proxima
+        // sessao, e marcar "pedido" agora faria o proximo login pular a carga.
+        if (sessao === sessaoRef.current) {
+          setCollectionsRequested(true);
+          requestCollectionsPromiseRef.current = null;
+        }
       }
     })();
     requestCollectionsPromiseRef.current = promise;
@@ -1450,15 +1512,20 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     // meio desta carga, ela precisa buscar "all" tambem — nao voltar a "active"
     // e desfazer a promocao.
     collectionsScopeRef.current = "all";
+    const sessao = sessaoRef.current;
 
     try {
       await fetchCollections(true, "all");
       // "all" ja inclui os quitados; o complemento em separado ficaria
       // duplicado dentro de `collections` (useMemo soma os dois arrays).
-      setSettledCollections([]);
+      if (sessao === sessaoRef.current) setSettledCollections([]);
     } finally {
-      loadingFullScopeRef.current = false;
-      setLoadingFullScope(false);
+      // Sessao trocada: o logout ja liberou a trava; liberar de novo aqui
+      // poderia soltar a de uma carga da sessao nova.
+      if (sessao === sessaoRef.current) {
+        loadingFullScopeRef.current = false;
+        setLoadingFullScope(false);
+      }
     }
   };
 
@@ -1495,6 +1562,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     // Trava antes de buscar, mesma razao do ensureAllCollections: duas
     // chamadas concorrentes nao podem disparar duas varreduras da view.
     settledCollectionsLoadedRef.current = true;
+    const sessao = sessaoRef.current;
+    const sessaoAtiva = () => sessao === sessaoRef.current;
 
     try {
       const source = SETTLED_COLLECTIONS_SOURCE as "BANCO_DADOS";
@@ -1561,15 +1630,21 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       // Faixa por id_parcela: cada linha pertence a exatamente uma faixa, nao
       // ha o que deduplicar (ao contrario do OFFSET antigo).
+      // Sessao trocada no meio: quitados do usuario anterior, descarta (o
+      // logout ja zerou as travas para a proxima sessao).
+      if (!sessaoAtiva()) return;
       setSettledCollections(buffer);
       invalidateCollections();
     } catch (err) {
       console.error("Erro ao carregar clientes quitados:", err);
+      if (!sessaoAtiva()) return;
       // Permite tentar de novo na proxima vez que o filtro "Pago" for aberto.
       settledCollectionsLoadedRef.current = false;
     } finally {
-      loadingSettledCollectionsRef.current = false;
-      setLoadingSettledCollections(false);
+      if (sessaoAtiva()) {
+        loadingSettledCollectionsRef.current = false;
+        setLoadingSettledCollections(false);
+      }
     }
   };
 
