@@ -51,6 +51,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 44 | Carregamento parcial/inconsistente (precisava de F5 2–3 vezes) — nova tentativa em erro passageiro, sem lista incompleta, caches das derivações por carga, corrida da carga de títulos; feito 2026-11-10, sem teste no navegador (extensão caiu), sem push | Alta | Médio |
 | 45 | Acordo cancelado: quem cancela escolhe estornar (refazer) ou manter (desistiu) o valor pago + histórico de acordos/agendamentos cancelados — `0005`/`0006` aplicadas (entrada da OTICA FERNANDA estornada); falta teste na tela | Alta | Médio |
 | 46 | Atender: "Cliente diz que já pagou" (comprovante → registro do pagamento) e "Cliente informa venda cancelada" (parcelas da venda vão para conferência do gestor) — migration `20261110000008` aplicada (`check:db` OK); falta teste na tela | Alta | Médio |
+| 47 | Lentidão/travamento do cobrador — 3 correções só de front feitas 2026-11-11 (`a7d7874`, `33e2278`, `cb749d1`), sem push, sem teste no navegador; próximos passos medidos e anotados | Alta | Pequeno |
 
 ## Perguntas em aberto para o financeiro
 
@@ -202,6 +203,49 @@ cobrador entre ~61/91 e 365 dias.
 **Falta:** teste na tela do cobrador (aba Ligar intercalada → Depois);
 etapa 3 (supervisão: previstos × trabalhados por faixa; referência é o
 HTML do Cedrus que está na raiz, fora do Git).
+
+### Item 47 — Lentidão do cobrador — 2026-11-11
+
+Relato: cobradores reclamando de demora para carregar e travamentos.
+Medido no banco (EXPLAIN ANALYZE como cobrador de carteira, em transação
+desfeita) e no código:
+
+1. **Carga da carteira** (`loadCollectionsOnce`): só o perfil `collector`
+   mandava filtro de cobrador (e ainda um `or` com `nome_da_loja.in.()`
+   vazio); os 3 de carteira não mandavam nenhum e contavam só com a RLS.
+   A policy `select_dono_ou_gestor` é `gestor OR user_id = eu` — atrás do
+   OR o Postgres não usa `idx_banco_dados_user_id`: cada página de 1000
+   varria a PK descartando ~130 mil linhas (**~600–700 ms por página**).
+   Agora todo perfil não gestor manda `user_id = eu` explícito (mesmo
+   resultado da RLS): **~50 ms por página**. `a7d7874`.
+2. **Contatos da carteira na Fila** (`InternalCollectorWallet`): lia
+   `collection_attempts` em lotes de 300 ids **em sequência** (~30–45
+   requisições para carteiras de 9–13 mil parcelas), no boot **e a cada
+   registro** (`versaoRegistros`). Cobrador agora faz uma leitura paginada
+   (a RLS já limita à carteira dele; ~160 linhas, ~16 ms) e filtra pelos
+   títulos em aberto no cliente; gestor continua por id. `33e2278`.
+3. **Atender** (`LogContactModal`): todo registro chamava
+   `refreshCollections()` (baixar a carteira inteira de novo), que por
+   sua vez disparava o item 2. `registrar_contato` só grava
+   `collection_attempts`/`scheduled_visits` — só mexe em `BANCO_DADOS`
+   quando libera o cliente (`liberar_cliente_da_carteira`). Agora recarrega
+   a carteira só nesse caso e na venda cancelada. `cb749d1`.
+
+**Próximos passos (medidos, não feitos):**
+- Índice `(user_id, id_parcela)` em `BANCO_DADOS`: hoje a página com
+  `user_id` explícito lê as ~9–13 mil linhas do cobrador e ordena para
+  devolver 1000; com o índice composto seria leitura direta. Migration +
+  `db push`.
+- Boot do cobrador também baixa `enderecos_historico` inteiro (15 mil
+  linhas, RLS `true`, ~180 ms + transferência) e `users` inteiro.
+- Realtime: qualquer mudança em `BANCO_DADOS` visível ao cobrador (sync do
+  Ciclone 3x/dia) recarrega a carteira inteira dele — já com debounce.
+- Não medido: custo de renderização no celular (derivações sobre 10k+
+  parcelas no `CollectionContext`).
+
+**Falta:** teste no navegador como cobrador de carteira (abrir, Atender um
+cliente, conferir que a fila anda e que liberar cliente ainda o tira da
+lista) e push.
 
 ### Item 46 — "Já pagou" e "venda cancelada" no Atender — 2026-11-10
 
