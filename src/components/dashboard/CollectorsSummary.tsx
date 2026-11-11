@@ -4,12 +4,7 @@ import {
   Info,
   Wallet,
   Users,
-  AlertTriangle,
   CalendarClock,
-  CalendarCheck2,
-  RotateCcw,
-  SearchX,
-  UserX,
   Repeat,
   ChevronDown,
   ChevronUp,
@@ -25,7 +20,6 @@ import { supabase } from "../../lib/supabase";
 import {
   isCollectorType,
   UserType,
-  ClienteForaDaFaixa,
   CollectionAttempt,
 } from "../../types";
 import { isEffectiveAttemptResult } from "../../config/collectionAttempts";
@@ -61,11 +55,10 @@ interface CollectorRow {
   semAgendamentoClientes: number;
   // No periodo [dateFrom, dateTo].
   // Atendimentos registrados (collection_attempts: Atender, Fila, pagamento,
-  // venda cancelada). Contados por CLIENTE, nunca por titulo: um
-  // atendimento = cliente x dia (um registro grava uma linha por titulo).
-  atendimentosQtd: number;
-  atendimentosEfetivosQtd: number;
-  atendimentosClientes: number;
+  // venda cancelada). Contados por CLIENTE, nunca por titulo (um registro
+  // grava uma linha por titulo) nem por dia: cliente atendido 3 vezes = 1.
+  clientesAtendidos: number;
+  clientesConversaram: number;
   previstaQtd: number;
   previstaValor: number;
   aReceberQtd: number;
@@ -96,7 +89,7 @@ type SortKey =
   | "recebidoPeriodo"
   | "emAtrasoVisitas"
   | "semAgendamentoClientes"
-  | "atendimentosQtd"
+  | "clientesAtendidos"
   | "agendadasQtd"
   | "realizadasQtd"
   | "reagendadasQtd"
@@ -113,7 +106,7 @@ const SORT_GETTERS: Record<SortKey, (row: CollectorRow) => number | string> =
     recebidoPeriodo: (r) => r.recebidoPeriodo,
     emAtrasoVisitas: (r) => r.emAtrasoVisitas,
     semAgendamentoClientes: (r) => r.semAgendamentoClientes,
-    atendimentosQtd: (r) => r.atendimentosQtd,
+    clientesAtendidos: (r) => r.clientesAtendidos,
     agendadasQtd: (r) => r.agendadasQtd,
     realizadasQtd: (r) => r.realizadasQtd,
     reagendadasQtd: (r) => r.reagendadasQtd,
@@ -124,7 +117,10 @@ const SORT_GETTERS: Record<SortKey, (row: CollectorRow) => number | string> =
 // Sentinelas para "Tudo": faixa larga o bastante pra cobrir qualquer registro
 // real sem precisar de um caso especial "sem filtro" nas comparacoes de string.
 const ALL_TIME_FROM = "2000-01-01";
-const ALL_TIME_TO = "2099-12-31";
+// 9999 e nao 2099: o ERP tem vencimento digitado errado (ex.: ano 2245), e
+// com teto menor "Tudo" deixava a parcela fora de "Vence no periodo" mas
+// dentro de "A vencer" -- os dois nao batiam.
+const ALL_TIME_TO = "9999-12-31";
 
 // Segmentacao tonal: Financeiro (parcelas de BANCO_DADOS) sempre no cinza mais
 // claro, Agenda (scheduledVisits) no cinza um pouco mais escuro — mesma dupla
@@ -136,11 +132,12 @@ const TONE_AGENDA = "bg-gray-100/80 dark:bg-white/[0.07]";
 // independente de ter havido agendamento antes.
 const TONE_ATENDIMENTO = "bg-indigo-50/70 dark:bg-indigo-900/10";
 
-/** Atendimentos de um cobrador no periodo, ja agregados por cliente. */
+/** Atendimentos de um cobrador no periodo, contados por cliente. */
 interface AtendimentosCobrador {
-  qtd: number;
-  efetivos: number;
+  /** Clientes diferentes com algum atendimento registrado. */
   clientes: number;
+  /** Desses, com quantos houve conversa (contato efetivo). */
+  conversaram: number;
 }
 
 const ID_CHUNK = 300;
@@ -185,97 +182,6 @@ const toBr = (iso: string): string => {
   return `${d}/${m}/${y}`;
 };
 
-const StatTile: React.FC<{
-  icon: React.ElementType;
-  label: string;
-  value: string;
-  sub?: string;
-  periodHint?: string;
-  tone?: "neutral" | "red" | "amber" | "green" | "blue";
-  size?: "md" | "lg";
-}> = ({
-  icon: Icon,
-  label,
-  value,
-  sub,
-  periodHint,
-  tone = "neutral",
-  size = "md",
-}) => {
-  const toneClasses: Record<string, string> = {
-    neutral: "text-gray-700 dark:text-dark-text",
-    red: "text-red-600 dark:text-red-400",
-    amber: "text-amber-600 dark:text-amber-400",
-    green: "text-green-600 dark:text-green-400",
-    blue: "text-blue-600 dark:text-blue-400",
-  };
-  return (
-    <div className="min-w-0 rounded-xl border border-gray-100 dark:border-dark-border/40 bg-gray-50/60 dark:bg-dark-bg/30 px-3 py-2.5">
-      <div className="flex items-center gap-1.5 min-w-0 text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-dark-text-secondary">
-        <Icon className="h-3.5 w-3.5 flex-shrink-0" />
-        <span className="truncate">{label}</span>
-      </div>
-      {periodHint && (
-        <div className="text-[9px] font-normal text-gray-400 dark:text-dark-text-secondary opacity-70 truncate">
-          {periodHint}
-        </div>
-      )}
-      <div
-        className={`mt-1 font-bold truncate ${size === "lg" ? "text-xl" : "text-base"} ${toneClasses[tone]}`}
-      >
-        {value}
-      </div>
-      {sub && (
-        <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary truncate">
-          {sub}
-        </div>
-      )}
-    </div>
-  );
-};
-
-const Badge: React.FC<{
-  icon: React.ElementType;
-  label: string;
-  value: number;
-  unit?: string;
-  money?: string;
-  tone?: "neutral" | "red" | "amber";
-  onClick?: () => void;
-}> = ({
-  icon: Icon,
-  label,
-  value,
-  unit,
-  money,
-  tone = "neutral",
-  onClick,
-}) => {
-  const toneClasses: Record<string, string> = {
-    neutral:
-      "bg-gray-100 text-gray-600 dark:bg-dark-bg dark:text-dark-text-secondary",
-    red: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-    amber: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  };
-  const Tag = onClick ? "button" : "div";
-  return (
-    <Tag
-      onClick={onClick}
-      className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-left ${toneClasses[tone]} ${onClick ? "cursor-pointer hover:opacity-80" : ""}`}
-    >
-      <Icon className="h-4 w-4 flex-shrink-0" />
-      <span className="flex flex-col leading-tight">
-        <span className="text-[10px] font-medium">{label}</span>
-        <span className="text-xs font-bold">
-          {value}
-          {unit ? ` ${unit}` : ""}
-        </span>
-        {money && <span className="text-[10px] opacity-70">{money}</span>}
-      </span>
-    </Tag>
-  );
-};
-
 /** Titulo de coluna clicavel pra ordenar a tabela, com seta indicando a
  * coluna/direcao ativa. */
 const SortTh: React.FC<{
@@ -300,6 +206,67 @@ const SortTh: React.FC<{
     </span>
   </th>
 );
+
+/** Card da Visao geral: uma pergunta (titulo), a resposta em destaque e o
+ * detalhe em linhas "rotulo ..... valor". */
+const SummaryCard: React.FC<{
+  icon: React.ElementType;
+  title: string;
+  value: string;
+  valueTone?: "neutral" | "red" | "green" | "blue";
+  caption?: string;
+  rows: { label: string; value: string; tone?: "red" | "amber" }[];
+}> = ({ icon: Icon, title, value, valueTone = "neutral", caption, rows }) => {
+  const valueClasses: Record<string, string> = {
+    neutral: "text-gray-900 dark:text-dark-text",
+    red: "text-red-600 dark:text-red-400",
+    green: "text-green-600 dark:text-green-400",
+    blue: "text-blue-600 dark:text-blue-400",
+  };
+  const rowClasses: Record<string, string> = {
+    red: "text-red-600 dark:text-red-400",
+    amber: "text-amber-600 dark:text-amber-400",
+  };
+  return (
+    <div className="min-w-0 rounded-xl border border-gray-100 dark:border-dark-border/40 bg-gray-50/60 dark:bg-dark-bg/30 px-4 py-3">
+      <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary">
+        <Icon className="h-4 w-4 flex-shrink-0" />
+        <span className="truncate">{title}</span>
+      </div>
+      <div
+        className={`mt-1 text-2xl font-bold truncate ${valueClasses[valueTone]}`}
+      >
+        {value}
+      </div>
+      {caption && (
+        <div className="text-[11px] text-gray-400 dark:text-dark-text-secondary truncate">
+          {caption}
+        </div>
+      )}
+      {rows.length > 0 && (
+        <div className="mt-2 pt-2 border-t border-gray-100 dark:border-dark-border/40 space-y-1">
+          {rows.map((r) => (
+            <div
+              key={r.label}
+              className="flex items-baseline justify-between gap-2 text-xs"
+            >
+              <span className="text-gray-500 dark:text-dark-text-secondary truncate">
+                {r.label}
+              </span>
+              <span
+                className={`font-semibold whitespace-nowrap ${r.tone ? rowClasses[r.tone] : "text-gray-700 dark:text-dark-text"}`}
+              >
+                {r.value}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const fmtNum = (n: number): string => n.toLocaleString("pt-BR");
 
 const CollectorsSummary: React.FC = () => {
   const {
@@ -340,74 +307,6 @@ const CollectorsSummary: React.FC = () => {
   // apos `rows`), porque af os totais seriam identicos ao card/linha unica.
   const [overviewOpen, setOverviewOpen] = useState(true);
   const prevSingleRef = useRef(false);
-  // Carteira automatica por faixa de atraso (etapas 7/8 da iniciativa de
-  // metas/vinculo/carteira automatica): consulta sob demanda (nao carrega
-  // sozinho) porque clientes_fora_da_faixa() varre todo cliente atribuido
-  // a um cobrador com faixa cadastrada -- mesma cautela de outras cargas
-  // pesadas do gestor neste projeto (ver collectionsRequested).
-  const [faixaOpen, setFaixaOpen] = useState(false);
-  const [foraDaFaixa, setForaDaFaixa] = useState<ClienteForaDaFaixa[] | null>(
-    null,
-  );
-  const [loadingForaDaFaixa, setLoadingForaDaFaixa] = useState(false);
-  const [saidasNoPeriodo, setSaidasNoPeriodo] = useState<
-    | {
-        documento: string;
-        clienteNome: string | null;
-        cobradorAnteriorId: string | null;
-        assignedAt: string;
-      }[]
-    | null
-  >(null);
-
-  const consultarCarteiraAutomatica = async () => {
-    setLoadingForaDaFaixa(true);
-    try {
-      const [foraRes, saidasRes] = await Promise.all([
-        supabase.rpc("clientes_fora_da_faixa"),
-        supabase
-          .from("atribuicoes_historico")
-          .select("documento, cliente_nome, cobrador_anterior_id, assigned_at")
-          // fora_da_faixa = automacao antiga (nunca ligada);
-          // distribuicao_regra = Distribuicao da carteira. So quem SAIU de
-          // um cobrador (entrada de quem estava sem cobrador nao conta).
-          .in("motivo", ["fora_da_faixa", "distribuicao_regra"])
-          .not("cobrador_anterior_id", "is", null)
-          .gte("assigned_at", `${dateFrom}T00:00:00`)
-          .lte("assigned_at", `${dateTo}T23:59:59`)
-          .order("assigned_at", { ascending: false }),
-      ]);
-
-      if (foraRes.error) throw foraRes.error;
-      if (saidasRes.error) throw saidasRes.error;
-
-      setForaDaFaixa(
-        (foraRes.data ?? []).map((r) => ({
-          documento: r.documento,
-          cliente: r.cliente,
-          collectorId: r.collector_id,
-          collectorName: r.collector_name,
-          atrasoAtual: r.atraso_atual,
-          faixaMin: r.faixa_min,
-          faixaMax: r.faixa_max,
-          diasExcedidos: r.dias_excedidos,
-          bloqueadoPor: r.bloqueado_por,
-        })),
-      );
-      setSaidasNoPeriodo(
-        (saidasRes.data ?? []).map((r) => ({
-          documento: r.documento,
-          clienteNome: r.cliente_nome,
-          cobradorAnteriorId: r.cobrador_anterior_id,
-          assignedAt: r.assigned_at,
-        })),
-      );
-    } catch (err) {
-      console.error("Erro ao consultar carteira automática por faixa:", err);
-    } finally {
-      setLoadingForaDaFaixa(false);
-    }
-  };
   // Conjunto dos EXCLUIDOS (nao dos selecionados). Vazio = nada excluido =
   // todos aparecem; cheio (todo allCollectors) = todos excluidos = nenhum
   // aparece. Essa inversao deixa representar os 3 estados (todos/parcial/
@@ -420,7 +319,7 @@ const CollectorsSummary: React.FC = () => {
   const collectorMenuRef = useRef<HTMLDivElement>(null);
   // Ordenacao (clicavel no titulo da coluna, tabela e cards compartilham).
   // Padrao: pior situacao primeiro, igual ao comportamento anterior fixo.
-  const [sortKey, setSortKey] = useState<SortKey>("vencidaValor");
+  const [sortKey, setSortKey] = useState<SortKey>("valorCarteira");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const toggleSort = (key: SortKey) => {
@@ -553,39 +452,36 @@ const CollectorsSummary: React.FC = () => {
           });
         }
 
-        // cobrador -> (cliente|dia) -> teve contato efetivo nesse dia?
-        const porCobrador = new Map<
-          string,
-          { dias: Map<string, boolean>; clientes: Set<string> }
-        >();
+        // cobrador -> cliente -> conversou com ele em algum atendimento do
+        // periodo? Uma unidade so (cliente) para o gestor nao ter de
+        // comparar "atendimentos" com "clientes".
+        const porCobrador = new Map<string, Map<string, boolean>>();
         linhas.forEach((l) => {
           if (!l.collector_id) return;
           // Sem documento (titulo apagado): o proprio titulo vira a chave,
           // para nao sumir com o atendimento.
-          const cliente = docByParcela.get(l.collection_id) ?? `t:${l.collection_id}`;
-          const chave = `${cliente}|${l.date}`;
-          const efetivo = isEffectiveAttemptResult(
+          const cliente =
+            docByParcela.get(l.collection_id) ?? `t:${l.collection_id}`;
+          const conversou = isEffectiveAttemptResult(
             l.result as CollectionAttempt["result"],
           );
-          let acc = porCobrador.get(l.collector_id);
-          if (!acc) {
-            acc = { dias: new Map(), clientes: new Set() };
-            porCobrador.set(l.collector_id, acc);
+          let clientes = porCobrador.get(l.collector_id);
+          if (!clientes) {
+            clientes = new Map();
+            porCobrador.set(l.collector_id, clientes);
           }
-          acc.dias.set(chave, (acc.dias.get(chave) ?? false) || efetivo);
-          acc.clientes.add(cliente);
+          clientes.set(cliente, (clientes.get(cliente) ?? false) || conversou);
         });
 
         const resultado = new Map<string, AtendimentosCobrador>();
-        porCobrador.forEach((acc, collectorId) => {
-          let efetivos = 0;
-          acc.dias.forEach((e) => {
-            if (e) efetivos++;
+        porCobrador.forEach((clientes, collectorId) => {
+          let conversaram = 0;
+          clientes.forEach((c) => {
+            if (c) conversaram++;
           });
           resultado.set(collectorId, {
-            qtd: acc.dias.size,
-            efetivos,
-            clientes: acc.clientes.size,
+            clientes: clientes.size,
+            conversaram,
           });
         });
         if (!cancelled) setAtendimentos(resultado);
@@ -762,9 +658,8 @@ const CollectorsSummary: React.FC = () => {
           aReceberQtd,
           aReceberValor,
           recebidoPeriodo,
-          atendimentosQtd: atend?.qtd ?? 0,
-          atendimentosEfetivosQtd: atend?.efetivos ?? 0,
-          atendimentosClientes: atend?.clientes ?? 0,
+          clientesAtendidos: atend?.clientes ?? 0,
+          clientesConversaram: atend?.conversaram ?? 0,
           agendadasQtd,
           agendadasValor,
           realizadasQtd,
@@ -832,11 +727,8 @@ const CollectorsSummary: React.FC = () => {
           recebidoPeriodo: acc.recebidoPeriodo + r.recebidoPeriodo,
           // Clientes somados por cobrador: o mesmo cliente atendido por dois
           // cobradores conta para cada um (cada um fez o seu atendimento).
-          atendimentosQtd: acc.atendimentosQtd + r.atendimentosQtd,
-          atendimentosEfetivosQtd:
-            acc.atendimentosEfetivosQtd + r.atendimentosEfetivosQtd,
-          atendimentosClientes:
-            acc.atendimentosClientes + r.atendimentosClientes,
+          clientesAtendidos: acc.clientesAtendidos + r.clientesAtendidos,
+          clientesConversaram: acc.clientesConversaram + r.clientesConversaram,
           agendadasQtd: acc.agendadasQtd + r.agendadasQtd,
           agendadasValor: acc.agendadasValor + r.agendadasValor,
           realizadasQtd: acc.realizadasQtd + r.realizadasQtd,
@@ -858,9 +750,8 @@ const CollectorsSummary: React.FC = () => {
           aReceberQtd: 0,
           aReceberValor: 0,
           recebidoPeriodo: 0,
-          atendimentosQtd: 0,
-          atendimentosEfetivosQtd: 0,
-          atendimentosClientes: 0,
+          clientesAtendidos: 0,
+          clientesConversaram: 0,
           agendadasQtd: 0,
           agendadasValor: 0,
           realizadasQtd: 0,
@@ -930,12 +821,12 @@ const CollectorsSummary: React.FC = () => {
   // nao mostra 0, que pareceria "nao atendeu ninguem".
   const atendimentosValor = (n: number): string =>
     atendimentosErro ? "erro" : atendimentos === null ? "…" : String(n);
-  const atendimentosSub = (clientes: number, efetivos: number): string =>
-    atendimentos === null || atendimentosErro
-      ? atendimentosErro
-        ? "falha ao carregar"
-        : "carregando"
-      : `${clientes} ${clientes === 1 ? "cliente" : "clientes"} · ${efetivos} efetivos`;
+  const atendimentosSub = (conversaram: number): string =>
+    atendimentosErro
+      ? "falha ao carregar"
+      : atendimentos === null
+        ? "carregando"
+        : `${conversaram} ${conversaram === 1 ? "conversou" : "conversaram"}`;
 
   return (
     <div className="space-y-4">
@@ -954,16 +845,15 @@ const CollectorsSummary: React.FC = () => {
               </button>
               {infoOpen && (
                 <div className="absolute z-20 mt-2 w-72 rounded-xl border border-blue-100 dark:border-blue-800/40 bg-blue-50 dark:bg-blue-900/20 px-4 py-3 text-xs font-normal normal-case text-blue-700 dark:text-blue-300 shadow-lg">
-                  <strong>Carteira, Vencida, Em atraso</strong> e{" "}
-                  <strong>Sem agendamento</strong> são a situação de agora; os
-                  demais valem só pro período selecionado.{" "}
-                  <strong>Financeiro</strong> e <strong>Agenda</strong> são
-                  independentes — parcela e visita não precisam coincidir.{" "}
-                  <strong>Atendimentos</strong> são os contatos registrados
-                  (Atender, Fila, pagamento), contados por cliente por dia —
-                  nunca por título; <strong>efetivos</strong> são os em que
-                  houve conversa com o cliente. <strong>Realizadas</strong>{" "}
-                  conta só o que estava agendado.
+                  <strong>Carteira</strong>, <strong>Atrasados</strong> e{" "}
+                  <strong>Sem agendamento</strong> mostram a situação de
+                  hoje. O resto vale para o período escolhido.
+                  <br />
+                  <strong>Clientes atendidos</strong>: cada cliente conta uma
+                  vez, mesmo atendido várias vezes. Embaixo, com quantos o
+                  cobrador conseguiu conversar.
+                  <br />
+                  <strong>Feitos</strong>: só o que estava agendado.
                 </div>
               )}
             </div>
@@ -1136,153 +1026,6 @@ const CollectorsSummary: React.FC = () => {
         </div>
       )}
 
-      {/* Carteira automatica por faixa de atraso: so leitura -- quem saiu
-          das regras do proprio cobrador e quem ja foi movido no periodo
-          (atribuicoes_historico). Mover de fato e na tela Distribuicao da
-          carteira (simular -> aplicar). */}
-      {currentUser?.type === "manager" && (
-        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border-2 border-pink-100 dark:border-pink-900/40 p-4 space-y-3">
-          <button
-            onClick={() => setFaixaOpen((o) => !o)}
-            className="w-full flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-dark-text"
-          >
-            <AlertTriangle className="h-4 w-4 text-pink-600 dark:text-pink-400" />
-            Carteira automática por faixa de atraso
-            {faixaOpen ? (
-              <ChevronUp className="h-3.5 w-3.5 ml-auto text-gray-400" />
-            ) : (
-              <ChevronDown className="h-3.5 w-3.5 ml-auto text-gray-400" />
-            )}
-          </button>
-
-          {faixaOpen && (
-            <>
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
-                  Consulta sob demanda -- varre todo cliente atribuído a um
-                  cobrador com faixa cadastrada.
-                </p>
-                <button
-                  onClick={consultarCarteiraAutomatica}
-                  disabled={loadingForaDaFaixa}
-                  className="px-3 py-1.5 bg-pink-600 text-white rounded-lg text-xs font-bold hover:bg-pink-700 disabled:opacity-50"
-                >
-                  {loadingForaDaFaixa ? "Consultando..." : "Consultar"}
-                </button>
-              </div>
-
-              {foraDaFaixa && (
-                <div className="space-y-2">
-                  <p className="text-xs font-bold text-gray-600 dark:text-dark-text-secondary">
-                    Perto de sair da carteira agora ({foraDaFaixa.length})
-                  </p>
-                  {foraDaFaixa.length === 0 ? (
-                    <p className="text-xs text-gray-400 italic">
-                      Nenhum cliente ultrapassou a faixa do próprio cobrador.
-                    </p>
-                  ) : (
-                    <div className="overflow-x-auto border border-gray-100 dark:border-dark-border rounded-lg">
-                      <table className="w-full text-xs text-left">
-                        <thead className="bg-gray-50 dark:bg-dark-bg text-gray-500">
-                          <tr>
-                            <th className="px-3 py-2 font-bold">Cliente</th>
-                            <th className="px-3 py-2 font-bold">Cobrador</th>
-                            <th className="px-3 py-2 font-bold text-center">
-                              Atraso
-                            </th>
-                            <th className="px-3 py-2 font-bold text-center">
-                              Faixa
-                            </th>
-                            <th className="px-3 py-2 font-bold text-center">
-                              Excedeu por
-                            </th>
-                            <th className="px-3 py-2 font-bold">Situação</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
-                          {[...foraDaFaixa]
-                            .sort((a, b) => {
-                              if (!!a.bloqueadoPor !== !!b.bloqueadoPor) {
-                                return a.bloqueadoPor ? 1 : -1;
-                              }
-                              return (b.diasExcedidos ?? 0) - (a.diasExcedidos ?? 0);
-                            })
-                            .map((c) => (
-                              <tr key={c.documento}>
-                                <td className="px-3 py-2 font-medium text-gray-800 dark:text-dark-text">
-                                  {c.cliente ?? c.documento}
-                                </td>
-                                <td className="px-3 py-2 text-gray-500">
-                                  {c.collectorName ?? "—"}
-                                </td>
-                                <td className="px-3 py-2 text-center">
-                                  {c.atrasoAtual} dias
-                                </td>
-                                <td className="px-3 py-2 text-center text-gray-400">
-                                  {c.faixaMin != null
-                                    ? `${c.faixaMin}–${c.faixaMax}`
-                                    : "Loja fora das regras"}
-                                </td>
-                                <td className="px-3 py-2 text-center font-bold text-pink-600">
-                                  {c.diasExcedidos != null
-                                    ? `+${c.diasExcedidos} dias`
-                                    : "—"}
-                                </td>
-                                <td className="px-3 py-2">
-                                  {c.bloqueadoPor ? (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-100">
-                                      {c.bloqueadoPor === "acordo_ativo"
-                                        ? "Travado: acordo ativo"
-                                        : "Travado: visita agendada"}
-                                    </span>
-                                  ) : (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-pink-50 text-pink-600 border border-pink-100">
-                                      Fora da regra
-                                    </span>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {saidasNoPeriodo && (
-                <div className="space-y-2">
-                  <p className="text-xs font-bold text-gray-600 dark:text-dark-text-secondary">
-                    Saíram da carteira por faixa no período ({saidasNoPeriodo.length})
-                  </p>
-                  {saidasNoPeriodo.length === 0 ? (
-                    <p className="text-xs text-gray-400 italic">
-                      Nenhuma saída automática registrada no período.
-                    </p>
-                  ) : (
-                    <ul className="text-xs divide-y divide-gray-100 dark:divide-dark-border border border-gray-100 dark:border-dark-border rounded-lg">
-                      {saidasNoPeriodo.map((s) => (
-                        <li
-                          key={`${s.documento}-${s.assignedAt}`}
-                          className="px-3 py-2 flex items-center justify-between"
-                        >
-                          <span className="font-medium text-gray-800 dark:text-dark-text">
-                            {s.clienteNome ?? s.documento}
-                          </span>
-                          <span className="text-gray-400">
-                            {new Date(s.assignedAt).toLocaleDateString("pt-BR")}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
-
       {/* Visao geral: soma de todos os cobradores visiveis no momento. Fica
           visivel nos dois modos (Cards e Tabela), conforme pedido. O
           cabecalho (com o botao de colapsar) e sempre o mesmo, com 1
@@ -1308,138 +1051,104 @@ const CollectorsSummary: React.FC = () => {
         </button>
 
         {overviewOpen && (
-        <>
-        <div className="space-y-2">
-          <div
-            className={`inline-block rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-dark-text-secondary ${TONE_FINANCEIRO}`}
-          >
-            Financeiro (parcelas)
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <StatTile
+          // Um card por pergunta do gestor: numero principal em destaque e o
+          // detalhe em linhas curtas embaixo (antes eram 3 faixas com 12
+          // blocos soltos).
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+            <SummaryCard
               icon={Wallet}
-              label="Carteira"
+              title="Carteira"
               value={formatCurrency(totals.valorCarteira, false)}
-              sub={`${totals.clientesCarteira} clientes`}
-              size="lg"
+              caption={`${fmtNum(totals.clientesCarteira)} clientes`}
+              rows={[
+                {
+                  label: "Vencido",
+                  value: formatCurrency(totals.vencidaValor, false),
+                  tone: "red",
+                },
+                {
+                  label: "A vencer",
+                  value: formatCurrency(
+                    totals.previstaValor + totals.aReceberValor,
+                    false,
+                  ),
+                },
+              ]}
             />
-            <StatTile
-              icon={AlertTriangle}
-              label="Vencida"
-              value={formatCurrency(totals.vencidaValor, false)}
-              sub={`${totals.vencidaQtd} parcelas`}
-              tone="red"
-              size="lg"
-            />
-            <StatTile
-              icon={CalendarCheck2}
-              label="Vence no período"
-              value={formatCurrency(totals.previstaValor, false)}
-              sub={`${totals.previstaQtd} parcelas`}
-              periodHint={previstaPeriodHint}
-              tone="amber"
-              size="lg"
-            />
-            <StatTile
+            <SummaryCard
               icon={Wallet}
-              label="Recebido"
+              title="Recebido no período"
               value={formatCurrency(totals.recebidoPeriodo, false)}
-              tone="green"
-              size="lg"
+              valueTone="green"
+              caption={previstaPeriodHint}
+              rows={[
+                {
+                  label: "Ainda vence no período",
+                  value: formatCurrency(totals.previstaValor, false),
+                },
+              ]}
             />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <div
-            className={`inline-block rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-dark-text-secondary ${TONE_ATENDIMENTO}`}
-          >
-            Atendimentos (registrados)
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <StatTile
+            <SummaryCard
               icon={PhoneCall}
-              label="Atendimentos"
-              value={atendimentosValor(totals.atendimentosQtd)}
-              sub={atendimentosSub(
-                totals.atendimentosClientes,
-                totals.atendimentosEfetivosQtd,
-              )}
-              periodHint={previstaPeriodHint}
-              tone="blue"
-              size="lg"
+              title="Clientes atendidos"
+              value={atendimentosValor(totals.clientesAtendidos)}
+              valueTone="blue"
+              caption="no período (cada cliente conta 1 vez)"
+              rows={[
+                {
+                  label: "Conseguiu conversar",
+                  value: atendimentosValor(totals.clientesConversaram),
+                },
+              ]}
             />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <div
-            className={`inline-block rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-dark-text-secondary ${TONE_AGENDA}`}
-          >
-            Agenda (visitas/contatos)
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Badge
+            <SummaryCard
               icon={CalendarClock}
-              label="Em atraso"
-              value={totals.emAtrasoVisitas}
-              unit="agendamentos"
-              tone={totals.emAtrasoVisitas > 0 ? "red" : "neutral"}
-            />
-            <Badge
-              icon={UserX}
-              label="Sem agendamento"
-              value={totals.semAgendamentoClientes}
-              unit="clientes"
-            />
-            <Badge
-              icon={CalendarCheck2}
-              label="Agendamentos"
-              value={totals.agendadasQtd}
-              unit="agendamentos"
-              money={formatCurrency(totals.agendadasValor, false)}
-            />
-            <Badge
-              icon={Users}
-              label="Realizadas"
-              value={totals.realizadasQtd}
-              unit="agendamentos"
-            />
-            <Badge
-              icon={RotateCcw}
-              label="Reagendamentos"
-              value={totals.reagendadasQtd}
-              unit="agendamentos"
-              money={formatCurrency(totals.reagendadasValor, false)}
-            />
-            <Badge
-              icon={SearchX}
-              label="Não encontrado"
-              value={totals.naoEncontradoQtd}
-              unit="agendamentos"
-              money={formatCurrency(totals.naoEncontradoValor, false)}
-            />
-            <Badge
-              icon={Repeat}
-              label="Reincidências"
-              value={totals.reincidentesQtd}
-              unit="clientes"
-              tone={totals.reincidentesQtd > 0 ? "amber" : "neutral"}
+              title="Agenda"
+              value={fmtNum(totals.emAtrasoVisitas)}
+              valueTone={totals.emAtrasoVisitas > 0 ? "red" : "neutral"}
+              caption="agendamentos atrasados"
+              rows={[
+                {
+                  label: "Agendados",
+                  value: fmtNum(totals.agendadasQtd),
+                },
+                {
+                  label: "Feitos",
+                  value: fmtNum(totals.realizadasQtd),
+                },
+                {
+                  label: "Remarcados",
+                  value: fmtNum(totals.reagendadasQtd),
+                },
+                {
+                  label: "Não encontrado",
+                  value: fmtNum(totals.naoEncontradoQtd),
+                },
+                {
+                  label: "Clientes sem agendamento",
+                  value: fmtNum(totals.semAgendamentoClientes),
+                },
+                {
+                  label: "Remarcados 3x ou mais",
+                  value: fmtNum(totals.reincidentesQtd),
+                  tone: totals.reincidentesQtd > 0 ? "amber" : undefined,
+                },
+              ]}
             />
           </div>
-        </div>
-        </>
         )}
       </div>
 
       {viewMode === "cards" ? (
         // Com 1 cobrador so, o card usa a largura toda em vez de ficar
         // espremido num terco da tela — nao ha mais ninguem pra formar grid.
+        // Mesmos 4 blocos da Visao geral (Carteira, Recebido, Clientes
+        // atendidos, Agenda), so que por cobrador.
         <div
           className={
             rows.length === 1
               ? "grid grid-cols-1 gap-4"
-              : "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
+              : "grid grid-cols-1 lg:grid-cols-2 gap-4"
           }
         >
           {rows.map((row, index) => (
@@ -1447,169 +1156,134 @@ const CollectorsSummary: React.FC = () => {
               key={row.id}
               className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-4 space-y-3"
             >
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-start gap-2 min-w-0">
                   <span className="flex-shrink-0 mt-0.5 flex items-center justify-center h-5 w-5 rounded-full bg-gray-100 dark:bg-dark-bg text-[10px] font-bold text-gray-500 dark:text-dark-text-secondary">
                     {index + 1}
                   </span>
-                  <div>
-                    <div className="font-bold text-gray-900 dark:text-dark-text">
+                  <div className="min-w-0">
+                    <div className="font-bold text-gray-900 dark:text-dark-text truncate">
                       {row.name}
                     </div>
                     <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
                       {USER_TYPE_LABELS[row.type]}
                     </div>
-                    {isWalletCollectorType(row.type) && (
-                      <button
-                        type="button"
-                        onClick={() => setScheduleContactCollectorId(row.id)}
-                        className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-700"
-                      >
-                        <CalendarClock className="h-3 w-3" />
-                        Agendar em massa
-                      </button>
-                    )}
                   </div>
                 </div>
-                {row.vencidaValor > 0 && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-600 dark:text-red-400">
-                    <AlertTriangle className="h-3.5 w-3.5" />
-                    vencida
-                  </span>
+                {isWalletCollectorType(row.type) && (
+                  <button
+                    type="button"
+                    onClick={() => setScheduleContactCollectorId(row.id)}
+                    className="flex-shrink-0 inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-700"
+                  >
+                    <CalendarClock className="h-3.5 w-3.5" />
+                    Agendar em massa
+                  </button>
                 )}
               </div>
 
-              <div className="space-y-2">
-                <div className="grid grid-cols-2 gap-2">
-                  <StatTile
-                    icon={Wallet}
-                    label="Carteira"
-                    value={formatCurrency(row.valorCarteira, false)}
-                    sub={`${row.clientesCarteira} clientes`}
-                    size="lg"
-                  />
-                  <StatTile
-                    icon={AlertTriangle}
-                    label="Vencida"
-                    value={formatCurrency(row.vencidaValor, false)}
-                    sub={`${row.vencidaQtd} parcelas`}
-                    tone="red"
-                    size="lg"
-                  />
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Badge
-                    icon={CalendarClock}
-                    label="Em atraso"
-                    value={row.emAtrasoVisitas}
-                    unit="agendamentos"
-                    tone={row.emAtrasoVisitas > 0 ? "red" : "neutral"}
-                  />
-                  <Badge
-                    icon={UserX}
-                    label="Sem agendamento"
-                    value={row.semAgendamentoClientes}
-                    unit="clientes"
-                    tone="neutral"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-3 border-t border-gray-100 dark:border-dark-border/40 space-y-3">
-                <div className="grid grid-cols-3 gap-2">
-                  <StatTile
-                    icon={CalendarCheck2}
-                    label="Vence no período"
-                    value={formatCurrency(row.previstaValor, false)}
-                    sub={`${row.previstaQtd} parc.`}
-                    periodHint={previstaPeriodHint}
-                    tone="amber"
-                  />
-                  <StatTile
-                    icon={Wallet}
-                    label="A receber"
-                    value={formatCurrency(row.aReceberValor, false)}
-                    sub={`${row.aReceberQtd} parc.`}
-                    tone="blue"
-                  />
-                  <StatTile
-                    icon={Wallet}
-                    label="Recebido"
-                    value={formatCurrency(row.recebidoPeriodo, false)}
-                    tone="green"
-                  />
-                </div>
-                <StatTile
-                  icon={PhoneCall}
-                  label="Atendimentos"
-                  value={atendimentosValor(row.atendimentosQtd)}
-                  sub={atendimentosSub(
-                    row.atendimentosClientes,
-                    row.atendimentosEfetivosQtd,
-                  )}
-                  tone="blue"
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <SummaryCard
+                  icon={Wallet}
+                  title="Carteira"
+                  value={formatCurrency(row.valorCarteira, false)}
+                  caption={`${fmtNum(row.clientesCarteira)} clientes`}
+                  rows={[
+                    {
+                      label: "Vencido",
+                      value: formatCurrency(row.vencidaValor, false),
+                      tone: "red",
+                    },
+                    {
+                      label: "A vencer",
+                      value: formatCurrency(
+                        row.previstaValor + row.aReceberValor,
+                        false,
+                      ),
+                    },
+                  ]}
                 />
-                <div className="flex flex-wrap gap-2">
-                  <Badge
-                    icon={CalendarCheck2}
-                    label="Agendamentos"
-                    value={row.agendadasQtd}
-                    unit="agendamentos"
-                    money={formatCurrency(row.agendadasValor, false)}
-                  />
-                  <Badge
-                    icon={Users}
-                    label="Realizadas"
-                    value={row.realizadasQtd}
-                    unit="agendamentos"
-                  />
-                  <Badge
-                    icon={RotateCcw}
-                    label="Reagendamentos"
-                    value={row.reagendadasQtd}
-                    unit="agendamentos"
-                    money={formatCurrency(row.reagendadasValor, false)}
-                  />
-                  <Badge
-                    icon={SearchX}
-                    label="Não encontrado"
-                    value={row.naoEncontradoQtd}
-                    unit="agendamentos"
-                    money={formatCurrency(row.naoEncontradoValor, false)}
-                  />
-                  <Badge
-                    icon={Repeat}
-                    label="Reincidências"
-                    value={row.reincidentes.length}
-                    unit="clientes"
-                    tone={row.reincidentes.length > 0 ? "amber" : "neutral"}
-                    onClick={
-                      row.reincidentes.length > 0
-                        ? () =>
-                            setExpandedReincidente((cur) =>
-                              cur === row.id ? null : row.id,
-                            )
-                        : undefined
-                    }
-                  />
-                  {row.reincidentes.length > 0 &&
-                    (expandedReincidente === row.id ? (
-                      <ChevronUp className="h-3.5 w-3.5 text-gray-400 self-center" />
-                    ) : (
-                      <ChevronDown className="h-3.5 w-3.5 text-gray-400 self-center" />
-                    ))}
-                </div>
-                {expandedReincidente === row.id && (
-                  <ul className="rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800/30 px-3 py-2 text-xs text-amber-800 dark:text-amber-300 space-y-0.5">
-                    {row.reincidentes.map((r) => (
-                      <li key={r.document} className="flex justify-between">
-                        <span>{r.name}</span>
-                        <span className="font-semibold">{r.count}x</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                <SummaryCard
+                  icon={Wallet}
+                  title="Recebido no período"
+                  value={formatCurrency(row.recebidoPeriodo, false)}
+                  valueTone="green"
+                  rows={[
+                    {
+                      label: "Ainda vence no período",
+                      value: formatCurrency(row.previstaValor, false),
+                    },
+                  ]}
+                />
+                <SummaryCard
+                  icon={PhoneCall}
+                  title="Clientes atendidos"
+                  value={atendimentosValor(row.clientesAtendidos)}
+                  valueTone="blue"
+                  rows={[
+                    {
+                      label: "Conseguiu conversar",
+                      value: atendimentosValor(row.clientesConversaram),
+                    },
+                  ]}
+                />
+                <SummaryCard
+                  icon={CalendarClock}
+                  title="Agenda"
+                  value={fmtNum(row.emAtrasoVisitas)}
+                  valueTone={row.emAtrasoVisitas > 0 ? "red" : "neutral"}
+                  caption="agendamentos atrasados"
+                  rows={[
+                    { label: "Agendados", value: fmtNum(row.agendadasQtd) },
+                    { label: "Feitos", value: fmtNum(row.realizadasQtd) },
+                    { label: "Remarcados", value: fmtNum(row.reagendadasQtd) },
+                    {
+                      label: "Não encontrado",
+                      value: fmtNum(row.naoEncontradoQtd),
+                    },
+                    {
+                      label: "Clientes sem agendamento",
+                      value: fmtNum(row.semAgendamentoClientes),
+                    },
+                  ]}
+                />
               </div>
+
+              {row.reincidentes.length > 0 && (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExpandedReincidente((cur) =>
+                        cur === row.id ? null : row.id,
+                      )
+                    }
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 dark:text-amber-400 hover:opacity-80"
+                  >
+                    <Repeat className="h-3.5 w-3.5" />
+                    {row.reincidentes.length}{" "}
+                    {row.reincidentes.length === 1
+                      ? "cliente remarcado"
+                      : "clientes remarcados"}{" "}
+                    3x ou mais
+                    {expandedReincidente === row.id ? (
+                      <ChevronUp className="h-3.5 w-3.5" />
+                    ) : (
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                  {expandedReincidente === row.id && (
+                    <ul className="mt-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800/30 px-3 py-2 text-xs text-amber-800 dark:text-amber-300 space-y-0.5">
+                      {row.reincidentes.map((r) => (
+                        <li key={r.document} className="flex justify-between">
+                          <span>{r.name}</span>
+                          <span className="font-semibold">{r.count}x</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
           ))}
 
@@ -1620,6 +1294,8 @@ const CollectorsSummary: React.FC = () => {
           )}
         </div>
       ) : (
+        // Tabela: as mesmas perguntas da Visao geral, uma coluna cada; o
+        // detalhe vai na linha de baixo da celula. Antes eram 15 colunas.
         <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -1627,21 +1303,21 @@ const CollectorsSummary: React.FC = () => {
                 <th className="px-3 py-1.5 bg-gray-50 dark:bg-dark-bg/50" />
                 <th className="px-3 py-1.5 bg-gray-50 dark:bg-dark-bg/50" />
                 <th
-                  colSpan={5}
+                  colSpan={2}
                   className={`px-3 py-1.5 text-center border-l border-gray-200 dark:border-dark-border ${TONE_FINANCEIRO}`}
                 >
-                  Financeiro (parcelas)
+                  Dinheiro
                 </th>
                 <th
                   className={`px-3 py-1.5 text-center border-l border-gray-200 dark:border-dark-border ${TONE_ATENDIMENTO}`}
                 >
-                  Registrados
+                  Atendimento
                 </th>
                 <th
-                  colSpan={7}
+                  colSpan={5}
                   className={`px-3 py-1.5 text-center border-l border-gray-200 dark:border-dark-border ${TONE_AGENDA}`}
                 >
-                  Agenda (visitas/contatos)
+                  Agenda
                 </th>
               </tr>
               <tr className="border-b border-gray-100 dark:border-dark-border/40 text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider">
@@ -1665,30 +1341,6 @@ const CollectorsSummary: React.FC = () => {
                   Carteira
                 </SortTh>
                 <SortTh
-                  active={sortKey === "vencidaValor"}
-                  dir={sortDir}
-                  onClick={() => toggleSort("vencidaValor")}
-                  className={`px-3 py-2.5 text-right whitespace-nowrap ${TONE_FINANCEIRO}`}
-                >
-                  Vencida
-                </SortTh>
-                <SortTh
-                  active={sortKey === "previstaValor"}
-                  dir={sortDir}
-                  onClick={() => toggleSort("previstaValor")}
-                  className={`px-3 py-2.5 text-right whitespace-nowrap ${TONE_FINANCEIRO}`}
-                >
-                  Vence no período
-                </SortTh>
-                <SortTh
-                  active={sortKey === "aReceberValor"}
-                  dir={sortDir}
-                  onClick={() => toggleSort("aReceberValor")}
-                  className={`px-3 py-2.5 text-right whitespace-nowrap ${TONE_FINANCEIRO}`}
-                >
-                  A receber
-                </SortTh>
-                <SortTh
                   active={sortKey === "recebidoPeriodo"}
                   dir={sortDir}
                   onClick={() => toggleSort("recebidoPeriodo")}
@@ -1697,12 +1349,12 @@ const CollectorsSummary: React.FC = () => {
                   Recebido
                 </SortTh>
                 <SortTh
-                  active={sortKey === "atendimentosQtd"}
+                  active={sortKey === "clientesAtendidos"}
                   dir={sortDir}
-                  onClick={() => toggleSort("atendimentosQtd")}
+                  onClick={() => toggleSort("clientesAtendidos")}
                   className={`px-3 py-2.5 text-right whitespace-nowrap border-l border-gray-200 dark:border-dark-border ${TONE_ATENDIMENTO}`}
                 >
-                  Atendim.
+                  Clientes atendidos
                 </SortTh>
                 <SortTh
                   active={sortKey === "emAtrasoVisitas"}
@@ -1710,15 +1362,7 @@ const CollectorsSummary: React.FC = () => {
                   onClick={() => toggleSort("emAtrasoVisitas")}
                   className={`px-3 py-2.5 text-right whitespace-nowrap border-l border-gray-200 dark:border-dark-border ${TONE_AGENDA}`}
                 >
-                  Em atraso
-                </SortTh>
-                <SortTh
-                  active={sortKey === "semAgendamentoClientes"}
-                  dir={sortDir}
-                  onClick={() => toggleSort("semAgendamentoClientes")}
-                  className={`px-3 py-2.5 text-right whitespace-nowrap ${TONE_AGENDA}`}
-                >
-                  Sem agend.
+                  Atrasados
                 </SortTh>
                 <SortTh
                   active={sortKey === "agendadasQtd"}
@@ -1726,7 +1370,7 @@ const CollectorsSummary: React.FC = () => {
                   onClick={() => toggleSort("agendadasQtd")}
                   className={`px-3 py-2.5 text-right whitespace-nowrap ${TONE_AGENDA}`}
                 >
-                  Agend.
+                  Agendados
                 </SortTh>
                 <SortTh
                   active={sortKey === "realizadasQtd"}
@@ -1734,7 +1378,7 @@ const CollectorsSummary: React.FC = () => {
                   onClick={() => toggleSort("realizadasQtd")}
                   className={`px-3 py-2.5 text-right whitespace-nowrap ${TONE_AGENDA}`}
                 >
-                  Realiz.
+                  Feitos
                 </SortTh>
                 <SortTh
                   active={sortKey === "reagendadasQtd"}
@@ -1742,23 +1386,15 @@ const CollectorsSummary: React.FC = () => {
                   onClick={() => toggleSort("reagendadasQtd")}
                   className={`px-3 py-2.5 text-right whitespace-nowrap ${TONE_AGENDA}`}
                 >
-                  Reagend.
+                  Remarcados
                 </SortTh>
                 <SortTh
-                  active={sortKey === "naoEncontradoQtd"}
+                  active={sortKey === "semAgendamentoClientes"}
                   dir={sortDir}
-                  onClick={() => toggleSort("naoEncontradoQtd")}
+                  onClick={() => toggleSort("semAgendamentoClientes")}
                   className={`px-3 py-2.5 text-right whitespace-nowrap ${TONE_AGENDA}`}
                 >
-                  Não enc.
-                </SortTh>
-                <SortTh
-                  active={sortKey === "reincidentesQtd"}
-                  dir={sortDir}
-                  onClick={() => toggleSort("reincidentesQtd")}
-                  className={`px-3 py-2.5 text-right whitespace-nowrap ${TONE_AGENDA}`}
-                >
-                  Reincid.
+                  Sem agendamento
                 </SortTh>
               </tr>
             </thead>
@@ -1793,104 +1429,80 @@ const CollectorsSummary: React.FC = () => {
                     <div className="font-semibold">
                       {formatCurrency(row.valorCarteira, false)}
                     </div>
+                    <div className="text-[10px] text-red-500 dark:text-red-400">
+                      {formatCurrency(row.vencidaValor, false)} vencido
+                    </div>
                     <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
-                      {row.clientesCarteira} clientes
+                      {formatCurrency(
+                        row.previstaValor + row.aReceberValor,
+                        false,
+                      )}{" "}
+                      a vencer
                     </div>
                   </td>
                   <td className="px-3 py-3 text-right whitespace-nowrap">
-                    <div className="font-semibold text-red-600 dark:text-red-400">
-                      {formatCurrency(row.vencidaValor, false)}
+                    <div className="font-semibold text-green-600 dark:text-green-400">
+                      {formatCurrency(row.recebidoPeriodo, false)}
                     </div>
                     <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
-                      {row.vencidaQtd} parcelas
+                      {formatCurrency(row.previstaValor, false)} ainda vence
                     </div>
                   </td>
-                  <td className="px-3 py-3 text-right whitespace-nowrap">
-                    <div className="font-semibold text-amber-600 dark:text-amber-400">
-                      {formatCurrency(row.previstaValor, false)}
-                    </div>
-                    <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
-                      {row.previstaQtd} parcelas
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 text-right whitespace-nowrap">
+                  <td className="px-3 py-3 text-right whitespace-nowrap border-l border-gray-100 dark:border-dark-border/40">
                     <div className="font-semibold text-blue-600 dark:text-blue-400">
-                      {formatCurrency(row.aReceberValor, false)}
+                      {atendimentosValor(row.clientesAtendidos)}
                     </div>
-                    <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
-                      {row.aReceberQtd} parcelas
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 text-right whitespace-nowrap font-semibold text-green-600 dark:text-green-400">
-                    {formatCurrency(row.recebidoPeriodo, false)}
-                  </td>
-                  <td className="px-3 py-3 text-right whitespace-nowrap border-l border-gray-100 dark:border-dark-border/40">
-                    <div className="font-semibold text-indigo-600 dark:text-indigo-400">
-                      {atendimentosValor(row.atendimentosQtd)}
-                    </div>
-                    <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
-                      {atendimentosSub(
-                        row.atendimentosClientes,
-                        row.atendimentosEfetivosQtd,
-                      )}
-                    </div>
+                    {(row.clientesAtendidos > 0 ||
+                      atendimentos === null ||
+                      atendimentosErro) && (
+                      <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
+                        {atendimentosSub(row.clientesConversaram)}
+                      </div>
+                    )}
                   </td>
                   <td className="px-3 py-3 text-right whitespace-nowrap border-l border-gray-100 dark:border-dark-border/40">
-                    <div className="font-semibold">{row.emAtrasoVisitas}</div>
-                    <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
-                      {isWalletCollectorType(row.type)
-                        ? "contatos"
-                        : "visitas"}
-                    </div>
+                    <span
+                      className={`font-semibold ${row.emAtrasoVisitas > 0 ? "text-red-600 dark:text-red-400" : ""}`}
+                    >
+                      {fmtNum(row.emAtrasoVisitas)}
+                    </span>
+                  </td>
+                  <td className="px-3 py-3 text-right whitespace-nowrap font-semibold">
+                    {fmtNum(row.agendadasQtd)}
                   </td>
                   <td className="px-3 py-3 text-right whitespace-nowrap">
                     <div className="font-semibold">
-                      {row.semAgendamentoClientes}
+                      {fmtNum(row.realizadasQtd)}
                     </div>
-                    <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
-                      clientes
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 text-right whitespace-nowrap">
-                    <div className="font-semibold">{row.agendadasQtd}</div>
-                    <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
-                      {formatCurrency(row.agendadasValor, false)}
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 text-right whitespace-nowrap">
-                    <div className="font-semibold">{row.realizadasQtd}</div>
-                    <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
-                      {isWalletCollectorType(row.type)
-                        ? "contatos"
-                        : "visitas"}
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 text-right whitespace-nowrap">
-                    <div className="font-semibold">{row.reagendadasQtd}</div>
-                    <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
-                      {formatCurrency(row.reagendadasValor, false)}
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 text-right whitespace-nowrap">
-                    <div className="font-semibold">{row.naoEncontradoQtd}</div>
-                    <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
-                      {formatCurrency(row.naoEncontradoValor, false)}
-                    </div>
+                    {row.naoEncontradoQtd > 0 && (
+                      <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
+                        {fmtNum(row.naoEncontradoQtd)} não encontrado
+                      </div>
+                    )}
                   </td>
                   <td className="px-3 py-3 text-right whitespace-nowrap">
                     <div className="font-semibold">
-                      {row.reincidentes.length}
+                      {fmtNum(row.reagendadasQtd)}
                     </div>
-                    <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
-                      clientes
-                    </div>
+                    {row.reincidentes.length > 0 && (
+                      <div className="text-[10px] text-amber-600 dark:text-amber-400">
+                        {row.reincidentes.length}{" "}
+                        {row.reincidentes.length === 1
+                          ? "cliente"
+                          : "clientes"}{" "}
+                        3x ou mais
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-3 py-3 text-right whitespace-nowrap font-semibold">
+                    {fmtNum(row.semAgendamentoClientes)}
                   </td>
                 </tr>
               ))}
               {rows.length === 0 && (
                 <tr>
                   <td
-                    colSpan={15}
+                    colSpan={10}
                     className="px-3 py-10 text-center text-sm text-gray-400 dark:text-dark-text-secondary"
                   >
                     Nenhum cobrador encontrado para esse filtro.

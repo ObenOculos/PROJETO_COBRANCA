@@ -286,6 +286,25 @@ ainda não tem próximo contato marcado). Só tela, sem migration.
 Conferido na tela (dev, Mês atual): José 27 / Monalisa 53 / Jonathan 75 /
 Terceirizado teste 2 = 157, igual à consulta direta no banco.
 
+**Mesmo dia, segunda rodada (usuário: "precisa ser mais simples para o
+gestor entender"):**
+- Unidade final: **clientes atendidos** no período (cada cliente conta 1
+  vez, nem por título nem por dia) + "conversaram" (cliente com algum
+  contato efetivo). "Cliente × dia" saiu: "19 clientes · 22 efetivos"
+  confundia (efetivos eram por atendimento).
+- Visão geral, cards por cobrador e tabela reorganizados nas mesmas 4
+  perguntas: **Carteira** (vencido + a vencer, somam o total),
+  **Recebido no período** (+ ainda vence no período), **Clientes
+  atendidos** (+ conversaram), **Agenda** (atrasados em destaque; agendados,
+  feitos, remarcados, não encontrado, sem agendamento, remarcados 3x+ em
+  linhas). Tabela de 15 → 10 colunas. Saíram "A receber" (solto), R$ dos
+  agendamentos e o bloco "Carteira automática por faixa de atraso"
+  (pedido do usuário: inútil nesta tela). Ordenação padrão: maior carteira.
+- "Tudo" vai até 9999-12-31 (era 2099): o Ciclone tem vencimento digitado
+  com ano 2245, que ficava em "a vencer" mas fora de "vence no período".
+  Conferido direto no ERP: a data está errada lá (correção é no Ciclone,
+  o sync traz).
+
 
 ### Item 48 — Gestor: números errados após login e travamento entre abas — 2026-11-11
 
