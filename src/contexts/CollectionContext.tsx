@@ -599,11 +599,13 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     [isOnline],
   );
 
-  const getVisitsByCollector = (collectorId: string) => {
-    return scheduledVisits.filter(
-      (visit: ScheduledVisit) => visit.collectorId === collectorId,
-    );
-  };
+  const getVisitsByCollector = React.useCallback(
+    (collectorId: string) =>
+      scheduledVisits.filter(
+        (visit: ScheduledVisit) => visit.collectorId === collectorId,
+      ),
+    [scheduledVisits],
+  );
 
   // Exclui visitas pelos ids (limpar pendentes de um cobrador desativado).
   // O chamador define o escopo (atrasadas/agendadas/pendentes); aqui so apaga.
@@ -1770,28 +1772,36 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
   /** Acordo ATIVO do cliente, se houver — no máximo 1 por vez (ver índice
    * único `uniq_acordo_ativo_por_cliente`). */
-  const getAcordoAtivoDoCliente = (
-    clientDocument: string,
-  ): Acordo | undefined =>
-    acordos.find(
-      (a) => a.clientDocument === clientDocument && a.status === "ativo",
-    );
+  // useCallback nestes getters (e em getFilteredCollections /
+  // getCollectorCollections): o `value` do contexto nao e memoizado, entao
+  // funcao declarada solta ganha identidade nova a CADA render do provider.
+  // Quem usa em deps de useMemo/useEffect (a carteira do cobrador, a fila)
+  // recalculava tudo -- e relia os contatos no servidor -- a cada mudanca
+  // de qualquer estado do contexto (loading, pagamentos, agendamentos...).
+  const getAcordoAtivoDoCliente = React.useCallback(
+    (clientDocument: string): Acordo | undefined =>
+      acordos.find(
+        (a) => a.clientDocument === clientDocument && a.status === "ativo",
+      ),
+    [acordos],
+  );
 
   /** Acordo QUEBRADO mais recente do cliente, se houver — pode haver mais
    * de um historicamente (renegociar apos quebra cria um acordo novo), por
    * isso pega o mais recente por resolvedAt (quando a quebra foi marcada)
    * ou createdAt como fallback. Leitura paralela a getAcordoAtivoDoCliente,
    * nao reaproveita — statuses diferentes, nao e so trocar um filtro. */
-  const getAcordoQuebradoDoCliente = (
-    clientDocument: string,
-  ): Acordo | undefined =>
-    acordos
-      .filter((a) => a.clientDocument === clientDocument && a.status === "quebrado")
-      .sort(
-        (a, b) =>
-          new Date(b.resolvedAt ?? b.createdAt).getTime() -
-          new Date(a.resolvedAt ?? a.createdAt).getTime(),
-      )[0];
+  const getAcordoQuebradoDoCliente = React.useCallback(
+    (clientDocument: string): Acordo | undefined =>
+      acordos
+        .filter((a) => a.clientDocument === clientDocument && a.status === "quebrado")
+        .sort(
+          (a, b) =>
+            new Date(b.resolvedAt ?? b.createdAt).getTime() -
+            new Date(a.resolvedAt ?? a.createdAt).getTime(),
+        )[0],
+    [acordos],
+  );
 
   const criarAcordo = async (params: {
     clientDocument: string;
@@ -2434,7 +2444,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     }
   };
 
-  const getFilteredCollections = (
+  const getFilteredCollections = React.useCallback((
     filters: FilterOptions,
     userType: UserType,
     collectorId?: string,
@@ -2753,8 +2763,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
     // Apply visitsOnly filter - show only clients with scheduled visits
     if (filters.visitsOnly && userType !== "manager" && collectorId) {
-      const collectorVisits = getVisitsByCollector(collectorId).filter(
-        (visit) => visit.status === "agendada",
+      const collectorVisits = scheduledVisits.filter(
+        (visit) =>
+          visit.collectorId === collectorId && visit.status === "agendada",
       );
 
       const clientsWithVisits = new Set(
@@ -2767,7 +2778,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     }
 
     return filtered;
-  };
+  }, [collections, rawCollections, scheduledVisits]);
 
   // Derivacoes (grupos por cliente, estatisticas, desempenho): o resultado
   // vale so para os dados de AGORA -- o Map vive dentro do useMemo e e
@@ -3137,7 +3148,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     };
   }, [collections, users]);
 
-  const getCollectorCollections = (collectorId: string): Collection[] => {
+  const getCollectorCollections = React.useCallback((collectorId: string): Collection[] => {
     const profileUser = users.find((u) => u.id === collectorId);
     const profileType = profileUser?.type;
     const assignedStores: string[] = [];
@@ -3155,7 +3166,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       return isAssigned && !movedToLaterPhase;
     });
-  };
+  }, [users, collections]);
 
   const getAvailableStores = (): string[] => {
     const stores = new Set<string>();
