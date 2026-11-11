@@ -52,7 +52,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 45 | Acordo cancelado: quem cancela escolhe estornar (refazer) ou manter (desistiu) o valor pago + histórico de acordos/agendamentos cancelados — `0005`/`0006` aplicadas (entrada da OTICA FERNANDA estornada); falta teste na tela | Alta | Médio |
 | 46 | Atender: "Cliente diz que já pagou" (comprovante → registro do pagamento) e "Cliente informa venda cancelada" (parcelas da venda vão para conferência do gestor) — migration `20261110000008` aplicada (`check:db` OK); falta teste na tela | Alta | Médio |
 | 47 | Lentidão/travamento do cobrador — 5 correções de front (`a7d7874`, `33e2278`, `cb749d1`, `3161703`, `af7f311`) + índice `20261111000001` (aplicado), 2026-11-11; sem push, sem teste no navegador | Alta | Pequeno |
-| 48 | Gestor: números errados depois de sair e entrar na mesma aba (só quitados) + travamento ao trocar de aba (Desempenho ~32 s, Lojas, Cobranças) — `831d182`, `96fb4f8`, `c563f22`, `63aaef6`, 2026-11-11; medido no build de produção, sem push | Alta | Pequeno |
+| 48 | Gestor: números errados depois de sair e entrar na mesma aba (só quitados) + travamento ao trocar de aba (Desempenho ~32 s, Lojas, Cobranças) — `831d182`, `96fb4f8`, `c563f22`, `63aaef6`, `87439e5`, 2026-11-11; testado no build de produção, sem push | Alta | Pequeno |
 
 ## Perguntas em aberto para o financeiro
 
@@ -279,12 +279,17 @@ ramo "usuário não logado" do `CollectionContext` só zerava a trava dos
 quitados; `collectionsRequestedRef`/escopo `all` sobreviviam, então
 `requestCollections`/`ensureAllCollections` achavam a carteira carregada.
 Agora o logout zera todas as travas de carga.
-Caso raro analisado e **não corrigido** (aguardando decisão): carga em voo
-que atravessa logout + login de OUTRA pessoa em segundos pode publicar o
-recorte do usuário anterior. Logout simples é seguro (`anon` não tem SELECT
-em `BANCO_DADOS`/views/`clientes`/`sale_payments` — a carga falha e não
-publica). Também não são cancelados no logout: timer do realtime (8 s) e
-o timeout de 60 s do boot.
+Caso raro (`87439e5`): carga em voo que atravessa logout + login. Cada
+login abre uma "sessão" (`sessaoRef`, muda quando muda o `user.id`); a
+carga guarda a sessão em que começou e, se mudou, não publica, não grava
+cache, não mexe no escopo nem em `error`/`loading`. A carga lê o usuário
+atual (`currentUserRef`), não o da closure — uma recarga enfileirada na
+sessão anterior serve ao usuário novo. Logout também libera as travas de
+carga em andamento e cancela a recarga do realtime (8 s) e o timeout de
+60 s do boot. Testado no build de produção: sair no meio da carga da aba
+Clientes e entrar de novo sem F5 → mesmos números do F5 (16.809 clientes,
+R$ 5.964.970,10). Outras cargas do boot (pagamentos, visitas, usuários)
+não têm essa guarda — mesma corrida, efeito menor.
 
 **Travamento ao trocar de aba (gestor).** Medido com `PerformanceObserver`
 (long tasks), dados já carregados, ~150 mil títulos. Em dev o `StrictMode`
@@ -312,7 +317,8 @@ Conferência: texto da aba comparado caractere a caractere antes/depois
 agendamentos criados no meio do teste, confirmados no banco). Busca da
 FilterBar testada (filtra e limpa).
 **Falta:** push e teste do usuário no site. Restante: Cobranças 0,6 s e
-Clientes 0,4 s não investigados.
+Clientes 0,4 s não investigados. Reteste completo 2026-11-11 (build de
+produção, todas as abas 2x): maior trava 0,63 s (Lojas).
 ### Item 46 — "Já pagou" e "venda cancelada" no Atender — 2026-11-10
 
 Reclamação dos cobradores: o cliente diz que já pagou (ou que a venda foi
