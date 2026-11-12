@@ -56,6 +56,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 50 | Desempenho do Cedrus → app — 2026-11-11: recebido do período inteiro (4.792 parcelas `sale_payments` "Cedrus", 7 operadores) + log real de 43.387 atendimentos (PROD_OPERADORES; aproximados apagados) + aba Conferência com seletor; publicado (`1c355e2`); carga da carteira do cobrador corrigida (RPC `ultimos_contatos_titulos`, `e97ba81`) | Alta | Médio |
 
 | 51 | Vendas canceladas na SSÓtica → app — 2026-11-11: script sem navegador `scripts/ssotica/cancelados_ssotica.py` (login + filtro Cancelada, 11 lojas, ~5 min) + função `cancelar_parcelas_ssotica` (migration `20261111000006`, aplicada); 959 parcelas / 173 vendas / R$ 118 mil canceladas no app em 2026-11-11; tarefa diária 6h `Cobranca_Cancelados_SSOtica` registrada | Alta | Médio |
+| 52 | Contas a receber da SSÓtica num lugar só e automático — 2026-11-12: `scripts/ssotica/contas_receber_ssotica.py` (sem navegador, substitui os 11 Selenium + Renomear/Organizar/Juntar/Formatar e o upload manual) + função `importar_parcelas_ssotica` (migrations `20261112000001`/`3`); renegociadas na SSÓtica saem da cobrança (342 parcelas); acordo do app × renegociação da SSÓtica ligados; tarefa única `Cobranca_Atualizar_SSOtica` 6h, "Python Óticas" desativada; data do pagamento informada pelo cobrador interno (`20261112000002`) | Alta | Grande |
 ## Perguntas em aberto para o financeiro
 
 Lista viva: o usuário leva ao financeiro (Márcia) e traz as respostas. Ao
@@ -206,6 +207,51 @@ cobrador entre ~61/91 e 365 dias.
 **Falta:** teste na tela do cobrador (aba Ligar intercalada → Depois);
 etapa 3 (supervisão: previstos × trabalhados por faixa; referência é o
 HTML do Cedrus que está na raiz, fora do Git).
+
+### Item 52 — Contas a receber da SSÓtica num lugar só — 2026-11-12
+
+Pedido: "toda essa lógica de atualização, seria bom organizar em um único
+lugar" e deixar automático. Antes: tarefa "Python Óticas" (11 scripts Selenium
++ Renomear_Aba + Organizar_Colunas + Enviar_Para_Ciclone, ~3 h, em
+`Empresa_Oben\...\SSÓTICA`) → cópia manual para
+`Desktop\Ajuste_Fábio\...\Arquivos` → Juntar + Formatar → upload na tela.
+
+**Agora (tudo em `scripts/ssotica`, tarefa única `Cobranca_Atualizar_SSOtica`,
+6h, `atualizar_ssotica.py`):**
+- `contas_receber_ssotica.py`: login + filtro do relatório (Em aberto + Pago,
+  Lançamento, por semestre), mesmos arquivos `BD_Contasareceber_*.xlsx` no
+  `\\ciclone` (Power BI; validado contra os do processo antigo: mesmos IDs e
+  colunas); `--app` aplica no app. Exxlab só Power BI. ~36 min.
+- `importar_parcelas_ssotica` (regras do Juntar no banco): só o que mudou;
+  parcela nova com cadastro/contatos/endereço (cobrador herdado pelo gatilho);
+  não mexe em Cancelado, acordo ativo, nem **pagamento lançado no app que a
+  loja ainda não baixou** (o upload manual zerava esses — incidente
+  2026-11-12 10h20: 22 pagamentos/R$ 2.224,80 restaurados). Origem `ssotica`
+  no `recebimentos_historico`.
+- **Renegociação na SSÓtica** (situação RE): a parcela antiga em aberto vira
+  `Renegociado` com desconto = saldo (convenção do Ciclone); as novas vêm como
+  "Renegociação de Parcelas" sem venda. 342 parcelas / R$ 44 mil cobradas em
+  dobro saíram da cobrança na 1ª rodada.
+- **Acordo do app × renegociação da SSÓtica** (`20261112000003`): a loja lança
+  o acordo do app como renegociação; as parcelas novas vão para
+  `ssotica_acordo_parcelas` (parcela N = parcela N do acordo), não viram
+  dívida; parcela paga na loja dá baixa no acordo (`registrar_pagamento_acordo_interno`,
+  mesma imputação da tela; o que o app já recebeu não duplica). Quadro
+  "Lançado na SSÓtica" no detalhe do acordo (mesmo do Ciclone).
+- 1ª rodada (2026-11-12 10h41): 423 atualizadas, 60 novas, 342 renegociadas,
+  12 pagos no app preservados; `check:db` OK.
+
+**Ajustes do mesmo dia no fluxo do cobrador:** retorno do "Acordo criado" é a
+1ª parcela depois da entrada (`e502d48`; 3 clientes corrigidos); promessa
+vencida só fica em "Marcados para hoje" se ainda há dívida vencida
+(`877777d`) e aparece cinza "em dia" na Carteira (`44f424b`); cobrador interno
+e gestor informam a data do pagamento, até 30 dias atrás (`ab37330`,
+`process_payment.p_payment_date`; offline guarda a data do registro).
+
+**Falta:** trocar a tela de upload para a função (upload manual hoje pode
+apagar pagamento do app — evitar); conferir ~190 parcelas em aberto no app
+que sumiram da SSÓtica sem ser RE nem cancelada; critério para cliente que
+não atende (proposta de degraus 1–3 / 4–7 / 8+ e 21 dias, aguardando decisão).
 
 ### Item 51 — Vendas canceladas na SSÓtica → app — 2026-11-11
 
