@@ -42,6 +42,8 @@
 -- há. Não mexe em (devolve em "ignoradas"):
 --   - cancelado_no_app: o app cancelou (cancelados_ssotica.py ou gestor);
 --   - acordo_ativo: o gatilho barraria; quem mexe é o acordo;
+--   - renegociacao_de_acordo: parcela NOVA de renegociação de cliente com
+--     acordo ativo no app (a loja lançou o acordo na SSÓtica) -> não entra;
 --   - pago_no_app: a última mudança de recebido veio do app (cobrador/acordo)
 --     e a SSÓtica tiraria o pagamento (recebido menor ou pago -> em aberto).
 --     É a loja que ainda não deu baixa; quando der, a próxima rodada alinha.
@@ -157,6 +159,21 @@ BEGIN
          OR EXISTS (SELECT 1 FROM public."BANCO_DADOS" b
                     WHERE b.id_parcela = i.id_parcela
                       AND lower(trim(COALESCE(b.status, ''))) IN ('pago', 'pago parcial', 'cancelado', 'renegociado')));
+
+  -- Parcela nova de "Renegociação" para cliente com ACORDO ATIVO no app: é a
+  -- loja lançando o acordo do app na SSÓtica (caso real 2026-11-12: acordo
+  -- de 11x criado no app, renegociação idêntica na SSÓtica 19 min depois).
+  -- Entrar como dívida avulsa cobraria duas vezes (acordo + parcelas novas).
+  -- Fica de fora e volta em "ignoradas" para conferência até a ligação
+  -- acordo do app x renegociação da SSÓtica existir (como a do Ciclone).
+  INSERT INTO _ign
+  SELECT i.id_parcela, 'renegociacao_de_acordo'
+  FROM _imp i
+  WHERE NOT i.existe
+    AND i.descricao ILIKE 'renegocia%'
+    AND i.documento IS NOT NULL
+    AND public.cliente_tem_acordo_ativo(i.documento);
+  DELETE FROM _imp WHERE id_parcela IN (SELECT id_parcela FROM _ign WHERE motivo = 'renegociacao_de_acordo');
 
   -- ------------------------------------------------------------------ novas
   -- Cadastro antes da parcela (FK fk_banco_dados_documento). Primeira linha
@@ -284,7 +301,7 @@ BEGIN
 
   RETURN jsonb_build_object(
     'recebidas', (SELECT count(*) FROM _imp) + v_reneg_fora
-                 + (SELECT count(*) FROM _ign WHERE motivo = 'status_desconhecido'),
+                 + (SELECT count(*) FROM _ign WHERE motivo IN ('status_desconhecido', 'renegociacao_de_acordo')),
     'inseridas', v_inseridas,
     'atualizadas', v_atualizadas,
     'quitadas', v_recebidas,
