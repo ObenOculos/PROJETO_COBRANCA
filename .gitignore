@@ -42,3 +42,7 @@ scripts/ssotica/saida/
 
 # Cache do Python (scripts/ssotica rodam pela tarefa agendada)
 __pycache__/
+
+# DRE da SSÓtica: downloads temporários e log de cada loja
+scripts/ssotica/dre/**/Temporario/
+scripts/ssotica/dre/**/scraper.log
