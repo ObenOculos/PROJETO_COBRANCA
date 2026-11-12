@@ -51,6 +51,7 @@ from bs4 import BeautifulSoup
 AQUI = Path(__file__).resolve().parent
 REPO = AQUI.parent.parent
 SAIDA = AQUI / "saida"
+DIAS_GUARDAR = 30
 
 SSOTICA_ENV_PATH = Path(
     os.getenv("SSOTICA_ENV")
@@ -499,11 +500,17 @@ def main() -> None:
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(message)s",
-        datefmt="%H:%M:%S",
+        datefmt="%Y-%m-%d %H:%M:%S",
         handlers=[logging.StreamHandler(sys.stdout),
                   logging.FileHandler(SAIDA / "cancelados_ssotica.log", encoding="utf-8")],
     )
     carimbo = datetime.now().strftime("%Y%m%d_%H%M")
+    # Rodando todo dia (Agendador), cada leitura deixa ~3 MB de JSON + CSV:
+    # guarda só os últimos DIAS_GUARDAR dias.
+    limite = time.time() - DIAS_GUARDAR * 86400
+    for velho in [*SAIDA.glob("ssotica_canceladas_*.json"), *SAIDA.glob("relatorio_cancelados_*.csv")]:
+        if velho.stat().st_mtime < limite:
+            velho.unlink()
     lojas = args.loja or list(LOJAS)
     for cod in lojas:
         if cod not in LOJAS:
@@ -572,4 +579,11 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except SystemExit:
+        raise
+    except BaseException:
+        # Pelo Agendador ninguém vê o terminal: o erro tem de ir para o .log.
+        log.exception("Falhou")
+        sys.exit(1)

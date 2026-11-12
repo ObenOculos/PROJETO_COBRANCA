@@ -55,7 +55,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 48 | Gestor: números errados depois de sair e entrar na mesma aba (só quitados) + travamento ao trocar de aba (Desempenho ~32 s, Lojas, Cobranças) — `831d182`, `96fb4f8`, `c563f22`, `63aaef6`, `87439e5`, 2026-11-11; testado no build de produção, sem push | Alta | Pequeno |
 | 50 | Desempenho do Cedrus → app — 2026-11-11: recebido do período inteiro (4.792 parcelas `sale_payments` "Cedrus", 7 operadores) + log real de 43.387 atendimentos (PROD_OPERADORES; aproximados apagados) + aba Conferência com seletor; publicado (`1c355e2`); carga da carteira do cobrador corrigida (RPC `ultimos_contatos_titulos`, `e97ba81`) | Alta | Médio |
 
-| 51 | Vendas canceladas na SSÓtica → app — 2026-11-11: script sem navegador `scripts/ssotica/cancelados_ssotica.py` (login + filtro Cancelada, 11 lojas, ~5 min) + função `cancelar_parcelas_ssotica` (migration `20261111000006`, sem db push); 1ª leitura: 953 parcelas / 172 vendas / R$ 117,5 mil em cobrança indevida; falta db push, 1ª gravação e agendamento | Alta | Médio |
+| 51 | Vendas canceladas na SSÓtica → app — 2026-11-11: script sem navegador `scripts/ssotica/cancelados_ssotica.py` (login + filtro Cancelada, 11 lojas, ~5 min) + função `cancelar_parcelas_ssotica` (migration `20261111000006`, aplicada); 953 parcelas / 172 vendas / R$ 117,5 mil canceladas no app em 2026-11-11; agendamento diário 6h por `agendar_tarefa.ps1` (usuário registra) | Alta | Médio |
 ## Perguntas em aberto para o financeiro
 
 Lista viva: o usuário leva ao financeiro (Márcia) e traz as respostas. Ao
@@ -254,9 +254,20 @@ Cancelado.
 uma parcela cancelada com outro status, ela sobrescreve o `Cancelado`; a
 próxima rodada cancela de novo e grava outra linha em `vendas_canceladas`.
 
-**Falta:** db push da `20261111000006` + `npm run check:db`; 1ª gravação
-(começar por uma loja: `--gravar --loja PwrbRL`); agendamento no Task
-Scheduler; depois, automatizar a atualização da base (contas a receber).
+**Aplicado (2026-11-11):** migration `20261111000006` + `check:db` OK.
+Gravação primeiro só na Eusébio (64 parcelas / 16 vendas), conferida no
+banco, depois as demais lojas (889 / 156). Total: 953 parcelas `Cancelado`,
+172 linhas em `vendas_canceladas`, 0 ignoradas. A única visita agendada de
+cliente afetado ficou (o cliente ainda tem outra dívida em aberto — certo).
+Rodada seguinte só em relatório: 0 a cancelar, 953 `JA_CANCELADA`.
+
+**Agendamento:** `scripts/ssotica/agendar_tarefa.ps1` registra a tarefa
+`Cobranca_Cancelados_SSOtica` (diária 6h, `--gravar`; mesmo padrão da tarefa
+do Ciclone). Log com data em `saida/cancelados_ssotica.log`, inclusive erro
+fatal; JSON/CSV com mais de 30 dias são apagados a cada rodada.
+
+**Falta:** usuário conferir Messejana 2865 e as 13 "Pago no app"; depois,
+automatizar a atualização da base (contas a receber).
 
 ### Item 50 — Desempenho do Cedrus → app — 2026-11-11
 
