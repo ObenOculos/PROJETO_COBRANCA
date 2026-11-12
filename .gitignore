@@ -39,3 +39,6 @@ Dados_Cedrus/
 
 # Saída do script de cancelados da SSÓtica (dados de cliente)
 scripts/ssotica/saida/
+
+# Cache do Python (scripts/ssotica rodam pela tarefa agendada)
+__pycache__/
