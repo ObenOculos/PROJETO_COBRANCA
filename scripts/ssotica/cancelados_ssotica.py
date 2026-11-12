@@ -15,11 +15,10 @@ chama a função cancelar_parcelas_ssotica (migration 20261111000006), que
 cancela só as parcelas que a SSÓtica marcou como Cancelado -- parcela paga
 fica Pago -- e registra cada venda em vendas_canceladas.
 
-Credenciais: SSO_EMAIL / SSO_PASSWORD, lidas das variáveis de ambiente ou
-do .env dos scripts da SSÓtica (mesmo arquivo usado pelo credentials.py de
-lá; caminho em SSOTICA_ENV_PATH, pode ser trocado pela variável de ambiente
-SSOTICA_ENV). Banco: VITE_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY do .env
-deste repositório.
+Credenciais: SSO_EMAIL / SSO_PASSWORD das variáveis de ambiente ou do .env
+deste repositório (fora do git), junto com VITE_SUPABASE_URL e
+SUPABASE_SERVICE_ROLE_KEY. Até 2026-11-12 vinham do .env dos scripts antigos
+(Empresa_Oben/.../SSÓTICA/Código_Óticas), que foram aposentados.
 
 Saída (pasta saida/, fora do git -- tem nome e CPF de cliente):
   - ssotica_canceladas_<data>.json  : o que foi lido da SSÓtica (cache)
@@ -53,10 +52,6 @@ REPO = AQUI.parent.parent
 SAIDA = AQUI / "saida"
 DIAS_GUARDAR = 30
 
-SSOTICA_ENV_PATH = Path(
-    os.getenv("SSOTICA_ENV")
-    or r"C:\Users\User\Documents\Empresa_Oben\Financeiro\Despesas_e_Receitas\SSÓTICA\Código_Óticas\.env"
-)
 COBRANCA_ENV_PATH = REPO / ".env"
 
 BASE_URL = "https://app.ssotica.com.br"
@@ -103,11 +98,11 @@ def ler_env(caminho: Path) -> dict:
 
 
 def credenciais_ssotica() -> tuple[str, str]:
-    arq = ler_env(SSOTICA_ENV_PATH)
+    arq = ler_env(COBRANCA_ENV_PATH)
     email = os.getenv("SSO_EMAIL") or arq.get("SSO_EMAIL")
     senha = os.getenv("SSO_PASSWORD") or arq.get("SSO_PASSWORD")
     if not email or not senha:
-        sys.exit(f"Credenciais da SSÓtica não encontradas (SSO_EMAIL/SSO_PASSWORD em {SSOTICA_ENV_PATH}).")
+        sys.exit(f"Credenciais da SSÓtica não encontradas (SSO_EMAIL/SSO_PASSWORD em {COBRANCA_ENV_PATH}).")
     return email, senha
 
 
