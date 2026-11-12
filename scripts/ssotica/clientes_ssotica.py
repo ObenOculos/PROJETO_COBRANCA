@@ -254,19 +254,37 @@ def mudancas(app: list[dict], base: pd.DataFrame, ligado: dict[int, tuple[str, s
 
 
 def gravar(url: str, chave: str, lista: list[dict]) -> int:
+    """Um PATCH por cliente (só os campos que mudam), com conexão reaproveitada
+    e alguns em paralelo -- um por vez, sem sessão, levava ~1 s cada (15 mil
+    clientes na 1ª carga)."""
+    from concurrent.futures import ThreadPoolExecutor
+    import threading
     h = {"apikey": chave, "Authorization": f"Bearer {chave}", "Content-Type": "application/json",
          "Prefer": "return=minimal"}
-    n = 0
-    for m in lista:
-        if not m["mudancas"]:
-            continue
-        r = requests.patch(f"{url}/rest/v1/clientes", headers=h, params={"id": f"eq.{m['id']}"},
-                           json=m["mudancas"], timeout=60)
-        if r.status_code >= 400:
-            log.warning("Cliente %s não atualizado (%s): %s", m["id"], r.status_code, r.text[:200])
-            continue
-        n += 1
-    return n
+    local = threading.local()
+
+    def um(m: dict) -> bool:
+        if not hasattr(local, "s"):
+            local.s = requests.Session()
+            local.s.headers.update(h)
+        for tentativa in range(3):
+            try:
+                r = local.s.patch(f"{url}/rest/v1/clientes", params={"id": f"eq.{m['id']}"},
+                                  json=m["mudancas"], timeout=60)
+                if r.status_code < 400:
+                    return True
+                log.warning("Cliente %s não atualizado (%s): %s", m["id"], r.status_code, r.text[:200])
+                return False
+            except requests.RequestException as e:
+                if tentativa == 2:
+                    log.warning("Cliente %s não atualizado: %s", m["id"], e)
+                    return False
+                time.sleep(2)
+        return False
+
+    alvo = [m for m in lista if m["mudancas"]]
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        return sum(ex.map(um, alvo))
 
 
 def main() -> int:

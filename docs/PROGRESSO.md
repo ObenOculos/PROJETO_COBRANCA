@@ -318,7 +318,12 @@ campo vazio (convertido de `+55...` para `(88) 9.9999-9999`), nascimento
 casamento), 276 telefones, 9.945 nascimentos, 3 e-mails. O
 `sumidas_ssotica.py` abre a ficha pelo Cliente ID quando guardado.
 
-**Falta:** `db push` da `20261112000004` e 1ª gravação do `clientes_ssotica.py --gravar`; testar o card novo na tela (grava em produção); conferir a 1ª
+1ª gravação 12/11 15h (fluxo completo, 4 min): 14.971 clientes com Cliente ID
+(todos distintos; 341 de CPF genérico), 274 telefones, ~9,9 mil nascimentos,
+3 e-mails; 2ª rodada = 0 mudanças; `check:db` OK. Gravação em paralelo com
+sessão (um PATCH por vez levava ~1 s cada).
+
+**Falta:** testar o card novo na tela (grava em produção); conferir a 1ª
 rodada agendada com o 3º passo; o usuário olhar as 17 divergentes (planilha
 `saida/sumidas_para_conferir_20261112.xlsx`; destino futuro: CSV ou tela?); critério para cliente que
 não atende (proposta de degraus 1–3 / 4–7 / 8+ e 21 dias, aguardando decisão).
