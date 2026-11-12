@@ -266,6 +266,10 @@ const ClientHistoryViewer: React.FC<ClientHistoryViewerProps> = ({
         icon: <FileSpreadsheet className="h-4 w-4 text-indigo-600" />,
         titulo: "Baixa pelo ERP ou edição manual",
       },
+      ssotica: {
+        icon: <FileSpreadsheet className="h-4 w-4 text-indigo-600" />,
+        titulo: "Baixa pela SSÓtica (atualização automática)",
+      },
       foto_inicial: {
         icon: <Camera className="h-4 w-4 text-gray-500" />,
         titulo: "Recebido até o início do histórico",
