@@ -802,6 +802,17 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
 
   const today = todayLocalStr();
 
+  // Divida vencida por cliente da carteira inteira (nao so do filtro), com o
+  // acordo ativo valendo no lugar dos titulos originais -- usada para a
+  // promessa so cobrar quem ainda deve algo vencido.
+  const vencidoPorDocumento = useMemo(() => {
+    const mapa = new Map<string, number>();
+    openClientGroups.forEach((g) =>
+      mapa.set(g.document, clientBalanceSplit(g, acordoAtivoOverdueMap).vencido),
+    );
+    return mapa;
+  }, [openClientGroups, acordoAtivoOverdueMap]);
+
   // Por que o cliente e "para hoje": compromisso com data (contato agendado,
   // promessa vencendo) -- fica acima do lote na Fila -- ou alerta sem
   // contato recente (acordo quebrado, perto de sair da faixa) -- entra no
@@ -812,7 +823,17 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       const agendado = scheduledContactByDocument.get(doc);
       const retorno = lastContacts[doc]?.efetivo?.nextActionDate;
       if (agendado && agendado.scheduledDate <= today) return "agendado";
-      if (!agendado && retorno && retorno <= today) return "promessa";
+      // Promessa/retorno vencido so e compromisso se ainda ha divida
+      // vencida: quem pagou o prometido (ou esta em dia no acordo) nao fica
+      // preso em "Marcados para hoje" ate alguem registrar outro contato
+      // efetivo (2026-11-12). Contato AGENDADO acima continua valendo sempre.
+      if (
+        !agendado &&
+        retorno &&
+        retorno <= today &&
+        (vencidoPorDocumento.get(doc) ?? 0) > 0.01
+      )
+        return "promessa";
       if (!contatoRecente && getAcordoQuebradoDoCliente(doc)) return "quebrado";
       if (!contatoRecente && urgenteInfoByDocument.has(doc)) return "urgente";
       return null;
@@ -824,6 +845,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       getAcordoQuebradoDoCliente,
       urgenteInfoByDocument,
       today,
+      vencidoPorDocumento,
     ],
   );
 
