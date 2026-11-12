@@ -6,6 +6,9 @@ Responda em **português**.
 
 > **Progresso, decisões e pendências: [`docs/PROGRESSO.md`](docs/PROGRESSO.md).**
 > Leia antes de propor mudanças estruturais e atualize ao fechar uma etapa.
+>
+> **Atualizações automáticas (Ciclone/SSÓtica → app e Power BI): [`docs/ATUALIZACOES.md`](docs/ATUALIZACOES.md).**
+> Tudo em `scripts/`; tarefas do Windows só por `scripts/agendar_tarefas.ps1`; senhas só no `.env`.
 
 ## Stack
 
