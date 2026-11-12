@@ -328,6 +328,17 @@ rodada agendada com o 3º passo; o usuário olhar as 17 divergentes (planilha
 `saida/sumidas_para_conferir_20261112.xlsx`; destino futuro: CSV ou tela?); critério para cliente que
 não atende (proposta de degraus 1–3 / 4–7 / 8+ e 21 dias, aguardando decisão).
 
+**Unificação das atualizações (2026-11-12, `95d63a6`):** pedido do usuário —
+toda atualização de app e Power BI num lugar só. Ver `docs/ATUALIZACOES.md`.
+`scripts/ciclone` (sync financeiro), `scripts/focco` (DRE e contas a receber
+→ Power BI), `scripts/ssotica` (+ `dre/`, DRE das óticas, antes rodada à mão;
+outubro gerado em 12/11), `scripts/atualizar_dre.py` (DRE mensal, dia 6),
+`scripts/agendar_tarefas.ps1` (registro único; remove Atualizar_BI,
+DRE_Atualização, "Python Óticas"). Senhas todas no `.env` da raiz. Achado: o
+Power BI da Focco recebia DUAS versões do contas a receber (9h30 nova, com
+PARCELA, pelo processo do Cedrus; 19h antiga, sem PARCELA, pelo Atualizar_BI)
+— fica só a nova, às 19h. Cedrus acaba 15/11: depois `-RemoverCedrus`.
+
 ### Item 51 — Vendas canceladas na SSÓtica → app — 2026-11-11
 
 Pedido: identificar as vendas canceladas na SSÓtica (sem API) e levar ao
