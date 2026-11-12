@@ -21,11 +21,12 @@ confirmado. Por isso cada sumida é conferida na ficha do cliente na SSÓtica
      parcela da SSÓtica: mesma loja + nº da parcela + vencimento + valor e,
      quando o app tem o nº do título/venda, o mesmo número. Sem número no app,
      não pode haver outra linha do app com o título/parcela casado;
-  4. casamento único e situação "Cancelado" -> cancela no app pela função
-     cancelar_parcelas_ssotica (a mesma das vendas canceladas: não mexe em
-     parcela paga nem em acordo ativo; registra em vendas_canceladas);
-  5. todo o resto vai para saida/sumidas_ssotica_<data>.csv (conferência do
-     gestor; nada é alterado).
+  4. cancela no app (função cancelar_parcelas_ssotica: não mexe em parcela
+     paga nem em acordo ativo; registra em vendas_canceladas) só com prova:
+     parcela casada "Cancelado"; nada ATIVO na ficha que corresponda a ela
+     (renegociação desfeita, título refeito); ou venda APAGADA (ver conferir);
+  5. o resto (título ativo com outros dados, cliente não achado...) vai para
+     saida/sumidas_ssotica_<data>.csv (conferência do gestor; nada é alterado).
 
 Sem --gravar é só leitura.
 
@@ -46,7 +47,7 @@ from datetime import date, datetime
 import requests
 from bs4 import BeautifulSoup
 
-from cancelados_ssotica import (BASE_URL, SAIDA, SSOtica, _data_br, _texto, _token, _valor_br,
+from cancelados_ssotica import (BASE_URL, LOJAS, SAIDA, SSOtica, _data_br, _texto, _token, _valor_br,
                                 config_supabase, credenciais_ssotica)
 from contas_receber_ssotica import ARQUIVO_IDS
 
@@ -168,33 +169,94 @@ def _mesma_loja(filial: str | None, loja: str) -> bool:
     return bool(filial) and (filial == loja or (filial in MESMA_EMPRESA and loja in MESMA_EMPRESA))
 
 
-def conferir(p: dict, titulos: list[dict], url: str, chave: str) -> dict:
-    numero = p["numero_titulo"] or p["venda_n"]
-    valor = float(p["valor_original"] or 0)
-    cand = [(t, q) for t in titulos if _mesma_loja(t["filial"], p["nome_da_loja"])
-            and (numero is None or numero in (t["titulo"], t["venda"]))
-            for q in t["parcelas"] if q["n"] == p["parcela"]]
-    exato = [(t, q) for t, q in cand if q["vencimento"] == p["data_vencimento"]
-             and q["valor"] is not None and abs(q["valor"] - valor) < 0.01]
-    if not exato:
-        return {"categoria": "SEM_PAR_NA_SSOTICA",
-                "obs": "; ".join(f"título {t['titulo']} p{q['n']} {q['situacao']} venc {q['vencimento']} R$ {q['valor']}"
-                                 for t, q in cand[:3])}
-    if len(exato) > 1:
-        return {"categoria": "AMBIGUO", "obs": ", ".join(q["situacao"] for _, q in exato)}
-    t, q = exato[0]
-    base = {"titulo_ssotica": t["titulo"], "situacao_ssotica": q["situacao"], "cancelada_em": q["cancelada_em"]}
-    if numero is None and outra_linha_no_app(url, chave, p, t["titulo"] or t["venda"]):
-        return {**base, "categoria": "CONFLITO", "obs": "outra linha do app já tem esse título/parcela"}
-    if q["situacao"].lower() == "cancelado":
-        return {**base, "categoria": "A_CANCELAR"}
-    if "spc" in q["situacao"].lower():
-        return {**base, "categoria": "SPC"}
-    return {**base, "categoria": "OUTRA_SITUACAO"}
-
-
 def _br(d: str | None) -> str:
     return f"{d[8:10]}/{d[5:7]}/{d[0:4]}" if d else "?"
+
+
+def venda_apagada(ss: SSOtica, loja: str, numero: int) -> str | None:
+    """Data em que a venda foi APAGADA na SSÓtica (tela de vendas, filtro pelo
+    número), ou None. Venda apagada some do relatório e da ficha do cliente e
+    não é 'cancelada' (o cancelados_ssotica não a vê). Visto em 2026-11-12:
+    Quiterionopolis 151 e Crateus 3609."""
+    for cod in [cod for cod, nomes in LOJAS.items() if loja in nomes]:
+        url = f"{BASE_URL}/movimentacao/vendas/{cod}/listar"
+        pagina = ss._req("GET", url)
+        r = ss._req("POST", url, data={
+            "_token": _token(pagina.text), "clearFilter": "0", "filterForm[filtroAvancado]": "1",
+            "filterForm[empresa]": cod, "filterForm[nsa_venda]": str(numero),
+            "filterForm[periodo][periodo]": "TUDO", "filterForm[periodo][inicio]": "01/01/2000",
+            "filterForm[periodo][fim]": "31/12/2099", "filterForm[searchTerm]": "",
+        })
+        for card in BeautifulSoup(r.text, "lxml").select("li.card-principal"):
+            carrinho = card.select_one("i.fa-shopping-cart")
+            if not carrinho or re.sub(r"\D", "", _texto(carrinho.parent)) != str(numero):
+                continue
+            m = re.search(r"Venda apagada por .*? em (\d{2}/\d{2}/\d{4})", _texto(card))
+            if m:
+                return m.group(1)
+    return None
+
+
+def _desc(cand: list) -> str:
+    return "; ".join(f"título {t['titulo']} p{q['n']} {q['situacao']} venc {q['vencimento']} R$ {q['valor']}"
+                     for t, q in cand[:3])
+
+
+def conferir(p: dict, titulos: list[dict], ss: SSOtica, url: str, chave: str) -> dict:
+    """Destino de uma sumida. A_CANCELAR só com prova na SSÓtica:
+      1. a parcela casada (loja + nº + vencimento + valor e, se o app tem, o
+         nº do título) está "Cancelado";
+      2. nada ATIVO na ficha corresponde a ela (nenhuma parcela não cancelada
+         com nº/vencimento/valor iguais e, se o app tem o nº, o título não tem
+         parcela ativa) -- ex.: renegociação desfeita, título refeito;
+      3. a venda (nº do app) está APAGADA.
+    Título ativo com outros dados, ficha sem títulos da loja, cliente não
+    achado -> conferência. Decisão do usuário (2026-11-12): o que estiver
+    errado no app fica igual à SSÓtica, motivo do cancelamento não importa."""
+    numero = p["numero_titulo"] or p["venda_n"]
+    valor = float(p["valor_original"] or 0)
+    loja = p["nome_da_loja"]
+    da_loja = [t for t in titulos if _mesma_loja(t["filial"], loja)]
+    cand = [(t, q) for t in da_loja if numero is None or numero in (t["titulo"], t["venda"])
+            for q in t["parcelas"] if q["n"] == p["parcela"]]
+
+    def igual(q):
+        return (q["vencimento"] == p["data_vencimento"] and q["valor"] is not None
+                and abs(q["valor"] - valor) < 0.01)
+
+    exato = [(t, q) for t, q in cand if igual(q)]
+    if len(exato) > 1:
+        return {"categoria": "AMBIGUO", "obs": ", ".join(q["situacao"] for _, q in exato)}
+    if exato:
+        t, q = exato[0]
+        base = {"titulo_ssotica": t["titulo"], "situacao_ssotica": q["situacao"], "cancelada_em": q["cancelada_em"]}
+        # Sem nº no app e a parcela casada já é de outra linha do app: não é
+        # esta; segue para a regra 2.
+        if not (numero is None and outra_linha_no_app(url, chave, p, t["titulo"] or t["venda"])):
+            sit = q["situacao"].lower()
+            if sit == "cancelado":
+                return {**base, "categoria": "A_CANCELAR",
+                        "motivo": f"SSÓtica: parcela {p['parcela']} do título {t['titulo']} ({loja}) "
+                                  f"cancelada na loja em {_br(q['cancelada_em'])}"}
+            return {**base, "categoria": "SPC" if "spc" in sit else "OUTRA_SITUACAO"}
+
+    vivas = [q for t in da_loja for q in t["parcelas"]
+             if q["situacao"].lower() != "cancelado" and q["n"] == p["parcela"] and igual(q)]
+    titulo_vivo = [t for t in da_loja if numero is not None and numero in (t["titulo"], t["venda"])
+                   and any(q["situacao"].lower() != "cancelado" for q in t["parcelas"])]
+    if vivas or titulo_vivo:
+        return {"categoria": "DIVERGENTE", "obs": _desc(cand) or "título ativo na SSÓtica com outros dados"}
+    if numero is not None:
+        apagada = venda_apagada(ss, loja, numero)
+        if apagada:
+            return {"categoria": "A_CANCELAR", "situacao_ssotica": "venda apagada",
+                    "motivo": f"SSÓtica: venda {numero} ({loja}) apagada na loja em {apagada}"}
+    if da_loja:
+        ref = f"título {numero}" if numero else "parcela sem nº de título"
+        return {"categoria": "A_CANCELAR", "situacao_ssotica": "não existe mais", "obs": _desc(cand),
+                "motivo": f"SSÓtica: {ref}, parcela {p['parcela']} ({loja}) não existe mais em aberto "
+                          f"na loja (nada ativo na ficha do cliente)"}
+    return {"categoria": "FICHA_SEM_TITULOS_DA_LOJA", "obs": "cliente achado, sem títulos dessa loja na ficha"}
 
 
 def gravar(url: str, chave: str, linhas: list[dict]) -> None:
@@ -207,8 +269,7 @@ def gravar(url: str, chave: str, linhas: list[dict]) -> None:
     total = {"parcelas": 0, "vendas": 0, "visitas": 0}
     for i in range(0, len(alvo), 300):
         itens = [{"id_parcela": int(l["id_parcela"]),
-                  "motivo": f"SSÓtica: parcela {l['parcela']} do título {l['titulo_ssotica']} ({l['nome_da_loja']}) "
-                            f"cancelada na loja em {_br(l['cancelada_em'])}; conferido na ficha do cliente em {hoje}"}
+                  "motivo": f"{l['motivo']}; conferido em {hoje}"}
                  for l in alvo[i:i + 300]]
         r = requests.post(f"{url}/rest/v1/rpc/cancelar_parcelas_ssotica", headers=h,
                           json={"p_itens": itens}, timeout=120)
@@ -272,13 +333,14 @@ def main() -> int:
                 cids = buscar_clientes(ss, doc)
                 fichas[doc] = [t for cid in cids for t in crediario(ss, cid)] if cids else None
             res = ({"categoria": "CLIENTE_NAO_ENCONTRADO"} if fichas[doc] is None
-                   else conferir(p, fichas[doc], url, chave))
+                   else conferir(p, fichas[doc], ss, url, chave))
         linhas.append({
             "categoria": res["categoria"], "id_parcela": p["id_parcela"], "nome_da_loja": p["nome_da_loja"],
             "numero_titulo": p["numero_titulo"], "venda_n": p["venda_n"], "parcela": p["parcela"],
             "vencimento": p["data_vencimento"], "valor_original": p["valor_original"], "status_app": p["status"],
             "titulo_ssotica": res.get("titulo_ssotica"), "situacao_ssotica": res.get("situacao_ssotica"),
-            "cancelada_em": res.get("cancelada_em"), "obs": res.get("obs", ""), "documento": doc,
+            "cancelada_em": res.get("cancelada_em"), "obs": res.get("obs", ""), "motivo": res.get("motivo", ""),
+            "documento": doc,
         })
     log.info("%d clientes conferidos na SSÓtica", len(fichas))
 

@@ -280,21 +280,30 @@ conferido na SSÓtica:
   errada); sem nº no app, nenhuma outra linha do app pode ter o
   título/parcela casado.
 - 122 canceladas no app por `cancelar_parcelas_ssotica` (33 vendas, 0 visitas).
-- Sobraram 68 para conferência (R$ 7,7 mil): 33 com título que nem aparece na
-  ficha do cliente, 34 com o mesmo título/parcela na SSÓtica mas vencimento ou
-  valor diferente (o app tem vencimento antigo), 1 conflito.
+- Das 68 que sobraram, o usuário conferiu um caso na SSÓtica (renegociação
+  lançada em 21/09 e desfeita quando a venda de origem foi cancelada: não
+  existe mais na loja, e renegociação ATIVA aparece na ficha — testado) e
+  decidiu: "se no app estiver errado, deixar de acordo com a SSÓtica". Mais
+  51 canceladas: 25 sem nada ativo na ficha do cliente e 26 de **venda
+  APAGADA** (situação diferente de cancelada; o `cancelados_ssotica` não vê;
+  ex. Quiterionopolis 151, Crateus 3609). Total do dia: 173 parcelas.
+- Ficam 17 em conferência (Itapipoca Ext 928 e 1148 e mais 4): título ATIVO
+  na SSÓtica com vencimento/valor diferentes do app — não se cancela.
 
 Rotina diária: `sumidas_ssotica.py --gravar` virou o 3º passo de
 `atualizar_ssotica.py` (só roda se o contas a receber deu certo). Lê
 `saida/contas_receber_ids.json` (IDs do relatório do dia, gravado pelo
 `contas_receber_ssotica.py --app` com todas as lojas; arquivo de outro dia →
-não confere), confere as sumidas na ficha do cliente, cancela só as
-confirmadas e põe o resto em `saida/sumidas_ssotica_<data>.csv`. Para se
+não confere), confere as sumidas na ficha do cliente e cancela com prova: parcela casada
+"Cancelado"; nada ativo na ficha que corresponda (renegociação desfeita,
+título refeito); ou venda APAGADA. Título ativo com outros dados, cliente não
+achado ou ficha sem títulos da loja → `saida/sumidas_ssotica_<data>.csv`.
+Validado contra as decisões manuais do dia (51 + 17 iguais). Para se
 houver mais de 1.500 sumidas (download incompleto).
 
 **Falta:** testar o card novo na tela (grava em produção); conferir a 1ª
-rodada agendada com o 3º passo; decidir o que fazer com as 68 da conferência
-(hoje só no CSV; tela para o gestor?); critério para cliente que
+rodada agendada com o 3º passo; o usuário olhar as 17 divergentes (planilha
+`saida/sumidas_para_conferir_20261112.xlsx`; destino futuro: CSV ou tela?); critério para cliente que
 não atende (proposta de degraus 1–3 / 4–7 / 8+ e 21 dias, aguardando decisão).
 
 ### Item 51 — Vendas canceladas na SSÓtica → app — 2026-11-11
