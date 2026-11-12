@@ -34,6 +34,9 @@ export interface DistributePaymentAction {
     paymentMethod?: string;
     notes?: string;
     collectorId: string;
+    /** Dia do pagamento (YYYY-MM-DD), fixado ao entrar na fila: sincronizar
+     * amanha nao pode mudar a data. Itens antigos sem o campo = hoje. */
+    paymentDate?: string;
   };
 }
 
@@ -323,6 +326,7 @@ export const useOffline = () => {
       p_notes: paymentData.notes || "",
       p_sale_number: paymentData.saleNumber ?? undefined,
       p_juros_amount: paymentData.jurosAmount || 0,
+      p_payment_date: paymentData.paymentDate ?? undefined,
     });
 
     if (error) {

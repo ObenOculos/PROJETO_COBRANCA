@@ -3728,6 +3728,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             paymentMethod: payment.paymentMethod,
             notes: payment.notes,
             collectorId: collectorId,
+            paymentDate: payment.paymentDate ?? todayLocalStr(),
           },
         });
         console.log("✅ Pagamento adicionado à fila offline");
@@ -3745,6 +3746,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         p_notes: payment.notes || "",
         p_sale_number: payment.saleNumber ?? undefined,
         p_juros_amount: payment.jurosAmount || 0,
+        p_payment_date: payment.paymentDate ?? undefined,
       });
 
       if (error) {
@@ -3789,6 +3791,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             paymentMethod: paymentMethod,
             notes: notes,
             collectorId: collectorId,
+            paymentDate: todayLocalStr(),
           },
         });
         console.log("✅ Pagamento geral adicionado à fila offline");

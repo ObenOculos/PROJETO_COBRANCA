@@ -746,6 +746,8 @@ export interface SalePaymentInput {
   discountAmount?: number;
   /** Juros/multa pagos junto: registrados no pagamento, nao abatem parcela. */
   jurosAmount?: number;
+  /** Dia em que o cliente pagou (YYYY-MM-DD); ausente = hoje. */
+  paymentDate?: string;
 }
 
 // Acordo de renegociacao (parcelamento futuro combinado com o cliente).

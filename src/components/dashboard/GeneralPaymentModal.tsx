@@ -23,7 +23,7 @@ import { useOffline } from "../../hooks/useOffline";
 import { useNotifications } from "../../contexts/NotificationContext";
 import { calculateOverdueDays, formatCurrency } from "../../utils/formatters";
 import { supabase } from "../../lib/supabase";
-import { todayLocalStr } from "../../config/visitStatus";
+import { addDaysLocalStr, todayLocalStr } from "../../config/visitStatus";
 import { isWalletCollectorType } from "../../config/profiles";
 import { ATTEMPT_RESULT_LABELS } from "../../config/collectionAttempts";
 import { isForaDaCobranca } from "../../types/status";
@@ -106,6 +106,17 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     const ehCarteira = isWalletCollectorType(user?.type);
     const ehExterno = user?.type === "collector";
     const hoje = todayLocalStr();
+    // Dia em que o cliente pagou. O cobrador interno (e o gestor) muitas vezes
+    // da a baixa depois -- o Pix caiu ontem, a baixa e lancada hoje. O
+    // externo registra na hora, em campo: fica sempre hoje. O banco
+    // (process_payment) recusa data futura ou anterior a 30 dias.
+    const podeEscolherData = !ehExterno;
+    const DIAS_RETROATIVOS = 30;
+    const dataMinima = addDaysLocalStr(hoje, -DIAS_RETROATIVOS);
+    const [dataPagamento, setDataPagamento] = useState(hoje);
+    const dataPagamentoValida =
+      !podeEscolherData ||
+      (dataPagamento !== "" && dataPagamento >= dataMinima && dataPagamento <= hoje);
 
     // Contato agendado ATIVO deste cliente, do proprio cobrador de carteira:
     // o pagamento conclui ele (mesma regra do "Atender" -- RPC
@@ -458,7 +469,11 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       const situacao = precisaAcompanhamento
         ? `Ainda restam ${formatCurrency(vencidoRestante)} vencidos.`
         : "Cliente ficou sem valor vencido.";
-      return `Pagamento de ${formatCurrency(amountToDistribute)} (${forma})${
+      const quando =
+        podeEscolherData && dataPagamento !== hoje
+          ? ` pago em ${dataBR(dataPagamento)}`
+          : "";
+      return `Pagamento de ${formatCurrency(amountToDistribute)} (${forma})${quando}${
         partes.length ? `: ${partes.join("; ")}` : ""
       }. ${situacao}`;
     };
@@ -496,6 +511,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                 notes: observations.trim(),
                 discountAmount: item.appliedDiscount,
                 jurosAmount: jurosPendente,
+                paymentDate: podeEscolherData ? dataPagamento : undefined,
               },
               user.id,
             );
@@ -947,6 +963,37 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                 )}
               </div>
 
+              {/* Data do pagamento: so quem pode lancar baixa depois */}
+              {podeEscolherData && (
+                <div className="mb-6">
+                  <label
+                    htmlFor="payment-date"
+                    className="block text-base font-semibold text-gray-900 dark:text-dark-text mb-1"
+                  >
+                    Data do pagamento
+                  </label>
+                  <p className="text-xs text-gray-500 dark:text-dark-text-secondary mb-3">
+                    Dia em que o cliente pagou (pode ser antes de hoje, até{" "}
+                    {DIAS_RETROATIVOS} dias).
+                  </p>
+                  <input
+                    id="payment-date"
+                    name="paymentDate"
+                    type="date"
+                    value={dataPagamento}
+                    min={dataMinima}
+                    max={hoje}
+                    onChange={(e) => setDataPagamento(e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-300 dark:border-dark-border rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm dark:bg-dark-bg dark:text-dark-text"
+                  />
+                  {!dataPagamentoValida && (
+                    <p className="text-xs text-red-600 dark:text-red-400 mt-2">
+                      Escolha uma data entre {dataMinima.split("-").reverse().join("/")} e hoje.
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* Forma de Pagamento */}
               <div className="mb-6">
                 <label
@@ -1105,7 +1152,8 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                     disabled={
                       loading ||
                       saleDistribution.length === 0 ||
-                      amountToDistribute <= 0
+                      amountToDistribute <= 0 ||
+                      !dataPagamentoValida
                     }
                     className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center shadow-lg text-base"
                   >
