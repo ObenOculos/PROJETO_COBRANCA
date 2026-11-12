@@ -1715,6 +1715,10 @@ export type Database = {
         Args: { p_acordo_id: string };
         Returns: Json;
       };
+      acordo_lancamento_ssotica: {
+        Args: { p_acordo_id: string };
+        Returns: Json;
+      };
       app_current_user_id: { Args: never; Returns: string };
       app_current_user_type: { Args: never; Returns: string };
       atribuir_clientes_em_lote: {

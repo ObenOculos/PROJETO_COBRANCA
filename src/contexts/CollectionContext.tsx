@@ -34,6 +34,7 @@ import {
   AcordoConfiguracaoPadrao,
   AcordoLancamentoCiclone,
   AcordoLancamentoCicloneStatus,
+  SistemaLancamentoAcordo,
 } from "../types";
 import { supabase } from "../lib/supabase";
 import {
@@ -2112,12 +2113,16 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   };
 
   // Conferencia so-leitura do acordo contra o lancamento no ERP Ciclone
-  // (RPC acordo_lancamento_ciclone, migration 20261106000002).
+  // (RPC acordo_lancamento_ciclone, migration 20261106000002) ou na SSOtica
+  // (acordo_lancamento_ssotica, migration 20261112000003) -- mesmo formato.
   const fetchAcordoLancamentoCiclone = async (
     acordoId: string,
+    sistema: SistemaLancamentoAcordo = "ciclone",
   ): Promise<AcordoLancamentoCiclone> => {
     const { data, error: rpcError } = await supabase.rpc(
-      "acordo_lancamento_ciclone",
+      sistema === "ssotica"
+        ? "acordo_lancamento_ssotica"
+        : "acordo_lancamento_ciclone",
       { p_acordo_id: acordoId },
     );
     if (rpcError) throw rpcError;

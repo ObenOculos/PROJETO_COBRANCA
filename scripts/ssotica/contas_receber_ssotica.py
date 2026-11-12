@@ -386,7 +386,8 @@ def aplicar_no_app(linhas: list[dict], url: str, chave: str) -> dict:
     """Envia em lotes para importar_parcelas_ssotica; soma os resultados."""
     h = {"apikey": chave, "Authorization": f"Bearer {chave}", "Content-Type": "application/json"}
     total = {"inseridas": 0, "atualizadas": 0, "quitadas": 0, "renegociadas": 0,
-             "renegociadas_fora_do_app": 0, "clientes_novos": 0, "enderecos_novos": 0}
+             "renegociadas_fora_do_app": 0, "clientes_novos": 0, "enderecos_novos": 0,
+             "parcelas_acordo_ssotica": 0, "pagamentos_acordo": 0}
     ignoradas: list[dict] = []
     for i in range(0, len(linhas), LOTE_APP):
         lote = linhas[i:i + LOTE_APP]

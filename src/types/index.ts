@@ -562,6 +562,7 @@ export interface CollectionContextType {
   }>;
   fetchAcordoLancamentoCiclone: (
     acordoId: string,
+    sistema?: SistemaLancamentoAcordo,
   ) => Promise<AcordoLancamentoCiclone>;
   registrarPagamentoAcordo: (params: {
     acordoParcelaId: string;
@@ -822,8 +823,12 @@ export interface AcordoPagamento {
 
 // Conferencia "acordo do app x lancamento no ERP Ciclone" (RPC
 // acordo_lancamento_ciclone, migration 20261106000002). So leitura.
+/** Onde o acordo do app e lancado: Ciclone (Focco Brasil) ou SSOtica (oticas). */
+export type SistemaLancamentoAcordo = "ciclone" | "ssotica";
+
 export type AcordoLancamentoCicloneStatus =
   | "fora_do_ciclone" // titulos do acordo nao vem do Ciclone (outra loja)
+  | "fora_da_ssotica" // titulos do acordo nao sao de loja SSOtica (Focco)
   | "nao_lancado" // nenhuma renegociacao do cliente com esses titulos ainda
   | "lancado" // achou e bate: titulos, parcelas, valores e vencimentos
   | "divergente"; // achou, mas algo difere (ver divergencias)

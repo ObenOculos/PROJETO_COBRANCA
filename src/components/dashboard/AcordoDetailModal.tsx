@@ -334,6 +334,7 @@ const AcordoDetailModal: React.FC<AcordoDetailModalProps> = ({
               </div>
 
               <AcordoLancamentoCiclone acordoId={acordo.id} />
+              <AcordoLancamentoCiclone acordoId={acordo.id} sistema="ssotica" />
 
               {(() => {
                 const entrada = parcelas.find((p) => p.numero === 1);
