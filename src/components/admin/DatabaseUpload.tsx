@@ -1,9 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { supabase } from "../../lib/supabase";
 import { fetchAllPagesByIdRange } from "../../utils/supabasePagination";
-import { parseMoney } from "../../utils/money";
 import { Modal } from "../Modal"; // Importar o componente Modal
 import { useCollection } from "../../contexts/CollectionContext";
 import {
@@ -20,8 +18,6 @@ import {
   ChevronDown,
 } from "lucide-react"; // Importar ícones
 import AddTituloModal from "./AddTituloModal";
-import { Database } from "../../types/database.types";
-import { PRIMARY_SITUACAO, ALL_SITUACOES } from "../../config/profiles";
 import {
   CLIENTE_IMPORT_FIELDS,
   importClientesCadastro,
@@ -34,30 +30,21 @@ import {
   downloadUploadTemplate,
 } from "../../services/uploadTemplates";
 import {
-  CADASTRO_CONTATO_COLUMNS,
-  fetchClientesRegistry,
-} from "../../services/clientesRegistry";
-
-type BancoDadosInsert = Database["public"]["Tables"]["BANCO_DADOS"]["Insert"];
-type ClienteInsert = Database["public"]["Tables"]["clientes"]["Insert"];
-
-interface FileData {
-  [key: string]: string;
-}
+  ResultadoImportacao,
+  descreverMotivo,
+  importarContasReceberSsotica,
+  lerPlanilhaSsotica,
+  resultadoVazio,
+  somarResultados,
+  validarNomeArquivo,
+} from "../../services/ssoticaContasReceberImport";
+import { fetchClientesRegistry } from "../../services/clientesRegistry";
 
 interface UpdateResult {
   id_parcela: string;
   status: "success" | "error" | "unchanged";
   error?: string;
   details?: any;
-}
-
-interface InsertResult {
-  success: boolean;
-  error?: string;
-  insertedRows?: FileData[];
-  duplicateRows?: FileData[];
-  invalidRows?: FileData[];
 }
 
 // Rotulos do modal de resultados. O mesmo modal e reusado por diferentes
@@ -79,6 +66,17 @@ const DEFAULT_RESULT_LABELS: ResultLabels = {
   errorLabel: "Títulos com Falha",
   successEmpty: "Nenhum título atualizado com sucesso.",
   unchangedEmpty: "Nenhum registro inalterado.",
+};
+
+// Contas a receber da SSOtica: a funcao do banco devolve totais, e por parcela
+// so as que ela NAO mexeu (com o motivo).
+const SSOTICA_RESULT_LABELS: ResultLabels = {
+  itemLabel: "ID Parcela",
+  successLabel: "Atualizadas",
+  unchangedLabel: "Não mexidas (protegidas ou para conferir)",
+  errorLabel: "Falhas",
+  successEmpty: "",
+  unchangedEmpty: "Nenhuma parcela deixada de lado.",
 };
 
 // Carga do cadastro de clientes (nome, apelido, nascimento e contatos).
@@ -121,8 +119,15 @@ const ResultList: React.FC<{
   items: UpdateResult[];
   emptyMessage: string;
   showError?: boolean;
+  showNote?: boolean;
   idLabel?: string;
-}> = ({ items, emptyMessage, showError = false, idLabel = "ID Parcela" }) => {
+}> = ({
+  items,
+  emptyMessage,
+  showError = false,
+  showNote = false,
+  idLabel = "ID Parcela",
+}) => {
   const [visibleCount, setVisibleCount] = useState(RESULTS_PAGE_SIZE);
 
   // Reinicia a paginacao quando o conjunto de itens muda (novo upload).
@@ -165,6 +170,9 @@ const ResultList: React.FC<{
               </p>
               {showError && result.error && (
                 <p className="text-sm text-red-600">Erro: {result.error}</p>
+              )}
+              {showNote && !showError && result.error && (
+                <p className="text-sm text-gray-600">{result.error}</p>
               )}
             </li>
           ))}
@@ -383,81 +391,40 @@ const FileSummaryRow: React.FC<{ summary: FileSummary }> = ({ summary }) => (
   </li>
 );
 
-// Valores válidos para a coluna situacao. Deriva da fonte única (config/profiles)
-// para acompanhar automaticamente novos perfis: valor fora desta lista é
-// descartado como null, o que apagaria a fase do cliente na importação.
-const VALID_SITUACAO_VALUES = ALL_SITUACOES;
-
-// Função para validar e normalizar o valor de situacao
-const validateSituacao = (value: string | undefined | null): string | null => {
-  if (!value || value.trim() === "") {
-    return null;
-  }
-
-  const trimmedValue = value.trim();
-  if (VALID_SITUACAO_VALUES.includes(trimmedValue)) {
-    return trimmedValue;
-  }
-
-  // Se não for um valor válido, retornar null ao invés de enviar valor inválido
-  console.warn(
-    `⚠️ Valor inválido para situacao: "${value}". Valores aceitos: ${VALID_SITUACAO_VALUES.join(", ")} ou vazio.`,
+// Totais devolvidos por importar_parcelas_ssotica (somados entre lotes e
+// arquivos).
+const SsoticaResumo: React.FC<{ totais: ResultadoImportacao }> = ({
+  totais,
+}) => {
+  const itens: [string, number][] = [
+    ["Parcelas lidas", totais.recebidas],
+    ["Novas no app", totais.inseridas],
+    ["Atualizadas", totais.atualizadas],
+    ["Quitadas", totais.quitadas],
+    ["Renegociadas (saíram da cobrança)", totais.renegociadas],
+    [
+      "Renegociadas que já estavam fora do app",
+      totais.renegociadas_fora_do_app,
+    ],
+    ["Clientes novos", totais.clientes_novos],
+    ["Endereços novos", totais.enderecos_novos],
+    ["Parcelas de acordo lançadas na loja", totais.parcelas_acordo_ssotica],
+    ["Pagamentos na loja baixados no acordo", totais.pagamentos_acordo],
+    ["Não mexidas (ver Visão Analítica)", totais.ignoradas.length],
+  ];
+  return (
+    <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
+      {itens.map(([rotulo, n]) => (
+        <div
+          key={rotulo}
+          className="flex justify-between border-b border-gray-100 py-1.5"
+        >
+          <dt className="text-gray-600">{rotulo}</dt>
+          <dd className="font-semibold text-gray-900 tabular-nums">{n}</dd>
+        </div>
+      ))}
+    </dl>
   );
-  return null;
-};
-
-const parseNullableNumber = (
-  value: string | undefined | null,
-): number | null => {
-  if (value === undefined || value === null) {
-    return null;
-  }
-
-  const trimmedValue = value.toString().trim();
-  if (trimmedValue === "") {
-    return null;
-  }
-
-  const normalizedValue = trimmedValue
-    .replace(/[^\d,.-]/g, "")
-    .replace(/,/g, ".");
-  const parsedNumber = Number(normalizedValue);
-
-  return Number.isNaN(parsedNumber) ? null : parsedNumber;
-};
-
-/**
- * Normaliza uma data para ISO "YYYY-MM-DD", detectando o formato de origem:
- * - "DD/MM/YYYY" (ou "DD/MM/YY") -> assume dia/mes/ano (padrao BR);
- * - "YYYY-MM-DD..." (ISO, com ou sem hora) -> mantem a parte da data.
- * Retorna null para vazio ou formato nao reconhecido (o chamador decide o
- * fallback). Alinhado a logica que o calculateOverdueDays ja usa.
- */
-const parseDateToISO = (value: string | undefined | null): string | null => {
-  if (value === undefined || value === null) return null;
-  const s = value.toString().trim();
-  if (s === "") return null;
-
-  // DD/MM/YYYY ou DD/MM/YY
-  if (s.includes("/")) {
-    const parts = s.split("/");
-    if (parts.length !== 3) return null;
-    const [d, m, y] = parts;
-    const day = d.padStart(2, "0");
-    const month = m.padStart(2, "0");
-    const year = y.length === 2 ? `20${y}` : y.padStart(4, "0");
-    const dayN = Number(day);
-    const monthN = Number(month);
-    if (dayN < 1 || dayN > 31 || monthN < 1 || monthN > 12) return null;
-    return `${year}-${month}-${day}`;
-  }
-
-  // ISO iniciando com YYYY-MM-DD (aceita "T..Z" ou " 00:00:00+00")
-  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
-
-  // Formato nao reconhecido: nao adivinhar (evita corromper).
-  return null;
 };
 
 // ---------------------------------------------------------------------------
@@ -472,33 +439,7 @@ const parseDateToISO = (value: string | undefined | null): string | null => {
 const MAX_FILE_SIZE_MB = 50;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
-// Colunas obrigatorias por tipo de carga (cargas de parcela sao casadas pelo
-// id_parcela; sem ele o arquivo quase certamente e de outro relatorio).
-const REQUIRED_COLUMNS_PARCELA = ["id_parcela"];
-
 type QuickValidation = { ok: boolean; error?: string };
-
-/** Checagens sincronas e baratas, feitas na SELECAO do arquivo. */
-const quickValidateCsv = (file: File): QuickValidation => {
-  const name = file.name.toLowerCase();
-  if (!name.endsWith(".csv")) {
-    return {
-      ok: false,
-      error: `Formato inválido: envie um arquivo .csv (recebido "${file.name}").`,
-    };
-  }
-  if (file.size === 0) {
-    return { ok: false, error: "O arquivo está vazio." };
-  }
-  if (file.size > MAX_FILE_SIZE_BYTES) {
-    const mb = (file.size / (1024 * 1024)).toFixed(1);
-    return {
-      ok: false,
-      error: `Arquivo muito grande (${mb}MB). O limite é ${MAX_FILE_SIZE_MB}MB.`,
-    };
-  }
-  return { ok: true };
-};
 
 /** Validacao do relatorio de clientes (aceita .csv, .xlsx, .xls). */
 const quickValidateClientes = (file: File): QuickValidation => {
@@ -521,65 +462,15 @@ const quickValidateClientes = (file: File): QuickValidation => {
   return { ok: true };
 };
 
-/** Detecta o separador a partir da primeira linha (mesma regra do parser). */
-const detectSeparator = (firstLine: string): string => {
-  if (firstLine.includes(";") && !firstLine.includes(",")) return ";";
-  if (firstLine.includes("\t")) return "\t";
-  return ",";
-};
-
-/** Le apenas o cabecalho (primeiros 64KB) sem carregar o arquivo inteiro. */
-const readCsvHeaders = async (file: File): Promise<string[]> => {
-  const slice = file.slice(0, 64 * 1024);
-  const text = await slice.text();
-  const nlIndex = text.search(/\r\n|\r|\n/);
-  const firstLine = nlIndex === -1 ? text : text.slice(0, nlIndex);
-  const separator = detectSeparator(firstLine);
-  return firstLine
-    .split(separator)
-    .map((h) => h.trim().replace(/^"|"$/g, "").toLowerCase());
-};
-
-/** Validacao completa (assincrona): quick + presenca das colunas obrigatorias. */
-const validateCsvFile = async (
-  file: File,
-  requiredColumns: string[],
-): Promise<QuickValidation> => {
-  const quick = quickValidateCsv(file);
-  if (!quick.ok) return quick;
-
-  let headers: string[];
-  try {
-    headers = await readCsvHeaders(file);
-  } catch {
-    return { ok: false, error: "Não foi possível ler o cabeçalho do arquivo." };
-  }
-
-  if (headers.length === 0 || (headers.length === 1 && headers[0] === "")) {
-    return { ok: false, error: "O arquivo não tem cabeçalho reconhecível." };
-  }
-
-  const missing = requiredColumns.filter(
-    (col) => !headers.includes(col.toLowerCase()),
-  );
-  if (missing.length > 0) {
-    return {
-      ok: false,
-      error: `O arquivo não contém a(s) coluna(s) obrigatória(s): ${missing.join(
-        ", ",
-      )}. Verifique se selecionou o relatório correto para este card.`,
-    };
-  }
-
-  return { ok: true };
-};
-
 const DatabaseUpload: React.FC = () => {
-  const { refreshData, users } = useCollection();
+  const { refreshData } = useCollection();
   // Cada card mantem uma FILA de arquivos (processados em sequencia), no lugar
   // do arquivo unico que obrigava o usuario a repetir o ciclo a cada envio.
-  const [statusFiles, setStatusFiles] = useState<File[]>([]);
-  const [newParcelaFiles, setNewParcelaFiles] = useState<File[]>([]);
+  const [ssoticaFiles, setSsoticaFiles] = useState<File[]>([]);
+  // Totais da ultima importacao do contas a receber da SSOtica (o modal mostra
+  // o retorno da funcao importar_parcelas_ssotica em vez dos 3 cards genericos).
+  const [ssoticaTotais, setSsoticaTotais] =
+    useState<ResultadoImportacao | null>(null);
   const [clientesFiles, setClientesFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [uploadStatus, setUploadStatus] = useState<string>("");
@@ -893,799 +784,6 @@ const DatabaseUpload: React.FC = () => {
     }
   };
 
-  // Processa CSV com PapaParse em STREAMING por chunks: o arquivo e lido e
-  // parseado em pedacos (nao vira uma unica string gigante em memoria) e o
-  // processamento cede a thread entre chunks, mantendo a UI responsiva mesmo
-  // com arquivos grandes. Parser robusto (aspas, \r\n, separador embutido) e
-  // progresso real por bytes lidos. As linhas sao acumuladas como objetos
-  // { header: valor } para o restante do fluxo.
-  // Obs.: worker:false de proposito -- o Web Worker do PapaParse e instavel sob
-  // bundlers (Vite/webpack). O streaming por chunks ja evita o congelamento.
-  const processFile = async (
-    file: File,
-    onProgress?: (percentage: number, message: string) => void,
-  ): Promise<FileData[]> => {
-    return new Promise((resolve, reject) => {
-      const rows: FileData[] = [];
-
-      Papa.parse<FileData>(file, {
-        worker: false,
-        header: true,
-        skipEmptyLines: "greedy",
-        transformHeader: (h) => h.trim(),
-        chunk: (results) => {
-          for (const row of results.data) rows.push(row);
-
-          if (onProgress && file.size > 0) {
-            const cursor = results.meta.cursor || 0;
-            const pct = Math.min(100, Math.round((cursor / file.size) * 100));
-            onProgress(pct, `Lendo arquivo... ${rows.length} linha(s)`);
-          }
-        },
-        complete: () => {
-          if (rows.length === 0) {
-            reject(
-              new Error(
-                "CSV não contém dados (cabeçalho + pelo menos uma linha).",
-              ),
-            );
-            return;
-          }
-          resolve(rows);
-        },
-        error: (err: Error) => {
-          reject(new Error(`Erro ao ler o arquivo: ${err.message}`));
-        },
-      });
-    });
-  };
-
-  // Função para atualizar status no Supabase
-  const updateStatusInSupabase = async (
-    data: FileData[],
-    onProgress?: (percentage: number, message: string) => void,
-  ): Promise<UpdateResult[]> => {
-    const updates: UpdateResult[] = [];
-    console.log(`🔄 Iniciando atualização de ${data.length} registros...`);
-
-    // 1. Extrair todos os IDs de parcela do arquivo
-    const allIds = data
-      .map((row) => row.id_parcela || row["id_parcela"])
-      .filter((id) => id);
-
-    if (allIds.length === 0) {
-      console.log("Nenhum id_parcela encontrado no arquivo.");
-      return [];
-    }
-
-    console.log(`🔍 Verificando a existência de ${allIds.length} títulos...`);
-    if (onProgress) onProgress(10, `Verificando ${allIds.length} títulos...`);
-
-    // 2. Verificar quais IDs existem no banco de dados em batches.
-    // Trazemos tambem os valores ATUAIS dos campos comparaveis para, mais
-    // adiante, evitar UPDATEs desnecessarios (registro cujo valor ja e igual
-    // ao do arquivo nao deve ser reescrito nem contado como atualizado).
-    const CHUNK_SIZE = 500; // Reduzir o tamanho do batch para evitar URLs muito longas
-    const existingRecords = new Map<string, any>();
-    let fetchError: any = null;
-
-    for (let i = 0; i < allIds.length; i += CHUNK_SIZE) {
-      const chunk = allIds.slice(i, i + CHUNK_SIZE);
-      const { data: chunkRecords, error: chunkError } = await supabase
-        .from("BANCO_DADOS")
-        .select(
-          "id_parcela, status, situacao, data_de_recebimento, data_vencimento, valor_original, valor_reajustado, multa, juros_por_dia, multa_aplicada, juros_aplicado, valor_recebido, desconto",
-        )
-        .in("id_parcela", chunk.map(Number));
-
-      if (chunkError) {
-        console.error("❌ Erro ao verificar um chunk de títulos:", chunkError);
-        fetchError = chunkError;
-        // Decide se quer parar no primeiro erro ou tentar continuar
-        // Aqui, vamos parar para evitar mais erros de rede.
-        break;
-      }
-
-      if (chunkRecords) {
-        chunkRecords.forEach((rec) =>
-          existingRecords.set(rec.id_parcela.toString(), rec),
-        );
-      }
-    }
-
-    if (fetchError) {
-      console.error(
-        "❌ Erro final ao verificar títulos existentes:",
-        fetchError,
-      );
-      return data.map((row) => ({
-        id_parcela: row.id_parcela || row["id_parcela"],
-        status: "error",
-        error: `Falha ao verificar títulos: ${fetchError.message}`,
-      }));
-    }
-    console.log(`✅ Encontrados ${existingRecords.size} títulos existentes.`);
-
-    // 3. Filtrar os dados do arquivo para manter apenas os registros que existem
-    const dataToUpdate = data.filter((row) =>
-      existingRecords.has(row.id_parcela || row["id_parcela"]),
-    );
-    const ignoredData = data.filter(
-      (row) => !existingRecords.has(row.id_parcela || row["id_parcela"]),
-    );
-
-    if (ignoredData.length > 0) {
-      console.warn(
-        `⚠️ Ignorando ${
-          ignoredData.length
-        } registros pois os títulos não foram encontrados no banco:`,
-        ignoredData.map((r) => r.id_parcela || r["id_parcela"]),
-      );
-      ignoredData.forEach((row) => {
-        updates.push({
-          id_parcela: row.id_parcela || row["id_parcela"],
-          status: "error",
-          error: "Título não encontrado no banco de dados.",
-        });
-      });
-    }
-
-    console.log(`🔄 Atualizando ${dataToUpdate.length} registros...`);
-    if (onProgress)
-      onProgress(30, `Atualizando ${dataToUpdate.length} registros...`);
-
-    // 4. Construir o objeto de update para uma linha comparando com o valor
-    // ATUAL no banco. Apenas campos que realmente mudaram entram no updateObj;
-    // se nada mudou, updateObj fica vazio e o registro e tratado como
-    // "inalterado" (nao gera UPDATE nem conta como atualizado).
-    const numericFields = [
-      "valor_reajustado",
-      "multa",
-      "juros_por_dia",
-      "multa_aplicada",
-      "juros_aplicado",
-      "valor_recebido",
-      "desconto",
-    ];
-
-    const buildUpdateObj = (
-      row: FileData,
-      current: any,
-    ): { updateObj: any; error?: string } => {
-      const situacao = row.situacao || row["situacao"];
-      const updateObj: any = {};
-
-      // status e texto: comparacao direta (trim).
-      if (row.status && row.status.trim() !== (current?.status ?? "").trim()) {
-        updateObj.status = row.status;
-      }
-
-      // data_de_recebimento: normaliza para ISO e compara so a parte da data,
-      // mesmo padrao de data_vencimento abaixo. So altera se o arquivo trouxer
-      // uma data reconhecida diferente da atual.
-      {
-        const raw = row.data_de_recebimento ?? row["data_de_recebimento"];
-        if (raw !== undefined && raw !== null && raw.toString().trim() !== "") {
-          const newIso = parseDateToISO(raw);
-          if (newIso) {
-            const curIso = parseDateToISO(current?.data_de_recebimento);
-            if (newIso !== curIso) updateObj.data_de_recebimento = newIso;
-          }
-        }
-      }
-
-      // Campos numericos (armazenados como texto no banco): comparacao
-      // NUMERICA para nao reagir a diferencas de formato (ex.: "10,50" do
-      // arquivo vs "10.5" no banco representam o mesmo valor).
-      for (const field of numericFields) {
-        const raw = row[field];
-        if (raw === undefined || raw === null) continue;
-
-        const isEmpty = raw.toString().trim() === "";
-        const newVal = isEmpty ? null : parseNullableNumber(raw);
-        // Valor nao vazio porem invalido (NaN): nao altera o registro.
-        if (!isEmpty && newVal === null) continue;
-
-        const curVal = parseNullableNumber(current?.[field]);
-        if (newVal !== curVal) {
-          updateObj[field] = newVal;
-        }
-      }
-
-      // valor_original: permite CORRIGIR titulos ja gravados. Comparacao
-      // numerica robusta (parseMoney trata "R$"/milhar/decimal BR). So altera
-      // se o arquivo trouxer um valor valido diferente do atual.
-      {
-        const raw = row.valor_original ?? row["valor_original"];
-        if (raw !== undefined && raw !== null && raw.toString().trim() !== "") {
-          const newVal = parseMoney(raw);
-          if (newVal !== null) {
-            const curVal = parseMoney(current?.valor_original);
-            if (newVal !== curVal) updateObj.valor_original = newVal;
-          }
-        }
-      }
-
-      // data_vencimento: normaliza para ISO e compara so a parte da data. So
-      // altera se o arquivo trouxer uma data reconhecida diferente da atual.
-      {
-        const raw = row.data_vencimento ?? row["data_vencimento"];
-        if (raw !== undefined && raw !== null && raw.toString().trim() !== "") {
-          const newIso = parseDateToISO(raw);
-          if (newIso) {
-            const curIso = parseDateToISO(current?.data_vencimento);
-            if (newIso !== curIso) updateObj.data_vencimento = newIso;
-          }
-        }
-      }
-
-      const validatedSituacao = validateSituacao(situacao);
-      if (situacao && validatedSituacao !== null) {
-        if (validatedSituacao !== (current?.situacao ?? null)) {
-          updateObj.situacao = validatedSituacao;
-        }
-      } else if (situacao) {
-        return {
-          updateObj: {},
-          error: `Valor de situacao inválido: "${situacao}".`,
-        };
-      }
-
-      return { updateObj };
-    };
-
-    // 5. Pre-classificar cada registro em: erro de validacao, inalterado ou
-    // pendente de update. Assim, registros sem mudanca nao geram chamada ao
-    // banco -- reenviar o mesmo arquivo resulta em zero UPDATEs.
-    const rowsNeedingUpdate: { idParcela: string; updateObj: any }[] = [];
-    for (const row of dataToUpdate) {
-      const idParcela = row.id_parcela || row["id_parcela"];
-      const current = existingRecords.get(idParcela);
-      const { updateObj, error: buildError } = buildUpdateObj(row, current);
-
-      if (buildError) {
-        updates.push({
-          id_parcela: idParcela,
-          status: "error",
-          error: buildError,
-        });
-      } else if (Object.keys(updateObj).length === 0) {
-        updates.push({ id_parcela: idParcela, status: "unchanged" });
-      } else {
-        rowsNeedingUpdate.push({ idParcela, updateObj });
-      }
-    }
-
-    const unchangedCount = dataToUpdate.length - rowsNeedingUpdate.length;
-    console.log(
-      `🔄 ${rowsNeedingUpdate.length} registro(s) com alteracao real; ${unchangedCount} inalterado(s) (ignorados).`,
-    );
-
-    // 6. Atualizar em LOTE via upsert (ON CONFLICT DO UPDATE), no lugar de 1
-    // request por linha. Para nao sobrescrever colunas nao-alteradas, agrupamos
-    // as linhas por ASSINATURA (mesmo conjunto de colunas mudadas): dentro de
-    // cada grupo todas as linhas fornecem exatamente as mesmas colunas, entao o
-    // upsert em lote e seguro. Reduz de N requests para ~poucos por grupo.
-    const UPSERT_CHUNK = 500;
-
-    const groups = new Map<string, { idParcela: string; updateObj: any }[]>();
-    for (const item of rowsNeedingUpdate) {
-      const signature = Object.keys(item.updateObj).sort().join(",");
-      const g = groups.get(signature);
-      if (g) g.push(item);
-      else groups.set(signature, [item]);
-    }
-
-    const total = rowsNeedingUpdate.length;
-    let processed = 0;
-
-    // Fallback: se um lote falhar (ex.: uma unica linha com valor recusado pelo
-    // banco), reprocessa o lote linha a linha para isolar a(s) linha(s) ruim(s)
-    // sem descartar as demais.
-    const updateRowByRow = async (
-      chunk: { idParcela: string; updateObj: any }[],
-    ) => {
-      const settled = await Promise.allSettled(
-        chunk.map(async ({ idParcela, updateObj }) => {
-          const { error: rowErr } = await supabase
-            .from("BANCO_DADOS")
-            .update(updateObj)
-            .eq("id_parcela", Number(idParcela));
-          if (rowErr) throw new Error(rowErr.message);
-          return idParcela;
-        }),
-      );
-      settled.forEach((r, idx) => {
-        const { idParcela } = chunk[idx];
-        if (r.status === "fulfilled") {
-          updates.push({ id_parcela: idParcela, status: "success" });
-        } else {
-          updates.push({
-            id_parcela: idParcela,
-            status: "error",
-            error: String(
-              (r.reason as Error)?.message ?? r.reason ?? "Erro desconhecido",
-            ),
-          });
-        }
-      });
-    };
-
-    for (const group of groups.values()) {
-      for (let i = 0; i < group.length; i += UPSERT_CHUNK) {
-        const chunk = group.slice(i, i + UPSERT_CHUNK);
-        // Payload homogeneo: mesmas colunas alteradas + a PK para casar o
-        // ON CONFLICT (id_parcela). Todas as linhas ja existem (dataToUpdate
-        // so contem ids presentes no banco), entao nunca ha INSERT real.
-        const payload = chunk.map(({ idParcela, updateObj }) => ({
-          ...updateObj,
-          id_parcela: Number(idParcela),
-        }));
-
-        const { error } = await supabase
-          .from("BANCO_DADOS")
-          .upsert(payload as BancoDadosInsert[], { onConflict: "id_parcela" });
-
-        if (error) {
-          console.warn(
-            `⚠️ Lote de ${chunk.length} falhou (${error.message}); tentando linha a linha...`,
-          );
-          await updateRowByRow(chunk);
-        } else {
-          chunk.forEach(({ idParcela }) =>
-            updates.push({ id_parcela: idParcela, status: "success" }),
-          );
-        }
-
-        processed += chunk.length;
-        if (onProgress && total > 0) {
-          const percentage = 30 + Math.round((processed / total) * 70);
-          onProgress(
-            percentage,
-            `Atualizando ${processed} de ${total} registros...`,
-          );
-        }
-      }
-    }
-
-    if (total === 0 && onProgress) {
-      onProgress(100, "Nenhum registro precisou ser atualizado.");
-    }
-
-    return updates;
-  };
-
-  // Função para inserir novas parcelas no Supabase
-  const insertNewParcelasInSupabase = async (
-    data: FileData[],
-    onProgress?: (percentage: number, message: string) => void,
-  ): Promise<InsertResult> => {
-    try {
-      // 1. Separar linhas inválidas (sem id_parcela)
-      const validData = data.filter(
-        (row) => row.id_parcela && row.id_parcela.trim() !== "",
-      );
-      const invalidRows = data.filter(
-        (row) => !row.id_parcela || row.id_parcela.trim() === "",
-      );
-
-      if (validData.length === 0) {
-        return {
-          success: true,
-          insertedRows: [],
-          duplicateRows: [],
-          invalidRows,
-        };
-      }
-
-      // 2. Verificar duplicatas em lote
-      if (onProgress) onProgress(10, "Verificando duplicatas...");
-      const allIds = validData.map((row) => row.id_parcela);
-      const existingIds = new Set<number>();
-      const CHUNK_SIZE = 500;
-
-      for (let i = 0; i < allIds.length; i += CHUNK_SIZE) {
-        const chunk = allIds.slice(i, i + CHUNK_SIZE);
-        const { data: chunkRecords, error: chunkError } = await supabase
-          .from("BANCO_DADOS")
-          .select("id_parcela")
-          .in("id_parcela", chunk.map(Number));
-
-        if (chunkError) {
-          console.error("❌ Erro ao verificar duplicatas:", chunkError);
-          return { success: false, error: chunkError.message };
-        }
-        chunkRecords?.forEach((rec) => existingIds.add(Number(rec.id_parcela)));
-      }
-
-      // 3. Separar dados em "para inserir" e "duplicatas".
-      // Considera duplicata tanto o id_parcela ja existente no banco quanto o
-      // repetido DENTRO do proprio arquivo (este ultimo antes passava batido e
-      // estourava a PK no insert). Comparacao numerica para evitar mismatch de
-      // formato (ex.: "123" do Excel vs 123 no banco).
-      const seenInFile = new Set<number>();
-      const rowsToInsert: typeof validData = [];
-      const duplicateRows: typeof validData = [];
-      for (const row of validData) {
-        const idNum = Number(row.id_parcela);
-        if (existingIds.has(idNum) || seenInFile.has(idNum)) {
-          duplicateRows.push(row);
-        } else {
-          seenInFile.add(idNum);
-          rowsToInsert.push(row);
-        }
-      }
-
-      if (rowsToInsert.length === 0) {
-        if (onProgress) onProgress(100, "Nenhuma nova parcela para inserir.");
-        return { success: true, insertedRows: [], duplicateRows, invalidRows };
-      }
-
-      // 3.1 Continuidade da carteira: descobrir, por CPF/CNPJ (documento), o
-      // cobrador que o cliente JA possui. Se possuir, os novos titulos herdam
-      // esse mesmo cobrador (prioridade sobre a regra dos 60 dias). Cliente novo
-      // (sem cobrador) nao recebe atribuicao automatica.
-      const documentos = Array.from(
-        new Set(
-          rowsToInsert
-            .map((row) => row.documento)
-            .filter((doc): doc is string => !!doc),
-        ),
-      );
-
-      const documentoToCollector = new Map<string, string>();
-      const DOC_CHUNK = 300;
-      for (let i = 0; i < documentos.length; i += DOC_CHUNK) {
-        const docChunk = documentos.slice(i, i + DOC_CHUNK);
-        const { data: existing, error: existingErr } = await supabase
-          .from("BANCO_DADOS")
-          .select("documento, user_id")
-          .in("documento", docChunk)
-          .not("user_id", "is", null);
-
-        if (existingErr) {
-          console.error(
-            "Erro ao buscar cobradores existentes por documento:",
-            existingErr,
-          );
-          continue; // segue sem heranca para este chunk
-        }
-
-        existing?.forEach((rec) => {
-          if (
-            rec.documento &&
-            rec.user_id &&
-            !documentoToCollector.has(rec.documento)
-          ) {
-            documentoToCollector.set(rec.documento, rec.user_id);
-          }
-        });
-      }
-
-      const userTypeById = new Map(users.map((u) => [u.id, u.type]));
-
-      // 4. Inserir apenas as novas linhas
-      if (onProgress)
-        onProgress(50, `Inserindo ${rowsToInsert.length} novas parcelas...`);
-
-      // Mapear e converter tipos
-      const processedChunk = rowsToInsert.map((row) => {
-        const newRow: { [key: string]: any } = { ...row };
-        newRow.dias_em_atraso = newRow.dias_em_atraso
-          ? Number(newRow.dias_em_atraso)
-          : null;
-        newRow.numero_titulo = newRow.numero_titulo
-          ? Number(newRow.numero_titulo)
-          : null;
-        newRow.parcela = newRow.parcela ? Number(newRow.parcela) : null;
-        newRow.id_parcela = Number(row.id_parcela);
-        newRow.venda_n = newRow.venda_n ? Number(newRow.venda_n) : null;
-        // Valores: parser robusto (trata "R$", milhar e decimal BR).
-        newRow.valor_original = parseMoney(newRow.valor_original);
-        newRow.valor_reajustado = parseMoney(newRow.valor_reajustado);
-        newRow.multa = parseMoney(newRow.multa);
-        newRow.juros_por_dia = parseMoney(newRow.juros_por_dia);
-        newRow.multa_aplicada = parseMoney(newRow.multa_aplicada);
-        newRow.juros_aplicado = parseMoney(newRow.juros_aplicado);
-        newRow.valor_recebido = parseMoney(newRow.valor_recebido);
-        newRow.desconto = parseMoney(newRow.desconto);
-        newRow.acrescimo = parseMoney(newRow.acrescimo);
-        newRow.multa_paga = parseMoney(newRow.multa_paga);
-        newRow.juros_pago = parseMoney(newRow.juros_pago);
-        // Datas: normaliza para ISO "YYYY-MM-DD". Vazio -> null; formato nao
-        // reconhecido -> mantem o original (nao piora o comportamento atual).
-        const normDate = (v: string | undefined | null): string | null => {
-          const iso = parseDateToISO(v);
-          if (iso) return iso;
-          const t = (v ?? "").toString().trim();
-          return t === "" ? null : t;
-        };
-        newRow.data_vencimento = normDate(newRow.data_vencimento);
-        newRow.data_lancamento = normDate(newRow.data_lancamento);
-        newRow.data_de_recebimento = normDate(newRow.data_de_recebimento);
-        if (newRow.user_id === "") newRow.user_id = null;
-        if (newRow.situacao !== undefined) {
-          newRow.situacao = validateSituacao(newRow.situacao);
-        }
-
-        // Apelido, telefones e e-mail nao sao mais colunas de BANCO_DADOS
-        // (migration 20260904000002). Mante-los aqui faria o INSERT inteiro
-        // falhar; eles seguem para o cadastro do cliente logo apos a carga.
-        for (const column of CADASTRO_CONTATO_COLUMNS) delete newRow[column];
-
-        // Continuidade da carteira: se o cliente (documento) ja possui cobrador,
-        // o novo titulo herda esse mesmo cobrador, independente dos dias em
-        // atraso. Alinha a situacao ao perfil do cobrador para o titulo aparecer
-        // na carteira dele (o filtro por situacao poderia esconde-lo).
-        const inheritedCollectorId = newRow.documento
-          ? documentoToCollector.get(newRow.documento)
-          : undefined;
-        if (inheritedCollectorId) {
-          newRow.user_id = inheritedCollectorId;
-          const collectorType = userTypeById.get(inheritedCollectorId);
-          if (collectorType && collectorType !== "manager") {
-            newRow.situacao = PRIMARY_SITUACAO[collectorType];
-          }
-        }
-
-        return newRow;
-      });
-
-      // Garante o cadastro dos clientes novos ANTES de inserir as parcelas: a
-      // FK fk_banco_dados_documento exige que o documento ja exista em
-      // `clientes` para poder ser referenciado por um titulo novo.
-      if (rowsToInsert.length > 0) {
-        await insertCadastroForNewClients(rowsToInsert);
-      }
-
-      // Insert em LOTES de 500 (em vez de um unico request gigante que poderia
-      // estourar limite de payload/timeout em arquivos grandes). ignoreDuplicates:
-      // rede de seguranca -- se algum id_parcela duplicado escapar da verificacao
-      // acima, o banco ignora a linha (ON CONFLICT DO NOTHING) em vez de abortar.
-      const INSERT_CHUNK = 500;
-      for (let i = 0; i < processedChunk.length; i += INSERT_CHUNK) {
-        const slice = processedChunk.slice(i, i + INSERT_CHUNK);
-        const { error } = await supabase
-          .from("BANCO_DADOS")
-          .upsert(slice as BancoDadosInsert[], {
-            onConflict: "id_parcela",
-            ignoreDuplicates: true,
-          });
-
-        if (error) {
-          console.error("❌ Erro ao inserir dados:", error);
-          // Lotes anteriores ja gravados permanecem; reenviar e seguro (a
-          // verificacao de duplicatas ignora os ja inseridos).
-          return { success: false, error: error.message };
-        }
-
-        if (onProgress) {
-          const done = Math.min(i + INSERT_CHUNK, processedChunk.length);
-          const pct = 50 + Math.round((done / processedChunk.length) * 50);
-          onProgress(
-            pct,
-            `Inserindo ${done} de ${processedChunk.length} parcelas...`,
-          );
-        }
-      }
-
-      if (onProgress) onProgress(100, "Inserção concluída.");
-
-      // ✅ Registrar endereços no histórico após sucesso
-      if (rowsToInsert.length > 0) {
-        await insertAddressHistoryForNewClients(rowsToInsert);
-      }
-
-      return {
-        success: true,
-        insertedRows: rowsToInsert,
-        duplicateRows,
-        invalidRows,
-      };
-    } catch (error) {
-      console.error("❌ Exceção ao inserir dados:", error);
-      return { success: false, error: (error as Error).message };
-    }
-  };
-
-  // Cria o cadastro dos clientes que ainda nao existem em `clientes`.
-  //
-  // O arquivo de Novas Parcelas costuma trazer apelido/telefones/e-mail, que
-  // desde a migration 20260904000002 nao cabem mais na parcela. Sem este passo
-  // um cliente novo entraria sem contato nenhum. Cliente ja cadastrado NAO e
-  // tocado: corrigir cadastro existente e papel do card "Atualizar Cadastro de
-  // Clientes", que compara campo a campo.
-  const insertCadastroForNewClients = async (
-    data: FileData[],
-  ): Promise<void> => {
-    try {
-      // Primeira ocorrencia de cada documento vence.
-      const byDocumento = new Map<string, FileData>();
-      data.forEach((row) => {
-        const documento = (row.documento || "").trim();
-        if (documento && !byDocumento.has(documento)) {
-          byDocumento.set(documento, row);
-        }
-      });
-      if (byDocumento.size === 0) return;
-
-      const documentos = Array.from(byDocumento.keys());
-      const existentes = new Set<string>();
-      const DOC_CHUNK = 300;
-
-      for (let i = 0; i < documentos.length; i += DOC_CHUNK) {
-        const chunk = documentos.slice(i, i + DOC_CHUNK);
-        const { data: found, error } = await supabase
-          .from("clientes")
-          .select("documento")
-          .in("documento", chunk);
-
-        if (error) {
-          console.warn(
-            "⚠️ Erro ao verificar cadastros existentes:",
-            error.message,
-          );
-          return; // sem a lista de existentes, nao arriscamos duplicar
-        }
-        found?.forEach((c) => existentes.add(c.documento));
-      }
-
-      const novos = documentos
-        .filter((documento) => !existentes.has(documento))
-        .map((documento) => {
-          const row = byDocumento.get(documento)!;
-          const cadastro: ClienteInsert = {
-            documento,
-            nome: (row.cliente || "").trim() || "Cliente sem nome",
-          };
-          for (const column of CADASTRO_CONTATO_COLUMNS) {
-            const value = (row[column] || "").trim();
-            (cadastro as Record<string, unknown>)[column] =
-              value === "" ? null : value;
-          }
-          return cadastro;
-        });
-
-      if (novos.length === 0) {
-        console.log("ℹ️ Nenhum cliente novo para cadastrar.");
-        return;
-      }
-
-      const INSERT_CHUNK = 500;
-      for (let i = 0; i < novos.length; i += INSERT_CHUNK) {
-        const chunk = novos.slice(i, i + INSERT_CHUNK);
-        const { error } = await supabase.from("clientes").insert(chunk);
-        if (error) {
-          // Parcelas ja gravadas continuam validas; o cadastro pode ser
-          // completado depois pela importacao de cadastro.
-          console.error("❌ Erro ao cadastrar clientes novos:", error);
-        }
-      }
-
-      console.log(`👤 ${novos.length} cliente(s) novo(s) cadastrado(s).`);
-    } catch (error) {
-      console.error("❌ Exceção ao cadastrar clientes novos:", error);
-    }
-  };
-
-  // Função para inserir endereço inicial no histórico
-  const insertAddressHistoryForNewClients = async (
-    data: FileData[],
-  ): Promise<void> => {
-    try {
-      // Extrair clientes únicos com endereço
-      const uniqueClients = new Map<
-        string,
-        {
-          documento: string;
-          logradouro: string;
-          numero: string;
-          bairro: string;
-          cep: string;
-          cidade: string;
-          estado: string;
-          complemento: string;
-        }
-      >();
-
-      data.forEach((row) => {
-        const documento = row.documento || row["documento"];
-        if (documento && !uniqueClients.has(documento)) {
-          uniqueClients.set(documento, {
-            documento,
-            logradouro: row.endereco || row["endereco"] || "",
-            numero: row.numero || row["numero"] || "",
-            bairro: row.bairro || row["bairro"] || "",
-            cep: row.cep || row["cep"] || "",
-            cidade: row.cidade || row["cidade"] || "",
-            estado: row.estado || row["estado"] || "",
-            complemento: row.complemento || row["complemento"] || "",
-          });
-        }
-      });
-
-      if (uniqueClients.size === 0) {
-        console.log("ℹ️ Nenhum cliente com documento para registrar endereço.");
-        return;
-      }
-
-      console.log(
-        `📍 Registrando endereços iniciais para ${uniqueClients.size} cliente(s)...`,
-      );
-
-      // Verificar quais documentos já têm registros no histórico
-      const documents = Array.from(uniqueClients.keys());
-      const CHUNK_SIZE = 500;
-      const existingDocuments = new Set<string>();
-
-      for (let i = 0; i < documents.length; i += CHUNK_SIZE) {
-        const chunk = documents.slice(i, i + CHUNK_SIZE);
-        const { data: existingRecords, error } = await supabase
-          .from("enderecos_historico")
-          .select("cliente_documento")
-          .in("cliente_documento", chunk);
-
-        if (error) {
-          console.warn(
-            "⚠️ Erro ao verificar endereços existentes:",
-            error.message,
-          );
-          continue;
-        }
-
-        existingRecords?.forEach((rec) =>
-          existingDocuments.add(rec.cliente_documento),
-        );
-      }
-
-      // Filtrar apenas clientes que não têm histórico
-      const clientsToInsert = Array.from(uniqueClients.values()).filter(
-        (client) => !existingDocuments.has(client.documento),
-      );
-
-      if (clientsToInsert.length === 0) {
-        console.log(
-          "ℹ️ Todos os clientes já possuem registros no histórico de endereços.",
-        );
-        return;
-      }
-
-      // Preparar dados para inserção
-      const addressRecords = clientsToInsert.map((client) => ({
-        cliente_documento: client.documento,
-        logradouro: client.logradouro,
-        numero: client.numero,
-        bairro: client.bairro,
-        cep: client.cep,
-        cidade: client.cidade,
-        estado: client.estado,
-        complemento: client.complemento,
-        created_at: new Date().toISOString(),
-      }));
-
-      // Inserir em chunks para evitar erros
-      for (let i = 0; i < addressRecords.length; i += CHUNK_SIZE) {
-        const chunk = addressRecords.slice(i, i + CHUNK_SIZE);
-        const { error } = await supabase
-          .from("enderecos_historico")
-          .insert(chunk);
-
-        if (error) {
-          console.error(
-            `❌ Erro ao inserir endereços (chunk ${i / CHUNK_SIZE + 1}):`,
-            error,
-          );
-        } else {
-          console.log(
-            `✅ ${chunk.length} endereço(s) registrado(s) no histórico.`,
-          );
-        }
-      }
-    } catch (error) {
-      console.error("❌ Erro ao processar histórico de endereços:", error);
-    }
-  };
-
   // Executor da fila, comum aos tres cards: valida todos os arquivos primeiro,
   // processa um a um SEM pedir interacao entre eles e abre um unico modal de
   // resultados no fim, com os numeros somados e o desfecho por arquivo. O que
@@ -1723,6 +821,7 @@ const DatabaseUpload: React.FC = () => {
     setUploadStatus("");
     setDebugInfo("");
     setFileSummaries([]);
+    setSsoticaTotais(null);
     setQueueIndex(0);
     setQueueTotal(files.length);
     setQueueFileName(files[0].name);
@@ -1839,40 +938,71 @@ const DatabaseUpload: React.FC = () => {
     }
   };
 
-  const handleUploadStatus = () =>
-    runQueue(statusFiles, {
-      // Valida estrutura (tamanho, tipo e cabecalho) antes de qualquer processamento.
-      validate: (file) => validateCsvFile(file, REQUIRED_COLUMNS_PARCELA),
-      beforeAll: async () => {
-        setProgressMessage("🔍 Testando conexão com Supabase...");
-        const connectionOk = await testSupabaseConnection();
-        if (!connectionOk) {
-          setProgressMessage("❌ Falha na conexão com Supabase");
-          setUploadStatus("❌ Falha na conexão com Supabase");
-        }
-        return connectionOk;
+  // Contas a receber da SSOtica (planilhas BD_Contasareceber_*.xlsx, aba BD).
+  // Mesma conversao do script diario (linhas_para_app) e mesma funcao do banco
+  // (importar_parcelas_ssotica): as regras -- o que atualizar, o que nao tocar
+  // (cancelada, acordo ativo, pagamento do app ainda nao baixado), renegociacao
+  // -- ficam la. Esta tela nao escreve em BANCO_DADOS diretamente.
+  const handleUploadSsotica = () => {
+    let totais = resultadoVazio();
+    return runQueue(ssoticaFiles, {
+      validate: async (file) => {
+        const v = validarNomeArquivo(file);
+        if (!v.ok) return v;
+        if (file.size === 0)
+          return { ok: false, error: "O arquivo está vazio." };
+        if (file.size > MAX_FILE_SIZE_BYTES)
+          return {
+            ok: false,
+            error: `Arquivo muito grande. O limite é ${MAX_FILE_SIZE_MB}MB.`,
+          };
+        return { ok: true };
       },
       run: async (file, onProgress) => {
-        const data = await processFile(file, (pct, msg) => {
-          onProgress(Math.round(pct * 0.4), msg); // parse ocupa 0-40%
-        });
+        onProgress(5, `📖 Lendo ${file.name}...`);
+        const { linhas, descartadas, lojas } = await lerPlanilhaSsotica(file);
+        if (linhas.length === 0)
+          throw new Error("Nenhuma parcela com ID Parcela na planilha.");
         onProgress(
-          40,
-          `📋 ${data.length} registros encontrados. Atualizando no Supabase...`,
+          20,
+          `📋 ${linhas.length} parcela(s) de ${lojas.join(", ") || "loja sem nome"}. Enviando...`,
         );
-        // 40% para processamento, 60% para upload
-        return updateStatusInSupabase(data, (percentage, message) =>
-          onProgress(40 + percentage * 0.6, message),
+        const res = await importarContasReceberSsotica(
+          linhas,
+          (feitas, total) =>
+            onProgress(
+              20 + Math.round((feitas / total) * 80),
+              `📤 ${feitas}/${total} parcela(s) enviadas...`,
+            ),
+          (lote) => {
+            totais = somarResultados(totais, lote);
+          },
         );
+        if (descartadas > 0) {
+          setDebugInfo(
+            (prev) =>
+              `${prev}${prev ? "\n" : ""}📄 ${file.name}: ${descartadas} linha(s) sem ID Parcela ou da Exxlab descartada(s).`,
+          );
+        }
+        return res.ignoradas.map((ig) => ({
+          id_parcela: String(ig.id_parcela),
+          status: "unchanged" as const,
+          error: descreverMotivo(ig.motivo),
+        }));
       },
-      summarize: (results) => {
-        const { success, unchanged, error } = countByStatus(results);
-        return `Status: ${success} atualizado(s), ${unchanged} inalterado(s), ${error} falha(s).`;
+      summarize: () =>
+        `SSÓtica: ${totais.recebidas} recebida(s), ${totais.inseridas} nova(s), ` +
+        `${totais.atualizadas} atualizada(s), ${totais.ignoradas.length} não mexida(s).`,
+      labels: SSOTICA_RESULT_LABELS,
+      title: "Resultado do Contas a Receber SSÓtica",
+      onFinish: () => {
+        setSsoticaTotais(totais);
+        if (totais.inseridas > 0 || totais.atualizadas > 0)
+          setNeedsRefresh(true);
+        setSsoticaFiles([]);
       },
-      labels: DEFAULT_RESULT_LABELS,
-      title: "Resultado da Atualização de Status",
-      onFinish: () => setStatusFiles([]),
     });
+  };
 
   // Importa o cadastro de clientes (nome, apelido, nascimento e contatos). A
   // regra de negocio (colunas aceitas, normalizacao, casamento por documento e
@@ -1909,58 +1039,6 @@ const DatabaseUpload: React.FC = () => {
       labels: CLIENTES_RESULT_LABELS,
       title: "Resultado da Atualização do Cadastro de Clientes",
       onFinish: () => setClientesFiles([]),
-    });
-
-  const handleUploadNewParcela = () =>
-    runQueue(newParcelaFiles, {
-      // Valida estrutura (tamanho, tipo e cabecalho) antes de qualquer processamento.
-      validate: (file) => validateCsvFile(file, REQUIRED_COLUMNS_PARCELA),
-      run: async (file, onProgress) => {
-        const data = await processFile(file, (pct, msg) => {
-          onProgress(Math.round(pct * 0.2), msg); // parse ocupa 0-20%
-        });
-        onProgress(20, `Processando ${data.length} linhas...`);
-
-        // 20% para processar, 80% para inserir
-        const result = await insertNewParcelasInSupabase(data, (p, m) =>
-          onProgress(20 + p * 0.8, m),
-        );
-        // Falha do arquivo: registrada no relatorio da fila, que segue para o
-        // proximo arquivo em vez de encerrar o lote inteiro.
-        if (!result.success) {
-          throw new Error(result.error ?? "Falha ao inserir as parcelas.");
-        }
-
-        const resultsForModal: UpdateResult[] = [];
-        result.insertedRows?.forEach((row) => {
-          resultsForModal.push({
-            id_parcela: row.id_parcela || "N/A",
-            status: "success",
-          });
-        });
-        result.duplicateRows?.forEach((row) => {
-          resultsForModal.push({
-            id_parcela: row.id_parcela || "N/A",
-            status: "error",
-            error: "Título já consta no Banco de Dados.",
-          });
-        });
-        result.invalidRows?.forEach((row) => {
-          resultsForModal.push({
-            id_parcela: row.id_parcela || "N/A",
-            status: "error",
-            error: "Linha inválida ou id_parcela ausente.",
-          });
-        });
-        return resultsForModal;
-      },
-      summarize: (results) => {
-        const { success, error } = countByStatus(results);
-        return `Status: ${success} inserido(s), ${error} falha(s)/duplicata(s).`;
-      },
-      labels: DEFAULT_RESULT_LABELS,
-      title: "Resultado da Adição de Novas Parcelas",
-      onFinish: () => setNewParcelaFiles([]),
     });
 
   return (
@@ -2100,7 +1178,7 @@ const DatabaseUpload: React.FC = () => {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {/* Card: Atualizar Status de Parcelas */}
+        {/* Card: Contas a receber SSOtica */}
         <div className="flex flex-col bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden transition-all hover:shadow-xl">
           <div className="p-6">
             <div className="flex items-center gap-3">
@@ -2108,40 +1186,48 @@ const DatabaseUpload: React.FC = () => {
                 <UploadCloud className="h-6 w-6 text-blue-600" />
               </div>
               <h3 className="text-xl font-bold text-gray-800">
-                Atualizar Status de Parcelas
+                Contas a Receber SSÓtica
               </h3>
             </div>
             <p className="text-gray-500 mt-3 text-sm">
-              Envie um arquivo CSV para atualizar o status, situação, data de
-              recebimento, valor recebido ou desconto de múltiplas parcelas de
-              uma só vez.
+              Envie as planilhas{" "}
+              <code className="text-xs bg-gray-100 px-1 py-0.5 rounded">
+                BD_Contasareceber_*.xlsx
+              </code>{" "}
+              (as mesmas do Power BI). Parcelas novas entram, as existentes são
+              atualizadas, e as que estão canceladas, em acordo ou com pagamento
+              do app ainda não baixado na loja não são tocadas.
+            </p>
+            <p className="text-gray-400 mt-2 text-xs">
+              A atualização já roda sozinha todo dia às 6h; use aqui só para
+              repetir fora do horário. A Focco Brasil vem do Ciclone e a Exxlab
+              não entra no app.
             </p>
           </div>
 
           <div className="px-6 pb-6 mt-auto">
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-4">
               <FileDropzone
-                id="statusFileInput"
-                accept=".csv"
-                hint="Formato CSV, até 50MB por arquivo"
+                id="ssoticaFileInput"
+                accept=".xlsx"
+                hint="Formato XLSX, até 50MB por arquivo"
                 color="blue"
-                files={statusFiles}
+                files={ssoticaFiles}
                 disabled={loading}
                 onAdd={(files) =>
-                  addFilesToQueue(
-                    files,
-                    statusFiles,
-                    setStatusFiles,
-                    quickValidateCsv,
+                  addFilesToQueue(files, ssoticaFiles, setSsoticaFiles, (f) =>
+                    f.size === 0
+                      ? { ok: false, error: "O arquivo está vazio." }
+                      : validarNomeArquivo(f),
                   )
                 }
-                onRemove={(key) => removeFromQueue(key, setStatusFiles)}
-                onClear={() => clearQueue(setStatusFiles)}
+                onRemove={(key) => removeFromQueue(key, setSsoticaFiles)}
+                onClear={() => clearQueue(setSsoticaFiles)}
               />
 
               <button
-                onClick={handleUploadStatus}
-                disabled={loading || statusFiles.length === 0}
+                onClick={handleUploadSsotica}
+                disabled={loading || ssoticaFiles.length === 0}
                 className="w-full inline-flex justify-center items-center px-4 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 {loading ? (
@@ -2151,67 +1237,9 @@ const DatabaseUpload: React.FC = () => {
                 )}
                 {loading
                   ? "Processando..."
-                  : statusFiles.length > 1
-                    ? `Enviar e Atualizar (${statusFiles.length} arquivos)`
+                  : ssoticaFiles.length > 1
+                    ? `Enviar e Atualizar (${ssoticaFiles.length} arquivos)`
                     : "Enviar e Atualizar"}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Card: Adicionar Novas Parcelas */}
-        <div className="flex flex-col bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden transition-all hover:shadow-xl">
-          <div className="p-6">
-            <div className="flex items-center gap-3">
-              <div className="bg-green-100 p-3 rounded-full">
-                <FileText className="h-6 w-6 text-green-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-800">
-                Adicionar Novas Parcelas
-              </h3>
-            </div>
-            <p className="text-gray-500 mt-3 text-sm">
-              Envie um arquivo CSV com novas parcelas para serem adicionadas ao
-              banco de dados. Certifique-se que o `id_parcela` seja único.
-            </p>
-          </div>
-
-          <div className="px-6 pb-6 mt-auto">
-            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-4">
-              <FileDropzone
-                id="newParcelaFileInput"
-                accept=".csv"
-                hint="Formato CSV, até 50MB por arquivo"
-                color="green"
-                files={newParcelaFiles}
-                disabled={loading}
-                onAdd={(files) =>
-                  addFilesToQueue(
-                    files,
-                    newParcelaFiles,
-                    setNewParcelaFiles,
-                    quickValidateCsv,
-                  )
-                }
-                onRemove={(key) => removeFromQueue(key, setNewParcelaFiles)}
-                onClear={() => clearQueue(setNewParcelaFiles)}
-              />
-
-              <button
-                onClick={handleUploadNewParcela}
-                disabled={loading || newParcelaFiles.length === 0}
-                className="w-full inline-flex justify-center items-center px-4 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-              >
-                {loading ? (
-                  <RefreshCcw className="h-5 w-5 mr-2 animate-spin" />
-                ) : (
-                  <UploadCloud className="h-5 w-5 mr-2" />
-                )}
-                {loading
-                  ? "Processando..."
-                  : newParcelaFiles.length > 1
-                    ? `Enviar e Adicionar (${newParcelaFiles.length} arquivos)`
-                    : "Enviar e Adicionar"}
               </button>
             </div>
           </div>
@@ -2331,48 +1359,56 @@ const DatabaseUpload: React.FC = () => {
                 <h3 className="text-lg font-bold text-gray-900 mb-4">
                   Resumo da Operação
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-green-50 p-4 rounded-lg flex items-center space-x-3">
-                    <CheckCircle className="h-8 w-8 text-green-500" />
-                    <div>
-                      <p className="text-sm text-gray-600">
-                        {resultLabels.successLabel}
-                      </p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {successResults.length}
-                      </p>
+                {ssoticaTotais ? (
+                  <SsoticaResumo totais={ssoticaTotais} />
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-green-50 p-4 rounded-lg flex items-center space-x-3">
+                      <CheckCircle className="h-8 w-8 text-green-500" />
+                      <div>
+                        <p className="text-sm text-gray-600">
+                          {resultLabels.successLabel}
+                        </p>
+                        <p className="text-2xl font-bold text-gray-900">
+                          {successResults.length}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="bg-gray-100 p-4 rounded-lg flex items-center space-x-3">
+                      <Info className="h-8 w-8 text-gray-500" />
+                      <div>
+                        <p className="text-sm text-gray-600">
+                          {resultLabels.unchangedLabel}
+                        </p>
+                        <p className="text-2xl font-bold text-gray-900">
+                          {unchangedResults.length}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="bg-red-50 p-4 rounded-lg flex items-center space-x-3">
+                      <AlertCircle className="h-8 w-8 text-red-500" />
+                      <div>
+                        <p className="text-sm text-gray-600">
+                          {resultLabels.errorLabel}
+                        </p>
+                        <p className="text-2xl font-bold text-gray-900">
+                          {errorResults.length}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                  <div className="bg-gray-100 p-4 rounded-lg flex items-center space-x-3">
-                    <Info className="h-8 w-8 text-gray-500" />
-                    <div>
-                      <p className="text-sm text-gray-600">
-                        {resultLabels.unchangedLabel}
-                      </p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {unchangedResults.length}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="bg-red-50 p-4 rounded-lg flex items-center space-x-3">
-                    <AlertCircle className="h-8 w-8 text-red-500" />
-                    <div>
-                      <p className="text-sm text-gray-600">
-                        {resultLabels.errorLabel}
-                      </p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {errorResults.length}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <p className="text-xs text-gray-500 mt-4 text-center">
-                  Total processado: {uploadResults.length} registro(s)
-                </p>
+                )}
+                {!ssoticaTotais && (
+                  <p className="text-xs text-gray-500 mt-4 text-center">
+                    Total processado: {uploadResults.length} registro(s)
+                  </p>
+                )}
 
                 {/* Quebra por arquivo -- so faz sentido quando a fila teve mais
-                    de um arquivo (ou algum foi ignorado na validacao). */}
-                {fileSummaries.length > 1 && (
+                    de um arquivo (ou algum foi ignorado na validacao). Na
+                    SSOtica sempre aparece: e onde fica a falha de um arquivo. */}
+                {(fileSummaries.length > 1 ||
+                  (ssoticaTotais && fileSummaries.length > 0)) && (
                   <div className="mt-6">
                     <h4 className="text-sm font-semibold text-gray-700 mb-2">
                       Por arquivo ({fileSummaries.length})
@@ -2457,21 +1493,24 @@ const DatabaseUpload: React.FC = () => {
                     <ResultList
                       items={unchangedResults}
                       emptyMessage={resultLabels.unchangedEmpty}
+                      showNote
                       idLabel={resultLabels.itemLabel}
                     />
                   </div>
 
-                  {/* Sucessos */}
-                  <div>
-                    <h4 className="text-md font-semibold text-green-700 mb-2">
-                      {resultLabels.successLabel} ({successResults.length})
-                    </h4>
-                    <ResultList
-                      items={successResults}
-                      emptyMessage={resultLabels.successEmpty}
-                      idLabel={resultLabels.itemLabel}
-                    />
-                  </div>
+                  {/* Sucessos (a SSOtica so devolve totais: ver Visao Sintetica) */}
+                  {!ssoticaTotais && (
+                    <div>
+                      <h4 className="text-md font-semibold text-green-700 mb-2">
+                        {resultLabels.successLabel} ({successResults.length})
+                      </h4>
+                      <ResultList
+                        items={successResults}
+                        emptyMessage={resultLabels.successEmpty}
+                        idLabel={resultLabels.itemLabel}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             )}

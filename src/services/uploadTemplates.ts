@@ -4,8 +4,8 @@ import { CLIENTE_IMPORT_FIELDS } from "./clientesImportService";
 // ---------------------------------------------------------------------------
 // Modelos de planilha para download
 //
-// Cada card de upload tem um modelo proprio: baixar o modelo "completo" para
-// preencher so o status obrigava o usuario a caçar as colunas certas entre 44.
+// O contas a receber da SSOtica nao tem modelo: o card aceita as planilhas
+// BD_Contasareceber_*.xlsx como saem do script. Sobrou o modelo de cadastro.
 // Os cabecalhos do modelo de cadastro sao derivados de CLIENTE_IMPORT_FIELDS,
 // entao o que o modelo oferece e sempre o que o importador aceita.
 // ---------------------------------------------------------------------------
@@ -66,24 +66,6 @@ export const BANCO_DADOS_HEADERS = [
   "situacao",
 ];
 
-// Somente as colunas que a carga de status realmente le (ver buildUpdateObj em
-// DatabaseUpload). id_parcela e a chave e nao pode faltar.
-const STATUS_HEADERS = [
-  "id_parcela",
-  "status",
-  "situacao",
-  "data_vencimento",
-  "data_de_recebimento",
-  "valor_original",
-  "valor_reajustado",
-  "valor_recebido",
-  "desconto",
-  "multa",
-  "multa_aplicada",
-  "juros_por_dia",
-  "juros_aplicado",
-];
-
 const CADASTRO_HEADERS = [
   "documento",
   ...CLIENTE_IMPORT_FIELDS.map((f) => f.key),
@@ -103,25 +85,6 @@ export const CADASTRO_EXPORT_HEADERS = [
 ];
 
 export const UPLOAD_TEMPLATES: UploadTemplate[] = [
-  {
-    id: "status",
-    label: "Atualizar Status de Parcelas",
-    description:
-      "Chave id_parcela + status, situação, datas e valores. Colunas vazias não alteram o registro.",
-    fileName: "modelo_atualizar_status.csv",
-    headers: STATUS_HEADERS,
-  },
-  {
-    id: "novas_parcelas",
-    label: "Adicionar Novas Parcelas",
-    description:
-      "Todas as colunas do BANCO_DADOS, para cadastrar títulos novos. Colunas de contato no arquivo vão para o cadastro do cliente.",
-    fileName: "modelo_novas_parcelas.csv",
-    // As colunas de contato continuam no modelo: um titulo novo costuma vir do
-    // mesmo relatorio que traz o cadastro, e a importacao as desvia para
-    // `clientes` quando o cliente ainda nao existe.
-    headers: [...BANCO_DADOS_HEADERS, ...CADASTRO_EXPORT_HEADERS],
-  },
   {
     id: "cadastro_clientes",
     label: "Cadastro de Clientes",

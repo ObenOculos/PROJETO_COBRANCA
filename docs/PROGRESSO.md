@@ -248,8 +248,21 @@ vencida só fica em "Marcados para hoje" se ainda há dívida vencida
 e gestor informam a data do pagamento, até 30 dias atrás (`ab37330`,
 `process_payment.p_payment_date`; offline guarda a data do registro).
 
-**Falta:** trocar a tela de upload para a função (upload manual hoje pode
-apagar pagamento do app — evitar); conferir ~190 parcelas em aberto no app
+**Tela de upload (2026-11-12):** os cards "Atualizar Status de Parcelas" e
+"Adicionar Novas Parcelas" (escreviam direto em `BANCO_DADOS`, causa do
+incidente das 10h20) saíram, com o código e os modelos CSV deles. No lugar,
+card "Contas a Receber SSÓtica": aceita os `BD_Contasareceber_*.xlsx` (aba BD;
+recusa Exxlab), converte igual a `linhas_para_app`
+(`src/services/ssoticaContasReceberImport.ts`, conferido sem diferença contra
+o Python em 3 lojas / ~28 mil linhas) e envia em lotes de 2.000 para
+`importar_parcelas_ssotica` (lote que estoura o limite de 8s da sessão do
+gestor é dividido ao meio e reenviado). O modal mostra os totais da função e
+a lista das não mexidas com o motivo. Antes de tirar os cards: todas as lojas
+de `BANCO_DADOS` fora a Focco Brasil (Ciclone) são lojas da SSÓtica cobertas
+pelo script — nenhuma outra origem dependia deles. "Cadastro de Clientes" e
+"Adicionar Título" ficam.
+
+**Falta:** testar o card novo na tela (grava em produção); conferir ~190 parcelas em aberto no app
 que sumiram da SSÓtica sem ser RE nem cancelada; critério para cliente que
 não atende (proposta de degraus 1–3 / 4–7 / 8+ e 21 dias, aguardando decisão).
 
