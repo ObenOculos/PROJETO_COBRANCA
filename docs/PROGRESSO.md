@@ -262,8 +262,39 @@ de `BANCO_DADOS` fora a Focco Brasil (Ciclone) são lojas da SSÓtica cobertas
 pelo script — nenhuma outra origem dependia deles. "Cadastro de Clientes" e
 "Adicionar Título" ficam.
 
-**Falta:** testar o card novo na tela (grava em produção); conferir ~190 parcelas em aberto no app
-que sumiram da SSÓtica sem ser RE nem cancelada; critério para cliente que
+**Parcelas "sumidas" (2026-11-12):** o relatório de contas a receber só filtra
+Em aberto / Pago / Renegociado / SPC — **não tem Cancelado**. Parcela cancelada
+sozinha na loja (venda segue ativa; o `cancelados_ssotica` só pega venda
+cancelada inteira) sumia do relatório e o app seguia cobrando. Decisão do
+usuário: cancelada na SSÓtica = cancelada no app, qualquer que seja o motivo.
+Sumir NÃO basta para cancelar: das 223 em aberto no app fora do relatório,
+29 eram `Pago Parcial` (fechadas: original = recebido + desconto), 4 em acordo
+ativo (renegociação do acordo, protegidas de propósito), e o resto foi
+conferido na SSÓtica:
+- busca da venda por número (tela de vendas, filtro `nsa_venda`) → 67
+  "Cancelado" com venda/parcela/vencimento iguais;
+- ficha do cliente (`/cadastro/cliente/<id>/detalhe/crediario`, cliente
+  achado pelo CPF em `/cadastro/cliente`, campo `search_Cliente`) → mais 55.
+  Casamento: loja + nº parcela + vencimento + valor e, se o app tem nº de
+  título/venda, o mesmo número (sem isso uma venda refeita casou com a
+  errada); sem nº no app, nenhuma outra linha do app pode ter o
+  título/parcela casado.
+- 122 canceladas no app por `cancelar_parcelas_ssotica` (33 vendas, 0 visitas).
+- Sobraram 68 para conferência (R$ 7,7 mil): 33 com título que nem aparece na
+  ficha do cliente, 34 com o mesmo título/parcela na SSÓtica mas vencimento ou
+  valor diferente (o app tem vencimento antigo), 1 conflito.
+
+Rotina diária: `sumidas_ssotica.py --gravar` virou o 3º passo de
+`atualizar_ssotica.py` (só roda se o contas a receber deu certo). Lê
+`saida/contas_receber_ids.json` (IDs do relatório do dia, gravado pelo
+`contas_receber_ssotica.py --app` com todas as lojas; arquivo de outro dia →
+não confere), confere as sumidas na ficha do cliente, cancela só as
+confirmadas e põe o resto em `saida/sumidas_ssotica_<data>.csv`. Para se
+houver mais de 1.500 sumidas (download incompleto).
+
+**Falta:** testar o card novo na tela (grava em produção); conferir a 1ª
+rodada agendada com o 3º passo; decidir o que fazer com as 68 da conferência
+(hoje só no CSV; tela para o gestor?); critério para cliente que
 não atende (proposta de degraus 1–3 / 4–7 / 8+ e 21 dias, aguardando decisão).
 
 ### Item 51 — Vendas canceladas na SSÓtica → app — 2026-11-11

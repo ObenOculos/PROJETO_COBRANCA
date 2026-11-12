@@ -307,6 +307,7 @@ def salvar(df: pd.DataFrame, caminho: Path) -> None:
 # ---------------------------------------------------------------------------
 
 LOTE_APP = 2000
+ARQUIVO_IDS = "contas_receber_ids.json"   # lido pelo sumidas_ssotica.py
 CAMPOS_APP = {   # coluna da planilha -> chave da função
     "Nome da Loja": "nome_da_loja", "Data Lançamento": "data_lancamento",
     "Data Vencimento": "data_vencimento", "Valor Original": "valor_original",
@@ -458,6 +459,10 @@ def main() -> None:
     ss.login()
     t_total = time.time()
     ignoradas_total: list[dict] = []
+    # IDs que vieram no relatório, por loja do app: o sumidas_ssotica.py compara
+    # com as parcelas em aberto no app (o que sumiu pode ter sido cancelado na
+    # loja -- o relatório não tem a situação Cancelado).
+    no_relatorio: dict[str, set[int]] = {}
     for loja in lojas:
         t0 = time.time()
         df = tratar(baixar_loja(ss, loja, bruto), loja, apelidos)
@@ -484,7 +489,11 @@ def main() -> None:
             # parcela antiga; não entram nas planilhas do Power BI.
             reneg = tratar(baixar_loja(ss, loja, bruto, situacoes=("RE",)), loja, apelidos)
             reneg = reneg[reneg["Status"].astype(str).str.strip() == "Renegociado"]
-            res = aplicar_no_app(linhas_para_app(df) + linhas_para_app(reneg), *supa)
+            linhas = linhas_para_app(df) + linhas_para_app(reneg)
+            for l in linhas:
+                if l["nome_da_loja"]:
+                    no_relatorio.setdefault(l["nome_da_loja"], set()).add(l["id_parcela"])
+            res = aplicar_no_app(linhas, *supa)
             ign = res.pop("ignoradas")
             por_motivo: dict[str, int] = {}
             for x in ign:
@@ -495,6 +504,13 @@ def main() -> None:
         arq = SAIDA / f"contas_receber_nao_aplicadas_{datetime.now():%Y%m%d_%H%M}.csv"
         pd.DataFrame(ignoradas_total).to_csv(arq, index=False, sep=";", encoding="utf-8-sig")
         log.info("Parcelas que o app não atualizou (cancelada/acordo/pago no app): %s", arq)
+    if supa and no_relatorio and not args.loja:
+        # Só com todas as lojas: rodada parcial faria as outras parecerem sumidas.
+        arq = SAIDA / ARQUIVO_IDS
+        arq.write_text(json.dumps({"gerado_em": datetime.now().isoformat(timespec="seconds"),
+                                   "lojas": {k: sorted(v) for k, v in no_relatorio.items()}}),
+                       encoding="utf-8")
+        log.info("IDs do relatório gravados em %s (%d lojas)", arq, len(no_relatorio))
     log.info("Concluído em %.0fs. Planilhas em: %s", time.time() - t_total, " | ".join(map(str, destinos)))
 
 
