@@ -1962,12 +1962,20 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     // reaparecia em "Sem contato ha 7+ dias" como se tivesse sido ignorado.
     // Mesma convencao do LogContactModal (uma linha por titulo), recortada
     // aos titulos DESTE acordo em vez de todo titulo aberto do cliente.
-    const proximaParcela = [...params.parcelas].sort((a, b) =>
+    const ordenadas = [...params.parcelas].sort((a, b) =>
       a.dataVencimento.localeCompare(b.dataVencimento),
-    )[0];
+    );
+    const primeiraParcela = ordenadas[0];
+    // Retorno ("Acompanhar parcela do acordo") = 1a parcela DEPOIS da
+    // entrada. A entrada (numero 1) ja sai paga da criacao -- o AcordoModal
+    // so cria o acordo com o Pix dela confirmado. Antes o retorno era a
+    // propria entrada (vence hoje) e o cliente caia em "Marcados para hoje"
+    // logo depois de fechar o acordo (2026-11-12). Acordo so de entrada: sem
+    // retorno.
+    const proximaParcela = ordenadas.find((p) => p.numero !== 1);
     const notesAcordo =
       `Acordo criado: ${params.parcelas.length}x — 1ª parcela em ` +
-      `${proximaParcela ? proximaParcela.dataVencimento.split("-").reverse().join("/") : "-"}` +
+      `${primeiraParcela ? primeiraParcela.dataVencimento.split("-").reverse().join("/") : "-"}` +
       ` — valor negociado ${formatCurrency(
         params.parcelas.reduce((sum, p) => sum + p.valorParcela, 0),
       )}`;
