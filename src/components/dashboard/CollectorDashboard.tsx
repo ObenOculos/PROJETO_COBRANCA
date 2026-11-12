@@ -1796,24 +1796,51 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
                   : ""}
               </span>
             )}
-            {lastContact?.efetivo?.nextActionDate && (
-              <span
-                className={`inline-flex items-center gap-1 w-fit px-2 py-1 rounded-full text-[10px] font-bold border whitespace-nowrap ${
-                  lastContact.efetivo.nextActionDate < todayLocalStr()
-                    ? "bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400"
-                    : "bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-300"
-                }`}
-                title="Data em que o cliente prometeu pagar"
-              >
-                <Clock className="w-3 h-3" />
-                {lastContact.efetivo.nextActionDate < todayLocalStr()
-                  ? "Promessa venceu "
-                  : "Prometeu pagar "}
-                {new Date(
-                  lastContact.efetivo.nextActionDate + "T00:00:00",
-                ).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
-              </span>
-            )}
+            {lastContact?.efetivo?.nextActionDate &&
+              (() => {
+                // Retorno de acordo ("Acordo criado") e a proxima parcela do
+                // acordo, nao uma promessa. Data passada com o cliente sem
+                // nada vencido = cumprida: cinza, nao vermelho (2026-11-12;
+                // mesma regra de "Marcados para hoje").
+                const retorno = lastContact.efetivo.nextActionDate;
+                const deAcordo = lastContact.efetivo.result === "agreement";
+                const passou = retorno < todayLocalStr();
+                const cumprida = passou && emDia;
+                const dataCurta = new Date(retorno + "T00:00:00").toLocaleDateString(
+                  "pt-BR",
+                  { day: "2-digit", month: "2-digit" },
+                );
+                const rotulo = deAcordo
+                  ? cumprida
+                    ? `Parcela do acordo de ${dataCurta} — em dia`
+                    : passou
+                      ? `Parcela do acordo venceu ${dataCurta}`
+                      : `Parcela do acordo em ${dataCurta}`
+                  : cumprida
+                    ? `Promessa de ${dataCurta} — em dia`
+                    : passou
+                      ? `Promessa venceu ${dataCurta}`
+                      : `Prometeu pagar ${dataCurta}`;
+                return (
+                  <span
+                    className={`inline-flex items-center gap-1 w-fit px-2 py-1 rounded-full text-[10px] font-bold border whitespace-nowrap ${
+                      cumprida
+                        ? "bg-gray-50 text-gray-500 border-gray-200 dark:bg-dark-bg-tertiary dark:border-dark-border dark:text-dark-text-secondary"
+                        : passou
+                          ? "bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400"
+                          : "bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-300"
+                    }`}
+                    title={
+                      deAcordo
+                        ? "Vencimento da próxima parcela do acordo"
+                        : "Data em que o cliente prometeu pagar"
+                    }
+                  >
+                    <Clock className="w-3 h-3" />
+                    {rotulo}
+                  </span>
+                );
+              })()}
           </div>
         ) : (
           <span className="text-xs text-gray-300 italic">—</span>
