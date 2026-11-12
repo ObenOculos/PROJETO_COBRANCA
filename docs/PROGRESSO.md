@@ -55,7 +55,7 @@ uma etapa (mova o item para "Concluído", com data e commit).
 | 48 | Gestor: números errados depois de sair e entrar na mesma aba (só quitados) + travamento ao trocar de aba (Desempenho ~32 s, Lojas, Cobranças) — `831d182`, `96fb4f8`, `c563f22`, `63aaef6`, `87439e5`, 2026-11-11; testado no build de produção, sem push | Alta | Pequeno |
 | 50 | Desempenho do Cedrus → app — 2026-11-11: recebido do período inteiro (4.792 parcelas `sale_payments` "Cedrus", 7 operadores) + log real de 43.387 atendimentos (PROD_OPERADORES; aproximados apagados) + aba Conferência com seletor; publicado (`1c355e2`); carga da carteira do cobrador corrigida (RPC `ultimos_contatos_titulos`, `e97ba81`) | Alta | Médio |
 
-| 51 | Vendas canceladas na SSÓtica → app — 2026-11-11: script sem navegador `scripts/ssotica/cancelados_ssotica.py` (login + filtro Cancelada, 11 lojas, ~5 min) + função `cancelar_parcelas_ssotica` (migration `20261111000006`, aplicada); 953 parcelas / 172 vendas / R$ 117,5 mil canceladas no app em 2026-11-11; agendamento diário 6h por `agendar_tarefa.ps1` (usuário registra) | Alta | Médio |
+| 51 | Vendas canceladas na SSÓtica → app — 2026-11-11: script sem navegador `scripts/ssotica/cancelados_ssotica.py` (login + filtro Cancelada, 11 lojas, ~5 min) + função `cancelar_parcelas_ssotica` (migration `20261111000006`, aplicada); 959 parcelas / 173 vendas / R$ 118 mil canceladas no app em 2026-11-11; tarefa diária 6h `Cobranca_Cancelados_SSOtica` registrada | Alta | Médio |
 ## Perguntas em aberto para o financeiro
 
 Lista viva: o usuário leva ao financeiro (Márcia) e traz as respostas. Ao
@@ -266,8 +266,24 @@ Rodada seguinte só em relatório: 0 a cancelar, 953 `JA_CANCELADA`.
 do Ciclone). Log com data em `saida/cancelados_ssotica.log`, inclusive erro
 fatal; JSON/CSV com mais de 30 dias são apagados a cada rodada.
 
-**Falta:** usuário conferir Messejana 2865 e as 13 "Pago no app"; depois,
-automatizar a atualização da base (contas a receber).
+Tarefa registrada pelo usuário em 2026-11-11 (1ª execução 12/11 6h).
+
+**Conferência (2026-11-11):**
+- Messejana 2865: cancelada 16/08 e refeita no mesmo dia como Crateus Ext
+  7368 (mesmo valor e parcelas); os pagamentos do Cedrus vieram com o número
+  antigo. Era cobrança em dobro — cancelada. O script agora reconhece venda
+  refeita: pagamento depois do cancelamento só segura a venda
+  (`PAGTO_APOS_CANCELAMENTO`) se o cliente não tiver outra venda (loja +
+  número) lançada a partir da data do cancelamento.
+- 13 "Pago no app": 7 pagas de fato antes do cancelamento; Itapipoca Ext
+  1385 parcelas 5–10 estão Pago com R$ 0 recebido (importação antiga) — não
+  somam no recebido nem estão em cobrança, mantidas.
+- Cancelamentos administrativos ("problema no PJBank", "refazer a venda",
+  "renegociado", "venda errada"): quase todos refeitos em outra venda que
+  está no app. Messejana 2706 e 2678 (R$ 1.840) sem venda nova do mesmo
+  cliente no app — usuário confere na SSÓtica.
+
+**Falta:** automatizar a atualização da base (contas a receber).
 
 ### Item 50 — Desempenho do Cedrus → app — 2026-11-11
 

@@ -432,11 +432,54 @@ def marcar_pagamento_apos_cancelamento(url: str, chave: str, linhas: list[dict])
             if len(rows) < 1000:
                 break
             offset += 1000
-    for l in alvo:
-        ultimo = pagos.get((l["documento"], str(l["venda"])))
-        if ultimo and l["cancelada_em"] and ultimo > l["cancelada_em"]:
+    suspeitas = [l for l in alvo
+                 if l["cancelada_em"]
+                 and pagos.get((l["documento"], str(l["venda"])), "") > l["cancelada_em"]]
+    refeitas = vendas_refeitas(url, chave, suspeitas)
+    for l in suspeitas:
+        ultimo = pagos[(l["documento"], str(l["venda"]))]
+        nova = refeitas.get((l["documento"], l["nome_da_loja"], str(l["venda"])))
+        if nova:
+            # Venda cancelada e refeita (outra venda do mesmo cliente lançada a
+            # partir da data do cancelamento): o pagamento é da venda nova,
+            # lançado no Cedrus com o número antigo. Cancela normalmente.
+            # Ex.: Messejana 2865 -> Crateus Ext 7368 (16/08/2026).
+            l["obs"] = f"pagamento em {ultimo} é da {nova}, que refez esta"
+        else:
             l["categoria"] = "PAGTO_APOS_CANCELAMENTO"
             l["obs"] = f"pagamento no app em {ultimo}"
+
+
+def vendas_refeitas(url: str, chave: str, linhas: list[dict]) -> dict[tuple, str]:
+    """(documento, loja, venda) -> "venda N (loja)" da venda do mesmo cliente
+    lançada no dia do cancelamento ou depois (o número da venda se repete
+    entre lojas: compara loja + número)."""
+    docs = sorted({l["documento"] for l in linhas if l["documento"]})
+    if not docs:
+        return {}
+    h = {"apikey": chave, "Authorization": f"Bearer {chave}"}
+    outras: list[dict] = []
+    for i in range(0, len(docs), 100):
+        lista = ",".join('"' + d + '"' for d in docs[i:i + 100])
+        r = requests.get(
+            f"{url}/rest/v1/BANCO_DADOS",
+            headers=h,
+            params={"select": "documento,nome_da_loja,venda_n,numero_titulo,data_lancamento",
+                    "documento": f"in.({lista})", "order": "id_parcela", "limit": "5000"},
+            timeout=60,
+        )
+        r.raise_for_status()
+        outras.extend(r.json())
+    res: dict[tuple, str] = {}
+    for l in linhas:
+        for o in outras:
+            venda_o = str(o["venda_n"] or o["numero_titulo"] or "")
+            if (o["documento"] == l["documento"]
+                    and (o["nome_da_loja"], venda_o) != (l["nome_da_loja"], str(l["venda"]))
+                    and (o["data_lancamento"] or "")[:10] >= l["cancelada_em"]):
+                res[(l["documento"], l["nome_da_loja"], str(l["venda"]))] = f"venda {venda_o} ({o['nome_da_loja']})"
+                break
+    return res
 
 
 def _br(d: str | None) -> str:
