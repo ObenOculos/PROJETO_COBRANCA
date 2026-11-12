@@ -27,7 +27,8 @@ unidades = [
 ]
 
 # Ordem de execução dos scripts
-tipos_script = ["Produtos", "Resultados", "Vendas"]
+# Resultados saiu daqui (2026-11-12): roda sem navegador em ../dre_resultados.py.
+tipos_script = ["Produtos", "Vendas"]
 
 # Codigo de saida dos scripts quando a loja esta sem acesso ao relatorio
 # (ex.: licenca suspensa por falta de pagamento) - nao conta como erro

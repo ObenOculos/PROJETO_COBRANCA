@@ -3,8 +3,9 @@
 """
 DRE das óticas (SSÓtica) -> Power BI (\\\\ciclone\\Power BI - FoccoBrasil\\Oticas Luana\\DRE\\<ano>).
 
-Roda, para cada loja, os scripts de scripts/ssotica/dre/<loja>/: Produtos
-(mês anterior), Resultados e Vendas (ano do mês anterior, acumulado). Rodando
+Roda, para cada loja: Resultados (ano do mês anterior) pelo dre_resultados.py,
+sem navegador; Produtos (mês anterior) e Vendas (ano até o mês anterior) pelos
+scripts de scripts/ssotica/dre/<loja>/ (Chrome). Rodando
 em qualquer dia de um mês, gera até o mês anterior -- por isso a tarefa é
 mensal (dia 2). Os scripts usam navegador (Selenium/Chrome); vieram da pasta
 antiga Empresa_Oben/.../SSÓTICA/Código_Óticas/Script_DRE em 2026-11-12, onde
@@ -26,6 +27,7 @@ SAIDA = AQUI / "saida"
 sys.path.insert(0, str(AQUI / "dre"))
 
 import executa_todos as et  # noqa: E402
+import dre_resultados  # noqa: E402
 
 
 class _Tee:
@@ -57,8 +59,10 @@ def main() -> int:
     print(f"\n{'=' * 60}\nDRE SSÓtica — {datetime.now():%d/%m/%Y %H:%M} — {len(unidades)} loja(s)\n{'=' * 60}")
 
     erros = []
+    # Resultados: sem navegador (dre_resultados.py), todas as lojas de uma vez.
+    erros += dre_resultados.rodar([u.split("_")[0] for u in unidades])
     for unidade in unidades:
-        for tipo in et.tipos_script:
+        for tipo in [t for t in et.tipos_script if t != "Resultados"]:
             caminho = et.montar_caminho_script(unidade, tipo)
             if not caminho.exists():
                 print(f"⚠ não encontrado: {caminho}")
