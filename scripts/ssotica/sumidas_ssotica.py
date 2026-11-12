@@ -152,6 +152,21 @@ def abertas_no_app(url: str, chave: str, lojas: list[str]) -> list[dict]:
         ultimo = lote[-1]["id_parcela"]
 
 
+def codigos_ssotica(url: str, chave: str, docs: list[str]) -> dict[str, str]:
+    """documento -> Cliente ID da SSÓtica (clientes.codigo_cliente_ssotica,
+    migration 20261112000004). Sem a coluna ainda, devolve vazio."""
+    res: dict[str, str] = {}
+    for i in range(0, len(docs), 150):
+        lista = ",".join('"' + d + '"' for d in docs[i:i + 150])
+        try:
+            linhas = _get(url, chave, "clientes", {"select": "documento,codigo_cliente_ssotica",
+                                                    "documento": f"in.({lista})"})
+        except requests.HTTPError:
+            return {}
+        res.update({l["documento"]: l["codigo_cliente_ssotica"] for l in linhas if l.get("codigo_cliente_ssotica")})
+    return res
+
+
 def outra_linha_no_app(url: str, chave: str, p: dict, numero: int) -> bool:
     """Já existe no app outra linha com esse título/venda e parcela na loja?"""
     return bool(_get(url, chave, "BANCO_DADOS", {
@@ -320,6 +335,7 @@ def main() -> int:
                   len(sumidas), LIMITE_SUMIDAS)
         return 1
 
+    codigos = codigos_ssotica(url, chave, sorted({p["documento"] for p in sumidas if p["documento"]}))
     ss = SSOtica(*credenciais_ssotica())
     ss.login()
     fichas: dict[str, list[dict] | None] = {}
@@ -330,7 +346,9 @@ def main() -> int:
             res = {"categoria": "SEM_DOCUMENTO"}
         else:
             if doc not in fichas:
-                cids = buscar_clientes(ss, doc)
+                # Cliente ID guardado (clientes_ssotica.py) abre a ficha direto
+                # -- é o único jeito para CPF genérico; senão, busca pelo CPF.
+                cids = ([codigos[doc]] if codigos.get(doc) else buscar_clientes(ss, doc))
                 fichas[doc] = [t for cid in cids for t in crediario(ss, cid)] if cids else None
             res = ({"categoria": "CLIENTE_NAO_ENCONTRADO"} if fichas[doc] is None
                    else conferir(p, fichas[doc], ss, url, chave))

@@ -301,7 +301,24 @@ achado ou ficha sem títulos da loja → `saida/sumidas_ssotica_<data>.csv`.
 Validado contra as decisões manuais do dia (51 + 17 iguais). Para se
 houver mais de 1.500 sumidas (download incompleto).
 
-**Falta:** testar o card novo na tela (grava em produção); conferir a 1ª
+**Cadastro de clientes da SSÓtica (2026-11-12):** a exportação "Exportar
+Clientes" (Cadastro > Clientes, filtro Ativos e Inativos) traz o **Cliente ID**
+— a ficha abre direto por ele (`/cadastro/cliente/<Cliente ID>/detalhe`).
+959 clientes não têm CPF na SSÓtica; na planilha CLIENTES_E_APELIDO cada um
+ganhou um CPF genérico ÚNICO (000.000...), 347 deles no app. Novo
+`clientes_ssotica.py` (tarefa `Cobranca_Clientes_SSOtica`, a cada 14 dias,
+7h30, `agendar_clientes.ps1`): exporta (assíncrono: POST
+`/cadastro/cliente/exportar/clientes` → status → baixar), salva no Dropbox
+(`4 - Relação_Óticas_CPF/BASE_CLIENTE_SSÓTICA_dd-mm-aaaa.xlsx`, nunca
+sobrescreve), liga `clientes.codigo_cliente_ssotica` (migration
+`20261112000004`; CPF, ou genérico por nome+loja/nome com casamento único) e
+completa só o que está VAZIO no app (decisão do usuário): telefone no 1º
+campo vazio (convertido de `+55...` para `(88) 9.9999-9999`), nascimento
+(ignora < 5 anos), e-mail. 1ª leitura: 14.971 ligados (6 genéricos sem
+casamento), 276 telefones, 9.945 nascimentos, 3 e-mails. O
+`sumidas_ssotica.py` abre a ficha pelo Cliente ID quando guardado.
+
+**Falta:** `db push` da `20261112000004` e 1ª gravação do `clientes_ssotica.py --gravar`; testar o card novo na tela (grava em produção); conferir a 1ª
 rodada agendada com o 3º passo; o usuário olhar as 17 divergentes (planilha
 `saida/sumidas_para_conferir_20261112.xlsx`; destino futuro: CSV ou tela?); critério para cliente que
 não atende (proposta de degraus 1–3 / 4–7 / 8+ e 21 dias, aguardando decisão).
