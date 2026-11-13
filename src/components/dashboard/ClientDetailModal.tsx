@@ -22,6 +22,7 @@ import {
 } from "../../types";
 import {
   formatCurrency,
+  formatTelefone,
   calculateOverdueDays,
 } from "../../utils/formatters";
 import { isForaDaCobranca, seloForaDaCobranca } from "../../types/status";
@@ -763,7 +764,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
         {/* Celular: tela cheia. Computador: janela de ate 90% da altura. Uma
             area de rolagem so (o conteudo da aba), o resto fica fixo. */}
         <div className="bg-white sm:rounded-2xl max-w-6xl w-full h-full sm:h-auto sm:max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
-          {/* Cabecalho: quem e o cliente, como falar com ele e quanto deve */}
+          {/* Cabecalho: quem e, como falar, situacao e acoes -- em 3 linhas */}
           <div className="relative px-4 lg:px-6 pt-4 pb-3 border-b border-gray-200 shrink-0">
             <button
               id="close-modal"
@@ -774,122 +775,114 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
             >
               <X className="h-5 w-5" />
             </button>
+
+            {/* 1. Quem e */}
             <div className="pr-10 min-w-0">
               <h2 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
                 {clientGroup.client}
               </h2>
-              <p className="text-xs sm:text-sm text-gray-500 truncate">
-                {razaoSocial && (
-                  <span title={`Razão social: ${razaoSocial}`}>
-                    {razaoSocial} ·{" "}
-                  </span>
-                )}
-                {clientGroup.document}
+              {razaoSocial && (
+                <p
+                  className="text-xs text-gray-500 truncate"
+                  title={`Razão social: ${razaoSocial}`}
+                >
+                  {razaoSocial}
+                </p>
+              )}
+              {/* Documento, codigo e telefones numa linha so */}
+              <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+                <span className="tabular-nums">{clientGroup.document}</span>
                 {codigoErp && (
                   <span title="Código do cliente no Ciclone">
-                    {" "}
-                    · Cód. Ciclone {codigoErp}
+                    Cód. {codigoErp}
                   </span>
                 )}
-              </p>
-            </div>
-
-            {telefonesCabecalho.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
                 {telefonesCabecalho.map((tel) => (
-                  <div
+                  <span
                     key={tel.numero}
-                    className="flex items-center gap-1.5 text-sm text-gray-700"
+                    className="inline-flex items-center gap-1"
                   >
                     {tel.rotulo && (
-                      <span className="text-xs text-gray-500">
-                        {tel.rotulo}:
-                      </span>
+                      <span className="text-gray-400">{tel.rotulo}:</span>
                     )}
-                    <span className="tabular-nums">{tel.numero}</span>
                     <a
                       href={`tel:${tel.numero.replace(/[^\d+]/g, "")}`}
-                      className="p-1 rounded-md text-blue-600 hover:bg-blue-50"
+                      className="inline-flex items-center gap-1 text-blue-700 hover:underline tabular-nums"
                       title="Ligar"
-                      aria-label={`Ligar para ${tel.numero}`}
                     >
-                      <Phone className="h-4 w-4" />
+                      <Phone className="h-3.5 w-3.5" />
+                      {formatTelefone(tel.numero)}
                     </a>
                     <button
                       type="button"
                       onClick={() => abrirWhatsApp(tel.numero)}
-                      className="p-1 rounded-md text-emerald-600 hover:bg-emerald-50"
+                      className="p-0.5 rounded text-emerald-600 hover:bg-emerald-50"
                       title="Abrir conversa no WhatsApp"
                       aria-label={`WhatsApp de ${tel.numero}`}
                     >
-                      <MessageCircle className="h-4 w-4" />
+                      <MessageCircle className="h-3.5 w-3.5" />
                     </button>
-                  </div>
+                  </span>
                 ))}
               </div>
-            )}
+            </div>
 
-            {/* Quanto deve: mesma regra da carteira (vencido x a vencer; com
-                acordo ativo, as parcelas do acordo). */}
-            <p className="mt-2 text-sm text-gray-700 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-              {hasRealPendingValue || acordoAtivo ? (
-                <>
-                  <span>
-                    Vencido{" "}
-                    <strong
-                      className={
-                        saldoCliente.vencido > 0.01
-                          ? "text-red-600"
-                          : "text-gray-900"
-                      }
-                    >
-                      {formatCurrency(saldoCliente.vencido)}
-                    </strong>
+            {/* 2. Situacao (mesma regra da carteira: vencido x a vencer; com
+                acordo ativo, as parcelas do acordo) + 3. acoes, lado a lado
+                no computador. So mostra o que tem valor. */}
+            <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                {!(hasRealPendingValue || acordoAtivo) ? (
+                  <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-medium">
+                    Sem saldo em aberto
                   </span>
-                  <span className="text-gray-300">|</span>
-                  <span>
-                    A vencer{" "}
-                    <strong className="text-gray-900">
-                      {formatCurrency(saldoCliente.aVencer)}
-                    </strong>
-                  </span>
-                  {atrasoCliente > 0 && (
-                    <>
-                      <span className="text-gray-300">|</span>
-                      <span
-                        className="text-red-600"
-                        title={`${atrasoCliente} dia${atrasoCliente !== 1 ? "s" : ""} de atraso`}
-                      >
-                        Maior atraso{" "}
-                        <strong>
-                          {atrasoCliente} dia{atrasoCliente !== 1 ? "s" : ""}
+                ) : (
+                  <>
+                    {saldoCliente.vencido > 0.01 ? (
+                      <span className="px-2 py-0.5 rounded-md bg-red-50 text-red-700">
+                        Vencido{" "}
+                        <strong>{formatCurrency(saldoCliente.vencido)}</strong>
+                        {atrasoCliente > 0 && (
+                          <span className="text-red-600">
+                            {" "}
+                            · {atrasoCliente} dia{atrasoCliente !== 1 ? "s" : ""}{" "}
+                            de atraso
+                          </span>
+                        )}
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-medium">
+                        Em dia
+                      </span>
+                    )}
+                    {saldoCliente.aVencer > 0.01 && (
+                      <span className="text-gray-600">
+                        A vencer{" "}
+                        <strong className="text-gray-900">
+                          {formatCurrency(saldoCliente.aVencer)}
                         </strong>
                       </span>
-                    </>
-                  )}
-                </>
-              ) : (
-                <span className="text-emerald-700 font-medium">
-                  Sem saldo em aberto
-                </span>
-              )}
-            </p>
-            {acordoAtivo && (
-              <p className="mt-1 text-xs text-amber-700">
-                Cliente em acordo: valores e atraso seguem as parcelas do
-                acordo, não o vencimento original dos títulos.
-              </p>
-            )}
+                    )}
+                    {acordoAtivo && (
+                      <span
+                        className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 text-xs font-medium"
+                        title="Valores e atraso seguem as parcelas do acordo, não o vencimento original dos títulos"
+                      >
+                        Em acordo
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
 
-            {/* Acoes. Atender e Receber pagamento sao o dia a dia; Acordo ao
-                lado; Editar pagamentos (rara, pede autorizacao) no menu. */}
-            {(podeAtender || isCollectorType(userType) || souGestor) && (
-              <div className="mt-3 flex flex-wrap items-center gap-2">
+              {/* Atender e Receber pagamento sao o dia a dia; Acordo ao lado;
+                  Editar pagamentos (rara, pede autorizacao) no menu. */}
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
                 {podeAtender && hasRealPendingValue && (
                   <button
                     type="button"
                     onClick={() => setIsAtenderOpen(true)}
-                    className="flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 text-sm font-medium shadow-sm"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium shadow-sm"
                     title="Registrar contato e agendar o próximo"
                   >
                     <PhoneCall className="h-4 w-4" />
@@ -909,7 +902,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                           setIsGeneralPaymentModalOpen(true);
                         }
                       }}
-                      className="flex items-center gap-2 px-3 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 text-sm font-medium shadow-sm"
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium shadow-sm"
                       title="Lançar o valor recebido; o sistema distribui entre as parcelas"
                     >
                       <CreditCard className="h-4 w-4" />
@@ -921,7 +914,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setAcordoDetalheId(acordoAtivo.id)}
-                      className="flex items-center gap-2 px-3 py-2 border border-amber-300 text-amber-800 bg-amber-50 rounded-xl hover:bg-amber-100 text-sm font-medium"
+                      className="flex items-center gap-1.5 px-3 py-1.5 border border-amber-300 text-amber-800 bg-white rounded-lg hover:bg-amber-50 text-sm font-medium"
                       title="Ver o acordo ativo, registrar pagamento de parcela"
                     >
                       <Handshake className="h-4 w-4" />
@@ -932,7 +925,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setIsAcordoOpen(true)}
-                        className="flex items-center gap-2 px-3 py-2 border border-amber-300 text-amber-800 bg-amber-50 rounded-xl hover:bg-amber-100 text-sm font-medium"
+                        className="flex items-center gap-1.5 px-3 py-1.5 border border-amber-300 text-amber-800 bg-white rounded-lg hover:bg-amber-50 text-sm font-medium"
                         title="Negociar a dívida em parcelas"
                       >
                         <Handshake className="h-4 w-4" />
@@ -946,7 +939,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setMenuMaisAberto((v) => !v)}
-                        className="p-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50"
+                        className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
                         title="Mais ações"
                         aria-label="Mais ações"
                         aria-expanded={menuMaisAberto}
@@ -959,7 +952,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                             className="fixed inset-0 z-10"
                             onClick={() => setMenuMaisAberto(false)}
                           />
-                          <div className="absolute left-0 sm:left-auto sm:right-0 mt-1 z-20 w-56 bg-white border border-gray-200 rounded-xl shadow-lg py-1">
+                          <div className="absolute right-0 mt-1 z-20 w-56 bg-white border border-gray-200 rounded-xl shadow-lg py-1">
                             <button
                               id="edit-payments"
                               name="editPayments"
@@ -981,52 +974,49 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                     </div>
                   )}
               </div>
-            )}
+            </div>
 
-            {/* Gestor: em nome de quem fica o registro */}
-            {souGestor && (hasRealPendingValue || acordoAtivo) && (
-              <div className="mt-2 text-xs text-gray-600">
-                {cobradorDaCarteira ? (
-                  <label className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="font-medium text-gray-700">
-                      Registrar em nome de:
-                    </span>
-                    <select
-                      value={emNomeDoCobrador ? "cobrador" : "eu"}
-                      onChange={(e) =>
-                        setEmNomeDoCobrador(e.target.value === "cobrador")
-                      }
-                      className="px-2 py-1 rounded-lg border border-gray-200 bg-white text-xs"
-                    >
-                      <option value="cobrador">
-                        {cobradorDaCarteira.name} (
-                        {USER_TYPE_LABELS[cobradorDaCarteira.type] ?? "cobrador"}, dono da carteira)
-                      </option>
-                      <option value="eu">Eu ({user?.name ?? "gestor"})</option>
-                    </select>
-                    <span className="text-[11px] text-gray-500">
-                      {emNomeDoCobrador
-                        ? "Conta para o cobrador e o próximo contato vai para a agenda dele; fica registrado que foi você."
-                        : "Conta para você e o próximo contato fica na sua agenda."}
-                      {emNomeDoCobrador && !acordoEmNomeDe
-                        ? " Acordo de cobrador de visita fica no seu nome."
-                        : ""}
-                    </span>
-                  </label>
-                ) : (
-                  <span className="text-[11px] text-gray-500">
-                    Cliente sem cobrador de carteira definido: o registro fica
-                    no seu nome.
+            {/* Gestor: em nome de quem fica o registro. Sem cobrador de
+                carteira nao ha escolha (fica no nome dele) -- nada a mostrar. */}
+            {souGestor && cobradorDaCarteira && (hasRealPendingValue || acordoAtivo) && (
+              <label className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-600">
+                <span>Registrar em nome de</span>
+                <select
+                  value={emNomeDoCobrador ? "cobrador" : "eu"}
+                  onChange={(e) =>
+                    setEmNomeDoCobrador(e.target.value === "cobrador")
+                  }
+                  className="px-2 py-1 rounded-lg border border-gray-200 bg-white text-xs"
+                  title={
+                    emNomeDoCobrador
+                      ? `Conta para o cobrador e o próximo contato vai para a agenda dele; fica registrado que foi você.${
+                          !acordoEmNomeDe
+                            ? " Acordo de cobrador de visita fica no seu nome."
+                            : ""
+                        }`
+                      : "Conta para você e o próximo contato fica na sua agenda."
+                  }
+                >
+                  <option value="cobrador">
+                    {cobradorDaCarteira.name} (
+                    {USER_TYPE_LABELS[cobradorDaCarteira.type] ?? "cobrador"})
+                  </option>
+                  <option value="eu">Eu ({user?.name ?? "gestor"})</option>
+                </select>
+                {emNomeDoCobrador && !acordoEmNomeDe && (
+                  <span className="text-gray-400">
+                    · acordo fica no seu nome
                   </span>
                 )}
-              </div>
+              </label>
             )}
           </div>
 
-          {/* Abas: navegacao, nao acao */}
+          {/* Abas: navegacao, nao acao. Sem overflow: com overflow-x o
+              sublinhado (-mb-px) criava barra de rolagem vertical. */}
           <div
             role="tablist"
-            className="flex gap-1 px-4 lg:px-6 border-b border-gray-200 shrink-0 overflow-x-auto"
+            className="flex gap-1 px-4 lg:px-6 border-b border-gray-200 shrink-0"
           >
             {(
               [
@@ -1048,7 +1038,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 aria-selected={view === aba}
                 onClick={() => setView(aba)}
                 title={dica}
-                className={`px-3 py-2.5 -mb-px border-b-2 text-sm font-medium whitespace-nowrap transition-colors ${
+                className={`px-3 py-2.5 border-b-2 text-sm font-medium whitespace-nowrap transition-colors ${
                   view === aba
                     ? "border-indigo-600 text-indigo-700"
                     : "border-transparent text-gray-500 hover:text-gray-800"
