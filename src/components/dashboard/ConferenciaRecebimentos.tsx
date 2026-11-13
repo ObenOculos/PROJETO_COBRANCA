@@ -1,12 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronUp,
-  Info,
-  Scale,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, Info, Scale, Search, X } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { supabase } from "../../lib/supabase";
 import { fetchAllRows } from "../../utils/fetchAllRows";
@@ -14,6 +7,10 @@ import { formatCurrency } from "../../utils/formatters";
 import { todayLocalStr } from "../../config/visitStatus";
 import {
   classificarConferencia,
+  CONFERENCIA_GRUPO,
+  CONFERENCIA_GRUPO_DICA,
+  CONFERENCIA_GRUPO_LABEL,
+  ConferenciaGrupo,
   ConferenciaSituacao,
   CONFERENCIA_SITUACAO_DICA,
   CONFERENCIA_SITUACAO_LABEL,
@@ -25,6 +22,10 @@ import {
 // (linha fica com quem registrou; sem registro, com o dono da carteira) ou so a
 // carteira de cada cobrador. Dados da RPC conferencia_recebimentos (migration
 // 20261111000004), uma linha por cobrador x cliente.
+//
+// Tela (2026-11-13): cobrador em chips no topo, busca por nome/CPF, cards de
+// grupo (precisa conferir / provavel juros / confere) que filtram a lista, e
+// uma lista unica de clientes logo abaixo.
 
 interface LinhaRpc {
   cobrador_id: string | null;
@@ -44,6 +45,7 @@ type Visao = "todos" | "carteira";
 interface LinhaCliente {
   chave: string;
   cobradorId: string | null;
+  cobradorNome: string;
   carteiraId: string | null;
   documento: string;
   cliente: string;
@@ -58,14 +60,11 @@ interface LinhaCliente {
 interface GrupoCobrador {
   id: string; // "" = sem cobrador (so na visao "todos")
   nome: string;
-  baseValor: number;
-  appValor: number;
-  appCedrus: number;
   // Lancado para cliente fora da carteira: so informacao, nao entra na
   // conferencia.
   foraQtd: number;
   foraValor: number;
-  contagem: Record<ConferenciaSituacao, number>;
+  pendencias: number;
   clientes: LinhaCliente[];
 }
 
@@ -76,6 +75,8 @@ const SITUACOES: ConferenciaSituacao[] = [
   "app_maior",
   "confere",
 ];
+
+const GRUPOS: ConferenciaGrupo[] = ["acao", "juros", "confere"];
 
 const SITUACAO_TONE: Record<ConferenciaSituacao, string> = {
   confere:
@@ -88,6 +89,30 @@ const SITUACAO_TONE: Record<ConferenciaSituacao, string> = {
     "bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300",
   app_maior: "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300",
 };
+
+// Card de grupo: borda/numero quando selecionado e quando nao.
+const GRUPO_TONE: Record<
+  ConferenciaGrupo,
+  { ativo: string; numero: string }
+> = {
+  acao: {
+    ativo:
+      "border-red-300 bg-red-50 ring-1 ring-red-200 dark:border-red-700 dark:bg-red-900/20 dark:ring-red-800/50",
+    numero: "text-red-600 dark:text-red-400",
+  },
+  juros: {
+    ativo:
+      "border-blue-300 bg-blue-50 ring-1 ring-blue-200 dark:border-blue-700 dark:bg-blue-900/20 dark:ring-blue-800/50",
+    numero: "text-blue-600 dark:text-blue-400",
+  },
+  confere: {
+    ativo:
+      "border-green-300 bg-green-50 ring-1 ring-green-200 dark:border-green-700 dark:bg-green-900/20 dark:ring-green-800/50",
+    numero: "text-green-600 dark:text-green-400",
+  },
+};
+
+const PAGINA = 100;
 
 const MESES = [
   "janeiro",
@@ -127,13 +152,9 @@ const rotuloMes = (mes: string): string => {
 const num = (v: number | string | null | undefined): number =>
   typeof v === "number" ? v : Number(v ?? 0) || 0;
 
-const contagemVazia = (): Record<ConferenciaSituacao, number> => ({
-  confere: 0,
-  sem_registro_app: 0,
-  sem_baixa_base: 0,
-  app_maior: 0,
-  base_maior: 0,
-});
+/** Minusculo e sem acento, para a busca por nome. */
+const normalizar = (s: string): string =>
+  s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 const Diferenca: React.FC<{ valor: number }> = ({ valor }) => {
   if (Math.abs(valor) < 0.005)
@@ -157,9 +178,16 @@ const ConferenciaRecebimentos: React.FC = () => {
   const [mes, setMes] = useState(() => todayLocalStr().slice(0, 7));
   const [linhas, setLinhas] = useState<LinhaRpc[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
-  const [aberto, setAberto] = useState<string | null>(null);
-  const [filtro, setFiltro] = useState<ConferenciaSituacao | "todas">("todas");
   const [infoOpen, setInfoOpen] = useState(false);
+  // null = todos os cobradores; "" = "Sem cobrador".
+  const [cobradorSel, setCobradorSel] = useState<string | null>(null);
+  const [grupoFiltro, setGrupoFiltro] = useState<ConferenciaGrupo | "todos">(
+    "acao",
+  );
+  const [situacaoFiltro, setSituacaoFiltro] =
+    useState<ConferenciaSituacao | null>(null);
+  const [busca, setBusca] = useState("");
+  const [limite, setLimite] = useState(PAGINA);
   const [visao, setVisao] = useState<Visao>(() => {
     try {
       return localStorage.getItem("conferenciaVisao") === "carteira"
@@ -171,7 +199,6 @@ const ConferenciaRecebimentos: React.FC = () => {
   });
   const trocarVisao = (v: Visao) => {
     setVisao(v);
-    setAberto(null);
     try {
       localStorage.setItem("conferenciaVisao", v);
     } catch {
@@ -210,6 +237,11 @@ const ConferenciaRecebimentos: React.FC = () => {
     };
   }, [mes, visao]);
 
+  // Lista volta ao inicio quando o recorte muda.
+  useEffect(() => {
+    setLimite(PAGINA);
+  }, [mes, visao, cobradorSel, grupoFiltro, situacaoFiltro, busca]);
+
   const nomePorId = useMemo(() => {
     const m = new Map<string, string>();
     users.forEach((u) => m.set(u.id, u.name));
@@ -228,12 +260,9 @@ const ConferenciaRecebimentos: React.FC = () => {
         g = {
           id,
           nome: id ? (nomePorId.get(id) ?? "Usuário removido") : "Sem cobrador",
-          baseValor: 0,
-          appValor: 0,
-          appCedrus: 0,
           foraQtd: 0,
           foraValor: 0,
-          contagem: contagemVazia(),
+          pendencias: 0,
           clientes: [],
         };
         porCobrador.set(id, g);
@@ -244,13 +273,11 @@ const ConferenciaRecebimentos: React.FC = () => {
         return;
       }
       const situacao = classificarConferencia(baseValor, appValor);
-      g.baseValor += baseValor;
-      g.appValor += appValor;
-      g.appCedrus += num(l.app_cedrus);
-      g.contagem[situacao]++;
+      if (CONFERENCIA_GRUPO[situacao] === "acao") g.pendencias++;
       g.clientes.push({
         chave: `${l.documento ?? ""}:${id}:${i}`,
         cobradorId: l.cobrador_id,
+        cobradorNome: g.nome,
         carteiraId: l.carteira_id,
         documento: l.documento ?? "",
         cliente: l.cliente ?? "(sem nome)",
@@ -262,33 +289,87 @@ const ConferenciaRecebimentos: React.FC = () => {
         situacao,
       });
     });
-    porCobrador.forEach((g) =>
-      g.clientes.sort(
+    // "Sem cobrador" por ultimo; os demais pelo nome.
+    return Array.from(porCobrador.values())
+      .filter((g) => g.clientes.length > 0 || g.foraQtd > 0)
+      .sort((a, b) => {
+        if (!a.id !== !b.id) return a.id ? -1 : 1;
+        return a.nome.localeCompare(b.nome, "pt-BR");
+      });
+  }, [linhas, nomePorId]);
+
+  // Cobrador escolhido que sumiu (troca de mes/visao) volta para "Todos".
+  const cobradorAtual =
+    cobradorSel !== null && grupos.some((g) => g.id === cobradorSel)
+      ? cobradorSel
+      : null;
+  const grupoAtual =
+    cobradorAtual === null ? null : grupos.find((g) => g.id === cobradorAtual);
+
+  // Clientes do cobrador escolhido (ou de todos) que passam na busca.
+  const escopo = useMemo<LinhaCliente[]>(() => {
+    const base =
+      grupoAtual != null ? grupoAtual.clientes : grupos.flatMap((g) => g.clientes);
+    const termo = busca.trim();
+    if (!termo) return base;
+    const digitos = termo.replace(/\D/g, "");
+    const texto = normalizar(termo);
+    return base.filter(
+      (c) =>
+        normalizar(c.cliente).includes(texto) ||
+        (digitos.length >= 3 && c.documento.replace(/\D/g, "").includes(digitos)),
+    );
+  }, [grupos, grupoAtual, busca]);
+
+  const resumo = useMemo(() => {
+    const r = {
+      base: 0,
+      app: 0,
+      cedrus: 0,
+      porGrupo: { acao: 0, juros: 0, confere: 0 } as Record<ConferenciaGrupo, number>,
+      porSituacao: {
+        confere: 0,
+        sem_registro_app: 0,
+        sem_baixa_base: 0,
+        app_maior: 0,
+        base_maior: 0,
+      } as Record<ConferenciaSituacao, number>,
+    };
+    escopo.forEach((c) => {
+      r.base += c.baseValor;
+      r.app += c.appValor;
+      r.cedrus += c.appCedrus;
+      r.porGrupo[CONFERENCIA_GRUPO[c.situacao]]++;
+      r.porSituacao[c.situacao]++;
+    });
+    return r;
+  }, [escopo]);
+
+  const lista = useMemo(() => {
+    return escopo
+      .filter(
+        (c) =>
+          (grupoFiltro === "todos" ||
+            CONFERENCIA_GRUPO[c.situacao] === grupoFiltro) &&
+          (situacaoFiltro === null || c.situacao === situacaoFiltro),
+      )
+      .sort(
         (a, b) =>
           SITUACOES.indexOf(a.situacao) - SITUACOES.indexOf(b.situacao) ||
           Math.abs(b.appValor - b.baseValor) - Math.abs(a.appValor - a.baseValor),
-      ),
-    );
-    // "Sem cobrador" por ultimo; os demais pelo maior valor (base ou app).
-    return Array.from(porCobrador.values()).sort((a, b) => {
-      if (!a.id !== !b.id) return a.id ? -1 : 1;
-      return Math.max(b.baseValor, b.appValor) - Math.max(a.baseValor, a.appValor);
-    });
-  }, [linhas, nomePorId]);
+      );
+  }, [escopo, grupoFiltro, situacaoFiltro]);
 
-  const totais = useMemo(() => {
-    const t = { base: 0, app: 0, cedrus: 0, contagem: contagemVazia() };
-    grupos.forEach((g) => {
-      t.base += g.baseValor;
-      t.app += g.appValor;
-      t.cedrus += g.appCedrus;
-      SITUACOES.forEach((s) => (t.contagem[s] += g.contagem[s]));
-    });
-    return t;
-  }, [grupos]);
+  const escolherGrupo = (g: ConferenciaGrupo | "todos") => {
+    setGrupoFiltro(g);
+    setSituacaoFiltro(null);
+  };
 
-  const pendencias = (c: Record<ConferenciaSituacao, number>) =>
-    c.sem_registro_app + c.base_maior + c.sem_baixa_base;
+  const pendenciasTotal = grupos.reduce((s, g) => s + g.pendencias, 0);
+  const situacoesDoGrupo =
+    grupoFiltro === "todos"
+      ? []
+      : SITUACOES.filter((s) => CONFERENCIA_GRUPO[s] === grupoFiltro);
 
   return (
     <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-4 lg:p-5 space-y-4">
@@ -331,24 +412,46 @@ const ConferenciaRecebimentos: React.FC = () => {
           </span>
         </h2>
 
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setMes((m) => somarMes(m, -1))}
-            className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 dark:text-dark-text-secondary dark:hover:bg-dark-bg"
-            aria-label="Mês anterior"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <span className="min-w-[9.5rem] text-center text-sm font-semibold text-gray-700 dark:text-dark-text">
-            {rotuloMes(mes)}
-          </span>
-          <button
-            onClick={() => setMes((m) => somarMes(m, 1))}
-            className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 dark:text-dark-text-secondary dark:hover:bg-dark-bg"
-            aria-label="Próximo mês"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex bg-gray-100 dark:bg-dark-bg rounded-md p-0.5">
+            {(
+              [
+                ["todos", "Todos os recebimentos"],
+                ["carteira", "Só carteira"],
+              ] as const
+            ).map(([v, rotulo]) => (
+              <button
+                key={v}
+                onClick={() => trocarVisao(v)}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                  visao === v
+                    ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
+                    : "text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
+                }`}
+              >
+                {rotulo}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setMes((m) => somarMes(m, -1))}
+              className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 dark:text-dark-text-secondary dark:hover:bg-dark-bg"
+              aria-label="Mês anterior"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="min-w-[9.5rem] text-center text-sm font-semibold text-gray-700 dark:text-dark-text">
+              {rotuloMes(mes)}
+            </span>
+            <button
+              onClick={() => setMes((m) => somarMes(m, 1))}
+              className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 dark:text-dark-text-secondary dark:hover:bg-dark-bg"
+              aria-label="Próximo mês"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -364,247 +467,304 @@ const ConferenciaRecebimentos: React.FC = () => {
         </div>
       )}
 
-      {linhas !== null && (
+      {linhas !== null && grupos.length === 0 && (
+        <div className="py-10 text-center text-sm text-gray-500 dark:text-dark-text-secondary">
+          Nenhum recebimento neste mês.
+        </div>
+      )}
+
+      {linhas !== null && grupos.length > 0 && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="rounded-xl border border-gray-100 dark:border-dark-border/40 bg-gray-50/60 dark:bg-dark-bg/30 px-4 py-3">
-              <div className="text-xs font-semibold text-gray-500 dark:text-dark-text-secondary">
+          {/* Cobrador */}
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              onClick={() => setCobradorSel(null)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                cobradorAtual === null
+                  ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900"
+                  : "bg-gray-100 dark:bg-dark-bg text-gray-700 dark:text-dark-text-secondary hover:bg-gray-200 dark:hover:bg-dark-border"
+              }`}
+            >
+              Todos
+              {pendenciasTotal > 0 && (
+                <span className="rounded-full bg-red-500 px-1.5 text-[10px] font-semibold text-white">
+                  {pendenciasTotal}
+                </span>
+              )}
+            </button>
+            {grupos.map((g) => {
+              const ativo = cobradorAtual === g.id;
+              return (
+                <button
+                  key={g.id || "sem"}
+                  onClick={() => setCobradorSel(ativo ? null : g.id)}
+                  title={
+                    g.pendencias > 0
+                      ? `${g.pendencias} cliente(s) para conferir`
+                      : "Nada para conferir"
+                  }
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                    ativo
+                      ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900"
+                      : "bg-gray-100 dark:bg-dark-bg text-gray-700 dark:text-dark-text-secondary hover:bg-gray-200 dark:hover:bg-dark-border"
+                  } ${g.id ? "" : "italic"}`}
+                >
+                  {g.nome}
+                  {g.pendencias > 0 && (
+                    <span className="rounded-full bg-red-500 px-1.5 text-[10px] font-semibold not-italic text-white">
+                      {g.pendencias}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Totais do recorte */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            <div className="rounded-xl border border-gray-100 dark:border-dark-border/40 bg-gray-50/60 dark:bg-dark-bg/30 px-3 sm:px-4 py-2.5">
+              <div className="text-[11px] sm:text-xs font-semibold text-gray-500 dark:text-dark-text-secondary">
                 Baixado na base
               </div>
-              <div className="mt-1 text-2xl font-bold text-gray-900 dark:text-dark-text">
-                {formatCurrency(totais.base)}
+              <div className="mt-0.5 text-base sm:text-xl font-bold text-gray-900 dark:text-dark-text">
+                {formatCurrency(resumo.base)}
               </div>
             </div>
-            <div className="rounded-xl border border-gray-100 dark:border-dark-border/40 bg-gray-50/60 dark:bg-dark-bg/30 px-4 py-3">
-              <div className="text-xs font-semibold text-gray-500 dark:text-dark-text-secondary">
-                Registrado pelos cobradores
+            <div className="rounded-xl border border-gray-100 dark:border-dark-border/40 bg-gray-50/60 dark:bg-dark-bg/30 px-3 sm:px-4 py-2.5">
+              <div className="text-[11px] sm:text-xs font-semibold text-gray-500 dark:text-dark-text-secondary">
+                Registrado no app
               </div>
-              <div className="mt-1 text-2xl font-bold text-gray-900 dark:text-dark-text">
-                {formatCurrency(totais.app)}
+              <div className="mt-0.5 text-base sm:text-xl font-bold text-gray-900 dark:text-dark-text">
+                {formatCurrency(resumo.app)}
               </div>
-              {totais.cedrus !== 0 && (
+              {resumo.cedrus !== 0 && (
                 <div className="text-[11px] text-gray-400 dark:text-dark-text-secondary">
-                  {formatCurrency(totais.cedrus)} importados do Cedrus
+                  {formatCurrency(resumo.cedrus)} do Cedrus
                 </div>
               )}
             </div>
-            <div className="rounded-xl border border-gray-100 dark:border-dark-border/40 bg-gray-50/60 dark:bg-dark-bg/30 px-4 py-3">
-              <div className="text-xs font-semibold text-gray-500 dark:text-dark-text-secondary">
-                Clientes para conferir
+            <div className="rounded-xl border border-gray-100 dark:border-dark-border/40 bg-gray-50/60 dark:bg-dark-bg/30 px-3 sm:px-4 py-2.5">
+              <div className="text-[11px] sm:text-xs font-semibold text-gray-500 dark:text-dark-text-secondary">
+                Diferença (app − base)
               </div>
-              <div className="mt-1 text-2xl font-bold text-red-600 dark:text-red-400">
-                {pendencias(totais.contagem)}
-              </div>
-              <div className="text-[11px] text-gray-400 dark:text-dark-text-secondary">
-                {totais.contagem.confere} conferem ·{" "}
-                {totais.contagem.app_maior} com app maior (juros?)
+              <div className="mt-0.5 text-base sm:text-xl font-bold">
+                <Diferenca valor={resumo.app - resumo.base} />
               </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5">
-            <div className="flex bg-gray-100 dark:bg-dark-bg rounded-md p-0.5 mr-1">
-              {(
-                [
-                  ["todos", "Todos os recebimentos"],
-                  ["carteira", "Só carteira"],
-                ] as const
-              ).map(([v, rotulo]) => (
+          {grupoAtual && grupoAtual.foraQtd > 0 && (
+            <div
+              className="text-xs text-gray-500 dark:text-dark-text-secondary"
+              title="Clientes que não estão na carteira deste cobrador: não entram na conferência."
+            >
+              Lançado fora da carteira: {grupoAtual.foraQtd} cliente(s),{" "}
+              {formatCurrency(grupoAtual.foraValor)} (não conferido)
+            </div>
+          )}
+
+          {/* Grupos (filtro da lista) */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {GRUPOS.map((gr) => {
+              const ativo = grupoFiltro === gr;
+              return (
                 <button
-                  key={v}
-                  onClick={() => trocarVisao(v)}
-                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
-                    visao === v
-                      ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
-                      : "text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
+                  key={gr}
+                  onClick={() => escolherGrupo(gr)}
+                  title={CONFERENCIA_GRUPO_DICA[gr]}
+                  className={`rounded-xl border px-3 py-2 text-left transition-colors ${
+                    ativo
+                      ? GRUPO_TONE[gr].ativo
+                      : "border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/40"
                   }`}
                 >
-                  {rotulo}
+                  <div
+                    className={`text-xl font-bold ${GRUPO_TONE[gr].numero}`}
+                  >
+                    {resumo.porGrupo[gr]}
+                  </div>
+                  <div className="text-xs font-medium text-gray-600 dark:text-dark-text-secondary">
+                    {CONFERENCIA_GRUPO_LABEL[gr]}
+                  </div>
                 </button>
-              ))}
-            </div>
-            {(["todas", ...SITUACOES] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => setFiltro(s)}
-                title={s === "todas" ? undefined : CONFERENCIA_SITUACAO_DICA[s]}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                  filtro === s
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 dark:bg-dark-bg text-gray-600 dark:text-dark-text-secondary hover:bg-gray-200 dark:hover:bg-dark-border"
-                }`}
-              >
-                {s === "todas"
-                  ? "Todas"
-                  : `${CONFERENCIA_SITUACAO_LABEL[s]} (${totais.contagem[s]})`}
-              </button>
-            ))}
+              );
+            })}
+            <button
+              onClick={() => escolherGrupo("todos")}
+              className={`rounded-xl border px-3 py-2 text-left transition-colors ${
+                grupoFiltro === "todos"
+                  ? "border-gray-400 bg-gray-50 ring-1 ring-gray-300 dark:border-dark-text-secondary dark:bg-dark-bg/40 dark:ring-dark-border"
+                  : "border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/40"
+              }`}
+            >
+              <div className="text-xl font-bold text-gray-900 dark:text-dark-text">
+                {escopo.length}
+              </div>
+              <div className="text-xs font-medium text-gray-600 dark:text-dark-text-secondary">
+                Todos os clientes
+              </div>
+            </button>
           </div>
 
-          {grupos.length === 0 ? (
+          {/* Busca + situacao dentro do grupo */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            <div className="relative sm:w-72">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Buscar cliente ou CPF/CNPJ"
+                className="w-full rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg pl-8 pr-8 py-1.5 text-sm text-gray-900 dark:text-dark-text placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {busca && (
+                <button
+                  onClick={() => setBusca("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  aria-label="Limpar busca"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            {situacoesDoGrupo.length > 1 && (
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  onClick={() => setSituacaoFiltro(null)}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                    situacaoFiltro === null
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-100 dark:bg-dark-bg text-gray-600 dark:text-dark-text-secondary hover:bg-gray-200 dark:hover:bg-dark-border"
+                  }`}
+                >
+                  Todas
+                </button>
+                {situacoesDoGrupo.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() =>
+                      setSituacaoFiltro(situacaoFiltro === s ? null : s)
+                    }
+                    title={CONFERENCIA_SITUACAO_DICA[s]}
+                    className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                      situacaoFiltro === s
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-100 dark:bg-dark-bg text-gray-600 dark:text-dark-text-secondary hover:bg-gray-200 dark:hover:bg-dark-border"
+                    }`}
+                  >
+                    {CONFERENCIA_SITUACAO_LABEL[s]} ({resumo.porSituacao[s]})
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Lista de clientes */}
+          {lista.length === 0 ? (
             <div className="py-10 text-center text-sm text-gray-500 dark:text-dark-text-secondary">
-              Nenhum recebimento neste mês.
+              {busca.trim()
+                ? "Nenhum cliente encontrado."
+                : grupoFiltro === "acao"
+                  ? "Nada para conferir aqui."
+                  : "Nenhum cliente neste grupo."}
             </div>
           ) : (
             <div className="overflow-x-auto -mx-4 lg:-mx-5">
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="text-left text-[11px] uppercase tracking-wide text-gray-400 dark:text-dark-text-secondary">
-                    <th className="px-4 lg:px-5 py-2 font-semibold">Cobrador</th>
+                  <tr className="text-left text-[11px] uppercase tracking-wide text-gray-400 dark:text-dark-text-secondary border-b border-gray-100 dark:border-dark-border/40">
+                    <th className="px-4 lg:px-5 py-2 font-semibold">Cliente</th>
+                    {cobradorAtual === null && (
+                      <th className="px-3 py-2 font-semibold">Cobrador</th>
+                    )}
+                    <th className="px-3 py-2 font-semibold">Situação</th>
                     <th className="px-3 py-2 font-semibold text-right">Base</th>
                     <th className="px-3 py-2 font-semibold text-right">App</th>
-                    <th className="px-3 py-2 font-semibold text-right">Diferença</th>
-                    <th className="px-3 py-2 font-semibold text-right">A conferir</th>
-                    <th className="px-3 py-2 font-semibold text-right">Conferem</th>
-                    <th className="px-2 py-2" />
+                    <th className="px-4 lg:px-5 py-2 font-semibold text-right">
+                      Diferença
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {grupos.map((g) => {
-                    const clientes =
-                      filtro === "todas"
-                        ? g.clientes
-                        : g.clientes.filter((c) => c.situacao === filtro);
-                    if (
-                      clientes.length === 0 &&
-                      (filtro !== "todas" || g.foraQtd === 0)
-                    )
-                      return null;
-                    const expandido = aberto === g.id;
+                  {lista.slice(0, limite).map((c) => {
+                    // Visao "todos": registrado por alguem que nao e o dono
+                    // da carteira do cliente.
+                    const outraCarteira =
+                      visao === "todos" &&
+                      !!c.cobradorId &&
+                      c.appLancamentos > 0 &&
+                      c.carteiraId !== c.cobradorId;
                     return (
-                      <React.Fragment key={g.id || "sem"}>
-                        <tr
-                          onClick={() => setAberto(expandido ? null : g.id)}
-                          className="cursor-pointer border-t border-gray-100 dark:border-dark-border/40 hover:bg-gray-50 dark:hover:bg-dark-bg/40"
-                        >
-                          <td className="px-4 lg:px-5 py-2.5 font-medium text-gray-900 dark:text-dark-text whitespace-nowrap">
-                            {g.nome}
-                            {g.appCedrus !== 0 && (
-                              <span className="ml-1.5 text-[11px] font-normal text-gray-400 dark:text-dark-text-secondary">
-                                ({formatCurrency(g.appCedrus)} do Cedrus)
-                              </span>
-                            )}
-                            {g.foraQtd > 0 && (
-                              <div
-                                className="text-[11px] font-normal text-gray-400 dark:text-dark-text-secondary"
-                                title="Clientes que não estão na carteira deste cobrador: não entram na conferência."
-                              >
-                                Fora da carteira: {g.foraQtd} cliente(s),{" "}
-                                {formatCurrency(g.foraValor)} (não conferido)
-                              </div>
-                            )}
+                      <tr
+                        key={c.chave}
+                        className="border-t border-gray-100 dark:border-dark-border/40 hover:bg-gray-50/60 dark:hover:bg-dark-bg/30"
+                      >
+                        <td className="px-4 lg:px-5 py-2">
+                          <div className="font-medium text-gray-900 dark:text-dark-text">
+                            {c.cliente}
+                          </div>
+                          <div className="text-[11px] text-gray-400 dark:text-dark-text-secondary">
+                            {c.documento}
+                            {outraCarteira &&
+                              ` · carteira: ${c.carteiraId ? (nomePorId.get(c.carteiraId) ?? "outro") : "sem cobrador"}`}
+                          </div>
+                        </td>
+                        {cobradorAtual === null && (
+                          <td className="px-3 py-2 whitespace-nowrap text-gray-600 dark:text-dark-text-secondary">
+                            {c.cobradorNome}
                           </td>
-                          <td className="px-3 py-2.5 text-right whitespace-nowrap text-gray-700 dark:text-dark-text">
-                            {formatCurrency(g.baseValor)}
-                          </td>
-                          <td className="px-3 py-2.5 text-right whitespace-nowrap text-gray-700 dark:text-dark-text">
-                            {formatCurrency(g.appValor)}
-                          </td>
-                          <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                            <Diferenca valor={g.appValor - g.baseValor} />
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-semibold text-red-600 dark:text-red-400">
-                            {pendencias(g.contagem) || ""}
-                          </td>
-                          <td className="px-3 py-2.5 text-right text-green-600 dark:text-green-400">
-                            {g.contagem.confere || ""}
-                          </td>
-                          <td className="px-2 py-2.5 text-gray-400">
-                            {expandido ? (
-                              <ChevronUp className="h-4 w-4" />
-                            ) : (
-                              <ChevronDown className="h-4 w-4" />
-                            )}
-                          </td>
-                        </tr>
-                        {expandido && (
-                          <tr>
-                            <td colSpan={7} className="px-4 lg:px-5 pb-3">
-                              <div className="rounded-xl border border-gray-100 dark:border-dark-border/40 overflow-x-auto">
-                                <table className="min-w-full text-xs">
-                                  <thead>
-                                    <tr className="text-left text-[10px] uppercase tracking-wide text-gray-400 dark:text-dark-text-secondary bg-gray-50/60 dark:bg-dark-bg/30">
-                                      <th className="px-3 py-1.5 font-semibold">Cliente</th>
-                                      <th className="px-3 py-1.5 font-semibold">Situação</th>
-                                      <th className="px-3 py-1.5 font-semibold text-right">Base</th>
-                                      <th className="px-3 py-1.5 font-semibold text-right">App</th>
-                                      <th className="px-3 py-1.5 font-semibold text-right">Diferença</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {clientes.map((c) => {
-                                      // Visao "todos": registrado por alguem que
-                                      // nao e o dono da carteira do cliente.
-                                      const outraCarteira =
-                                        visao === "todos" &&
-                                        !!c.cobradorId &&
-                                        c.appLancamentos > 0 &&
-                                        c.carteiraId !== c.cobradorId;
-                                      return (
-                                        <tr
-                                          key={c.chave}
-                                          className="border-t border-gray-100 dark:border-dark-border/40"
-                                        >
-                                          <td className="px-3 py-1.5">
-                                            <div className="font-medium text-gray-800 dark:text-dark-text">
-                                              {c.cliente}
-                                            </div>
-                                            <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
-                                              {c.documento}
-                                              {outraCarteira &&
-                                                ` · carteira: ${c.carteiraId ? (nomePorId.get(c.carteiraId) ?? "outro") : "sem cobrador"}`}
-                                            </div>
-                                          </td>
-                                          <td className="px-3 py-1.5">
-                                            <span
-                                              title={CONFERENCIA_SITUACAO_DICA[c.situacao]}
-                                              className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium ${SITUACAO_TONE[c.situacao]}`}
-                                            >
-                                              {CONFERENCIA_SITUACAO_LABEL[c.situacao]}
-                                            </span>
-                                          </td>
-                                          <td className="px-3 py-1.5 text-right whitespace-nowrap text-gray-700 dark:text-dark-text">
-                                            {c.baseParcelas > 0 ? (
-                                              <>
-                                                {formatCurrency(c.baseValor)}
-                                                <div className="text-[10px] text-gray-400">
-                                                  {c.baseParcelas} parcela(s)
-                                                </div>
-                                              </>
-                                            ) : (
-                                              "—"
-                                            )}
-                                          </td>
-                                          <td className="px-3 py-1.5 text-right whitespace-nowrap text-gray-700 dark:text-dark-text">
-                                            {c.appLancamentos > 0 ? (
-                                              <>
-                                                {formatCurrency(c.appValor)}
-                                                <div className="text-[10px] text-gray-400">
-                                                  {c.appLancamentos} lançamento(s)
-                                                  {c.appCedrus !== 0 && " · Cedrus"}
-                                                </div>
-                                              </>
-                                            ) : (
-                                              "—"
-                                            )}
-                                          </td>
-                                          <td className="px-3 py-1.5 text-right whitespace-nowrap">
-                                            <Diferenca valor={c.appValor - c.baseValor} />
-                                          </td>
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </td>
-                          </tr>
                         )}
-                      </React.Fragment>
+                        <td className="px-3 py-2">
+                          <span
+                            title={CONFERENCIA_SITUACAO_DICA[c.situacao]}
+                            className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ${SITUACAO_TONE[c.situacao]}`}
+                          >
+                            {CONFERENCIA_SITUACAO_LABEL[c.situacao]}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-right whitespace-nowrap text-gray-700 dark:text-dark-text">
+                          {c.baseParcelas > 0 ? (
+                            <>
+                              {formatCurrency(c.baseValor)}
+                              <div className="text-[11px] text-gray-400">
+                                {c.baseParcelas} parcela(s)
+                              </div>
+                            </>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-right whitespace-nowrap text-gray-700 dark:text-dark-text">
+                          {c.appLancamentos > 0 ? (
+                            <>
+                              {formatCurrency(c.appValor)}
+                              <div className="text-[11px] text-gray-400">
+                                {c.appLancamentos} lançamento(s)
+                                {c.appCedrus !== 0 && " · Cedrus"}
+                              </div>
+                            </>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className="px-4 lg:px-5 py-2 text-right whitespace-nowrap font-medium">
+                          <Diferenca valor={c.appValor - c.baseValor} />
+                        </td>
+                      </tr>
                     );
                   })}
                 </tbody>
               </table>
+              {lista.length > limite && (
+                <div className="px-4 lg:px-5 pt-3 text-center">
+                  <button
+                    onClick={() => setLimite((l) => l + PAGINA)}
+                    className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+                  >
+                    Mostrar mais ({lista.length - limite} restantes)
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </>

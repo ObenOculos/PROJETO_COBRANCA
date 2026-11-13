@@ -48,3 +48,32 @@ export const classificarConferencia = (
   if (!temBase && temApp) return "sem_baixa_base";
   return appValor > baseValor ? "app_maior" : "base_maior";
 };
+
+/**
+ * Agrupamento por urgencia, para a tela: "acao" = o gestor precisa olhar
+ * (dinheiro baixado sem registro, registro sem baixa ou registro a menor);
+ * "juros" = app maior que a base, quase sempre juros (a base so guarda o
+ * principal); "confere" = sem diferenca.
+ */
+export type ConferenciaGrupo = "acao" | "juros" | "confere";
+
+export const CONFERENCIA_GRUPO: Record<ConferenciaSituacao, ConferenciaGrupo> = {
+  sem_registro_app: "acao",
+  base_maior: "acao",
+  sem_baixa_base: "acao",
+  app_maior: "juros",
+  confere: "confere",
+};
+
+export const CONFERENCIA_GRUPO_LABEL: Record<ConferenciaGrupo, string> = {
+  acao: "Precisa conferir",
+  juros: "App maior (provável juros)",
+  confere: "Confere",
+};
+
+export const CONFERENCIA_GRUPO_DICA: Record<ConferenciaGrupo, string> = {
+  acao: "Pagou sem registro no app, registrado sem baixa na base ou base maior que o app.",
+  juros:
+    "O app tem mais que a base. Diferença pequena costuma ser juros (a base só guarda o principal).",
+  confere: "Valor do app igual ao baixado na base (até R$ 1 de diferença).",
+};
