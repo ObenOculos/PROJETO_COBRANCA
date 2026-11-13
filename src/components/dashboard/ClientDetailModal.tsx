@@ -37,7 +37,6 @@ import { useCollection } from "../../contexts/CollectionContext";
 import { useClientBirthDate } from "../../hooks/useClientBirthDate";
 import { razaoSocialDistinta } from "../../utils/clienteNome";
 import { useAuth } from "../../contexts/AuthContext";
-import { AuthorizationHistoryService } from "../../services/authorizationHistoryService";
 
 import GeneralPaymentModal from "./GeneralPaymentModal";
 import CorrigirPagamentoModal from "./CorrigirPagamentoModal";
@@ -204,6 +203,10 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     acordoAtivoOverdueMap,
   } = useCollection();
   const { user } = useAuth();
+  const nomePorUsuario = React.useMemo(
+    () => new Map(users.map((u) => [u.id, u.name])),
+    [users],
+  );
 
   // Espelho do ERP Ciclone (somente leitura). Lido direto do cadastro porque o
   // ClientGroup chega de varias telas e nem todas montam esses campos.
@@ -233,184 +236,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     () => new Set(vendaInicial != null ? [vendaInicial] : []),
   );
   const [refreshKey, setRefreshKey] = useState(0);
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authToken, setAuthToken] = useState("");
-  const [authError, setAuthError] = useState("");
-  const [isRequestingAuth, setIsRequestingAuth] = useState(false);
-  const [authRequestSent, setAuthRequestSent] = useState(false);
-  const [showApprovalNotification, setShowApprovalNotification] =
-    useState(false);
-  const [showRejectionModal, setShowRejectionModal] = useState(false);
-  const [approvedToken, setApprovedToken] = useState("");
-  const [processedApprovalToken, setProcessedApprovalToken] = useState("");
   const birthDate = useClientBirthDate(clientGroup.document);
-
-  // Monitorar aprovações e rejeições de token
-  React.useEffect(() => {
-    const handleTokenApproved = (event: CustomEvent) => {
-      const approvedRequest = event.detail;
-      if (
-        approvedRequest.clientDocument === clientGroup.document &&
-        authRequestSent
-      ) {
-        setApprovedToken(approvedRequest.token);
-        setProcessedApprovalToken(approvedRequest.token);
-        setShowApprovalNotification(true);
-        setAuthToken(approvedRequest.token);
-
-        // Notificação do navegador
-        if ("Notification" in window && Notification.permission === "granted") {
-          new Notification("Token Aprovado!", {
-            body: `Seu token ${approvedRequest.token} foi aprovado pelo gerente.`,
-            icon: "/icon_aplicativo.png",
-          });
-        }
-
-        // Auto-hide notification after 10 seconds
-        setTimeout(() => {
-          setShowApprovalNotification(false);
-        }, 10000);
-      }
-    };
-
-    const handleTokenRejected = (event: CustomEvent) => {
-      const rejectedRequest = event.detail;
-      if (
-        rejectedRequest.clientDocument === clientGroup.document &&
-        authRequestSent
-      ) {
-        setShowRejectionModal(true);
-        setShowAuthModal(false); // Esconder modal de solicitação
-
-        // Notificação do navegador
-        if ("Notification" in window && Notification.permission === "granted") {
-          new Notification("Token Rejeitado", {
-            body: `Seu token ${rejectedRequest.token} foi rejeitado pelo gerente.`,
-            icon: "/icon_aplicativo.png",
-          });
-        }
-      }
-    };
-
-    const checkTokenStatus = async () => {
-      if (authRequestSent && user) {
-        try {
-          // Buscar solicitações do usuário atual para este cliente
-          const { data } =
-            await AuthorizationHistoryService.getAuthorizationHistory({
-              searchTerm: clientGroup.document,
-              status: "all",
-            });
-
-          const userRequests = data.filter(
-            (req: any) =>
-              req.collector_id === user.id &&
-              req.client_document === clientGroup.document,
-          );
-
-          // Verificar aprovações
-          const approvedRequest = userRequests.find(
-            (req: any) =>
-              req.status === "approved" &&
-              new Date(req.expires_at) > new Date(),
-          );
-
-          if (
-            approvedRequest &&
-            processedApprovalToken !== approvedRequest.token
-          ) {
-            setApprovedToken(approvedRequest.token);
-            setProcessedApprovalToken(approvedRequest.token);
-            setShowApprovalNotification(true);
-            setAuthToken(approvedRequest.token);
-
-            // Notificação do navegador
-            if (
-              "Notification" in window &&
-              Notification.permission === "granted"
-            ) {
-              new Notification("Token Aprovado!", {
-                body: `Seu token ${approvedRequest.token} foi aprovado pelo gerente.`,
-                icon: "/icon_aplicativo.png",
-              });
-            }
-
-            // Auto-hide notification after 10 seconds
-            setTimeout(() => {
-              setShowApprovalNotification(false);
-            }, 10000);
-          }
-
-          // Verificar rejeições
-          const rejectedRequest = userRequests.find(
-            (req: any) =>
-              req.status === "rejected" &&
-              new Date(req.processed_at) > new Date(Date.now() - 30000), // Rejeitado nos últimos 30 segundos
-          );
-
-          if (rejectedRequest && !showRejectionModal) {
-            setShowRejectionModal(true);
-            setShowAuthModal(false); // Esconder modal de solicitação
-
-            // Notificação do navegador
-            if (
-              "Notification" in window &&
-              Notification.permission === "granted"
-            ) {
-              new Notification("Token Rejeitado", {
-                body: `Seu token ${rejectedRequest.token} foi rejeitado pelo gerente.`,
-                icon: "/icon_aplicativo.png",
-              });
-            }
-          }
-        } catch (error) {
-          console.error("Erro ao verificar status de token:", error);
-        }
-      }
-    };
-
-    // Listeners para aprovação e rejeição imediatas
-    window.addEventListener(
-      "tokenApproved",
-      handleTokenApproved as EventListener,
-    );
-    window.addEventListener(
-      "tokenRejected",
-      handleTokenRejected as EventListener,
-    );
-
-    // Fallback: verificar periodicamente -- so enquanto ha pedido de token
-    // pendente (sem pedido, o timer rodava a toa com o modal aberto).
-    const interval = authRequestSent
-      ? setInterval(checkTokenStatus, 3000)
-      : undefined;
-
-    return () => {
-      window.removeEventListener(
-        "tokenApproved",
-        handleTokenApproved as EventListener,
-      );
-      window.removeEventListener(
-        "tokenRejected",
-        handleTokenRejected as EventListener,
-      );
-      if (interval) clearInterval(interval);
-    };
-  }, [
-    authRequestSent,
-    clientGroup.document,
-    showApprovalNotification,
-    showRejectionModal,
-    user,
-    processedApprovalToken,
-  ]);
-
-  // Solicitar permissão para notificações
-  React.useEffect(() => {
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
-    }
-  }, []);
 
   // Desabilitar scroll do body quando o modal estiver aberto
   React.useEffect(() => {
@@ -642,102 +468,11 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     setExpandedSales(newExpanded);
   };
 
-  // Gerar token de 6 dígitos
-  const generateToken = () => {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  };
-
-  // Função para solicitar autorização do gerente
-  const requestManagerAuth = async () => {
-    if (!user) return;
-
-    setIsRequestingAuth(true);
-    setAuthError("");
-
-    try {
-      // Primeiro, expirar qualquer solicitação anterior pendente para este cliente e cobrador
-      await AuthorizationHistoryService.expirePreviousRequests(
-        user.id,
-        clientGroup.document,
-      );
-
-      // Gerar token único
-      const token = generateToken();
-      const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutos
-
-      // Criar solicitação no Supabase
-      const authRequest =
-        await AuthorizationHistoryService.createAuthorizationRequest({
-          token,
-          collector_id: user.id,
-          collector_name: user.name,
-          client_name: clientGroup.client,
-          client_document: clientGroup.document,
-          expires_at: expiresAt,
-        });
-
-      // Disparar evento para notificar o gerente
-      window.dispatchEvent(
-        new CustomEvent("authRequestCreated", {
-          detail: {
-            token: authRequest.token,
-            collectorName: authRequest.collector_name,
-            clientName: authRequest.client_name,
-            clientDocument: authRequest.client_document,
-          },
-        }),
-      );
-
-      setAuthRequestSent(true);
-      setProcessedApprovalToken("");
-      setAuthError("");
-    } catch (error) {
-      console.error("Erro ao solicitar autorização:", error);
-      setAuthError("Erro ao solicitar autorização. Tente novamente.");
-    } finally {
-      setIsRequestingAuth(false);
-    }
-  };
-
-  // Função para validar token inserido
-  const validateToken = async () => {
-    if (!authToken) return;
-
-    try {
-      const { isValid, authorization, error } =
-        await AuthorizationHistoryService.validateToken(authToken);
-
-      if (isValid && authorization) {
-        // Token válido e aprovado
-        setAuthError("");
-        setShowAuthModal(false);
-        setAuthToken("");
-        setAuthRequestSent(false);
-        setIsGeneralEditModalOpen(true);
-
-        // Marcar token como usado (opcional - ou deixar expirar naturalmente)
-        // await AuthorizationHistoryService.markTokenAsUsed(authToken);
-      } else {
-        // Token inválido
-        setAuthError(error || "Token inválido.");
-      }
-    } catch (error) {
-      console.error("Erro ao validar token:", error);
-      setAuthError("Erro ao validar token. Tente novamente.");
-    }
-  };
-
+  // Item 62: gestor corrige (estorna) direto; cobrador pede a correcao ao
+  // gestor. Sem token: a trava e o banco (estornar_pagamento so aceita
+  // gestor; o pedido so aceita pagamento que o proprio cobrador registrou).
   const handleEditPaymentClick = () => {
-    // Item 62: o gestor corrige direto (sem token para si mesmo); a trava
-    // real e a RPC estornar_pagamento, que so aceita gestor.
-    if (souGestor) {
-      setIsGeneralEditModalOpen(true);
-      return;
-    }
-    setShowAuthModal(true);
-    setAuthError("");
-    setAuthToken("");
-    setAuthRequestSent(false);
+    setIsGeneralEditModalOpen(true);
   };
 
   // Um modal ativo por vez: com Receber pagamento / Editar pagamentos /
@@ -927,7 +662,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                               <Edit className="h-4 w-4 text-gray-500" />
                               {souGestor
                                 ? "Corrigir pagamento"
-                                : "Editar pagamentos (pede autorização)"}
+                                : "Pedir correção de pagamento"}
                             </button>
                           </div>
                         </>
@@ -1532,192 +1267,6 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
         </div>
       </div>
 
-      {/* Authorization Modal */}
-      {showAuthModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[110]">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
-            <h3 className="text-sm sm:text-lg font-semibold text-gray-900 mb-4">
-              Autorização Necessária
-            </h3>
-
-            {!authRequestSent ? (
-              <>
-                <p className="text-gray-600 mb-4">
-                  Para editar pagamentos, é necessária autorização do gerente.
-                  Clique no botão abaixo para solicitar um token de autorização.
-                </p>
-                <p className="text-xs sm:text-sm text-amber-600 mb-4">
-                  ⚠️ O token expira em 5 minutos após a aprovação.
-                </p>
-
-                <div className="space-y-4">
-                  {authError && (
-                    <div className="bg-red-50 border border-red-200 rounded-2xl p-3">
-                      <p className="text-xs sm:text-sm text-red-700">
-                        {authError}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="flex gap-3">
-                    <button
-                      id="cancel-auth"
-                      name="cancelAuth"
-                      onClick={() => {
-                        setShowAuthModal(false);
-                        setAuthToken("");
-                        setAuthError("");
-                        setAuthRequestSent(false);
-                      }}
-                      className="flex-1 px-4 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      id="request-auth"
-                      name="requestAuth"
-                      onClick={requestManagerAuth}
-                      disabled={isRequestingAuth}
-                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isRequestingAuth ? (
-                        "Solicitando..."
-                      ) : (
-                        <>
-                          <span className="sm:hidden">Solicitar</span>
-                          <span className="hidden sm:inline">
-                            Solicitar Autorização
-                          </span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
-                {showApprovalNotification ? (
-                  <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-4 animate-pulse">
-                    <div className="flex items-center">
-                      <div className="bg-blue-500 rounded-full p-1 mr-3">
-                        <svg
-                          className="h-4 w-4 text-white"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="text-xs sm:text-sm font-medium text-blue-700">
-                          Token Aprovado pelo Gerente!
-                        </p>
-                        <p className="text-xs sm:text-sm text-blue-600">
-                          Token:{" "}
-                          <span className="font-mono font-bold">
-                            {approvedToken}
-                          </span>{" "}
-                          - Token preenchido automaticamente
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  !approvedToken && (
-                    <div className="bg-green-50 border border-green-200 rounded-2xl p-3 mb-4">
-                      <p className="text-xs sm:text-sm text-green-700">
-                        ✅ Solicitação enviada para o gerente! Aguarde a
-                        aprovação.
-                      </p>
-                    </div>
-                  )
-                )}
-
-                <div className="space-y-4">
-                  <div>
-                    <label
-                      htmlFor="auth-token"
-                      className="block text-xs sm:text-sm font-medium text-gray-700 mb-2"
-                    >
-                      Token de Autorização
-                    </label>
-                    <input
-                      id="auth-token"
-                      name="authToken"
-                      type="text"
-                      value={authToken}
-                      onChange={(e) =>
-                        setAuthToken(
-                          e.target.value.replace(/\D/g, "").slice(0, 6),
-                        )
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-sm sm:text-lg font-mono"
-                      placeholder="000000"
-                      maxLength={6}
-                      onKeyDown={(e) => e.key === "Enter" && validateToken()}
-                    />
-                  </div>
-
-                  {authError && (
-                    <div className="bg-red-50 border border-red-200 rounded-2xl p-3">
-                      <p className="text-xs sm:text-sm text-red-700">
-                        {authError}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="flex gap-3">
-                    <button
-                      id="cancel-auth"
-                      name="cancelAuth"
-                      onClick={() => {
-                        setShowAuthModal(false);
-                        setAuthToken("");
-                        setAuthError("");
-                        setAuthRequestSent(false);
-                      }}
-                      className="flex-1 px-4 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      id="validate-token"
-                      name="validateToken"
-                      onClick={validateToken}
-                      disabled={authToken.length !== 6}
-                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Validar Token
-                    </button>
-                  </div>
-
-                  <button
-                    id="new-request"
-                    name="newRequest"
-                    onClick={() => {
-                      setAuthRequestSent(false);
-                      setShowApprovalNotification(false);
-                      setShowRejectionModal(false);
-                      setAuthToken("");
-                      setAuthError("");
-                      setApprovedToken("");
-                      setProcessedApprovalToken("");
-                    }}
-                    className="w-full px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-2xl transition-colors text-xs sm:text-sm"
-                  >
-                    Solicitar Nova Autorização
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Aviso de acordo ativo antes de abrir o Distribuir Pagamento --
           titulos vinculados ao acordo nao podem ser pagos por aqui (ver
           migration 20261102000005); o cobrador precisa confirmar que sabe
@@ -1807,56 +1356,18 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
         />
       )}
 
-      {/* General Payment Edit Modal */}
-      {isGeneralEditModalOpen && (
+      {/* Corrigir pagamento (gestor) / Pedir correcao (cobrador) */}
+      {isGeneralEditModalOpen && user && (
         <CorrigirPagamentoModal
           clientGroup={clientGroup}
+          modo={souGestor ? "estornar" : "pedir"}
+          usuarioId={user?.id ?? ""}
+          nomePorId={nomePorUsuario}
           onClose={() => setIsGeneralEditModalOpen(false)}
           onSuccess={handleGeneralEditSuccess}
         />
       )}
 
-      {/* Rejection Modal */}
-      {showRejectionModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[110]">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
-            <div className="text-center">
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
-                <svg
-                  className="h-6 w-6 text-red-600"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth="1.5"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </div>
-              <h3 className="text-sm sm:text-lg font-semibold text-gray-900 mb-2">
-                Solicitação Rejeitada
-              </h3>
-              <p className="text-xs sm:text-sm text-gray-600 mb-6">
-                Sua solicitação de autorização foi rejeitada pelo gerente.
-              </p>
-              <button
-                onClick={() => {
-                  setShowRejectionModal(false);
-                  setAuthRequestSent(false);
-                  setAuthToken("");
-                  setAuthError("");
-                }}
-                className="w-full px-4 py-2 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition-colors font-medium"
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 };

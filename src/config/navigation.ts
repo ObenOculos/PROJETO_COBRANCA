@@ -108,7 +108,7 @@ export const navigationItems: NavItemConfig[] = [
   },
   {
     id: "authorization",
-    managerName: "Autorizações",
+    managerName: "Correções",
     managerIcon: CircleCheckBig,
     roles: ["manager"],
   },

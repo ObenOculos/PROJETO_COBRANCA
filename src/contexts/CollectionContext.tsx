@@ -3965,6 +3965,35 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     }
   };
 
+  const decidirPedidoCorrecao: CollectionContextType["decidirPedidoCorrecao"] =
+    async ({ pedidoId, aprovar, valor, resposta }) => {
+      setGlobalLoading(true, aprovar ? "Registrando estorno..." : "Recusando pedido...");
+      try {
+        const { data, error } = await supabase.rpc("decidir_pedido_correcao", {
+          p_pedido: pedidoId,
+          p_aprovar: aprovar,
+          p_valor: valor == null ? undefined : Math.round(valor * 100) / 100,
+          p_resposta: resposta?.trim() || undefined,
+        });
+        if (error) throw new Error(error.message);
+        if (!aprovar) return null;
+        const r = (data ?? {}) as {
+          valor?: number;
+          revertido_parcelas?: number;
+          parcelas?: number;
+        };
+        invalidatePayments();
+        await fetchSalePayments(false);
+        return {
+          valor: Number(r.valor ?? valor ?? 0),
+          revertidoParcelas: Number(r.revertido_parcelas ?? 0),
+          parcelas: Number(r.parcelas ?? 0),
+        };
+      } finally {
+        setGlobalLoading(false);
+      }
+    };
+
   // useCallback: identidade estavel entre renders, para os useMemo de quem
   // consome (getSalesByClient, Detalhes do Cliente) nao recalcularem a toa.
   const getSalePayments = React.useCallback(
@@ -5306,6 +5335,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     processGeneralPayment,
     registrarAjusteRecebimento,
     estornarPagamento,
+    decidirPedidoCorrecao,
     getSalePayments,
     calculateSaleBalance,
     getSalesByClient,

@@ -1076,6 +1076,54 @@ export type Database = {
         };
         Relationships: [];
       };
+      pedidos_correcao_pagamento: {
+        Row: {
+          cliente: string | null;
+          created_at: string;
+          decidido_em: string | null;
+          decidido_por_id: string | null;
+          decisao: string | null;
+          documento: string;
+          estorno_id: string | null;
+          id: string;
+          motivo: string;
+          resposta: string | null;
+          sale_payment_id: string;
+          solicitado_por_id: string;
+          valor: number;
+        };
+        Insert: {
+          cliente?: string | null;
+          created_at?: string;
+          decidido_em?: string | null;
+          decidido_por_id?: string | null;
+          decisao?: string | null;
+          documento: string;
+          estorno_id?: string | null;
+          id?: string;
+          motivo: string;
+          resposta?: string | null;
+          sale_payment_id: string;
+          solicitado_por_id: string;
+          valor: number;
+        };
+        Update: {
+          cliente?: string | null;
+          created_at?: string;
+          decidido_em?: string | null;
+          decidido_por_id?: string | null;
+          decisao?: string | null;
+          documento?: string;
+          estorno_id?: string | null;
+          id?: string;
+          motivo?: string;
+          resposta?: string | null;
+          sale_payment_id?: string;
+          solicitado_por_id?: string;
+          valor?: number;
+        };
+        Relationships: [];
+      };
       fila_adiamentos: {
         Row: {
           collector_id: string;
@@ -2245,6 +2293,15 @@ export type Database = {
           isOneToOne: false;
           isSetofReturn: true;
         };
+      };
+      decidir_pedido_correcao: {
+        Args: {
+          p_pedido: string;
+          p_aprovar: boolean;
+          p_valor?: number;
+          p_resposta?: string;
+        };
+        Returns: Json;
       };
       estornar_pagamento: {
         Args: {

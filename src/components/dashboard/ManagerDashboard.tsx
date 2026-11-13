@@ -18,13 +18,12 @@ import VisitTracking from "./VisitTracking";
 import CollectorsSummary from "./CollectorsSummary";
 import ConferenciaRecebimentos from "./ConferenciaRecebimentos";
 import DailyCashReport from "./DailyCashReport";
-import AuthorizationManager from "./AuthorizationManager";
+import PedidosCorrecao from "./PedidosCorrecao";
 import AcordoConfiguracaoPadrao from "./AcordoConfiguracaoPadrao";
 import CarteiraDistribuicao from "./CarteiraDistribuicao";
 import TabTransition from "../common/TabTransition";
 import { useCollection } from "../../contexts/CollectionContext";
 import { FilterOptions } from "../../types";
-import { AuthorizationHistoryService } from "../../services/authorizationHistoryService";
 import { CollectionTableRef } from "./CollectionTable";
 import VendasAguardandoConferencia from "./VendasAguardandoConferencia";
 import { Notification } from "../../contexts/NotificationContext";
@@ -47,10 +46,8 @@ const TABS_NEEDING_FULL_SCOPE = new Set([
 // gestor nao carrega mais nada no login, elas precisam pedir os dados ao abrir.
 // A Cobranca fica DE FORA de proposito — e justamente onde o gestor escolhe o
 // que consultar. (Desempenho/Lojas/Clientes ja se resolvem pelo full scope.)
-const TABS_AUTOLOADING_COLLECTIONS = new Set([
-  "visit-tracking",
-  "authorization",
-]);
+// "authorization" (Correções, item 62) tem consulta propria: nao carrega.
+const TABS_AUTOLOADING_COLLECTIONS = new Set(["visit-tracking"]);
 
 interface ManagerDashboardProps {
   activeTab?: string;
@@ -130,7 +127,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
-  const [, setPendingAuthorizations] = useState(0);
   const collectionTableRef = useRef<CollectionTableRef>(null);
 
   // Preset da Atribuicao vindo de notificacao; o nonce remonta a tela para
@@ -199,21 +195,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   useEffect(() => {
     localStorage.setItem("managerCollectionsView", collectionsView);
   }, [collectionsView]);
-
-  useEffect(() => {
-    const fetchPendingAuthorizations = async () => {
-      try {
-        const pendingRequests =
-          await AuthorizationHistoryService.getPendingRequests();
-        setPendingAuthorizations(pendingRequests.length);
-      } catch (error) {
-        console.error("Erro ao buscar autorizações pendentes:", error);
-      }
-    };
-    fetchPendingAuthorizations();
-    const interval = setInterval(fetchPendingAuthorizations, 30000);
-    return () => clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -476,7 +457,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
         return <VisitTracking />;
 
       case "authorization":
-        return <AuthorizationManager />;
+        return <PedidosCorrecao />;
 
       case "users":
         return (
