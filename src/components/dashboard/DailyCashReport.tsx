@@ -729,7 +729,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
         "Loja",
         "Cobrador",
         "Forma Pagamento",
-        "Valor Recebido (Hoje)",
+        "Valor Recebido",
         "Total Pago (Histórico)",
         "Desconto",
         "Total da Dívida",
@@ -750,7 +750,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       p.totalDiscount,
       p.totalDebt,
       p.remainingDebt,
-      p.receivedDate,
+      formatDate(p.receivedDate),
     ]);
 
     const detailsWS = XLSX.utils.aoa_to_sheet([
@@ -1351,6 +1351,9 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                     <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-wide min-w-[200px]">
                       Cliente / Venda
                     </th>
+                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-wide whitespace-nowrap">
+                      Data Pgto.
+                    </th>
                     <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-wide hidden 2xl:table-cell">
                       Loja
                     </th>
@@ -1414,6 +1417,11 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                               </span>
                             </div>
                           </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <p className="text-xs font-semibold text-gray-700 dark:text-dark-text tabular-nums whitespace-nowrap">
+                            {formatDate(payment.receivedDate)}
+                          </p>
                         </td>
                         <td className="px-4 py-4 hidden 2xl:table-cell">
                           <p className="text-xs font-semibold text-gray-500 dark:text-dark-text-secondary truncate max-w-[120px]">
@@ -1568,6 +1576,7 @@ const generateReportContent = (
     data.payments.forEach((payment) => {
       lines.push(
         `Cliente: ${payment.client}`,
+        `Data do Pagamento: ${formatDate(payment.receivedDate)}`,
         `${payment.saleNumber ? `Venda: #${payment.saleNumber}` : "Venda sem número"} | Loja: ${payment.store}`,
         `Forma de Pagamento: ${payment.paymentMethod}`,
         `Valor Recebido: ${formatCurrency(payment.totalReceivedValue)} | Desconto: ${formatCurrency(payment.totalDiscount)}`,
@@ -1861,12 +1870,13 @@ const generatePrintableReport = (
       <h3 class="section-title">Transações Detalhadas</h3>
       <table>
         <tr>
+          <th>Data Pgto.</th>
           <th>Cliente</th>
           <th>Documento</th>
           <th>Venda</th>
           <th>Loja</th>
           <th>Forma Pag.</th>
-          <th>Recebido Hoje</th>
+          <th>Recebido</th>
           <th>Total Pago (Hist.)</th>
           <th>Desconto</th>
           <th>Total Dívida</th>
@@ -1877,6 +1887,7 @@ const generatePrintableReport = (
           .map(
             (p) => `
           <tr>
+            <td style="white-space: nowrap;">${formatDate(p.receivedDate)}</td>
             <td>${p.client}</td>
             <td>${p.clientDocument}</td>
             <td>${p.saleNumber ? `#${p.saleNumber}` : "Sem número"}</td>
@@ -1913,7 +1924,7 @@ const generatePrintableReport = (
           </div>
           <div class="totals-column">
             <div class="total-row">
-              <span class="label">Total Recebido (Hoje):</span>
+              <span class="label">Total Recebido${isRangeMode ? " no Período" : " no Dia"}:</span>
               <span class="value">${formatCurrency(data.totalReceived)}</span>
             </div>
             <div class="total-row">
