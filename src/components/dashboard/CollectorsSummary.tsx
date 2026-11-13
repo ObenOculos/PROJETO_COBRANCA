@@ -13,6 +13,7 @@ import {
   Check,
   Gauge,
   PhoneCall,
+  UserX,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
@@ -32,6 +33,8 @@ import { hasInstallmentBalance } from "../../filters/clientStatus";
 import { toYYYYMMDD } from "../../filters/dates";
 import { formatCurrency, calculateOverdueDays } from "../../utils/formatters";
 import ContactScheduler from "./ContactScheduler";
+import SaidasSemAcaoModal from "./SaidasSemAcao";
+import { useSaidasSemAcao } from "../../hooks/useSaidasSemAcao";
 
 interface CollectorRow {
   id: string;
@@ -327,6 +330,19 @@ const CollectorsSummary: React.FC = () => {
     dateTo,
     docByParcelaRef,
   );
+
+  // Carteira automatica (item 55): clientes que sairam da faixa do cobrador
+  // sem acao dele, no periodo. Numero no card/linha do cobrador; o clique
+  // abre a lista, onde o gestor pode devolver os clientes ao cobrador.
+  const { porCobrador: saidasPorCobrador, recarregar: recarregarSaidas } =
+    useSaidasSemAcao(dateFrom, dateTo);
+  const [saidasCobradorId, setSaidasCobradorId] = useState<string | null>(
+    null,
+  );
+  const saidasCobrador = saidasCobradorId
+    ? (users.find((u) => u.id === saidasCobradorId) ?? null)
+    : null;
+  const qtdSaidas = (id: string) => saidasPorCobrador.get(id)?.length ?? 0;
 
   const lastVisitStatus = useMemo(
     () => lastVisitStatusByClient(scheduledVisits),
@@ -1034,6 +1050,23 @@ const CollectorsSummary: React.FC = () => {
                         false,
                       ),
                     },
+                    ...(isWalletCollectorType(row.type)
+                      ? [
+                          {
+                            label: "Saíram sem ação",
+                            value: fmtNum(qtdSaidas(row.id)),
+                            tone:
+                              qtdSaidas(row.id) > 0
+                                ? ("red" as const)
+                                : undefined,
+                            onClick:
+                              qtdSaidas(row.id) > 0
+                                ? () => setSaidasCobradorId(row.id)
+                                : undefined,
+                            hint: "Clientes que passaram da faixa no período sem nenhuma ação do cobrador. Clique para ver e devolver.",
+                          },
+                        ]
+                      : []),
                   ]}
                 />
                 <SummaryCard
@@ -1257,6 +1290,17 @@ const CollectorsSummary: React.FC = () => {
                         Agendar em massa
                       </button>
                     )}
+                    {qtdSaidas(row.id) > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setSaidasCobradorId(row.id)}
+                        title="Clientes que passaram da faixa no período sem nenhuma ação do cobrador. Clique para ver e devolver."
+                        className="mt-1 flex items-center gap-1 text-[10px] font-bold text-red-600 hover:text-red-700 dark:text-red-400"
+                      >
+                        <UserX className="h-3 w-3" />
+                        {fmtNum(qtdSaidas(row.id))} saíram sem ação
+                      </button>
+                    )}
                   </td>
                   <td className="px-3 py-3 text-right whitespace-nowrap border-l border-gray-100 dark:border-dark-border/40">
                     <div className="font-semibold">
@@ -1345,6 +1389,16 @@ const CollectorsSummary: React.FC = () => {
             </tbody>
           </table>
         </div>
+      )}
+
+      {saidasCobrador && (
+        <SaidasSemAcaoModal
+          cobrador={saidasCobrador}
+          saidas={saidasPorCobrador.get(saidasCobrador.id) ?? []}
+          users={users}
+          onClose={() => setSaidasCobradorId(null)}
+          onDevolvido={recarregarSaidas}
+        />
       )}
 
       {scheduleContactCollectorId && (
