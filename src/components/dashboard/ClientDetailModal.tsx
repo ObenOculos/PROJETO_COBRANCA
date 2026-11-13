@@ -734,10 +734,19 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     setAuthRequestSent(false);
   };
 
+  // Um modal ativo por vez: com Receber pagamento / Editar pagamentos /
+  // Atender / Acordo aberto por cima, a Ficha fica minimizada (escondida,
+  // mas montada -- volta na mesma aba e rolagem ao fechar).
+  const fichaMinimizada =
+    isGeneralPaymentModalOpen ||
+    isGeneralEditModalOpen ||
+    isAtenderOpen ||
+    isAcordoOpen;
+
   return (
     <>
       <div
-        className="fixed inset-0 bg-black bg-opacity-50 flex items-stretch sm:items-center justify-center sm:p-4 z-[100] backdrop-blur-sm"
+        className={`fixed inset-0 bg-black bg-opacity-50 ${fichaMinimizada ? "hidden" : "flex"} items-stretch sm:items-center justify-center sm:p-4 z-[100] backdrop-blur-sm`}
         onClick={(e) => {
           if (e.target === e.currentTarget) {
             onClose();

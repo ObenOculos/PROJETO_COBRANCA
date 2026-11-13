@@ -98,6 +98,39 @@ const Aviso: React.FC<{
   );
 };
 
+/** Cor de cada venda na lista de parcelas (cliente com mais de uma venda). */
+const CORES_VENDA = [
+  {
+    faixa: "border-l-indigo-500",
+    etiqueta:
+      "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300",
+  },
+  {
+    faixa: "border-l-amber-500",
+    etiqueta:
+      "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+  },
+  {
+    faixa: "border-l-teal-500",
+    etiqueta:
+      "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300",
+  },
+  {
+    faixa: "border-l-rose-500",
+    etiqueta:
+      "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300",
+  },
+  {
+    faixa: "border-l-sky-500",
+    etiqueta: "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300",
+  },
+  {
+    faixa: "border-l-lime-500",
+    etiqueta:
+      "bg-lime-100 text-lime-800 dark:bg-lime-900/30 dark:text-lime-300",
+  },
+] as const;
+
 interface GeneralPaymentModalProps {
   clientGroup: ClientGroup;
   clientSales: SaleGroup[];
@@ -150,6 +183,10 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     >(null);
     // Parcelas a vencer ficam fechadas: adiantar e uma acao deliberada.
     const [mostrarAVencer, setMostrarAVencer] = useState(false);
+    // So muda a exibicao: a marcacao segue sempre a ordem de vencimento.
+    const [ordenarPor, setOrdenarPor] = useState<"vencimento" | "venda">(
+      "vencimento",
+    );
     // Juros/multa: so o que o cobrador INFORMA (acordado com o cliente).
     // O app nunca presume encargo (decisao do usuario 2026-11-13).
     const [mostrarJuros, setMostrarJuros] = useState(false);
@@ -172,7 +209,9 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     const [dataPagamento, setDataPagamento] = useState(hoje);
     const dataPagamentoValida =
       !podeEscolherData ||
-      (dataPagamento !== "" && dataPagamento >= dataMinima && dataPagamento <= hoje);
+      (dataPagamento !== "" &&
+        dataPagamento >= dataMinima &&
+        dataPagamento <= hoje);
 
     // Contato agendado ATIVO deste cliente, do proprio cobrador de carteira:
     // o pagamento conclui ele (mesma regra do "Atender" -- RPC
@@ -219,7 +258,10 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
               (inst.valor_recebido || 0) -
               (inst.desconto || 0),
           );
-          const diasAtraso = Math.max(0, calculateOverdueDays(inst.data_vencimento));
+          const diasAtraso = Math.max(
+            0,
+            calculateOverdueDays(inst.data_vencimento),
+          );
           lista.push({
             sale,
             idParcela: inst.id_parcela,
@@ -239,6 +281,54 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       );
     }, [clientSales]);
     const qtdVencidas = parcelasAbertas.filter((p) => p.vencida).length;
+    // Vendas com parcela em aberto, na ordem em que aparecem (vencimento).
+    // Com mais de uma, cada venda ganha uma cor (faixa + etiqueta) -- a lista
+    // continua em ordem de vencimento, que e a ordem em que o banco abate.
+    const vendasDaLista = useMemo(() => {
+      const mapa = new Map<
+        number,
+        { saleNumber: number; titulo: number; saldo: number; qtd: number }
+      >();
+      parcelasAbertas.forEach((p) => {
+        const v = mapa.get(p.sale.saleNumber) ?? {
+          saleNumber: p.sale.saleNumber,
+          titulo: p.sale.titleNumber || 0,
+          saldo: 0,
+          qtd: 0,
+        };
+        v.saldo = round2(v.saldo + p.saldo);
+        v.qtd += 1;
+        mapa.set(p.sale.saleNumber, v);
+      });
+      return Array.from(mapa.values());
+    }, [parcelasAbertas]);
+    const variasVendas = vendasDaLista.length > 1;
+    const corDaVenda = (saleNumber: number) =>
+      CORES_VENDA[
+        Math.max(
+          0,
+          vendasDaLista.findIndex((v) => v.saleNumber === saleNumber),
+        ) % CORES_VENDA.length
+      ];
+    const nomeVenda = (saleNumber: number) =>
+      saleNumber === 0 ? "Renegociada" : `Venda #${saleNumber}`;
+    /** "Venda #X · Parcela N" -- com varias vendas, a venda vira etiqueta colorida. */
+    const rotuloParcela = (saleNumber: number, numero: number | null) =>
+      variasVendas ? (
+        <span className="flex flex-wrap items-center gap-1.5">
+          <span
+            className={`px-1.5 py-0.5 rounded text-[11px] font-semibold ${corDaVenda(saleNumber).etiqueta}`}
+          >
+            {nomeVenda(saleNumber)}
+          </span>
+          {numero != null && <span>Parcela {numero}</span>}
+        </span>
+      ) : (
+        <>
+          {nomeVenda(saleNumber)}
+          {numero != null && ` · Parcela ${numero}`}
+        </>
+      );
     const qtdMarcadas = Math.min(
       qtdMarcadasEscolhida ?? qtdVencidas,
       parcelasAbertas.length,
@@ -282,7 +372,8 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     const modoParcelas = !withDiscount && !acordoAtivo;
 
     // Juros/multa informados pelo cobrador (0 se nao informou).
-    const jurosInformado = modoParcelas && mostrarJuros ? parseValor(jurosTexto) : 0;
+    const jurosInformado =
+      modoParcelas && mostrarJuros ? parseValor(jurosTexto) : 0;
 
     /**
      * Para onde vai cada real. A base e sempre o valor ORIGINAL das parcelas
@@ -326,8 +417,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         situacao,
         temVencida: marcadas.some((p) => p.vencida),
         principal: round2(itens.reduce((s, p) => s + p.aplicado, 0)),
-        aMais:
-          situacao === "acima" ? round2(disponivel - somaParcelas) : 0,
+        aMais: situacao === "acima" ? round2(disponivel - somaParcelas) : 0,
       };
     }, [parcelasAbertas, qtdMarcadas, amountToDistribute, jurosInformado]);
 
@@ -361,7 +451,10 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       return round2(
         parcelasAbertas
           .filter((p) => p.vencida)
-          .reduce((s, p) => s + p.saldo - (aplicadoPor.get(p.idParcela) ?? 0), 0),
+          .reduce(
+            (s, p) => s + p.saldo - (aplicadoPor.get(p.idParcela) ?? 0),
+            0,
+          ),
       );
     }, [withDiscount, acordoAtivo, vencidoTotal, alocacao, parcelasAbertas]);
     const precisaAcompanhamento = vencidoRestante > 0.01;
@@ -395,7 +488,10 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       // venda. Antes ia pela venda de MENOR saldo, o que podia mandar o
       // dinheiro para parcela a vencer com outra venda em atraso.
       if (modoParcelas) {
-        const porVenda = new Map<number, { sale: SaleGroup; aplicado: number }>();
+        const porVenda = new Map<
+          number,
+          { sale: SaleGroup; aplicado: number }
+        >();
         alocacao.itens.forEach((p) => {
           const aplicado = p.aplicado;
           if (aplicado <= 0) return;
@@ -413,15 +509,15 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
               .reduce((s, p) => s + p.saldo, 0),
           );
         return Array.from(porVenda.values())
-            .filter((v) => v.aplicado > 0)
-            .map(({ sale, aplicado }) => ({
-              sale,
-              currentReceived: sale.totalReceived || 0,
-              appliedAmount: aplicado,
-              appliedDiscount: 0,
-              newAmount: (sale.totalReceived || 0) + aplicado,
-              willBeComplete: saldoDaVenda(sale.saleNumber) - aplicado <= 0.01,
-            }));
+          .filter((v) => v.aplicado > 0)
+          .map(({ sale, aplicado }) => ({
+            sale,
+            currentReceived: sale.totalReceived || 0,
+            appliedAmount: aplicado,
+            appliedDiscount: 0,
+            newAmount: (sale.totalReceived || 0) + aplicado,
+            willBeComplete: saldoDaVenda(sale.saleNumber) - aplicado <= 0.01,
+          }));
       }
 
       let remainingPayment = paymentAmount;
@@ -469,7 +565,6 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       parcelasAbertas,
     ]);
 
-
     // Função para notificar manager sobre pagamentos com desconto
     const notifyManagerAboutDiscount = (discountAmount: number) => {
       if (!user || user.type !== "collector" || discountAmount <= 0) {
@@ -510,7 +605,8 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         return "Marque a(s) parcela(s) que o cliente está pagando.";
       }
       // Exige valor positivo mesmo na quitação com desconto (sem "desconto de 100%").
-      if (amountToDistribute <= 0) return "Informe o valor que o cliente pagou.";
+      if (amountToDistribute <= 0)
+        return "Informe o valor que o cliente pagou.";
       if (modoParcelas && alocacao.situacao === "jurosMaior") {
         return "Os juros/multa informados são maiores que o valor recebido.";
       }
@@ -554,7 +650,8 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       if (!rescheduleDate || !rescheduleTime) {
         return "Informe a data e o horário da próxima visita.";
       }
-      if (rescheduleDate < hoje) return "A data da visita não pode estar no passado.";
+      if (rescheduleDate < hoje)
+        return "A data da visita não pode estar no passado.";
       if (rescheduleDate === hoje && rescheduleTime <= horaLocalAgora()) {
         return "Esse horário de hoje já passou.";
       }
@@ -840,6 +937,12 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     };
 
     const ETAPAS = ["Valor", "Pagamento", "Conferir"] as const;
+    // Modal largo em duas colunas no computador (no modo parcelas); no
+    // celular continua uma coluna so.
+    const duasColunas = modoParcelas;
+    const grade = duasColunas
+      ? "space-y-5 md:space-y-0 md:grid md:grid-cols-2 md:gap-6 md:items-start"
+      : "space-y-5";
     const formaRotulo = FORMA_PAGAMENTO_LABEL[paymentMethod] ?? paymentMethod;
     const dataTexto = (iso: string) => iso.split("-").reverse().join("/");
     const desconto = withDiscount
@@ -855,7 +958,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       >
         <form
           onSubmit={handleSubmit}
-          className="bg-white dark:bg-dark-bg-secondary sm:rounded-2xl max-w-xl w-full h-full sm:h-auto sm:max-h-[90vh] flex flex-col overflow-hidden shadow-2xl"
+          className={`bg-white dark:bg-dark-bg-secondary sm:rounded-2xl ${duasColunas ? "max-w-xl md:max-w-4xl" : "max-w-xl"} w-full h-full sm:h-auto sm:max-h-[90vh] flex flex-col overflow-hidden shadow-2xl`}
         >
           {/* Cabecalho */}
           <div className="px-4 sm:px-6 pt-4 pb-3 border-b border-gray-200 dark:border-dark-border shrink-0">
@@ -944,707 +1047,870 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                   </div>
                 )}
 
-                {modoParcelas && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-dark-text mb-2">
-                      O que o cliente está pagando?
-                    </h3>
-                    {parcelasAbertas.length === 0 ? (
-                      <p className="text-sm text-gray-500">
-                        Não há parcela em aberto.
-                      </p>
-                    ) : (
-                      <ul className="divide-y divide-gray-100 dark:divide-dark-border border border-gray-200 dark:border-dark-border rounded-xl overflow-hidden">
-                        {parcelasAbertas.map((p, i) => {
-                          if (!p.vencida && !aVencerVisivel) return null;
-                          const marcada = i < qtdMarcadas;
-                          return (
-                            <li key={p.idParcela}>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setQtdMarcadasEscolhida(marcada ? i : i + 1);
-                                  setErroEtapa(null);
-                                }}
-                                className={`w-full flex items-start gap-3 px-3 py-2.5 text-left text-sm transition-colors ${
-                                  marcada
-                                    ? "bg-indigo-50 dark:bg-indigo-900/20"
-                                    : "hover:bg-gray-50 dark:hover:bg-dark-bg-tertiary"
-                                }`}
-                                aria-pressed={marcada}
-                              >
-                                <span
-                                  className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 ${
-                                    marcada
-                                      ? "border-indigo-600 bg-indigo-600 text-white"
-                                      : "border-gray-300"
+                <div className={grade}>
+                  {modoParcelas && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-dark-text mb-2">
+                        O que o cliente está pagando?
+                      </h3>
+                      {variasVendas && (
+                        <div className="mb-2 space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs text-gray-500 dark:text-dark-text-secondary">
+                              {vendasDaLista.length} vendas em aberto
+                            </span>
+                            <div
+                              role="group"
+                              aria-label="Organizar parcelas"
+                              className="inline-flex rounded-lg border border-gray-200 dark:border-dark-border p-0.5 text-xs"
+                            >
+                              {(
+                                [
+                                  ["vencimento", "Por vencimento"],
+                                  ["venda", "Por venda"],
+                                ] as const
+                              ).map(([valor, rotulo]) => (
+                                <button
+                                  key={valor}
+                                  type="button"
+                                  onClick={() => setOrdenarPor(valor)}
+                                  aria-pressed={ordenarPor === valor}
+                                  className={`px-2.5 py-1 rounded-md font-medium ${
+                                    ordenarPor === valor
+                                      ? "bg-indigo-600 text-white"
+                                      : "text-gray-600 hover:bg-gray-100 dark:text-dark-text-secondary dark:hover:bg-dark-bg-tertiary"
                                   }`}
                                 >
-                                  {marcada && <Check className="h-3 w-3" />}
+                                  {rotulo}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          {ordenarPor === "venda" ? (
+                            <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
+                              O pagamento abate sempre da parcela mais antiga do
+                              cliente, em qualquer venda.
+                            </p>
+                          ) : (
+                            <div className="flex flex-wrap gap-1.5">
+                              {vendasDaLista.map((v) => (
+                                <span
+                                  key={v.saleNumber}
+                                  className={`px-2 py-0.5 rounded-full text-xs font-medium ${corDaVenda(v.saleNumber).etiqueta}`}
+                                >
+                                  {nomeVenda(v.saleNumber)}
+                                  {v.titulo
+                                    ? ` · Título ${v.titulo}`
+                                    : ""} · {formatCurrency(v.saldo)}
                                 </span>
-                                <span className="min-w-0 flex-1">
-                                  <span className="block text-gray-900 dark:text-dark-text">
-                                    {p.sale.saleNumber === 0
-                                      ? "Renegociada"
-                                      : `Venda #${p.sale.saleNumber}`}
-                                    {p.numero != null && ` · Parcela ${p.numero}`}
-                                  </span>
-                                  <span
-                                    className={`block text-xs ${p.vencida ? "text-red-600" : "text-gray-500"}`}
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {parcelasAbertas.length === 0 ? (
+                        <p className="text-sm text-gray-500">
+                          Não há parcela em aberto.
+                        </p>
+                      ) : (
+                        <ul className="divide-y divide-gray-100 dark:divide-dark-border border border-gray-200 dark:border-dark-border rounded-xl overflow-hidden">
+                          {(() => {
+                            const linha = (
+                              p: (typeof parcelasAbertas)[number],
+                              i: number,
+                            ) => {
+                              if (!p.vencida && !aVencerVisivel) return null;
+                              const marcada = i < qtdMarcadas;
+                              return (
+                                <li key={p.idParcela}>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setQtdMarcadasEscolhida(
+                                        marcada ? i : i + 1,
+                                      );
+                                      setErroEtapa(null);
+                                    }}
+                                    className={`w-full flex items-start gap-3 px-3 py-2.5 text-left text-sm transition-colors ${
+                                      variasVendas
+                                        ? `border-l-4 ${corDaVenda(p.sale.saleNumber).faixa}`
+                                        : ""
+                                    } ${
+                                      marcada
+                                        ? "bg-indigo-50 dark:bg-indigo-900/20"
+                                        : "hover:bg-gray-50 dark:hover:bg-dark-bg-tertiary"
+                                    }`}
+                                    aria-pressed={marcada}
                                   >
-                                    venc. {dataTexto(p.vencimento.slice(0, 10))}
-                                    {p.vencida &&
-                                      ` · ${p.diasAtraso} ${p.diasAtraso === 1 ? "dia" : "dias"} de atraso`}
-                                  </span>
-                                  {p.jaPago > 0.01 && (
-                                    <span className="block text-xs text-gray-500">
-                                      já pago {formatCurrency(p.jaPago)} de{" "}
-                                      {formatCurrency(p.valorOriginal)}
+                                    <span
+                                      className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 ${
+                                        marcada
+                                          ? "border-indigo-600 bg-indigo-600 text-white"
+                                          : "border-gray-300"
+                                      }`}
+                                    >
+                                      {marcada && <Check className="h-3 w-3" />}
                                     </span>
-                                  )}
-                                </span>
-                                <span className="text-right shrink-0">
-                                  <span className="block font-semibold tabular-nums text-gray-900 dark:text-dark-text">
-                                    {formatCurrency(p.saldo)}
-                                  </span>
-                                </span>
-                              </button>
-                            </li>
-                          );
-                        })}
-                        {qtdVencidas > 0 &&
-                          parcelasAbertas.length > qtdVencidas && (
-                            <li>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (mostrarAVencer) {
-                                    setQtdMarcadasEscolhida(
-                                      Math.min(qtdMarcadas, qtdVencidas),
-                                    );
-                                  }
-                                  setMostrarAVencer(!mostrarAVencer);
-                                  setErroEtapa(null);
-                                }}
-                                className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-sm text-indigo-700 hover:bg-gray-50 dark:hover:bg-dark-bg-tertiary"
-                              >
-                                <ChevronRight
-                                  className={`h-4 w-4 transition-transform ${mostrarAVencer ? "rotate-90" : ""}`}
-                                />
-                                {mostrarAVencer
-                                  ? "Esconder parcelas a vencer"
-                                  : `Adiantar parcelas a vencer (${parcelasAbertas.length - qtdVencidas})`}
-                              </button>
-                            </li>
-                          )}
-                      </ul>
-                    )}
-                    {qtdMarcadas > 0 && (
-                      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm">
-                        <span className="text-gray-600 dark:text-dark-text-secondary">
-                          A cobrar{" "}
-                          <strong className="text-gray-900 dark:text-dark-text tabular-nums">
-                            {formatCurrency(alocacao.esperado)}
-                          </strong>
-                          {jurosInformado > 0 && (
-                            <span className="block text-xs">
-                              parcelas {formatCurrency(alocacao.somaParcelas)} +
-                              juros/multa {formatCurrency(jurosInformado)}
-                            </span>
-                          )}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setDistributionAmount(valorParaCampo(alocacao.esperado));
-                            setErroEtapa(null);
-                          }}
-                          className="px-3 py-1.5 text-xs font-medium rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
-                        >
-                          Recebi exatamente este valor
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div>
-                  <label
-                    htmlFor="distribution-amount"
-                    className="block text-sm font-semibold text-gray-900 dark:text-dark-text mb-2"
-                  >
-                    {modoParcelas ? "Quanto você recebeu?" : "Quanto o cliente pagou?"}
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-semibold text-gray-400">
-                      R$
-                    </span>
-                    <input
-                      id="distribution-amount"
-                      name="distributionAmount"
-                      type="text"
-                      inputMode="decimal"
-                      autoComplete="off"
-                      // No modo parcelas a lista vem primeiro (o teclado do
-                      // celular cobriria a lista).
-                      autoFocus={!modoParcelas}
-                      value={distributionAmount}
-                      onChange={(e) => {
-                        setDistributionAmount(
-                          e.target.value.replace(/[^\d.,]/g, ""),
-                        );
-                        setErroEtapa(null);
-                      }}
-                      className="w-full pl-12 pr-4 py-3 border border-gray-300 dark:border-dark-border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-2xl font-semibold tabular-nums dark:bg-dark-bg dark:text-dark-text"
-                      placeholder="0,00"
-                    />
-                  </div>
-                  {/* Com acordo ativo (modo so por valor) segue o atalho do
-                      saldo; no modo parcelas o atalho e "Recebi exatamente
-                      este valor", limitado ao que foi marcado. */}
-                  {acordoAtivo && !withDiscount && (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <button
-                        id="total-balance-button"
-                        type="button"
-                        onClick={() => {
-                          setDistributionAmount(valorParaCampo(totalPending));
-                          setErroEtapa(null);
-                        }}
-                        className="px-3 py-1.5 text-xs font-medium rounded-full border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100"
-                      >
-                        Saldo total · {formatCurrency(totalPending)}
-                      </button>
+                                    <span className="min-w-0 flex-1">
+                                      <span className="block text-gray-900 dark:text-dark-text">
+                                        {ordenarPor === "venda"
+                                          ? p.numero != null
+                                            ? `Parcela ${p.numero}`
+                                            : "Parcela"
+                                          : rotuloParcela(
+                                              p.sale.saleNumber,
+                                              p.numero,
+                                            )}
+                                      </span>
+                                      <span
+                                        className={`block text-xs ${p.vencida ? "text-red-600" : "text-gray-500"}`}
+                                      >
+                                        venc.{" "}
+                                        {dataTexto(p.vencimento.slice(0, 10))}
+                                        {p.vencida &&
+                                          ` · ${p.diasAtraso} ${p.diasAtraso === 1 ? "dia" : "dias"} de atraso`}
+                                      </span>
+                                      {p.jaPago > 0.01 && (
+                                        <span className="block text-xs text-gray-500">
+                                          já pago {formatCurrency(p.jaPago)} de{" "}
+                                          {formatCurrency(p.valorOriginal)}
+                                        </span>
+                                      )}
+                                    </span>
+                                    <span className="text-right shrink-0">
+                                      <span className="block font-semibold tabular-nums text-gray-900 dark:text-dark-text">
+                                        {formatCurrency(p.saldo)}
+                                      </span>
+                                    </span>
+                                  </button>
+                                </li>
+                              );
+                            };
+                            if (!(variasVendas && ordenarPor === "venda")) {
+                              return parcelasAbertas.map((p, i) => linha(p, i));
+                            }
+                            // Por venda: cabecalho (venda, titulo, saldo) e as
+                            // parcelas dela; o indice continua o global (a
+                            // marcacao segue a ordem de vencimento do cliente).
+                            return vendasDaLista.map((v) => {
+                              const daVenda = parcelasAbertas
+                                .map((p, i) => ({ p, i }))
+                                .filter(
+                                  ({ p }) => p.sale.saleNumber === v.saleNumber,
+                                );
+                              const visiveis = daVenda.filter(
+                                ({ p }) => p.vencida || aVencerVisivel,
+                              );
+                              if (visiveis.length === 0) return null;
+                              return (
+                                <React.Fragment key={`venda-${v.saleNumber}`}>
+                                  <li
+                                    className={`flex items-center justify-between gap-2 px-3 py-2 bg-gray-50 dark:bg-dark-bg-tertiary border-l-4 ${corDaVenda(v.saleNumber).faixa}`}
+                                  >
+                                    <span className="min-w-0">
+                                      <span className="block text-sm font-semibold text-gray-900 dark:text-dark-text">
+                                        {nomeVenda(v.saleNumber)}
+                                      </span>
+                                      {v.titulo > 0 && (
+                                        <span className="block text-xs text-gray-500">
+                                          Título {v.titulo}
+                                        </span>
+                                      )}
+                                    </span>
+                                    <span className="text-right text-xs text-gray-600 dark:text-dark-text-secondary shrink-0">
+                                      {v.qtd}{" "}
+                                      {v.qtd === 1 ? "parcela" : "parcelas"}
+                                      <span className="block font-semibold text-gray-900 dark:text-dark-text tabular-nums">
+                                        {formatCurrency(v.saldo)}
+                                      </span>
+                                    </span>
+                                  </li>
+                                  {visiveis.map(({ p, i }) => linha(p, i))}
+                                </React.Fragment>
+                              );
+                            });
+                          })()}
+                          {qtdVencidas > 0 &&
+                            parcelasAbertas.length > qtdVencidas && (
+                              <li>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (mostrarAVencer) {
+                                      setQtdMarcadasEscolhida(
+                                        Math.min(qtdMarcadas, qtdVencidas),
+                                      );
+                                    }
+                                    setMostrarAVencer(!mostrarAVencer);
+                                    setErroEtapa(null);
+                                  }}
+                                  className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-sm text-indigo-700 hover:bg-gray-50 dark:hover:bg-dark-bg-tertiary"
+                                >
+                                  <ChevronRight
+                                    className={`h-4 w-4 transition-transform ${mostrarAVencer ? "rotate-90" : ""}`}
+                                  />
+                                  {mostrarAVencer
+                                    ? "Esconder parcelas a vencer"
+                                    : `Adiantar parcelas a vencer (${parcelasAbertas.length - qtdVencidas})`}
+                                </button>
+                              </li>
+                            )}
+                        </ul>
+                      )}
+                      {qtdMarcadas > 0 && (
+                        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm">
+                          <span className="text-gray-600 dark:text-dark-text-secondary">
+                            A cobrar{" "}
+                            <strong className="text-gray-900 dark:text-dark-text tabular-nums">
+                              {formatCurrency(alocacao.esperado)}
+                            </strong>
+                            {jurosInformado > 0 && (
+                              <span className="block text-xs">
+                                parcelas {formatCurrency(alocacao.somaParcelas)}{" "}
+                                + juros/multa {formatCurrency(jurosInformado)}
+                              </span>
+                            )}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDistributionAmount(
+                                valorParaCampo(alocacao.esperado),
+                              );
+                              setErroEtapa(null);
+                            }}
+                            className="px-3 py-1.5 text-xs font-medium rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                          >
+                            Recebi exatamente este valor
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
 
-                {/* Juros/multa: so informados pelo cobrador (acordados com o
-                    cliente). Fechado por padrao. */}
-                {modoParcelas &&
-                  (mostrarJuros ? (
+                  <div className="space-y-5 min-w-0">
                     <div>
                       <label
-                        htmlFor="juros-informado"
-                        className="flex items-center justify-between text-sm font-semibold text-gray-900 dark:text-dark-text mb-2"
+                        htmlFor="distribution-amount"
+                        className="block text-sm font-semibold text-gray-900 dark:text-dark-text mb-2"
                       >
-                        Juros/multa acordados com o cliente
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setMostrarJuros(false);
-                            setJurosTexto("");
-                            setErroEtapa(null);
-                          }}
-                          className="text-xs font-normal text-gray-500 hover:text-gray-800"
-                        >
-                          Remover
-                        </button>
+                        {modoParcelas
+                          ? "Quanto você recebeu?"
+                          : "Quanto o cliente pagou?"}
                       </label>
                       <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-400">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-semibold text-gray-400">
                           R$
                         </span>
                         <input
-                          id="juros-informado"
+                          id="distribution-amount"
+                          name="distributionAmount"
                           type="text"
                           inputMode="decimal"
                           autoComplete="off"
-                          value={jurosTexto}
+                          // No modo parcelas a lista vem primeiro (o teclado do
+                          // celular cobriria a lista).
+                          autoFocus={!modoParcelas}
+                          value={distributionAmount}
                           onChange={(e) => {
-                            setJurosTexto(e.target.value.replace(/[^\d.,]/g, ""));
+                            setDistributionAmount(
+                              e.target.value.replace(/[^\d.,]/g, ""),
+                            );
                             setErroEtapa(null);
                           }}
-                          className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-dark-border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-base tabular-nums dark:bg-dark-bg dark:text-dark-text"
+                          className="w-full pl-12 pr-4 py-3 border border-gray-300 dark:border-dark-border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-2xl font-semibold tabular-nums dark:bg-dark-bg dark:text-dark-text"
                           placeholder="0,00"
                         />
                       </div>
-                      <p className="mt-1 text-xs text-gray-500">
-                        Sai do valor recebido e não abate parcela. Explique na
-                        observação.
-                      </p>
+                      {/* Com acordo ativo (modo so por valor) segue o atalho do
+                      saldo; no modo parcelas o atalho e "Recebi exatamente
+                      este valor", limitado ao que foi marcado. */}
+                      {acordoAtivo && !withDiscount && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <button
+                            id="total-balance-button"
+                            type="button"
+                            onClick={() => {
+                              setDistributionAmount(
+                                valorParaCampo(totalPending),
+                              );
+                              setErroEtapa(null);
+                            }}
+                            className="px-3 py-1.5 text-xs font-medium rounded-full border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100"
+                          >
+                            Saldo total · {formatCurrency(totalPending)}
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setMostrarJuros(true)}
-                      className="text-sm font-medium text-indigo-700 hover:text-indigo-900"
-                    >
-                      + Informar juros/multa acordados
-                    </button>
-                  ))}
 
-                {/* Conferencia do valor com as parcelas marcadas: um aviso
+                    {/* Juros/multa: so informados pelo cobrador (acordados com o
+                    cliente). Fechado por padrao. */}
+                    {modoParcelas &&
+                      (mostrarJuros ? (
+                        <div>
+                          <label
+                            htmlFor="juros-informado"
+                            className="flex items-center justify-between text-sm font-semibold text-gray-900 dark:text-dark-text mb-2"
+                          >
+                            Juros/multa acordados com o cliente
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMostrarJuros(false);
+                                setJurosTexto("");
+                                setErroEtapa(null);
+                              }}
+                              className="text-xs font-normal text-gray-500 hover:text-gray-800"
+                            >
+                              Remover
+                            </button>
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-400">
+                              R$
+                            </span>
+                            <input
+                              id="juros-informado"
+                              type="text"
+                              inputMode="decimal"
+                              autoComplete="off"
+                              value={jurosTexto}
+                              onChange={(e) => {
+                                setJurosTexto(
+                                  e.target.value.replace(/[^\d.,]/g, ""),
+                                );
+                                setErroEtapa(null);
+                              }}
+                              className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-dark-border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-base tabular-nums dark:bg-dark-bg dark:text-dark-text"
+                              placeholder="0,00"
+                            />
+                          </div>
+                          <p className="mt-1 text-xs text-gray-500">
+                            Sai do valor recebido e não abate parcela. Explique
+                            na observação.
+                          </p>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setMostrarJuros(true)}
+                          className="text-sm font-medium text-indigo-700 hover:text-indigo-900"
+                        >
+                          + Informar juros/multa acordados
+                        </button>
+                      ))}
+
+                    {/* Conferencia do valor com as parcelas marcadas: um aviso
                     por situacao, no mesmo formato (Aviso). */}
-                {modoParcelas && qtdMarcadas === 0 && amountToDistribute > 0 && (
-                  <Aviso tom="info">
-                    Marque acima as parcelas que o cliente está pagando — o
-                    valor é conferido com elas.
-                  </Aviso>
-                )}
-                {acimaSemJuros && (
-                  <Aviso
-                    tom="erro"
-                    titulo={`Valor ${formatCurrency(alocacao.aMais)} acima das parcelas marcadas`}
-                  >
-                    Você marcou {formatCurrency(alocacao.somaParcelas)} em
-                    parcelas que ainda não venceram (sem juros). Confira o valor
-                    {qtdMarcadas < parcelasAbertas.length &&
-                      " ou marque mais parcelas"}
-                    .
-                  </Aviso>
-                )}
-                {modoParcelas && alocacao.situacao === "fecha" && (
-                  <Aviso tom="ok">Fecha com as parcelas marcadas.</Aviso>
-                )}
-                {modoParcelas && alocacao.situacao === "jurosMaior" && (
-                  <Aviso tom="erro">
-                    Os juros/multa informados (
-                    {formatCurrency(jurosInformado)}) são maiores que o valor
-                    recebido.
-                  </Aviso>
-                )}
-                {avisoAcima && (
-                  <Aviso
-                    tom="atencao"
-                    titulo={`Valor ${formatCurrency(alocacao.aMais)} acima do esperado`}
-                  >
-                    <p>
-                      As parcelas marcadas somam{" "}
-                      {formatCurrency(alocacao.esperado)} e você digitou{" "}
-                      <strong>{formatCurrency(amountToDistribute)}</strong>. O
-                      que são esses {formatCurrency(alocacao.aMais)}?
-                    </p>
-                    <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setJurosTexto(
-                            valorParaCampo(round2(jurosInformado + alocacao.aMais)),
-                          );
-                          setMostrarJuros(true);
-                          setErroEtapa(null);
-                        }}
-                        className="rounded-xl border-2 border-amber-300 bg-white dark:bg-dark-bg px-3 py-2 text-left hover:border-amber-500"
+                    {modoParcelas &&
+                      qtdMarcadas === 0 &&
+                      amountToDistribute > 0 && (
+                        <Aviso tom="info">
+                          Marque acima as parcelas que o cliente está pagando —
+                          o valor é conferido com elas.
+                        </Aviso>
+                      )}
+                    {acimaSemJuros && (
+                      <Aviso
+                        tom="erro"
+                        titulo={`Valor ${formatCurrency(alocacao.aMais)} acima das parcelas marcadas`}
                       >
-                        <span className="block font-semibold">
-                          Juros/multa acordados
-                        </span>
-                        <span className="block text-xs">
-                          Combinado com o cliente; não abate parcela.
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDistributionAmount("");
-                          setErroEtapa(null);
-                          document.getElementById("distribution-amount")?.focus();
-                        }}
-                        className="rounded-xl border-2 border-amber-300 bg-white dark:bg-dark-bg px-3 py-2 text-left hover:border-amber-500"
-                      >
-                        <span className="block font-semibold">
-                          Erro de digitação
-                        </span>
-                        <span className="block text-xs">
-                          Apaga o valor para digitar de novo.
-                        </span>
-                      </button>
-                    </div>
-                    {qtdMarcadas < parcelasAbertas.length && (
-                      <p className="mt-2 text-xs">
-                        Se o cliente está pagando mais parcelas, marque-as na
-                        lista.
-                      </p>
+                        Você marcou {formatCurrency(alocacao.somaParcelas)} em
+                        parcelas que ainda não venceram (sem juros). Confira o
+                        valor
+                        {qtdMarcadas < parcelasAbertas.length &&
+                          " ou marque mais parcelas"}
+                        .
+                      </Aviso>
                     )}
-                  </Aviso>
-                )}
+                    {modoParcelas && alocacao.situacao === "fecha" && (
+                      <Aviso tom="ok">Fecha com as parcelas marcadas.</Aviso>
+                    )}
+                    {modoParcelas && alocacao.situacao === "jurosMaior" && (
+                      <Aviso tom="erro">
+                        Os juros/multa informados (
+                        {formatCurrency(jurosInformado)}) são maiores que o
+                        valor recebido.
+                      </Aviso>
+                    )}
+                    {avisoAcima && (
+                      <Aviso
+                        tom="atencao"
+                        titulo={`Valor ${formatCurrency(alocacao.aMais)} acima do esperado`}
+                      >
+                        <p>
+                          As parcelas marcadas somam{" "}
+                          {formatCurrency(alocacao.esperado)} e você digitou{" "}
+                          <strong>{formatCurrency(amountToDistribute)}</strong>.
+                          O que são esses {formatCurrency(alocacao.aMais)}?
+                        </p>
+                        <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setJurosTexto(
+                                valorParaCampo(
+                                  round2(jurosInformado + alocacao.aMais),
+                                ),
+                              );
+                              setMostrarJuros(true);
+                              setErroEtapa(null);
+                            }}
+                            className="rounded-xl border-2 border-amber-300 bg-white dark:bg-dark-bg px-3 py-2 text-left hover:border-amber-500"
+                          >
+                            <span className="block font-semibold">
+                              Juros/multa acordados
+                            </span>
+                            <span className="block text-xs">
+                              Combinado com o cliente; não abate parcela.
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDistributionAmount("");
+                              setErroEtapa(null);
+                              document
+                                .getElementById("distribution-amount")
+                                ?.focus();
+                            }}
+                            className="rounded-xl border-2 border-amber-300 bg-white dark:bg-dark-bg px-3 py-2 text-left hover:border-amber-500"
+                          >
+                            <span className="block font-semibold">
+                              Erro de digitação
+                            </span>
+                            <span className="block text-xs">
+                              Apaga o valor para digitar de novo.
+                            </span>
+                          </button>
+                        </div>
+                        {qtdMarcadas < parcelasAbertas.length && (
+                          <p className="mt-2 text-xs">
+                            Se o cliente está pagando mais parcelas, marque-as
+                            na lista.
+                          </p>
+                        )}
+                      </Aviso>
+                    )}
 
-                {modoParcelas &&
-                  alocacao.situacao === "parcial" && (
-                    <Aviso tom="info" titulo="Pagamento parcial">
-                      {(() => {
-                        const quitadas = alocacao.itens.filter((p) => p.quita).length;
-                        const parcial = alocacao.itens.find(
-                          (p) => !p.quita && p.aplicado > 0,
-                        );
-                        const partes: string[] = [];
-                        if (quitadas > 0) {
-                          partes.push(
-                            `quita ${quitadas} ${quitadas === 1 ? "parcela" : "parcelas"}`,
+                    {modoParcelas && alocacao.situacao === "parcial" && (
+                      <Aviso tom="info" titulo="Pagamento parcial">
+                        {(() => {
+                          const quitadas = alocacao.itens.filter(
+                            (p) => p.quita,
+                          ).length;
+                          const parcial = alocacao.itens.find(
+                            (p) => !p.quita && p.aplicado > 0,
                           );
-                        }
-                        if (parcial) {
-                          partes.push(
-                            `abate ${formatCurrency(parcial.aplicado)} da parcela de ${dataTexto(parcial.vencimento.slice(0, 10))}`,
-                          );
-                        }
-                        const t = partes.join(" e ") || "nada é quitado";
-                        return t.charAt(0).toUpperCase() + t.slice(1) + ".";
-                      })()}
-                    </Aviso>
-                  )}
+                          const partes: string[] = [];
+                          if (quitadas > 0) {
+                            partes.push(
+                              `quita ${quitadas} ${quitadas === 1 ? "parcela" : "parcelas"}`,
+                            );
+                          }
+                          if (parcial) {
+                            partes.push(
+                              `abate ${formatCurrency(parcial.aplicado)} da parcela de ${dataTexto(parcial.vencimento.slice(0, 10))}`,
+                            );
+                          }
+                          const t = partes.join(" e ") || "nada é quitado";
+                          return t.charAt(0).toUpperCase() + t.slice(1) + ".";
+                        })()}
+                      </Aviso>
+                    )}
 
-                {modoParcelas && quitaTudo && !acimaSemJuros && (
-                  <Aviso tom="atencao" titulo="Quita toda a dívida do cliente">
-                    {qtdAVencerPagas > 0
-                      ? `Inclusive ${qtdAVencerPagas} ${qtdAVencerPagas === 1 ? "parcela que ainda não venceu" : "parcelas que ainda não venceram"}.`
-                      : "Todas as parcelas em aberto ficam pagas."}
-                  </Aviso>
-                )}
-                {modoParcelas &&
-                  !quitaTudo &&
-                  !acimaSemJuros &&
-                  qtdAVencerPagas > 0 && (
-                    <Aviso tom="info">
-                      Inclui {qtdAVencerPagas}{" "}
-                      {qtdAVencerPagas === 1 ? "parcela a vencer" : "parcelas a vencer"}{" "}
-                      (adiantamento).
-                    </Aviso>
-                  )}
+                    {modoParcelas && quitaTudo && !acimaSemJuros && (
+                      <Aviso
+                        tom="atencao"
+                        titulo="Quita toda a dívida do cliente"
+                      >
+                        {qtdAVencerPagas > 0
+                          ? `Inclusive ${qtdAVencerPagas} ${qtdAVencerPagas === 1 ? "parcela que ainda não venceu" : "parcelas que ainda não venceram"}.`
+                          : "Todas as parcelas em aberto ficam pagas."}
+                      </Aviso>
+                    )}
+                    {modoParcelas &&
+                      !quitaTudo &&
+                      !acimaSemJuros &&
+                      qtdAVencerPagas > 0 && (
+                        <Aviso tom="info">
+                          Inclui {qtdAVencerPagas}{" "}
+                          {qtdAVencerPagas === 1
+                            ? "parcela a vencer"
+                            : "parcelas a vencer"}{" "}
+                          (adiantamento).
+                        </Aviso>
+                      )}
 
-                {/* Quitacao com desconto: so quando o valor deixa algo a
+                    {/* Quitacao com desconto: so quando o valor deixa algo a
                     descontar (com o valor cheio a opcao confundia). */}
-                {(withDiscount || amountToDistribute < totalPending - 0.01) && (
-                <label
-                  className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
-                    withDiscount
-                      ? "border-indigo-300 bg-indigo-50"
-                      : "border-gray-200 hover:bg-gray-50"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    id="with-discount"
-                    name="withDiscount"
-                    checked={withDiscount}
-                    onChange={(e) => {
-                      setWithDiscount(e.target.checked);
-                      setErroEtapa(null);
-                    }}
-                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                  />
-                  <span className="text-sm">
-                    <span className="flex items-center gap-1.5 font-medium text-gray-900 dark:text-dark-text">
-                      <TrendingDown className="h-4 w-4 text-indigo-600" />
-                      Quitar tudo com desconto
-                    </span>
-                    <span className="block text-xs text-gray-600 dark:text-dark-text-secondary">
-                      {withDiscount && amountToDistribute > 0 && desconto > 0
-                        ? `Desconto de ${formatCurrency(desconto)} (${((desconto / totalPending) * 100).toFixed(1)}% do saldo de ${formatCurrency(totalPending)}). O gestor é avisado.`
-                        : `O que faltar para ${formatCurrency(totalPending)} vira desconto e todas as parcelas são quitadas.`}
-                    </span>
-                  </span>
-                </label>
-                )}
+                    {(withDiscount ||
+                      amountToDistribute < totalPending - 0.01) && (
+                      <label
+                        className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                          withDiscount
+                            ? "border-indigo-300 bg-indigo-50"
+                            : "border-gray-200 hover:bg-gray-50"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          id="with-discount"
+                          name="withDiscount"
+                          checked={withDiscount}
+                          onChange={(e) => {
+                            setWithDiscount(e.target.checked);
+                            setErroEtapa(null);
+                          }}
+                          className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span className="text-sm">
+                          <span className="flex items-center gap-1.5 font-medium text-gray-900 dark:text-dark-text">
+                            <TrendingDown className="h-4 w-4 text-indigo-600" />
+                            Quitar tudo com desconto
+                          </span>
+                          <span className="block text-xs text-gray-600 dark:text-dark-text-secondary">
+                            {withDiscount &&
+                            amountToDistribute > 0 &&
+                            desconto > 0
+                              ? `Desconto de ${formatCurrency(desconto)} (${((desconto / totalPending) * 100).toFixed(1)}% do saldo de ${formatCurrency(totalPending)}). O gestor é avisado.`
+                              : `O que faltar para ${formatCurrency(totalPending)} vira desconto e todas as parcelas são quitadas.`}
+                          </span>
+                        </span>
+                      </label>
+                    )}
+                  </div>
+                </div>
               </>
             )}
 
             {etapa === 2 && (
               <>
-                <fieldset>
-                  <legend className="text-sm font-semibold text-gray-900 dark:text-dark-text mb-2">
-                    Como pagou?
-                  </legend>
-                  <div className="grid grid-cols-2 gap-2">
-                    {Object.entries(FORMA_PAGAMENTO_LABEL).map(
-                      ([valor, rotulo]) => (
-                        <label
-                          key={valor}
-                          className={`cursor-pointer rounded-xl border-2 px-3 py-2.5 text-sm font-medium text-center transition-colors ${
-                            paymentMethod === valor
-                              ? "border-indigo-500 bg-indigo-50 text-indigo-800"
-                              : "border-gray-200 text-gray-700 hover:border-gray-300"
-                          }`}
-                        >
+                <div className={grade}>
+                  <div className="space-y-5">
+                    <fieldset>
+                      <legend className="text-sm font-semibold text-gray-900 dark:text-dark-text mb-2">
+                        Como pagou?
+                      </legend>
+                      <div className="grid grid-cols-2 gap-2">
+                        {Object.entries(FORMA_PAGAMENTO_LABEL).map(
+                          ([valor, rotulo]) => (
+                            <label
+                              key={valor}
+                              className={`cursor-pointer rounded-xl border-2 px-3 py-2.5 text-sm font-medium text-center transition-colors ${
+                                paymentMethod === valor
+                                  ? "border-indigo-500 bg-indigo-50 text-indigo-800"
+                                  : "border-gray-200 text-gray-700 hover:border-gray-300"
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name="paymentMethod"
+                                value={valor}
+                                checked={paymentMethod === valor}
+                                onChange={() => setPaymentMethod(valor)}
+                                className="sr-only"
+                              />
+                              {rotulo}
+                            </label>
+                          ),
+                        )}
+                      </div>
+                    </fieldset>
+
+                    {/* Data: so quem pode lancar baixa depois (externo e hoje) */}
+                    {podeEscolherData && (
+                      <fieldset>
+                        <legend className="text-sm font-semibold text-gray-900 dark:text-dark-text mb-2">
+                          Quando pagou?
+                        </legend>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {(
+                            [
+                              ["Hoje", hoje],
+                              ["Ontem", addDaysLocalStr(hoje, -1)],
+                            ] as const
+                          ).map(([rotulo, valor]) => (
+                            <button
+                              key={rotulo}
+                              type="button"
+                              onClick={() => {
+                                setDataPagamento(valor);
+                                setErroEtapa(null);
+                              }}
+                              className={`px-3 py-2 rounded-xl border-2 text-sm font-medium ${
+                                dataPagamento === valor
+                                  ? "border-indigo-500 bg-indigo-50 text-indigo-800"
+                                  : "border-gray-200 text-gray-700 hover:border-gray-300"
+                              }`}
+                            >
+                              {rotulo}
+                            </button>
+                          ))}
                           <input
-                            type="radio"
-                            name="paymentMethod"
-                            value={valor}
-                            checked={paymentMethod === valor}
-                            onChange={() => setPaymentMethod(valor)}
-                            className="sr-only"
+                            id="payment-date"
+                            name="paymentDate"
+                            type="date"
+                            value={dataPagamento}
+                            min={dataMinima}
+                            max={hoje}
+                            onChange={(e) => {
+                              setDataPagamento(e.target.value);
+                              setErroEtapa(null);
+                            }}
+                            className="px-3 py-2 border border-gray-300 dark:border-dark-border rounded-xl text-sm dark:bg-dark-bg dark:text-dark-text"
+                            aria-label="Outra data"
                           />
-                          {rotulo}
-                        </label>
-                      ),
+                        </div>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Até {DIAS_RETROATIVOS} dias atrás.
+                        </p>
+                      </fieldset>
                     )}
                   </div>
-                </fieldset>
-
-                {/* Data: so quem pode lancar baixa depois (externo e hoje) */}
-                {podeEscolherData && (
-                  <fieldset>
-                    <legend className="text-sm font-semibold text-gray-900 dark:text-dark-text mb-2">
-                      Quando pagou?
-                    </legend>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {(
-                        [
-                          ["Hoje", hoje],
-                          ["Ontem", addDaysLocalStr(hoje, -1)],
-                        ] as const
-                      ).map(([rotulo, valor]) => (
-                        <button
-                          key={rotulo}
-                          type="button"
-                          onClick={() => {
-                            setDataPagamento(valor);
-                            setErroEtapa(null);
-                          }}
-                          className={`px-3 py-2 rounded-xl border-2 text-sm font-medium ${
-                            dataPagamento === valor
-                              ? "border-indigo-500 bg-indigo-50 text-indigo-800"
-                              : "border-gray-200 text-gray-700 hover:border-gray-300"
-                          }`}
-                        >
-                          {rotulo}
-                        </button>
-                      ))}
-                      <input
-                        id="payment-date"
-                        name="paymentDate"
-                        type="date"
-                        value={dataPagamento}
-                        min={dataMinima}
-                        max={hoje}
-                        onChange={(e) => {
-                          setDataPagamento(e.target.value);
-                          setErroEtapa(null);
-                        }}
-                        className="px-3 py-2 border border-gray-300 dark:border-dark-border rounded-xl text-sm dark:bg-dark-bg dark:text-dark-text"
-                        aria-label="Outra data"
-                      />
-                    </div>
-                    <p className="mt-1 text-xs text-gray-500">
-                      Até {DIAS_RETROATIVOS} dias atrás.
-                    </p>
-                  </fieldset>
-                )}
-
-                <div>
-                  <label
-                    htmlFor="observations"
-                    className="block text-sm font-semibold text-gray-900 dark:text-dark-text mb-2"
-                  >
-                    Observação{" "}
-                    <span className="font-normal text-gray-500">
-                      {observacaoObrigatoria
-                        ? `(obrigatória: explique ${motivoObservacao})`
-                        : "(opcional)"}
-                    </span>
-                  </label>
-                  <textarea
-                    id="observations"
-                    name="observations"
-                    value={observations}
-                    onChange={(e) => {
-                      setObservations(e.target.value);
-                      setErroEtapa(null);
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm dark:bg-dark-bg dark:text-dark-text"
-                    rows={3}
-                    placeholder="Ex.: comprovante enviado pelo WhatsApp"
-                  />
+                  <div>
+                    <label
+                      htmlFor="observations"
+                      className="block text-sm font-semibold text-gray-900 dark:text-dark-text mb-2"
+                    >
+                      Observação{" "}
+                      <span className="font-normal text-gray-500">
+                        {observacaoObrigatoria
+                          ? `(obrigatória: explique ${motivoObservacao})`
+                          : "(opcional)"}
+                      </span>
+                    </label>
+                    <textarea
+                      id="observations"
+                      name="observations"
+                      value={observations}
+                      onChange={(e) => {
+                        setObservations(e.target.value);
+                        setErroEtapa(null);
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm dark:bg-dark-bg dark:text-dark-text"
+                      rows={3}
+                      placeholder="Ex.: comprovante enviado pelo WhatsApp"
+                    />
+                  </div>
                 </div>
               </>
             )}
 
             {etapa === 3 && (
               <>
-                {/* Resumo do que vai ser gravado */}
-                <div className="rounded-xl bg-gray-50 dark:bg-dark-bg-tertiary p-4">
-                  <p className="text-2xl font-semibold text-gray-900 dark:text-dark-text tabular-nums">
-                    {formatCurrency(amountToDistribute)}
-                  </p>
-                  <p className="text-sm text-gray-600 dark:text-dark-text-secondary">
-                    {formaRotulo}
-                    {podeEscolherData && ` · pago em ${dataTexto(dataPagamento)}`}
-                  </p>
-                  {modoParcelas ? (
-                    <dl className="mt-3 grid grid-cols-[1fr_auto] gap-x-4 gap-y-0.5 text-sm">
-                      <dt className="text-gray-600">Abate das parcelas</dt>
-                      <dd className="text-right tabular-nums">
-                        {formatCurrency(principal)}
-                      </dd>
-                      <dt className="text-gray-600">
-                        Juros/multa acordados
-                      </dt>
-                      <dd className="text-right tabular-nums">
-                        {formatCurrency(jurosValor)}
-                      </dd>
-                      <dt className="text-gray-600 pt-1 border-t border-gray-200">
-                        Dívida do cliente
-                      </dt>
-                      <dd className="text-right tabular-nums pt-1 border-t border-gray-200">
-                        {formatCurrency(totalPending)} →{" "}
-                        <strong>
-                          {formatCurrency(round2(Math.max(0, totalPending - principal)))}
-                        </strong>
-                      </dd>
-                    </dl>
-                  ) : (
-                    desconto > 0 && (
-                      <p className="mt-1 text-sm text-gray-600">
-                        Desconto de {formatCurrency(desconto)}
+                <div className={grade}>
+                  <div className="space-y-5">
+                    {/* Resumo do que vai ser gravado */}
+                    <div className="rounded-xl bg-gray-50 dark:bg-dark-bg-tertiary p-4">
+                      <p className="text-2xl font-semibold text-gray-900 dark:text-dark-text tabular-nums">
+                        {formatCurrency(amountToDistribute)}
                       </p>
-                    )
-                  )}
-                  {observations.trim() && (
-                    <p className="mt-1 text-xs text-gray-500 whitespace-pre-wrap">
-                      “{observations.trim()}”
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-dark-text mb-2">
-                    Vai abater
-                  </h3>
-                  {abatimentoPorParcela ? (
-                    <ul className="divide-y divide-gray-100 border border-gray-200 rounded-xl">
-                      {abatimentoPorParcela.map((p) => (
-                        <li
-                          key={p.idParcela}
-                          className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
-                        >
-                          <span className="min-w-0">
-                            <span className="text-gray-900">
-                              {p.sale.saleNumber === 0
-                                ? "Renegociada"
-                                : `Venda #${p.sale.saleNumber}`}
-                              {p.numero != null && ` · Parcela ${p.numero}`}
-                            </span>
-                            <span
-                              className={`block text-xs ${p.vencida ? "text-red-600" : "text-gray-500"}`}
-                            >
-                              venc. {dataTexto(p.vencimento.slice(0, 10))}
-                              {p.vencida && " (vencida)"}
-                            </span>
-                          </span>
-                          <span className="text-right shrink-0">
-                            <span className="block font-medium tabular-nums">
-                              {formatCurrency(p.aplicado)}
-                            </span>
-                            <span
-                              className={`block text-xs ${
-                                p.quita
-                                  ? p.vencida
-                                    ? "text-emerald-600"
-                                    : "text-amber-700"
-                                  : "text-gray-500"
+                      <p className="text-sm text-gray-600 dark:text-dark-text-secondary">
+                        {formaRotulo}
+                        {podeEscolherData &&
+                          ` · pago em ${dataTexto(dataPagamento)}`}
+                      </p>
+                      {modoParcelas ? (
+                        <dl className="mt-3 grid grid-cols-[1fr_auto] gap-x-4 gap-y-0.5 text-sm">
+                          <dt className="text-gray-600">Abate das parcelas</dt>
+                          <dd className="text-right tabular-nums">
+                            {formatCurrency(principal)}
+                          </dd>
+                          <dt className="text-gray-600">
+                            Juros/multa acordados
+                          </dt>
+                          <dd className="text-right tabular-nums">
+                            {formatCurrency(jurosValor)}
+                          </dd>
+                          <dt className="text-gray-600 pt-1 border-t border-gray-200">
+                            Dívida do cliente
+                          </dt>
+                          <dd className="text-right tabular-nums pt-1 border-t border-gray-200">
+                            {formatCurrency(totalPending)} →{" "}
+                            <strong>
+                              {formatCurrency(
+                                round2(Math.max(0, totalPending - principal)),
+                              )}
+                            </strong>
+                          </dd>
+                        </dl>
+                      ) : (
+                        desconto > 0 && (
+                          <p className="mt-1 text-sm text-gray-600">
+                            Desconto de {formatCurrency(desconto)}
+                          </p>
+                        )
+                      )}
+                      {observations.trim() && (
+                        <p className="mt-1 text-xs text-gray-500 whitespace-pre-wrap">
+                          “{observations.trim()}”
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-5 min-w-0">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-dark-text mb-2">
+                        Vai abater
+                      </h3>
+                      {abatimentoPorParcela ? (
+                        <ul className="divide-y divide-gray-100 border border-gray-200 rounded-xl">
+                          {abatimentoPorParcela.map((p) => (
+                            <li
+                              key={p.idParcela}
+                              className={`flex items-center justify-between gap-3 px-3 py-2 text-sm ${
+                                variasVendas
+                                  ? `border-l-4 ${corDaVenda(p.sale.saleNumber).faixa}`
+                                  : ""
                               }`}
                             >
-                              {p.quita
-                                ? p.vencida
-                                  ? "quita"
-                                  : "quita (adiantada)"
-                                : `fica faltando ${formatCurrency(round2(p.saldo - p.aplicado))}`}
-                            </span>
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <ul className="divide-y divide-gray-100 border border-gray-200 rounded-xl">
-                      {saleDistribution.map((item) => (
-                        <li
-                          key={item.sale.saleNumber}
-                          className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
-                        >
-                          <span className="text-gray-900">
-                            {item.sale.saleNumber === 0
-                              ? "Venda renegociada"
-                              : `Venda #${item.sale.saleNumber}`}
-                          </span>
-                          <span className="text-right">
-                            <span className="block font-medium tabular-nums">
-                              {formatCurrency(item.appliedAmount)}
-                            </span>
-                            <span
-                              className={`block text-xs ${item.willBeComplete ? "text-emerald-600" : "text-gray-500"}`}
+                              <span className="min-w-0">
+                                <span className="block text-gray-900">
+                                  {rotuloParcela(p.sale.saleNumber, p.numero)}
+                                </span>
+                                <span
+                                  className={`block text-xs ${p.vencida ? "text-red-600" : "text-gray-500"}`}
+                                >
+                                  venc. {dataTexto(p.vencimento.slice(0, 10))}
+                                  {p.vencida && " (vencida)"}
+                                </span>
+                              </span>
+                              <span className="text-right shrink-0">
+                                <span className="block font-medium tabular-nums">
+                                  {formatCurrency(p.aplicado)}
+                                </span>
+                                <span
+                                  className={`block text-xs ${
+                                    p.quita
+                                      ? p.vencida
+                                        ? "text-emerald-600"
+                                        : "text-amber-700"
+                                      : "text-gray-500"
+                                  }`}
+                                >
+                                  {p.quita
+                                    ? p.vencida
+                                      ? "quita"
+                                      : "quita (adiantada)"
+                                    : `fica faltando ${formatCurrency(round2(p.saldo - p.aplicado))}`}
+                                </span>
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <ul className="divide-y divide-gray-100 border border-gray-200 rounded-xl">
+                          {saleDistribution.map((item) => (
+                            <li
+                              key={item.sale.saleNumber}
+                              className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
                             >
-                              {item.appliedDiscount > 0
-                                ? `+ desconto ${formatCurrency(item.appliedDiscount)} · `
-                                : ""}
-                              {item.willBeComplete ? "quita a venda" : "abate parte"}
-                            </span>
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-
-                {quitaTudo && (
-                  <Aviso tom="atencao" titulo="Quita toda a dívida do cliente">
-                    {qtdAVencerPagas > 0
-                      ? `Inclusive ${qtdAVencerPagas} ${qtdAVencerPagas === 1 ? "parcela que ainda não venceu" : "parcelas que ainda não venceram"}.`
-                      : "Todas as parcelas em aberto ficam pagas."}
-                  </Aviso>
-                )}
-
-                <p
-                  className={`text-sm ${precisaAcompanhamento ? "text-red-700" : "text-emerald-700"}`}
-                >
-                  {precisaAcompanhamento
-                    ? `Depois deste pagamento ainda ficam ${formatCurrency(vencidoRestante)} vencidos.`
-                    : "Depois deste pagamento o cliente fica sem valor vencido."}
-                </p>
-
-                {ehCarteira && !contatoJaRegistrado && isOnline && (
-                  <p className="text-xs text-gray-500">
-                    Fica registrado no histórico como contato “
-                    {ATTEMPT_RESULT_LABELS[
-                      precisaAcompanhamento ? "partial_payment" : "full_payment"
-                    ]}
-                    ”.
-                  </p>
-                )}
-
-                {/* Externo com vencido sobrando: proxima visita aqui mesmo */}
-                {precisaAcompanhamento && ehExterno && (
-                  <fieldset className="rounded-xl border border-gray-200 p-3">
-                    <legend className="px-1 text-sm font-semibold text-gray-900 dark:text-dark-text">
-                      Próxima visita
-                    </legend>
-                    <div className="grid grid-cols-2 gap-2">
-                      <label className="text-xs text-gray-600">
-                        <span className="flex items-center gap-1 mb-1">
-                          <Calendar className="h-3.5 w-3.5" /> Data
-                        </span>
-                        <input
-                          id="reschedule-date"
-                          name="reschedule-date"
-                          type="date"
-                          min={hoje}
-                          value={rescheduleDate}
-                          onChange={(e) => {
-                            setRescheduleDate(e.target.value);
-                            setErroEtapa(null);
-                          }}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-xl text-sm dark:bg-dark-bg dark:text-dark-text"
-                        />
-                      </label>
-                      <label className="text-xs text-gray-600">
-                        <span className="flex items-center gap-1 mb-1">
-                          <Clock className="h-3.5 w-3.5" /> Horário
-                        </span>
-                        <input
-                          id="reschedule-time"
-                          name="reschedule-time"
-                          type="time"
-                          value={rescheduleTime}
-                          onChange={(e) => {
-                            setRescheduleTime(e.target.value);
-                            setErroEtapa(null);
-                          }}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-xl text-sm dark:bg-dark-bg dark:text-dark-text"
-                        />
-                      </label>
+                              <span className="text-gray-900">
+                                {item.sale.saleNumber === 0
+                                  ? "Venda renegociada"
+                                  : `Venda #${item.sale.saleNumber}`}
+                              </span>
+                              <span className="text-right">
+                                <span className="block font-medium tabular-nums">
+                                  {formatCurrency(item.appliedAmount)}
+                                </span>
+                                <span
+                                  className={`block text-xs ${item.willBeComplete ? "text-emerald-600" : "text-gray-500"}`}
+                                >
+                                  {item.appliedDiscount > 0
+                                    ? `+ desconto ${formatCurrency(item.appliedDiscount)} · `
+                                    : ""}
+                                  {item.willBeComplete
+                                    ? "quita a venda"
+                                    : "abate parte"}
+                                </span>
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
-                  </fieldset>
-                )}
+
+                    {quitaTudo && (
+                      <Aviso
+                        tom="atencao"
+                        titulo="Quita toda a dívida do cliente"
+                      >
+                        {qtdAVencerPagas > 0
+                          ? `Inclusive ${qtdAVencerPagas} ${qtdAVencerPagas === 1 ? "parcela que ainda não venceu" : "parcelas que ainda não venceram"}.`
+                          : "Todas as parcelas em aberto ficam pagas."}
+                      </Aviso>
+                    )}
+
+                    <p
+                      className={`text-sm ${precisaAcompanhamento ? "text-red-700" : "text-emerald-700"}`}
+                    >
+                      {precisaAcompanhamento
+                        ? `Depois deste pagamento ainda ficam ${formatCurrency(vencidoRestante)} vencidos.`
+                        : "Depois deste pagamento o cliente fica sem valor vencido."}
+                    </p>
+
+                    {ehCarteira && !contatoJaRegistrado && isOnline && (
+                      <p className="text-xs text-gray-500">
+                        Fica registrado no histórico como contato “
+                        {
+                          ATTEMPT_RESULT_LABELS[
+                            precisaAcompanhamento
+                              ? "partial_payment"
+                              : "full_payment"
+                          ]
+                        }
+                        ”.
+                      </p>
+                    )}
+
+                    {/* Externo com vencido sobrando: proxima visita aqui mesmo */}
+                    {precisaAcompanhamento && ehExterno && (
+                      <fieldset className="rounded-xl border border-gray-200 p-3">
+                        <legend className="px-1 text-sm font-semibold text-gray-900 dark:text-dark-text">
+                          Próxima visita
+                        </legend>
+                        <div className="grid grid-cols-2 gap-2">
+                          <label className="text-xs text-gray-600">
+                            <span className="flex items-center gap-1 mb-1">
+                              <Calendar className="h-3.5 w-3.5" /> Data
+                            </span>
+                            <input
+                              id="reschedule-date"
+                              name="reschedule-date"
+                              type="date"
+                              min={hoje}
+                              value={rescheduleDate}
+                              onChange={(e) => {
+                                setRescheduleDate(e.target.value);
+                                setErroEtapa(null);
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-xl text-sm dark:bg-dark-bg dark:text-dark-text"
+                            />
+                          </label>
+                          <label className="text-xs text-gray-600">
+                            <span className="flex items-center gap-1 mb-1">
+                              <Clock className="h-3.5 w-3.5" /> Horário
+                            </span>
+                            <input
+                              id="reschedule-time"
+                              name="reschedule-time"
+                              type="time"
+                              value={rescheduleTime}
+                              onChange={(e) => {
+                                setRescheduleTime(e.target.value);
+                                setErroEtapa(null);
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-xl text-sm dark:bg-dark-bg dark:text-dark-text"
+                            />
+                          </label>
+                        </div>
+                      </fieldset>
+                    )}
+                  </div>
+                </div>
               </>
             )}
 
