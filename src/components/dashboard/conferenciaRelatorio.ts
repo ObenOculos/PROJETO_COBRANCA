@@ -38,12 +38,23 @@ interface ResumoCobrador {
   app: number;
   acao: number;
   juros: number;
+  data: number;
+  direto: number;
   confere: number;
   clientes: number;
 }
 
 const resumir = (linhas: LinhaRelatorio[]) => {
-  const total = { base: 0, app: 0, cedrus: 0, acao: 0, juros: 0, confere: 0 };
+  const total = {
+    base: 0,
+    app: 0,
+    cedrus: 0,
+    acao: 0,
+    juros: 0,
+    data: 0,
+    direto: 0,
+    confere: 0,
+  };
   const porCobrador = new Map<string, ResumoCobrador>();
   linhas.forEach((l) => {
     const grupo = CONFERENCIA_GRUPO[l.situacao];
@@ -59,6 +70,8 @@ const resumir = (linhas: LinhaRelatorio[]) => {
         app: 0,
         acao: 0,
         juros: 0,
+        data: 0,
+        direto: 0,
         confere: 0,
         clientes: 0,
       };
@@ -100,7 +113,7 @@ export const exportarTxt = (d: DadosRelatorio) => {
     `Baixado na base: ${formatCurrency(total.base)}`,
     `Registrado no app: ${formatCurrency(total.app)}${total.cedrus ? ` (${formatCurrency(total.cedrus)} do Cedrus)` : ""}`,
     `Diferença (app - base): ${formatCurrency(total.app - total.base)}`,
-    `Clientes: ${d.linhas.length} (precisa conferir ${total.acao} · app maior ${total.juros} · confere ${total.confere})`,
+    `Clientes: ${d.linhas.length} (precisa conferir ${total.acao} · app maior ${total.juros} · só data ${total.data} · pago direto ${total.direto} · confere ${total.confere})`,
     "",
     "RESUMO POR COBRADOR:",
     "-".repeat(70),
@@ -109,7 +122,7 @@ export const exportarTxt = (d: DadosRelatorio) => {
     linhas.push(
       `${c.nome}:`,
       `  Base: ${formatCurrency(c.base)}   App: ${formatCurrency(c.app)}   Diferença: ${formatCurrency(c.app - c.base)}`,
-      `  Clientes: ${c.clientes} (precisa conferir ${c.acao} · app maior ${c.juros} · confere ${c.confere})`,
+      `  Clientes: ${c.clientes} (precisa conferir ${c.acao} · app maior ${c.juros} · só data ${c.data} · pago direto ${c.direto} · confere ${c.confere})`,
       "",
     );
   });
@@ -146,6 +159,8 @@ export const exportarExcel = (d: DadosRelatorio) => {
     ["Clientes", d.linhas.length],
     ["Precisa conferir", total.acao],
     ["App maior (provável juros)", total.juros],
+    ["Só data (mês vizinho)", total.data],
+    ["Pago direto (sem cobrador)", total.direto],
     ["Confere", total.confere],
     [""],
     ["POR COBRADOR"],
@@ -276,7 +291,7 @@ export const imprimir = (d: DadosRelatorio) => {
     <div class="card"><div class="l">Baixado na base</div><div class="v">${formatCurrency(total.base)}</div></div>
     <div class="card"><div class="l">Registrado no app</div><div class="v">${formatCurrency(total.app)}</div>${total.cedrus ? `<div class="l">${formatCurrency(total.cedrus)} do Cedrus</div>` : ""}</div>
     <div class="card"><div class="l">Diferença (app − base)</div><div class="v" style="color:${corDif(dif)}">${formatCurrency(dif)}</div></div>
-    <div class="card"><div class="l">Clientes</div><div class="v">${d.linhas.length}</div><div class="l">conferir ${total.acao} · app maior ${total.juros} · confere ${total.confere}</div></div>
+    <div class="card"><div class="l">Clientes</div><div class="v">${d.linhas.length}</div><div class="l">conferir ${total.acao} · app maior ${total.juros} · só data ${total.data} · direto ${total.direto} · confere ${total.confere}</div></div>
   </div>
   <h2>Por cobrador</h2>
   <table>

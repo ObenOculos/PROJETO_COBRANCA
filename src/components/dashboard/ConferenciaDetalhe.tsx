@@ -3,6 +3,7 @@ import { CheckCircle2, ExternalLink, RotateCcw } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 import {
+  CONFERENCIA_JANELA_DIAS,
   ConferenciaEstadoMarcacao,
   ConferenciaMarcacao,
   marcacaoPedeObservacao,
@@ -44,9 +45,8 @@ interface AppRow {
   estorno: boolean;
 }
 
-/** Dias antes/depois do mes em que o detalhe procura baixa ou lancamento
- * "fora do mes" (diferenca que e so de data). */
-const JANELA_DIAS = 45;
+// Mesma janela da RPC ("so data"): fonte unica em filters/conferenciaRecebimentos.
+const JANELA_DIAS = CONFERENCIA_JANELA_DIAS;
 
 /** "YYYY-MM-DD" + n dias, em UTC (sem fuso: so aritmetica de calendario). */
 const somarDias = (dia: string, n: number): string => {

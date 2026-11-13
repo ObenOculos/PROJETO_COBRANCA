@@ -68,6 +68,9 @@ interface LinhaRpc {
   app_valor: number | string;
   app_lancamentos: number;
   app_cedrus: number | string;
+  // Migration 20261113000009: totais de +-45 dias em volta do mes.
+  base_janela?: number | string;
+  app_janela?: number | string;
   na_carteira: boolean;
 }
 
@@ -122,10 +125,19 @@ const SITUACOES: ConferenciaSituacao[] = [
   "base_maior",
   "sem_baixa_base",
   "app_maior",
+  "so_data",
+  "pago_direto",
   "confere",
 ];
 
-const GRUPOS: GrupoTela[] = ["acao", "juros", "confere", "conferido"];
+const GRUPOS: GrupoTela[] = [
+  "acao",
+  "juros",
+  "data",
+  "direto",
+  "confere",
+  "conferido",
+];
 
 const SITUACAO_TONE: Record<ConferenciaSituacao, string> = {
   confere:
@@ -137,6 +149,10 @@ const SITUACAO_TONE: Record<ConferenciaSituacao, string> = {
   sem_baixa_base:
     "bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300",
   app_maior: "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300",
+  so_data:
+    "bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-300",
+  pago_direto:
+    "bg-slate-100 text-slate-600 dark:bg-slate-800/40 dark:text-slate-300",
 };
 
 // Card de grupo: borda/numero quando selecionado e quando nao.
@@ -155,6 +171,16 @@ const GRUPO_TONE: Record<GrupoTela, { ativo: string; numero: string }> = {
     ativo:
       "border-blue-300 bg-blue-50 ring-1 ring-blue-200 dark:border-blue-700 dark:bg-blue-900/20 dark:ring-blue-800/50",
     numero: "text-blue-600 dark:text-blue-400",
+  },
+  data: {
+    ativo:
+      "border-violet-300 bg-violet-50 ring-1 ring-violet-200 dark:border-violet-700 dark:bg-violet-900/20 dark:ring-violet-800/50",
+    numero: "text-violet-600 dark:text-violet-400",
+  },
+  direto: {
+    ativo:
+      "border-slate-300 bg-slate-50 ring-1 ring-slate-200 dark:border-slate-600 dark:bg-slate-800/30 dark:ring-slate-700/50",
+    numero: "text-slate-600 dark:text-slate-300",
   },
   confere: {
     ativo:
@@ -415,7 +441,13 @@ const ConferenciaRecebimentos: React.FC = () => {
         g.foraValor += appValor;
         return;
       }
-      const situacao = classificarConferencia(baseValor, appValor);
+      // Janela so existe depois da migration 20261113000009; sem ela, a
+      // classificacao fica como antes (sem "so data").
+      const situacao = classificarConferencia(baseValor, appValor, {
+        semCobrador: !l.cobrador_id,
+        baseJanela: l.base_janela == null ? undefined : num(l.base_janela),
+        appJanela: l.app_janela == null ? undefined : num(l.app_janela),
+      });
       const historico = marcacoesPorDoc.get(l.documento ?? "");
       const ultima = historico?.[historico.length - 1];
       const marcacao = estadoMarcacao(ultima, visao, baseValor, appValor);
@@ -478,16 +510,22 @@ const ConferenciaRecebimentos: React.FC = () => {
       base: 0,
       app: 0,
       cedrus: 0,
-      porGrupo: { acao: 0, juros: 0, confere: 0, conferido: 0 } as Record<
-        GrupoTela,
-        number
-      >,
+      porGrupo: {
+        acao: 0,
+        juros: 0,
+        data: 0,
+        direto: 0,
+        confere: 0,
+        conferido: 0,
+      } as Record<GrupoTela, number>,
       porSituacao: {
         confere: 0,
         sem_registro_app: 0,
         sem_baixa_base: 0,
         app_maior: 0,
         base_maior: 0,
+        so_data: 0,
+        pago_direto: 0,
       } as Record<ConferenciaSituacao, number>,
     };
     escopo.forEach((c) => {
@@ -834,7 +872,7 @@ const ConferenciaRecebimentos: React.FC = () => {
           )}
 
           {/* Grupos (filtro da lista) */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
             {GRUPOS.map((gr) => {
               const ativo = grupoFiltro === gr;
               return (

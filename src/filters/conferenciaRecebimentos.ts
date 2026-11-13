@@ -15,7 +15,13 @@ export type ConferenciaSituacao =
   | "sem_registro_app"
   | "sem_baixa_base"
   | "app_maior"
-  | "base_maior";
+  | "base_maior"
+  | "so_data"
+  | "pago_direto";
+
+/** Dias antes/depois do mes da janela de "so data" -- igual a da RPC
+ * conferencia_recebimentos (migration 20261113000009) e a do detalhe. */
+export const CONFERENCIA_JANELA_DIAS = 45;
 
 export const CONFERENCIA_SITUACAO_LABEL: Record<ConferenciaSituacao, string> = {
   confere: "Confere",
@@ -23,6 +29,8 @@ export const CONFERENCIA_SITUACAO_LABEL: Record<ConferenciaSituacao, string> = {
   sem_baixa_base: "Registrado, sem baixa na base",
   app_maior: "App maior que a base",
   base_maior: "Base maior que o app",
+  so_data: "Diferença só de data",
+  pago_direto: "Pago direto (sem cobrador)",
 };
 
 export const CONFERENCIA_SITUACAO_DICA: Record<ConferenciaSituacao, string> = {
@@ -35,16 +43,35 @@ export const CONFERENCIA_SITUACAO_DICA: Record<ConferenciaSituacao, string> = {
     "O app tem mais que a base. Diferença pequena costuma ser juros (a base só guarda o principal).",
   base_maior:
     "A base baixou mais do que o cobrador registrou (parcela paga sem registro ou registro a menor).",
+  so_data:
+    "O mês não bate, mas de 45 dias antes a 45 dias depois base e app batem: a baixa ou o registro caiu no mês vizinho.",
+  pago_direto:
+    "A base baixou e o cliente não está na carteira de nenhum cobrador: pagou direto (loja, boleto, Pix). Não há registro de cobrador a conferir.",
 };
 
+/**
+ * Situacao da linha. `extra` (opcional):
+ * - semCobrador: a linha nao tem cobrador (cliente fora de qualquer carteira
+ *   e ninguem registrou) -> baixa sem registro e "pago_direto";
+ * - baseJanela/appJanela: totais de +-CONFERENCIA_JANELA_DIAS em volta do mes;
+ *   se batem e o mes nao, a diferenca e "so_data".
+ */
 export const classificarConferencia = (
   baseValor: number,
   appValor: number,
+  extra?: { semCobrador?: boolean; baseJanela?: number; appJanela?: number },
 ): ConferenciaSituacao => {
   const temBase = baseValor > CONFERENCIA_TOLERANCIA;
   const temApp = Math.abs(appValor) > CONFERENCIA_TOLERANCIA;
   if (Math.abs(appValor - baseValor) <= CONFERENCIA_TOLERANCIA)
     return "confere";
+  if (extra?.semCobrador && temBase && !temApp) return "pago_direto";
+  if (
+    extra?.baseJanela != null &&
+    extra?.appJanela != null &&
+    Math.abs(extra.appJanela - extra.baseJanela) <= CONFERENCIA_TOLERANCIA
+  )
+    return "so_data";
   if (temBase && !temApp) return "sem_registro_app";
   if (!temBase && temApp) return "sem_baixa_base";
   return appValor > baseValor ? "app_maior" : "base_maior";
@@ -56,7 +83,7 @@ export const classificarConferencia = (
  * "juros" = app maior que a base, quase sempre juros (a base so guarda o
  * principal); "confere" = sem diferenca.
  */
-export type ConferenciaGrupo = "acao" | "juros" | "confere";
+export type ConferenciaGrupo = "acao" | "juros" | "data" | "direto" | "confere";
 
 export const CONFERENCIA_GRUPO: Record<ConferenciaSituacao, ConferenciaGrupo> =
   {
@@ -64,12 +91,16 @@ export const CONFERENCIA_GRUPO: Record<ConferenciaSituacao, ConferenciaGrupo> =
     base_maior: "acao",
     sem_baixa_base: "acao",
     app_maior: "juros",
+    so_data: "data",
+    pago_direto: "direto",
     confere: "confere",
   };
 
 export const CONFERENCIA_GRUPO_LABEL: Record<ConferenciaGrupo, string> = {
   acao: "Precisa conferir",
   juros: "App maior (provável juros)",
+  data: "Só data (mês vizinho)",
+  direto: "Pago direto (sem cobrador)",
   confere: "Confere",
 };
 
@@ -77,6 +108,9 @@ export const CONFERENCIA_GRUPO_DICA: Record<ConferenciaGrupo, string> = {
   acao: "Pagou sem registro no app, registrado sem baixa na base ou base maior que o app.",
   juros:
     "O app tem mais que a base. Diferença pequena costuma ser juros (a base só guarda o principal).",
+  data: "O mês não bate, mas na janela de 45 dias antes e depois base e app batem: baixa ou registro no mês vizinho.",
+  direto:
+    "Baixa de cliente fora de qualquer carteira, sem registro no app: pagou direto. Nada a conferir com cobrador.",
   confere: "Valor do app igual ao baixado na base (até R$ 1 de diferença).",
 };
 
