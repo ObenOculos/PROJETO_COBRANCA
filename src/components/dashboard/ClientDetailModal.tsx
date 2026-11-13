@@ -1363,12 +1363,20 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                               <div className="text-sm font-semibold text-gray-900">
                                 {formatCurrency(sale.totalValue)}
                               </div>
-                              <div className="text-xs text-green-600">
-                                ↑ {formatCurrency(saleBalance.totalPaid)}
+                              <div className="text-xs text-gray-500">
+                                Pago{" "}
+                                <span className="text-green-600">
+                                  {formatCurrency(saleBalance.totalPaid)}
+                                </span>
                               </div>
-                              <div className="text-xs text-red-600">
-                                ↓ {formatCurrency(saleBalance.remainingBalance)}
-                              </div>
+                              {saleBalance.remainingBalance > 0.01 && (
+                                <div className="text-xs text-gray-500">
+                                  Falta{" "}
+                                  <span className="font-medium text-red-600">
+                                    {formatCurrency(saleBalance.remainingBalance)}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1376,33 +1384,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                         {/* Expanded Sale Details - Minimalista */}
                         {expandedSales.has(sale.saleNumber) && (
                           <div className="px-3 py-3 bg-white border-t border-gray-100">
-                            {/* Resumo em linha única */}
-                            <div className="flex justify-between text-xs mb-3 pb-2 border-b border-gray-100">
-                              <span className="text-gray-600">
-                                Total:{" "}
-                                <strong className="text-gray-900">
-                                  {formatCurrency(saleBalance.totalValue)}
-                                </strong>
-                              </span>
-                              <span className="text-gray-600">
-                                Pago:{" "}
-                                <strong className="text-green-600">
-                                  {formatCurrency(saleBalance.totalPaid)}
-                                </strong>
-                              </span>
-                              <span className="text-gray-600">
-                                Falta:{" "}
-                                <strong className="text-red-600">
-                                  {formatCurrency(saleBalance.remainingBalance)}
-                                </strong>
-                              </span>
-                            </div>
-
                             {/* Tabela de Parcelas */}
                             <div className="space-y-1">
-                              <h4 className="text-xs font-medium text-gray-700 mb-2">
-                                Parcelas ({sale.installments.length})
-                              </h4>
 
                               {/* Mobile: Cards compactos */}
                               <div className="space-y-1.5">
@@ -1451,8 +1434,13 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                         />
                                         <div className="min-w-0">
                                           <div className="flex items-center gap-2">
-                                            <span className="font-mono text-xs text-gray-500">
-                                              #{installment.id_parcela}
+                                            <span
+                                              className="text-xs font-medium text-gray-700"
+                                              title={`ID da parcela: ${installment.id_parcela}`}
+                                            >
+                                              {installment.parcela != null
+                                                ? `Parcela ${installment.parcela}`
+                                                : `#${installment.id_parcela}`}
                                             </span>
                                             {isForaDaCobranca(
                                               installment.status,
