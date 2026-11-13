@@ -28,6 +28,7 @@ import { isForaDaCobranca, seloForaDaCobranca } from "../../types/status";
 import {
   clientBalanceSplit,
   clientMaxOverdueDays,
+  clientStoresForDisplay,
   hasInstallmentBalance,
   round2,
 } from "../../filters/clientStatus";
@@ -449,6 +450,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     acordoAtivoOverdueMap,
   );
   const [menuMaisAberto, setMenuMaisAberto] = useState(false);
+  // Loja(s) do cliente (a primeira e a da parcela em aberto mais antiga).
+  const lojasCliente = clientStoresForDisplay({ sales: clientSales });
 
   // Saldo de cada venda calculado UMA vez e reaproveitado (pendencia, abas e
   // lista). Antes era recalculado em cada uso e a cada clique no modal.
@@ -767,6 +770,14 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   title={`Razão social: ${razaoSocial}`}
                 >
                   {razaoSocial}
+                </p>
+              )}
+              {lojasCliente.length > 0 && (
+                <p className="text-sm text-indigo-700 font-medium truncate">
+                  <span className="font-normal text-gray-500">
+                    Loja{lojasCliente.length > 1 ? "s" : ""}:{" "}
+                  </span>
+                  {lojasCliente.join(" | ")}
                 </p>
               )}
               {/* Documento e codigo numa linha so */}
@@ -1289,6 +1300,19 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                 <p className="text-xs text-gray-500">
                                   {sale.installments.length} parcela
                                   {sale.installments.length !== 1 ? "s" : ""}
+                                  {lojasCliente.length > 1 &&
+                                    (() => {
+                                      const lojasVenda = [
+                                        ...new Set(
+                                          sale.installments
+                                            .map((i) => i.nome_da_loja)
+                                            .filter(Boolean),
+                                        ),
+                                      ];
+                                      return lojasVenda.length > 0
+                                        ? ` · ${lojasVenda.join(", ")}`
+                                        : "";
+                                    })()}
                                 </p>
                               </div>
                             </div>

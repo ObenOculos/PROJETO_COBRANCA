@@ -57,6 +57,7 @@ import {
   clientMaxOverdueDays,
   clientBalanceSplit,
   clientReferenceStore,
+  clientStoresForDisplay,
   ClientBalanceSplit,
   QUITADO_VISIVEL_DIAS,
   dataQuitacao,
@@ -1741,6 +1742,9 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
   const saleLabels = Array.from(
     new Set((group.sales ?? []).map((s) => s.saleNumber)),
   ).map((n) => (n ? `#${n}` : "#Renegociada"));
+  // Loja(s) do cliente: cobrador com mais de uma loja precisa saber de qual
+  // esta cobrando. A primeira e a da parcela em aberto mais antiga.
+  const lojas = clientStoresForDisplay(group);
   return (
     <>
     <tr className="group hover:bg-gray-50/80 dark:hover:bg-dark-bg-secondary transition-colors cursor-pointer">
@@ -1752,6 +1756,17 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
           >
             {group.client}
           </span>
+          {lojas.length > 0 && (
+            <span
+              className="block truncate text-xs font-medium text-indigo-700 dark:text-indigo-300"
+              title={`Loja${lojas.length > 1 ? "s" : ""}: ${lojas.join(", ")}`}
+            >
+              <span className="font-normal text-gray-500 dark:text-dark-text-secondary">
+                Loja{lojas.length > 1 ? "s" : ""}:{" "}
+              </span>
+              {lojas.join(" | ")}
+            </span>
+          )}
           {group.apelido && (
             <span
               className="block truncate text-xs text-blue-600 dark:text-blue-400"

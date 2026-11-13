@@ -300,3 +300,43 @@ export const clientReferenceStore = (
   });
   return (best as { venc: string; loja: string } | null)?.loja ?? null;
 };
+
+/**
+ * Lojas em que o cliente tem saldo em aberto, para o cobrador saber de qual
+ * loja esta cobrando (cobrador com mais de uma loja na carteira). Ordem: a
+ * parcela em aberto mais antiga de cada loja -- a primeira e sempre a
+ * clientReferenceStore (a que vale para as regras da carteira).
+ */
+export const clientOpenStores = (group: Pick<ClientGroup, "sales">): string[] => {
+  const maisAntiga = new Map<string, string>();
+  group.sales?.forEach((sale) => {
+    sale.installments?.forEach((inst) => {
+      if (!hasInstallmentBalance(inst) || !inst.nome_da_loja) return;
+      const venc = inst.data_vencimento ?? "9999-12-31";
+      const atual = maisAntiga.get(inst.nome_da_loja);
+      if (!atual || venc < atual) maisAntiga.set(inst.nome_da_loja, venc);
+    });
+  });
+  return Array.from(maisAntiga.entries())
+    .sort((a, b) => a[1].localeCompare(b[1]) || a[0].localeCompare(b[0]))
+    .map(([loja]) => loja);
+};
+
+/**
+ * Lojas para exibir no cliente: as com saldo em aberto (clientOpenStores);
+ * cliente sem saldo (ex.: quitado nos ultimos dias) mostra as lojas das
+ * vendas dele.
+ */
+export const clientStoresForDisplay = (
+  group: Pick<ClientGroup, "sales">,
+): string[] => {
+  const abertas = clientOpenStores(group);
+  if (abertas.length > 0) return abertas;
+  const todas = new Set<string>();
+  group.sales?.forEach((sale) =>
+    sale.installments?.forEach((inst) => {
+      if (inst.nome_da_loja) todas.add(inst.nome_da_loja);
+    }),
+  );
+  return Array.from(todas).sort();
+};
