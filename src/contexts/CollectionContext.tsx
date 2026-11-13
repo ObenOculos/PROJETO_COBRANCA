@@ -358,6 +358,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   > | null>(null);
   // Inicio da rajada de eventos em andamento (null = sem rajada aberta).
   const realtimeBurstStartRef = React.useRef<number | null>(null);
+  const realtimeBurstCountRef = React.useRef(0);
+  const paymentsRefreshTimer = React.useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
   // Uma carga de BANCO_DADOS por vez: duas concorrentes escreveriam em
   // setAllCollections fora de ordem, e a mais lenta sobrescreveria a mais nova.
   // Quem pede durante uma carga recebe a promessa da PROXIMA (que traz os
@@ -1031,8 +1035,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             schema: "public",
             table: "BANCO_DADOS",
           },
-          (payload) => {
-            console.log("Mudança detectada na tabela BANCO_DADOS:", payload);
+          () => {
+            // Sem log por evento: uma importacao manda milhares, e logar o
+            // payload (a linha inteira) retinha tudo na memoria e travava a
+            // aba. Conta a rajada e loga uma vez, na recarga.
+            realtimeBurstCountRef.current += 1;
 
             const now = Date.now();
             if (realtimeBurstStartRef.current === null) {
@@ -1051,6 +1058,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             realtimeRefreshTimer.current = setTimeout(() => {
               realtimeRefreshTimer.current = null;
               realtimeBurstStartRef.current = null;
+              console.log(
+                `BANCO_DADOS: ${realtimeBurstCountRef.current} mudança(s) em tempo real; recarregando`,
+              );
+              realtimeBurstCountRef.current = 0;
               refreshCollections();
             }, delay);
           },
@@ -1062,11 +1073,16 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             schema: "public",
             table: "sale_payments",
           },
-          (payload) => {
-            console.log("Mudança detectada na tabela sale_payments:", payload);
-            // Atualizar sale payments quando houver mudanças
-            invalidatePayments(); // Invalidate cache before fetching
-            fetchSalePayments(false); // Force fresh fetch
+          () => {
+            // Varias mudancas seguidas (estorno + ajuste, lote) viram uma
+            // releitura so dos pagamentos.
+            if (paymentsRefreshTimer.current)
+              clearTimeout(paymentsRefreshTimer.current);
+            paymentsRefreshTimer.current = setTimeout(() => {
+              paymentsRefreshTimer.current = null;
+              invalidatePayments();
+              fetchSalePayments(false);
+            }, 1500);
           },
         )
         .subscribe((status) => {
@@ -1125,6 +1141,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         clearTimeout(realtimeRefreshTimer.current);
         realtimeRefreshTimer.current = null;
         realtimeBurstStartRef.current = null;
+      }
+      realtimeBurstCountRef.current = 0;
+      if (paymentsRefreshTimer.current) {
+        clearTimeout(paymentsRefreshTimer.current);
+        paymentsRefreshTimer.current = null;
       }
       if (realtimeChannel) {
         console.log("Removendo listener em tempo real...");

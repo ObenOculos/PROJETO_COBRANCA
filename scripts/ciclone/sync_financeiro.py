@@ -705,6 +705,69 @@ def upsert_clientes(sb: SupabaseRestClient, clientes_por_documento: dict) -> Non
 # Upsert em BANCO_DADOS
 # ---------------------------------------------------------------------------
 
+def _normalizar(valor):
+    """Valor comparavel entre o que o sync monta e o que o PostgREST devolve
+    (numeric vem como numero, date como 'YYYY-MM-DD')."""
+    if valor is None or isinstance(valor, bool):
+        return valor
+    if isinstance(valor, (int, float, Decimal)):
+        return round(float(valor), 2)
+    return str(valor)
+
+
+def carregar_atuais(sb: SupabaseRestClient, colunas: list[str]) -> dict:
+    """{id_parcela: linha} das parcelas da Focco hoje no app (so leitura)."""
+    atuais: dict = {}
+    inicio = 0
+    while True:
+        resp = sb.request(
+            "GET",
+            "BANCO_DADOS",
+            params={
+                "select": ",".join(["id_parcela", *colunas]),
+                "nome_da_loja": f"eq.{NOME_DA_LOJA}",
+                "order": "id_parcela",
+                "offset": inicio,
+                "limit": 1000,
+            },
+        )
+        for linha in resp:
+            atuais[linha["id_parcela"]] = linha
+        if len(resp) < 1000:
+            return atuais
+        inicio += 1000
+
+
+def linhas_alteradas(sb: SupabaseRestClient, linhas: list[dict]) -> list[dict]:
+    """So as linhas novas ou com alguma coluna diferente do app.
+
+    Regravar as ~36 mil parcelas iguais a cada rodada disparava um evento
+    realtime por linha para cada tela aberta (o gestor travava no sync das
+    5h/12h/17h) e trabalho a toa no banco. O resultado gravado e o mesmo: o
+    ERP continua valendo por cima de qualquer diferenca. Se a leitura falhar,
+    grava tudo como antes."""
+    if not linhas:
+        return linhas
+    colunas = [c for c in linhas[0] if c != "id_parcela"]
+    try:
+        atuais = carregar_atuais(sb, colunas)
+    except Exception as exc:  # noqa: BLE001 -- melhor gravar tudo que falhar
+        logger.warning("Nao foi possivel comparar com o app (%s); gravando todas as linhas", exc)
+        return linhas
+    alteradas = []
+    for linha in linhas:
+        atual = atuais.get(linha["id_parcela"])
+        if atual is None or any(
+            _normalizar(linha[c]) != _normalizar(atual.get(c)) for c in colunas
+        ):
+            alteradas.append(linha)
+    logger.info(
+        "BANCO_DADOS: %d de %d linhas mudaram (as iguais nao sao regravadas)",
+        len(alteradas), len(linhas),
+    )
+    return alteradas
+
+
 def upsert_banco_dados(sb: SupabaseRestClient, linhas: list[dict]) -> None:
     for i in range(0, len(linhas), LOTE):
         lote = linhas[i : i + LOTE]
@@ -920,8 +983,9 @@ def main() -> None:
     logger.info("Gravando %d clientes...", len(clientes_por_documento))
     upsert_clientes(sb, clientes_por_documento)
 
-    logger.info("Gravando %d linhas em BANCO_DADOS...", len(linhas_banco_dados))
-    upsert_banco_dados(sb, linhas_banco_dados)
+    alteradas = linhas_alteradas(sb, linhas_banco_dados)
+    logger.info("Gravando %d linhas em BANCO_DADOS...", len(alteradas))
+    upsert_banco_dados(sb, alteradas)
 
     # Depois do BANCO_DADOS: os itens tem FK para ele. Falha aqui nao desfaz
     # nem invalida a carga dos titulos -- loga e segue (proxima rodada refaz,
