@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { supabase } from "../../lib/supabase";
 import AddressHistoryViewer from "./AddressHistoryViewer";
-import ClientHistoryViewer from "./ClientHistoryViewer";
 import {
   X,
   ChevronDown,
@@ -12,9 +10,6 @@ import {
   AlertTriangle,
   Phone,
   MessageCircle,
-  Clock,
-  RefreshCw,
-  History,
   PhoneCall,
   Handshake,
   MoreHorizontal,
@@ -28,13 +23,7 @@ import {
 import {
   formatCurrency,
   calculateOverdueDays,
-  parseAndFormatDate,
-  formatHorario,
 } from "../../utils/formatters";
-import {
-  clientesReincidentes,
-  rescheduleReasonLabel,
-} from "../../config/rescheduleReasons";
 import { isForaDaCobranca, seloForaDaCobranca } from "../../types/status";
 import { abrirWhatsApp } from "../../utils/whatsapp";
 import {
@@ -44,11 +33,6 @@ import {
   round2,
 } from "../../filters/clientStatus";
 import { parseAndNormalizeDate } from "../../filters/dates";
-import {
-  ATTEMPT_TYPE_LABELS,
-  ATTEMPT_RESULT_LABELS,
-  notaContatoExibicao,
-} from "../../config/collectionAttempts";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useClientBirthDate } from "../../hooks/useClientBirthDate";
 import { razaoSocialDistinta } from "../../utils/clienteNome";
@@ -60,7 +44,7 @@ import GeneralPaymentEditModal from "./GeneralPaymentEditModal";
 import LogContactModal from "./LogContactModal";
 import AcordoModal from "./AcordoModal";
 import AcordoDetailModal from "./AcordoDetailModal";
-import HistoricoAcordosAgendamentos from "./HistoricoAcordosAgendamentos";
+import LinhaDoTempoCliente from "./LinhaDoTempoCliente";
 import { USER_TYPE_LABELS, isWalletCollectorType } from "../../config/profiles";
 
 interface ClientDetailModalProps {
@@ -215,7 +199,6 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     refreshCollections,
     scheduledVisits,
     users,
-    reincidenciaResets,
     getAcordoAtivoDoCliente,
     clientesRegistry,
     acordoAtivoOverdueMap,
@@ -258,162 +241,6 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
       cadastroErp?.regiao ||
       cadastroErp?.observacao_erp,
   );
-
-  const getCollectorName = (collectorId: string) => {
-    const collector = users?.find((u) => u.id === collectorId);
-    return collector?.name || "Cobrador não identificado";
-  };
-
-  const formatVisitDate = (dateString: string) => {
-    try {
-      const [year, month, day] = dateString.split("-");
-      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-      return date.toLocaleDateString("pt-BR");
-    } catch {
-      return dateString;
-    }
-  };
-
-  const getStatusVisitBadge = (status: string) => {
-    const config = {
-      realizada: {
-        bg: "bg-green-100",
-        text: "text-green-800",
-        label: "Realizada",
-      },
-      cancelada: {
-        bg: "bg-gray-100",
-        text: "text-gray-800",
-        label: "Cancelada",
-      },
-      nao_encontrado: {
-        bg: "bg-yellow-100",
-        text: "text-yellow-800",
-        label: "Não Encontrado",
-      },
-    };
-
-    const statusConfig =
-      config[status as keyof typeof config] || config["realizada"];
-
-    return (
-      <span
-        className={`px-2 py-1 rounded-full text-xs font-semibold ${statusConfig.bg} ${statusConfig.text}`}
-      >
-        {statusConfig.label}
-      </span>
-    );
-  };
-
-  const clientVisits = React.useMemo(() => {
-    if (!clientGroup?.document || !scheduledVisits) return [];
-
-    return scheduledVisits
-      .filter((visit) => visit.clientDocument === clientGroup.document)
-      .filter((visit) => visit.status === "realizada" && visit.notes) // Apenas visitas realizadas com observações
-      .sort((a, b) => {
-        const dateA = new Date(a.updatedAt || a.createdAt);
-        const dateB = new Date(b.updatedAt || b.createdAt);
-        return dateB.getTime() - dateA.getTime(); // Mais recentes primeiro
-      });
-  }, [clientGroup.document, scheduledVisits]);
-
-  // Reincidência de reagendamentos do cliente. Mesma regra da aba Reincidentes
-  // do Acompanhamento (config/rescheduleReasons): conta a MAIOR cadeia, isto é,
-  // quantas vezes a mesma cobrança foi empurrada — não remarcações avulsas.
-  const reincidencia = React.useMemo(() => {
-    if (!clientGroup?.document || !scheduledVisits) return null;
-    const doCliente = scheduledVisits.filter(
-      (v) => v.clientDocument === clientGroup.document,
-    );
-    return clientesReincidentes(doCliente, 2, reincidenciaResets)[0] ?? null;
-  }, [clientGroup.document, scheduledVisits, reincidenciaResets]);
-
-  // Histórico completo de collection_attempts do cliente (ligação/WhatsApp/
-  // mensagem registrados pelo Atender -- RPC registrar_contato), em TODOS
-  // os títulos dele -- não só os em aberto (diferente do attemptsByCollection
-  // da tela do cobrador, que só olha título pendente).
-  interface ContactAttemptRow {
-    id: string;
-    saleDescription: string;
-    date: string;
-    type: string;
-    result: string;
-    notes: string | null;
-    nextAction: string | null;
-    nextActionDate: string | null;
-  }
-  const [contactAttempts, setContactAttempts] = useState<ContactAttemptRow[]>(
-    [],
-  );
-
-  useEffect(() => {
-    const idToSale = new Map<string, string>();
-    clientGroup.sales?.forEach((sale) => {
-      sale.installments?.forEach((inst) => {
-        idToSale.set(
-          inst.id_parcela.toString(),
-          sale.description || `Venda ${sale.titleNumber}`,
-        );
-      });
-    });
-    const ids = Array.from(idToSale.keys());
-    if (ids.length === 0) {
-      setContactAttempts([]);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      const { data, error } = await supabase
-        .from("collection_attempts")
-        .select(
-          "id, collection_id, date, type, result, notes, next_action, next_action_date, created_at",
-        )
-        .in("collection_id", ids)
-        .order("created_at", { ascending: false });
-      if (cancelled) return;
-      if (error) {
-        console.error("Erro ao buscar histórico de contatos do cliente:", error);
-        return;
-      }
-      // Um contato de carteira grava UMA linha por titulo em aberto
-      // (registrar_contato); na tela e um contato so. Agrupa as linhas
-      // gravadas juntas (mesmo instante, tipo, resultado e observacao) e
-      // junta as vendas envolvidas.
-      const porContato = new Map<string, ContactAttemptRow>();
-      (data || []).forEach((row) => {
-        const chave = [
-          row.created_at,
-          row.type,
-          row.result,
-          row.notes ?? "",
-        ].join("|");
-        const venda = idToSale.get(row.collection_id) ?? "Título";
-        const atual = porContato.get(chave);
-        if (atual) {
-          if (!atual.saleDescription.split(", ").includes(venda)) {
-            atual.saleDescription += `, ${venda}`;
-          }
-          return;
-        }
-        porContato.set(chave, {
-          id: row.id,
-          saleDescription: venda,
-          date: row.date,
-          type: row.type,
-          result: row.result,
-          notes: row.notes,
-          nextAction: row.next_action,
-          nextActionDate: row.next_action_date,
-        });
-      });
-      setContactAttempts(Array.from(porContato.values()));
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientGroup.document]);
 
   const [isGeneralPaymentModalOpen, setIsGeneralPaymentModalOpen] =
     useState(false);
@@ -1235,184 +1062,11 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           {/* Sales and Collections, Client Data or History */}
           {view === "historico" ? (
             <div className="flex-1 min-h-0 overflow-y-auto p-4 lg:p-6">
-              <div className="space-y-8">
-                {/* Histórico de Contatos (collection_attempts) -- ligação,
-                    WhatsApp, mensagem registrados pelo cobrador de carteira.
-                    Visualmente distinto do bloco de visitas abaixo, que é do
-                    cobrador externo (scheduled_visits). */}
-                {contactAttempts.length > 0 && (
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                      <MessageCircle className="h-5 w-5 mr-2 text-indigo-600" />
-                      Histórico de Contatos
-                    </h3>
-                    <ul className="space-y-3 max-h-80 overflow-y-auto pr-2">
-                      {contactAttempts.map((attempt) => (
-                        <li
-                          key={attempt.id}
-                          className="bg-gray-50 p-4 rounded-2xl border border-gray-200"
-                        >
-                          <div className="flex items-center justify-between gap-2 mb-1">
-                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-800">
-                              <History className="w-4 h-4 text-indigo-500" />
-                              {ATTEMPT_TYPE_LABELS[
-                                attempt.type as keyof typeof ATTEMPT_TYPE_LABELS
-                              ] ?? attempt.type}
-                            </span>
-                            <span className="text-[10px] text-gray-400">
-                              {formatDate(attempt.date)}
-                            </span>
-                          </div>
-                          <p className="text-xs text-gray-400 mb-1">
-                            {attempt.saleDescription}
-                          </p>
-                          <p className="text-xs font-semibold text-gray-600 mb-1">
-                            {ATTEMPT_RESULT_LABELS[
-                              attempt.result as keyof typeof ATTEMPT_RESULT_LABELS
-                            ] ?? attempt.result}
-                          </p>
-                          {attempt.notes && (
-                            <p className="text-xs text-gray-500 whitespace-pre-wrap">
-                              {notaContatoExibicao(attempt.notes)}
-                            </p>
-                          )}
-                          {attempt.nextAction && (
-                            <p className="text-[11px] text-gray-400 mt-2">
-                              Próxima ação: {attempt.nextAction}
-                              {attempt.nextActionDate
-                                ? ` (${formatDate(attempt.nextActionDate)})`
-                                : ""}
-                            </p>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Acordos (criado/cancelado/quebrado/cumprido) e
-                    agendamentos cancelados -- item 22. */}
-                <HistoricoAcordosAgendamentos
-                  clientDocument={clientGroup.document}
-                  users={users ?? []}
-                  scheduledVisits={scheduledVisits ?? []}
-                />
-
-                {/* Visit History */}
-                {clientVisits.length > 0 && (
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                      <Clock className="h-5 w-5 mr-2 text-blue-600" />
-                      Histórico de Acompanhamento
-                    </h3>
-                    <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
-                      {clientVisits.map((visit) => (
-                        <div
-                          key={visit.id}
-                          className="bg-gray-50 p-4 rounded-2xl border border-gray-200"
-                        >
-                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                {getStatusVisitBadge(visit.status)}
-                                <span className="text-xs text-gray-500">
-                                  {formatVisitDate(visit.scheduledDate)}
-                                  {visit.scheduledTime &&
-                                    ` às ${formatHorario(visit.scheduledTime)}`}
-                                </span>
-                              </div>
-
-                              <div className="flex items-center text-sm text-gray-600 mb-2">
-                                <User className="h-4 w-4 mr-1" />
-                                <span className="font-medium">
-                                  {getCollectorName(visit.collectorId)}
-                                </span>
-                              </div>
-
-                              {visit.notes && (
-                                <div className="bg-white p-3 rounded-2xl border border-gray-200">
-                                  <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
-                                    {visit.notes}
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="flex items-center text-xs text-gray-400">
-                              <Clock className="h-3 w-3 mr-1" />
-                              {visit.updatedAt ? (
-                                <>
-                                  Finalizada em{" "}
-                                  {formatVisitDate(visit.updatedAt.split("T")[0])}
-                                </>
-                              ) : (
-                                <>
-                                  Registrada em{" "}
-                                  {formatVisitDate(visit.createdAt.split("T")[0])}
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {/* Reincidência de reagendamentos — contexto rápido antes do
-                    histórico, para o gestor não precisar abrir visita por visita. */}
-                {reincidencia && (
-                  <div>
-                    <div className="border border-amber-200 rounded-2xl overflow-hidden">
-                      <div className="px-4 py-3 bg-amber-50 border-b border-amber-200 flex items-center gap-2">
-                        <RefreshCw className="h-4 w-4 text-amber-600 shrink-0" />
-                        <span className="text-sm font-semibold text-amber-900">
-                          Reagendado {reincidencia.totalRemarcacoes}x
-                        </span>
-                        {reincidencia.maiorCadeia >= 2 && (
-                          <span
-                            className="text-[10px] font-medium text-amber-700 bg-white border border-amber-200 rounded-md px-1.5 py-0.5"
-                            title="Maior sequência da MESMA cobrança sendo empurrada."
-                          >
-                            seq. {reincidencia.maiorCadeia}x
-                          </span>
-                        )}
-                        <div className="flex flex-wrap gap-1.5 ml-auto">
-                          {reincidencia.motivos.map((m) => (
-                            <span
-                              key={m.key}
-                              className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-white text-amber-800 border border-amber-200"
-                            >
-                              {m.label} ({m.count})
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      <ol className="divide-y divide-amber-100 bg-white">
-                        {reincidencia.elos.map((step, i) => (
-                          <li
-                            key={step.visitId}
-                            className="px-4 py-2 text-xs text-gray-600 flex items-center gap-2"
-                          >
-                            <span className="w-5 shrink-0 text-gray-400 tabular-nums">
-                              {i + 1}.
-                            </span>
-                            <span className="font-semibold text-gray-800 tabular-nums">
-                              {parseAndFormatDate(step.date)}
-                            </span>
-                            <span className="text-gray-400">—</span>
-                            <span>{rescheduleReasonLabel(step.reasonKey)}</span>
-                          </li>
-                        ))}
-                      </ol>
-                    </div>
-                  </div>
-                )}
-                <ClientHistoryViewer
-                  clientDocument={clientGroup.document}
-                  users={users ?? []}
-                  mostrarCarteira={userType === "manager"}
-                />
-              </div>
+              <LinhaDoTempoCliente
+                clientDocument={clientGroup.document}
+                sales={clientSales}
+                mostrarCarteira={userType === "manager"}
+              />
             </div>
           ) : view === "dados" ? (
             <div className="flex-1 min-h-0 overflow-y-auto p-4 lg:p-6">
