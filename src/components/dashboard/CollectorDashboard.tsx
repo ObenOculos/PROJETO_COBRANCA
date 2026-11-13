@@ -93,6 +93,7 @@ import { comRetentativa } from "../../utils/supabaseRetry";
 import LogContactModal from "./LogContactModal";
 import CancelContactModal from "./CancelContactModal";
 import ContactScheduler from "./ContactScheduler";
+import MeuDesempenho, { FiltroDesempenho } from "./MeuDesempenho";
 import ClientDetailModal from "./ClientDetailModal";
 import AcordoModal from "./AcordoModal";
 import AcordoDetailModal from "./AcordoDetailModal";
@@ -164,9 +165,8 @@ type MotivoParaHoje = "agendado" | "promessa" | "quebrado" | "urgente";
 type SituacaoCarteira =
   | "todos"
   | "paraHoje"
-  | "semContato"
-  | "contatadosHoje"
-  | "contatadosAntes";
+  | "atendidosHoje"
+  | "semAtendimento";
 type FaixaCarteira = "todas" | "critical" | "high" | "medium" | "low" | "emDia";
 
 // Colunas ordenaveis, compartilhadas pela tabela da Carteira completa e
@@ -463,10 +463,20 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   const [attemptsFalharam, setAttemptsFalharam] = useState(false);
 
   useEffect(() => {
+    // Todos os titulos dos clientes que ainda devem -- inclusive os ja
+    // pagos: o atendimento pode ter sido gravado num titulo quitado (ex.:
+    // "diz que ja pagou") e, lendo so os em aberto, sumia da lista
+    // (2026-11-12).
+    const docsEmAberto = new Set(
+      (myCollections || [])
+        .filter((c) => hasInstallmentBalance(c))
+        .map((c) => c.documento)
+        .filter(Boolean),
+    );
     const ids = Array.from(
       new Set(
         (myCollections || [])
-          .filter((c) => hasInstallmentBalance(c))
+          .filter((c) => c.documento && docsEmAberto.has(c.documento))
           .map((c) => c.id_parcela?.toString())
           .filter((id): id is string => Boolean(id)),
       ),
@@ -985,44 +995,59 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
         : priorityBucket(clientMaxOverdueDays(g, acordoAtivoOverdueMap)),
     [saldoPorDocumento, acordoAtivoOverdueMap],
   );
-  const situacaoDoCliente = React.useCallback(
-    (g: ClientGroup): Exclude<SituacaoCarteira, "todos"> => {
-      if (motivoParaHojeDe(g.document)) return "paraHoje";
-      const i = interacaoDoCliente(g.document);
-      return i === "hoje"
-        ? "contatadosHoje"
-        : i === "semana"
-          ? "contatadosAntes"
-          : "semContato";
+  // Filtros da Carteira completa. NAO se excluem: um cliente "Para hoje"
+  // que ja foi atendido hoje aparece nos dois. "Atendido" = o cobrador
+  // registrou qualquer coisa (conversou ou nao) -- mesma regra do card
+  // "Quantos atendi" e do Resumo por Cobrador do gestor (2026-11-12).
+  const diasDesdeAtendimento = React.useCallback(
+    (doc: string): number | null => {
+      const ultimo = lastContacts[doc];
+      if (!ultimo) return null;
+      const hojeData = new Date(todayLocalStr() + "T00:00:00");
+      return Math.floor(
+        (hojeData.getTime() - ultimo.date.getTime()) / 86400000,
+      );
     },
-    [motivoParaHojeDe, interacaoDoCliente],
+    [lastContacts],
+  );
+  const estaNaSituacao = React.useCallback(
+    (g: ClientGroup, s: Exclude<SituacaoCarteira, "todos">): boolean => {
+      if (s === "paraHoje") return motivoParaHojeDe(g.document) !== null;
+      const dias = diasDesdeAtendimento(g.document);
+      if (s === "atendidosHoje") return dias !== null && dias <= 0;
+      return dias === null || dias > SEM_CONTATO_DIAS;
+    },
+    [motivoParaHojeDe, diasDesdeAtendimento],
   );
 
   const contagemCarteira = useMemo(() => {
     const situacao = new Map<string, number>();
     const faixa = new Map<string, number>();
     walletFilteredGroups.forEach((g) => {
-      const s = situacaoDoCliente(g);
-      situacao.set(s, (situacao.get(s) ?? 0) + 1);
+      (["paraHoje", "atendidosHoje", "semAtendimento"] as const).forEach(
+        (s) => {
+          if (estaNaSituacao(g, s)) situacao.set(s, (situacao.get(s) ?? 0) + 1);
+        },
+      );
       const f = faixaDoCliente(g);
       faixa.set(f, (faixa.get(f) ?? 0) + 1);
     });
     return { situacao, faixa };
-  }, [walletFilteredGroups, situacaoDoCliente, faixaDoCliente]);
+  }, [walletFilteredGroups, estaNaSituacao, faixaDoCliente]);
 
   const carteiraFiltrada = useMemo(
     () =>
       sortedWalletFilteredGroups.filter(
         (g) =>
           (situacaoCarteira === "todos" ||
-            situacaoDoCliente(g) === situacaoCarteira) &&
+            estaNaSituacao(g, situacaoCarteira)) &&
           (faixaCarteira === "todas" || faixaDoCliente(g) === faixaCarteira),
       ),
     [
       sortedWalletFilteredGroups,
       situacaoCarteira,
       faixaCarteira,
-      situacaoDoCliente,
+      estaNaSituacao,
       faixaDoCliente,
     ],
   );
@@ -1121,6 +1146,68 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     acordoPagamentosMes,
   ]);
 
+  // Clique num card do Meu desempenho: abre a Carteira completa ja
+  // filtrada (busca/filtros anteriores limpos, para a lista bater com o
+  // numero do card) e rola ate ela.
+  const listaRef = useRef<HTMLDivElement>(null);
+  const filtrarPeloPainel = React.useCallback((filtro: FiltroDesempenho) => {
+    setWalletFilters({});
+    setSituacaoCarteira(
+      filtro === "paraHoje"
+        ? "paraHoje"
+        : filtro === "atendidosHoje"
+          ? "atendidosHoje"
+          : filtro === "semAtendimento"
+            ? "semAtendimento"
+            : "todos",
+    );
+    setFaixaCarteira(filtro === "criticos" ? "critical" : "todas");
+    setWalletTab("carteira");
+    requestAnimationFrame(() =>
+      listaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
+  }, []);
+
+  // Numeros do "Meu desempenho": carteira INTEIRA (nao o recorte da busca/
+  // filtro), com as mesmas regras da lista -- compromisso (motivoParaHojeDe),
+  // faixa e situacao de contato.
+  const painel = useMemo(() => {
+    let agendados = 0,
+      promessas = 0,
+      acordosQuebrados = 0,
+      vencido = 0,
+      aVencer = 0,
+      criticos = 0,
+      semAtendimento = 0;
+    openClientGroups.forEach((g) => {
+      const motivo = motivoParaHojeDe(g.document);
+      if (motivo === "agendado") agendados++;
+      else if (motivo === "promessa") promessas++;
+      else if (motivo === "quebrado") acordosQuebrados++;
+      const saldo = saldoPorDocumento.get(g.document);
+      vencido += saldo?.vencido ?? 0;
+      aVencer += saldo?.aVencer ?? 0;
+      if (faixaDoCliente(g) === "critical") criticos++;
+      if (estaNaSituacao(g, "semAtendimento")) semAtendimento++;
+    });
+    return {
+      compromissos: { agendados, promessas, acordosQuebrados },
+      carteira: {
+        vencido,
+        aVencer,
+        clientes: openClientGroups.length,
+        criticos,
+        semAtendimento,
+      },
+    };
+  }, [
+    openClientGroups,
+    motivoParaHojeDe,
+    saldoPorDocumento,
+    faixaDoCliente,
+    estaNaSituacao,
+  ]);
+
   return (
     <div className="space-y-6">
       <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border p-6 shadow-sm">
@@ -1176,104 +1263,21 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
         </div>
       </div>
 
-      {!focusMode && (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border p-4 shadow-sm">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg text-green-600">
-              <TrendingUp className="w-4 h-4" />
-            </div>
-            <p className="text-sm font-medium text-gray-500">
-              Recuperação do Mês
-            </p>
-          </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-dark-text">
-            {formatCurrency(stats.totalReceived)}
-          </p>
-          {stats.hasGoal ? (
-            <div className="mt-4 space-y-2">
-              <div className="flex justify-between text-xs font-medium">
-                <span className="text-gray-500">
-                  Meta: {formatCurrency(stats.targetValue)}
-                </span>
-                <span className="text-indigo-600">
-                  {stats.progress.toFixed(1)}%
-                </span>
-              </div>
-              <div className="h-2 bg-gray-100 dark:bg-dark-bg-secondary rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-indigo-600"
-                  style={{ width: `${stats.progress}%` }}
-                />
-              </div>
-              <p className="text-xs text-gray-500">
-                {stats.remaining > 0
-                  ? `Faltam ${formatCurrency(stats.remaining)} para a meta`
-                  : "Meta atingida"}
-              </p>
-            </div>
-          ) : (
-            <p className="mt-4 text-xs text-gray-400">
-              Meta do mês ainda não definida pelo gestor.
-            </p>
-          )}
-        </div>
-        <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border p-4 shadow-sm">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-600">
-              <Users className="w-4 h-4" />
-            </div>
-            <p className="text-sm font-medium text-gray-500">
-              Total de Clientes
-            </p>
-          </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-dark-text">
-            {stats.totalClients}
-          </p>
-          {stats.clientesEmDia > 0 && (
-            <p className="text-[10px] text-gray-400 mt-1">
-              {stats.clientesEmDia} em dia (só parcelas a vencer)
-            </p>
-          )}
-        </div>
-        <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border p-4 shadow-sm">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg text-red-600">
-              <Zap className="w-4 h-4" />
-            </div>
-            <p className="text-sm font-medium text-gray-500">
-              Volume em Atraso
-            </p>
-          </div>
-          <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-            {formatCurrency(stats.totalPending)}
-          </p>
-          {stats.totalAVencer > 0.01 && (
-            <p className="text-[10px] text-gray-400 mt-1">
-              + {formatCurrency(stats.totalAVencer)} a vencer (ainda no prazo)
-            </p>
-          )}
-        </div>
-        <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border p-4 shadow-sm">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg text-purple-600">
-              <Target className="w-4 h-4" />
-            </div>
-            <p className="text-sm font-medium text-gray-500">Ticket Médio</p>
-          </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-dark-text">
-            {formatCurrency(
-              stats.totalClients > 0
-                ? stats.totalPending / stats.totalClients
-                : 0,
-            )}
-          </p>
-          <p className="text-[10px] text-gray-400 mt-1">
-            Volume em atraso ÷ clientes na carteira
-          </p>
-        </div>
-      </div>
+      {!focusMode && user?.id && (
+        <MeuDesempenho
+          userId={user.id}
+          myCollections={myCollections || []}
+          salePayments={salePayments}
+          metaMes={stats.targetValue}
+          versaoRegistros={versaoRegistros}
+          compromissos={painel.compromissos}
+          carteira={painel.carteira}
+          onFiltrar={filtrarPeloPainel}
+        />
       )}
+
+      {/* Alvo da rolagem quando um card do Meu desempenho aplica filtro. */}
+      <div ref={listaRef} className="scroll-mt-4" />
 
       <FilterBar
         filters={walletFilters}
@@ -1415,11 +1419,10 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
               total={walletFilteredGroups.length}
               opcoes={[
                 { key: "paraHoje", label: "Para hoje" },
-                { key: "semContato", label: "Sem contato" },
-                { key: "contatadosHoje", label: "Contatados hoje" },
+                { key: "atendidosHoje", label: "Atendidos hoje" },
                 {
-                  key: "contatadosAntes",
-                  label: `Contatados 1 a ${SEM_CONTATO_DIAS} dias atrás`,
+                  key: "semAtendimento",
+                  label: `Sem atendimento há ${SEM_CONTATO_DIAS} dias`,
                 },
               ].map((o) => ({
                 ...o,

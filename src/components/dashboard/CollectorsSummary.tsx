@@ -16,15 +16,9 @@ import {
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
-import { supabase } from "../../lib/supabase";
-import {
-  isCollectorType,
-  UserType,
-  CollectionAttempt,
-} from "../../types";
-import { isEffectiveAttemptResult } from "../../config/collectionAttempts";
-import { fetchAllRows } from "../../utils/fetchAllRows";
-import { comRetentativa } from "../../utils/supabaseRetry";
+import { isCollectorType, UserType } from "../../types";
+import { useAtendimentosPeriodo } from "../../hooks/useAtendimentosPeriodo";
+import SummaryCard from "../common/SummaryCard";
 import { USER_TYPE_LABELS, isWalletCollectorType } from "../../config/profiles";
 import {
   isVisitOverdue,
@@ -132,21 +126,6 @@ const TONE_AGENDA = "bg-gray-100/80 dark:bg-white/[0.07]";
 // independente de ter havido agendamento antes.
 const TONE_ATENDIMENTO = "bg-indigo-50/70 dark:bg-indigo-900/10";
 
-/** Atendimentos de um cobrador no periodo, contados por cliente. */
-interface AtendimentosCobrador {
-  /** Clientes diferentes com algum atendimento registrado. */
-  clientes: number;
-  /** Desses, com quantos houve conversa (contato efetivo). */
-  conversaram: number;
-}
-
-const ID_CHUNK = 300;
-const chunk = <T,>(arr: T[], size: number): T[][] => {
-  const out: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
-  return out;
-};
-
 // Atalhos do filtro de periodo. "Mes atual" e o padrao pedido pelo gestor —
 // cobre a pergunta mais comum sem exigir configuracao. "Tudo" remove o filtro
 // de periodo pra mostrar o total geral, sem recorte de data.
@@ -206,65 +185,6 @@ const SortTh: React.FC<{
     </span>
   </th>
 );
-
-/** Card da Visao geral: uma pergunta (titulo), a resposta em destaque e o
- * detalhe em linhas "rotulo ..... valor". */
-const SummaryCard: React.FC<{
-  icon: React.ElementType;
-  title: string;
-  value: string;
-  valueTone?: "neutral" | "red" | "green" | "blue";
-  caption?: string;
-  rows: { label: string; value: string; tone?: "red" | "amber" }[];
-}> = ({ icon: Icon, title, value, valueTone = "neutral", caption, rows }) => {
-  const valueClasses: Record<string, string> = {
-    neutral: "text-gray-900 dark:text-dark-text",
-    red: "text-red-600 dark:text-red-400",
-    green: "text-green-600 dark:text-green-400",
-    blue: "text-blue-600 dark:text-blue-400",
-  };
-  const rowClasses: Record<string, string> = {
-    red: "text-red-600 dark:text-red-400",
-    amber: "text-amber-600 dark:text-amber-400",
-  };
-  return (
-    <div className="min-w-0 rounded-xl border border-gray-100 dark:border-dark-border/40 bg-gray-50/60 dark:bg-dark-bg/30 px-4 py-3">
-      <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary">
-        <Icon className="h-4 w-4 flex-shrink-0" />
-        <span className="truncate">{title}</span>
-      </div>
-      <div
-        className={`mt-1 text-2xl font-bold truncate ${valueClasses[valueTone]}`}
-      >
-        {value}
-      </div>
-      {caption && (
-        <div className="text-[11px] text-gray-400 dark:text-dark-text-secondary truncate">
-          {caption}
-        </div>
-      )}
-      {rows.length > 0 && (
-        <div className="mt-2 pt-2 border-t border-gray-100 dark:border-dark-border/40 space-y-1">
-          {rows.map((r) => (
-            <div
-              key={r.label}
-              className="flex items-baseline justify-between gap-2 text-xs"
-            >
-              <span className="text-gray-500 dark:text-dark-text-secondary truncate">
-                {r.label}
-              </span>
-              <span
-                className={`font-semibold whitespace-nowrap ${r.tone ? rowClasses[r.tone] : "text-gray-700 dark:text-dark-text"}`}
-              >
-                {r.value}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
 
 const fmtNum = (n: number): string => n.toLocaleString("pt-BR");
 
@@ -389,11 +309,6 @@ const CollectorsSummary: React.FC = () => {
   // Sem isto, a coluna "Realizadas" (scheduled_visits) era o unico sinal de
   // trabalho do cobrador de carteira -- e ela so conta contato que estava
   // agendado, o que quase nunca acontece na Fila de Cobranca.
-  const [atendimentos, setAtendimentos] = useState<Map<
-    string,
-    AtendimentosCobrador
-  > | null>(null);
-  const [atendimentosErro, setAtendimentosErro] = useState(false);
   // Titulo -> documento ja conhecido no contexto (evita reconsultar
   // BANCO_DADOS); lido por ref para a busca nao rodar de novo a cada
   // recarga de `collections`.
@@ -407,93 +322,11 @@ const CollectorsSummary: React.FC = () => {
     });
   }, [collections]);
 
-  useEffect(() => {
-    let cancelled = false;
-    setAtendimentos(null);
-    setAtendimentosErro(false);
-    (async () => {
-      try {
-        const linhas = await fetchAllRows(
-          (from, to) =>
-            supabase
-              .from("collection_attempts")
-              .select("id, collector_id, collection_id, date, result")
-              // `date` e text YYYY-MM-DD (data do atendimento).
-              .gte("date", dateFrom)
-              .lte("date", dateTo)
-              .order("id")
-              .range(from, to),
-          () => cancelled,
-        );
-        if (cancelled) return;
-
-        // collection_attempts guarda o titulo, nao o cliente: resolve o
-        // documento dos titulos que o contexto nao tem (gestor so carrega os
-        // em aberto, e um atendimento pode ser de titulo ja quitado).
-        const docByParcela = docByParcelaRef.current;
-        const faltando = Array.from(
-          new Set(
-            linhas
-              .map((l) => l.collection_id)
-              .filter((id) => !docByParcela.has(id)),
-          ),
-        );
-        for (const ids of chunk(faltando, ID_CHUNK)) {
-          const { data, error } = await comRetentativa(() =>
-            supabase
-              .from("BANCO_DADOS")
-              .select("id_parcela, documento")
-              .in("id_parcela", ids.map(Number)),
-          );
-          if (error) throw error;
-          if (cancelled) return;
-          (data ?? []).forEach((r) => {
-            if (r.documento) docByParcela.set(String(r.id_parcela), r.documento);
-          });
-        }
-
-        // cobrador -> cliente -> conversou com ele em algum atendimento do
-        // periodo? Uma unidade so (cliente) para o gestor nao ter de
-        // comparar "atendimentos" com "clientes".
-        const porCobrador = new Map<string, Map<string, boolean>>();
-        linhas.forEach((l) => {
-          if (!l.collector_id) return;
-          // Sem documento (titulo apagado): o proprio titulo vira a chave,
-          // para nao sumir com o atendimento.
-          const cliente =
-            docByParcela.get(l.collection_id) ?? `t:${l.collection_id}`;
-          const conversou = isEffectiveAttemptResult(
-            l.result as CollectionAttempt["result"],
-          );
-          let clientes = porCobrador.get(l.collector_id);
-          if (!clientes) {
-            clientes = new Map();
-            porCobrador.set(l.collector_id, clientes);
-          }
-          clientes.set(cliente, (clientes.get(cliente) ?? false) || conversou);
-        });
-
-        const resultado = new Map<string, AtendimentosCobrador>();
-        porCobrador.forEach((clientes, collectorId) => {
-          let conversaram = 0;
-          clientes.forEach((c) => {
-            if (c) conversaram++;
-          });
-          resultado.set(collectorId, {
-            clientes: clientes.size,
-            conversaram,
-          });
-        });
-        if (!cancelled) setAtendimentos(resultado);
-      } catch (err) {
-        console.error("Erro ao buscar atendimentos do período:", err);
-        if (!cancelled) setAtendimentosErro(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [dateFrom, dateTo]);
+  const { atendimentos, erro: atendimentosErro } = useAtendimentosPeriodo(
+    dateFrom,
+    dateTo,
+    docByParcelaRef,
+  );
 
   const lastVisitStatus = useMemo(
     () => lastVisitStatusByClient(scheduledVisits),
