@@ -9,9 +9,7 @@ import {
   User,
   Edit,
   CreditCard,
-  Info,
   AlertTriangle,
-  Receipt,
   Phone,
   MessageCircle,
   Clock,
@@ -19,6 +17,7 @@ import {
   History,
   PhoneCall,
   Handshake,
+  MoreHorizontal,
 } from "lucide-react";
 import {
   ClientGroup,
@@ -37,7 +36,9 @@ import {
   rescheduleReasonLabel,
 } from "../../config/rescheduleReasons";
 import { isForaDaCobranca, seloForaDaCobranca } from "../../types/status";
+import { abrirWhatsApp } from "../../utils/whatsapp";
 import {
+  clientBalanceSplit,
   clientMaxOverdueDays,
   hasInstallmentBalance,
   round2,
@@ -232,6 +233,24 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     cadastroErp?.contato_telefone,
     cadastroErp?.contato_telefone2,
   ].filter((t): t is string => Boolean(t?.trim()));
+  // Telefones do cabecalho (Ligar/WhatsApp sem sair da ficha): celular e
+  // fixo do cliente, depois os da pessoa de contato do Ciclone. Sem repetir
+  // o mesmo numero.
+  const telefonesCabecalho: { numero: string; rotulo?: string }[] = [];
+  {
+    const vistos = new Set<string>();
+    const add = (numero: string | null | undefined, rotulo?: string) => {
+      const digitos = (numero ?? "").replace(/\D/g, "");
+      if (!digitos || vistos.has(digitos)) return;
+      vistos.add(digitos);
+      telefonesCabecalho.push({ numero: (numero ?? "").trim(), rotulo });
+    };
+    add(clientGroup.mobile);
+    add(clientGroup.phone);
+    telefonesContato.forEach((t) =>
+      add(t, cadastroErp?.contato_nome?.trim() || "Contato"),
+    );
+  }
   const codigoErp = cadastroErp?.codigo_cliente_erp?.trim() || undefined;
   const temDadosErp = Boolean(
     codigoErp ||
@@ -616,6 +635,12 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     { document: clientGroup.document, sales: clientSales },
     acordoAtivoOverdueMap,
   );
+  // Vencido x a vencer do cabecalho: mesma regra da carteira (item 34).
+  const saldoCliente = clientBalanceSplit(
+    { document: clientGroup.document, sales: clientSales },
+    acordoAtivoOverdueMap,
+  );
+  const [menuMaisAberto, setMenuMaisAberto] = useState(false);
 
   // Saldo de cada venda calculado UMA vez e reaproveitado (pendencia, abas e
   // lista). Antes era recalculado em cada uso e a cada clique no modal.
@@ -901,102 +926,139 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   return (
     <>
       <div
-        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[100] backdrop-blur-sm"
+        className="fixed inset-0 bg-black bg-opacity-50 flex items-stretch sm:items-center justify-center sm:p-4 z-[100] backdrop-blur-sm"
         onClick={(e) => {
           if (e.target === e.currentTarget) {
             onClose();
           }
         }}
       >
-        <div className="bg-white rounded-2xl max-w-6xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden shadow-2xl">
-          {/* Header */}
-          <div className="relative px-4 py-4 border-b border-gray-200 sm:flex sm:items-center sm:justify-between">
-            <div className="flex items-center pr-8 sm:pr-0">
-              <User className="h-6 w-6 text-blue-600 mr-3 flex-shrink-0" />
-              <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-medium text-gray-600">
-                  Detalhes do Cliente
-                </h3>
-                <h2 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
-                  {clientGroup.client}
-                </h2>
-                {razaoSocial && (
-                  <p
-                    className="text-xs sm:text-sm text-gray-700 truncate"
-                    title={`Razão social: ${razaoSocial}`}
-                  >
-                    {razaoSocial}
-                  </p>
-                )}
-                <p className="text-xs sm:text-sm text-gray-500 truncate">
-                  {clientGroup.document}
-                  {codigoErp && (
-                    <span title="Código do cliente no Ciclone">
-                      {" "}
-                      · Cód. Ciclone {codigoErp}
-                    </span>
-                  )}
-                </p>
-              </div>
-            </div>
+        {/* Celular: tela cheia. Computador: janela de ate 90% da altura. Uma
+            area de rolagem so (o conteudo da aba), o resto fica fixo. */}
+        <div className="bg-white sm:rounded-2xl max-w-6xl w-full h-full sm:h-auto sm:max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+          {/* Cabecalho: quem e o cliente, como falar com ele e quanto deve */}
+          <div className="relative px-4 lg:px-6 pt-4 pb-3 border-b border-gray-200 shrink-0">
             <button
               id="close-modal"
               name="closeModal"
               onClick={onClose}
-              className="absolute top-3 right-3 p-2 text-gray-500 hover:text-gray-800 sm:static sm:p-2 sm:ml-4 rounded-full hover:bg-gray-100 transition-colors"
+              className="absolute top-3 right-3 p-2 text-gray-500 hover:text-gray-800 rounded-full hover:bg-gray-100 transition-colors"
               aria-label="Fechar modal"
             >
               <X className="h-5 w-5" />
             </button>
-          </div>
-
-          {/* Action Buttons */}
-
-          {/* Todo perfil de cobranca precisa consultar dados/vendas e registrar
-              recebimento na propria carteira — Terceirizado e Juridico ficavam
-              de fora por omissao de quando esses perfis foram criados. */}
-          {/* Atender e acordo (gestor escolhe em nome de quem) */}
-          {podeAtender && (hasRealPendingValue || acordoAtivo) && (
-            <div className="mt-4 mx-4 lg:mx-6 p-3 rounded-2xl border border-indigo-100 bg-indigo-50/50 dark:bg-indigo-900/10 dark:border-indigo-900/30 flex flex-col lg:flex-row lg:items-center gap-3">
-              <div className="flex-1 min-w-0 text-xs text-gray-600 dark:text-dark-text-secondary">
-                {!souGestor ? (
-                  <span>Registrar contato ou negociar com este cliente.</span>
-                ) : cobradorDaCarteira ? (
-                  <label className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-gray-700 dark:text-dark-text">
-                      Registrar em nome de:
-                    </span>
-                    <select
-                      value={emNomeDoCobrador ? "cobrador" : "eu"}
-                      onChange={(e) =>
-                        setEmNomeDoCobrador(e.target.value === "cobrador")
-                      }
-                      className="px-2 py-1.5 rounded-lg border border-gray-200 bg-white text-xs dark:bg-dark-bg dark:border-dark-border dark:text-dark-text"
-                    >
-                      <option value="cobrador">
-                        {cobradorDaCarteira.name} (
-                        {USER_TYPE_LABELS[cobradorDaCarteira.type] ?? "cobrador"}, dono da carteira)
-                      </option>
-                      <option value="eu">Eu ({user?.name ?? "gestor"})</option>
-                    </select>
-                    <span className="w-full text-[11px] text-gray-500">
-                      {emNomeDoCobrador
-                        ? "Conta para o cobrador e o próximo contato vai para a agenda dele. Fica registrado que foi você."
-                        : "Conta para você e o próximo contato fica na sua agenda."}
-                      {emNomeDoCobrador && !acordoEmNomeDe
-                        ? " Acordo de cobrador de visita fica no seu nome."
-                        : ""}
-                    </span>
-                  </label>
-                ) : (
-                  <span>
-                    Cliente sem cobrador de carteira definido: o registro fica
-                    no seu nome.
+            <div className="pr-10 min-w-0">
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
+                {clientGroup.client}
+              </h2>
+              <p className="text-xs sm:text-sm text-gray-500 truncate">
+                {razaoSocial && (
+                  <span title={`Razão social: ${razaoSocial}`}>
+                    {razaoSocial} ·{" "}
                   </span>
                 )}
+                {clientGroup.document}
+                {codigoErp && (
+                  <span title="Código do cliente no Ciclone">
+                    {" "}
+                    · Cód. Ciclone {codigoErp}
+                  </span>
+                )}
+              </p>
+            </div>
+
+            {telefonesCabecalho.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
+                {telefonesCabecalho.map((tel) => (
+                  <div
+                    key={tel.numero}
+                    className="flex items-center gap-1.5 text-sm text-gray-700"
+                  >
+                    {tel.rotulo && (
+                      <span className="text-xs text-gray-500">
+                        {tel.rotulo}:
+                      </span>
+                    )}
+                    <span className="tabular-nums">{tel.numero}</span>
+                    <a
+                      href={`tel:${tel.numero.replace(/[^\d+]/g, "")}`}
+                      className="p-1 rounded-md text-blue-600 hover:bg-blue-50"
+                      title="Ligar"
+                      aria-label={`Ligar para ${tel.numero}`}
+                    >
+                      <Phone className="h-4 w-4" />
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => abrirWhatsApp(tel.numero)}
+                      className="p-1 rounded-md text-emerald-600 hover:bg-emerald-50"
+                      title="Abrir conversa no WhatsApp"
+                      aria-label={`WhatsApp de ${tel.numero}`}
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
               </div>
-              <div className="flex gap-2 shrink-0">
-                {hasRealPendingValue && (
+            )}
+
+            {/* Quanto deve: mesma regra da carteira (vencido x a vencer; com
+                acordo ativo, as parcelas do acordo). */}
+            <p className="mt-2 text-sm text-gray-700 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+              {hasRealPendingValue || acordoAtivo ? (
+                <>
+                  <span>
+                    Vencido{" "}
+                    <strong
+                      className={
+                        saldoCliente.vencido > 0.01
+                          ? "text-red-600"
+                          : "text-gray-900"
+                      }
+                    >
+                      {formatCurrency(saldoCliente.vencido)}
+                    </strong>
+                  </span>
+                  <span className="text-gray-300">|</span>
+                  <span>
+                    A vencer{" "}
+                    <strong className="text-gray-900">
+                      {formatCurrency(saldoCliente.aVencer)}
+                    </strong>
+                  </span>
+                  {atrasoCliente > 0 && (
+                    <>
+                      <span className="text-gray-300">|</span>
+                      <span
+                        className="text-red-600"
+                        title={`${atrasoCliente} dia${atrasoCliente !== 1 ? "s" : ""} de atraso`}
+                      >
+                        Maior atraso{" "}
+                        <strong>
+                          {atrasoCliente} dia{atrasoCliente !== 1 ? "s" : ""}
+                        </strong>
+                      </span>
+                    </>
+                  )}
+                </>
+              ) : (
+                <span className="text-emerald-700 font-medium">
+                  Sem saldo em aberto
+                </span>
+              )}
+            </p>
+            {acordoAtivo && (
+              <p className="mt-1 text-xs text-amber-700">
+                Cliente em acordo: valores e atraso seguem as parcelas do
+                acordo, não o vencimento original dos títulos.
+              </p>
+            )}
+
+            {/* Acoes. Atender e Receber pagamento sao o dia a dia; Acordo ao
+                lado; Editar pagamentos (rara, pede autorizacao) no menu. */}
+            {(podeAtender || isCollectorType(userType) || souGestor) && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {podeAtender && hasRealPendingValue && (
                   <button
                     type="button"
                     onClick={() => setIsAtenderOpen(true)}
@@ -1007,131 +1069,172 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                     Atender
                   </button>
                 )}
-                {acordoAtivo ? (
-                  <button
-                    type="button"
-                    onClick={() => setAcordoDetalheId(acordoAtivo.id)}
-                    className="flex items-center gap-2 px-3 py-2 bg-amber-600 text-white rounded-xl hover:bg-amber-700 text-sm font-medium shadow-sm"
-                    title="Ver o acordo ativo, registrar pagamento de parcela"
-                  >
-                    <Handshake className="h-4 w-4" />
-                    Ver acordo
-                  </button>
-                ) : (
+                {(isCollectorType(userType) || souGestor) &&
                   hasRealPendingValue && (
                     <button
+                      id="distribute-payment"
+                      name="distributePayment"
                       type="button"
-                      onClick={() => setIsAcordoOpen(true)}
-                      className="flex items-center gap-2 px-3 py-2 bg-amber-600 text-white rounded-xl hover:bg-amber-700 text-sm font-medium shadow-sm"
-                      title="Negociar a dívida em parcelas"
+                      onClick={() => {
+                        if (getAcordoAtivoDoCliente(clientGroup.document)) {
+                          setShowAcordoAtivoConfirm(true);
+                        } else {
+                          setIsGeneralPaymentModalOpen(true);
+                        }
+                      }}
+                      className="flex items-center gap-2 px-3 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 text-sm font-medium shadow-sm"
+                      title="Lançar o valor recebido; o sistema distribui entre as parcelas"
+                    >
+                      <CreditCard className="h-4 w-4" />
+                      Receber pagamento
+                    </button>
+                  )}
+                {podeAtender &&
+                  (acordoAtivo ? (
+                    <button
+                      type="button"
+                      onClick={() => setAcordoDetalheId(acordoAtivo.id)}
+                      className="flex items-center gap-2 px-3 py-2 border border-amber-300 text-amber-800 bg-amber-50 rounded-xl hover:bg-amber-100 text-sm font-medium"
+                      title="Ver o acordo ativo, registrar pagamento de parcela"
                     >
                       <Handshake className="h-4 w-4" />
-                      Fazer acordo
+                      Ver acordo
                     </button>
-                  )
+                  ) : (
+                    hasRealPendingValue && (
+                      <button
+                        type="button"
+                        onClick={() => setIsAcordoOpen(true)}
+                        className="flex items-center gap-2 px-3 py-2 border border-amber-300 text-amber-800 bg-amber-50 rounded-xl hover:bg-amber-100 text-sm font-medium"
+                        title="Negociar a dívida em parcelas"
+                      >
+                        <Handshake className="h-4 w-4" />
+                        Fazer acordo
+                      </button>
+                    )
+                  ))}
+                {(isCollectorType(userType) || souGestor) &&
+                  clientSales.some((sale) => sale.totalReceived > 0) && (
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setMenuMaisAberto((v) => !v)}
+                        className="p-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50"
+                        title="Mais ações"
+                        aria-label="Mais ações"
+                        aria-expanded={menuMaisAberto}
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </button>
+                      {menuMaisAberto && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-10"
+                            onClick={() => setMenuMaisAberto(false)}
+                          />
+                          <div className="absolute left-0 sm:left-auto sm:right-0 mt-1 z-20 w-56 bg-white border border-gray-200 rounded-xl shadow-lg py-1">
+                            <button
+                              id="edit-payments"
+                              name="editPayments"
+                              type="button"
+                              onClick={() => {
+                                setMenuMaisAberto(false);
+                                handleEditPaymentClick();
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left"
+                            >
+                              <Edit className="h-4 w-4 text-gray-500" />
+                              {souGestor
+                                ? "Editar pagamentos"
+                                : "Editar pagamentos (pede autorização)"}
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+              </div>
+            )}
+
+            {/* Gestor: em nome de quem fica o registro */}
+            {souGestor && (hasRealPendingValue || acordoAtivo) && (
+              <div className="mt-2 text-xs text-gray-600">
+                {cobradorDaCarteira ? (
+                  <label className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="font-medium text-gray-700">
+                      Registrar em nome de:
+                    </span>
+                    <select
+                      value={emNomeDoCobrador ? "cobrador" : "eu"}
+                      onChange={(e) =>
+                        setEmNomeDoCobrador(e.target.value === "cobrador")
+                      }
+                      className="px-2 py-1 rounded-lg border border-gray-200 bg-white text-xs"
+                    >
+                      <option value="cobrador">
+                        {cobradorDaCarteira.name} (
+                        {USER_TYPE_LABELS[cobradorDaCarteira.type] ?? "cobrador"}, dono da carteira)
+                      </option>
+                      <option value="eu">Eu ({user?.name ?? "gestor"})</option>
+                    </select>
+                    <span className="text-[11px] text-gray-500">
+                      {emNomeDoCobrador
+                        ? "Conta para o cobrador e o próximo contato vai para a agenda dele; fica registrado que foi você."
+                        : "Conta para você e o próximo contato fica na sua agenda."}
+                      {emNomeDoCobrador && !acordoEmNomeDe
+                        ? " Acordo de cobrador de visita fica no seu nome."
+                        : ""}
+                    </span>
+                  </label>
+                ) : (
+                  <span className="text-[11px] text-gray-500">
+                    Cliente sem cobrador de carteira definido: o registro fica
+                    no seu nome.
+                  </span>
                 )}
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
-          {(isCollectorType(userType) || userType === "manager") && (
-            <div
-              className="mt-4 px-4 lg:px-6 py-0 grid grid-cols-2 gap-3 sm:grid-cols-5"
-            >
-              <button
-                id="view-client-data"
-                name="viewClientData"
-                onClick={() => setView("dados")}
-                className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm"
-                title="Ver todos os dados de cadastro do cliente"
-              >
-                <Info className="h-5 w-5 mr-2" />
-                <span className="text-xs sm:text-sm">
-                  <span className="sm:hidden">Dados</span>
-                  <span className="hidden sm:inline">Ver Dados</span>
-                </span>
-              </button>
-              <button
-                id="view-client-sales"
-                name="viewClientSales"
-                onClick={() => setView("vendas")}
-                className="flex items-center px-3 py-2 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition-colors text-sm font-medium shadow-sm"
-                title="Ver vendas do cliente"
-              >
-                <Receipt className="h-5 w-5 mr-2" />
-                <span className="text-xs sm:text-sm">
-                  <span className="sm:hidden">Vendas</span>
-                  <span className="hidden sm:inline">Ver Vendas</span>
-                </span>
-              </button>
-              {/* Historico para todos: contatos, visitas, reagendamentos e
-                  baixas. A linha do tempo da carteira (quem teve o cliente e
-                  quem transferiu) so aparece para o gestor -- e o banco so a
-                  entrega para ele (migration 20261109000007). */}
-              <button
-                id="view-client-history"
-                name="viewClientHistory"
-                onClick={() => setView("historico")}
-                className="flex items-center px-3 py-2 bg-slate-700 text-white rounded-2xl hover:bg-slate-800 transition-colors text-sm font-medium shadow-sm"
-                title={
+          {/* Abas: navegacao, nao acao */}
+          <div
+            role="tablist"
+            className="flex gap-1 px-4 lg:px-6 border-b border-gray-200 shrink-0 overflow-x-auto"
+          >
+            {(
+              [
+                ["vendas", `Vendas (${clientSales.length})`, "Vendas e parcelas do cliente"],
+                [
+                  "historico",
+                  "Histórico",
                   userType === "manager"
                     ? "Contatos, visitas, baixas e quem teve o cliente na carteira"
-                    : "Contatos, visitas e baixas do cliente"
-                }
+                    : "Contatos, visitas e baixas do cliente",
+                ],
+                ["dados", "Cadastro", "Dados de cadastro e endereços"],
+              ] as const
+            ).map(([aba, rotulo, dica]) => (
+              <button
+                key={aba}
+                type="button"
+                role="tab"
+                aria-selected={view === aba}
+                onClick={() => setView(aba)}
+                title={dica}
+                className={`px-3 py-2.5 -mb-px border-b-2 text-sm font-medium whitespace-nowrap transition-colors ${
+                  view === aba
+                    ? "border-indigo-600 text-indigo-700"
+                    : "border-transparent text-gray-500 hover:text-gray-800"
+                }`}
               >
-                <History className="h-5 w-5 mr-2" />
-                <span className="text-xs sm:text-sm">Histórico</span>
+                {rotulo}
               </button>
-              {hasRealPendingValue && (
-                <button
-                  id="distribute-payment"
-                  name="distributePayment"
-                  onClick={() => {
-                    if (getAcordoAtivoDoCliente(clientGroup.document)) {
-                      setShowAcordoAtivoConfirm(true);
-                    } else {
-                      setIsGeneralPaymentModalOpen(true);
-                    }
-                  }}
-                  className="flex items-center px-3 py-2 bg-emerald-600 text-white rounded-2xl hover:bg-emerald-700 transition-colors text-sm font-medium shadow-sm"
-                  title="Distribuir pagamento entre parcelas"
-                >
-                  <CreditCard className="h-5 w-5 mr-2" />
-                  <span className="text-xs sm:text-sm">
-                    <span className="sm:hidden">Distribuir</span>
-                    <span className="hidden sm:inline">
-                      Distribuir Pagamento
-                    </span>
-                  </span>
-                </button>
-              )}
-
-              {clientSales.reduce((sum, sale) => sum + sale.totalReceived, 0) >
-                0 && (
-                <button
-                  id="edit-payments"
-                  name="editPayments"
-                  onClick={handleEditPaymentClick}
-                  className="flex items-center px-3 py-2 bg-purple-600 text-white rounded-2xl hover:bg-purple-700 transition-colors text-sm font-medium shadow-sm"
-                  title={
-                    userType === "manager"
-                      ? "Editar valores recebidos"
-                      : "Solicitar autorização para editar pagamentos"
-                  }
-                >
-                  <Edit className="h-5 w-5 mr-2" />
-                  <span className="text-xs sm:text-sm">
-                    <span className="sm:hidden">Editar</span>
-                    <span className="hidden sm:inline">Editar Pagamentos</span>
-                  </span>
-                </button>
-              )}
-            </div>
-          )}
+            ))}
+          </div>
 
           {/* Sales and Collections, Client Data or History */}
           {view === "historico" ? (
-            <div className="overflow-y-auto max-h-[60vh] p-4 lg:p-6">
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 lg:p-6">
               <div className="space-y-8">
                 {/* Histórico de Contatos (collection_attempts) -- ligação,
                     WhatsApp, mensagem registrados pelo cobrador de carteira.
@@ -1312,7 +1415,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
               </div>
             </div>
           ) : view === "dados" ? (
-            <div className="overflow-y-auto max-h-[60vh] p-4 lg:p-6">
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 lg:p-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Column 1: Basic and Contact Info */}
                 <div className="space-y-4">
@@ -1516,42 +1619,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
               </div>
             </div>
           ) : (
-            <div className="overflow-y-auto max-h-[60vh]">
+            <div className="flex-1 min-h-0 overflow-y-auto">
               <div className="px-4 lg:px-6 py-4">
-                <h3 className="text-sm sm:text-lg font-medium text-gray-900 mb-4">
-                  Vendas ({clientSales.length} venda
-                  {clientSales.length !== 1 ? "s" : ""})
-                </h3>
-
-                {hasRealPendingValue && (
-                  <div
-                    className={`mb-4 px-3 py-2 rounded-xl border text-xs flex flex-wrap items-center gap-x-2 gap-y-1 ${
-                      atrasoCliente > 0
-                        ? "bg-red-50 border-red-200 text-red-700"
-                        : "bg-gray-50 border-gray-200 text-gray-600"
-                    }`}
-                  >
-                    <Clock className="h-3.5 w-3.5 shrink-0" />
-                    <span>
-                      {atrasoCliente > 0 ? (
-                        <>
-                          Maior atraso:{" "}
-                          <strong>{formatDaysOverdue(atrasoCliente)}</strong> (
-                          {atrasoCliente} dia{atrasoCliente !== 1 ? "s" : ""})
-                        </>
-                      ) : (
-                        "Sem parcela vencida em aberto"
-                      )}
-                    </span>
-                    {acordoAtivo && (
-                      <span className="text-gray-600">
-                        · cliente em acordo: o atraso segue as parcelas do
-                        acordo, não o vencimento original dos títulos abaixo
-                      </span>
-                    )}
-                  </div>
-                )}
-
                 {/* Abas: Todos | Em aberto | Pagos */}
                 <div
                   role="tablist"
