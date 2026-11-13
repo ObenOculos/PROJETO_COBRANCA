@@ -19,6 +19,10 @@ import {
   imprimir,
 } from "./conferenciaRelatorio";
 import { useCollection } from "../../contexts/CollectionContext";
+import { useAuth } from "../../contexts/AuthContext";
+import { ClientGroup } from "../../types";
+import ClientDetailModal from "./ClientDetailModal";
+import ConferenciaDetalhe from "./ConferenciaDetalhe";
 import { supabase } from "../../lib/supabase";
 import { fetchAllRows } from "../../utils/fetchAllRows";
 import { formatCurrency } from "../../utils/formatters";
@@ -109,26 +113,24 @@ const SITUACAO_TONE: Record<ConferenciaSituacao, string> = {
 };
 
 // Card de grupo: borda/numero quando selecionado e quando nao.
-const GRUPO_TONE: Record<
-  ConferenciaGrupo,
-  { ativo: string; numero: string }
-> = {
-  acao: {
-    ativo:
-      "border-red-300 bg-red-50 ring-1 ring-red-200 dark:border-red-700 dark:bg-red-900/20 dark:ring-red-800/50",
-    numero: "text-red-600 dark:text-red-400",
-  },
-  juros: {
-    ativo:
-      "border-blue-300 bg-blue-50 ring-1 ring-blue-200 dark:border-blue-700 dark:bg-blue-900/20 dark:ring-blue-800/50",
-    numero: "text-blue-600 dark:text-blue-400",
-  },
-  confere: {
-    ativo:
-      "border-green-300 bg-green-50 ring-1 ring-green-200 dark:border-green-700 dark:bg-green-900/20 dark:ring-green-800/50",
-    numero: "text-green-600 dark:text-green-400",
-  },
-};
+const GRUPO_TONE: Record<ConferenciaGrupo, { ativo: string; numero: string }> =
+  {
+    acao: {
+      ativo:
+        "border-red-300 bg-red-50 ring-1 ring-red-200 dark:border-red-700 dark:bg-red-900/20 dark:ring-red-800/50",
+      numero: "text-red-600 dark:text-red-400",
+    },
+    juros: {
+      ativo:
+        "border-blue-300 bg-blue-50 ring-1 ring-blue-200 dark:border-blue-700 dark:bg-blue-900/20 dark:ring-blue-800/50",
+      numero: "text-blue-600 dark:text-blue-400",
+    },
+    confere: {
+      ativo:
+        "border-green-300 bg-green-50 ring-1 ring-green-200 dark:border-green-700 dark:bg-green-900/20 dark:ring-green-800/50",
+      numero: "text-green-600 dark:text-green-400",
+    },
+  };
 
 const POR_PAGINA = 50;
 
@@ -152,7 +154,10 @@ const limitesDoMes = (mes: string): { inicio: string; fim: string } => {
   const [y, m] = mes.split("-").map(Number);
   const ultimo = new Date(Date.UTC(y, m, 0)).getUTCDate();
   const mm = String(m).padStart(2, "0");
-  return { inicio: `${y}-${mm}-01`, fim: `${y}-${mm}-${String(ultimo).padStart(2, "0")}` };
+  return {
+    inicio: `${y}-${mm}-01`,
+    fim: `${y}-${mm}-${String(ultimo).padStart(2, "0")}`,
+  };
 };
 
 const somarMes = (mes: string, delta: number): string => {
@@ -176,7 +181,9 @@ const normalizar = (s: string): string =>
 
 const Diferenca: React.FC<{ valor: number }> = ({ valor }) => {
   if (Math.abs(valor) < 0.005)
-    return <span className="text-gray-400 dark:text-dark-text-secondary">—</span>;
+    return (
+      <span className="text-gray-400 dark:text-dark-text-secondary">—</span>
+    );
   return (
     <span
       className={
@@ -192,7 +199,11 @@ const Diferenca: React.FC<{ valor: number }> = ({ valor }) => {
 };
 
 const ConferenciaRecebimentos: React.FC = () => {
-  const { users } = useCollection();
+  const { users, getClientGroups } = useCollection();
+  const { user } = useAuth();
+  // Linha com o detalhe aberto (chave da linha) e Ficha aberta.
+  const [aberta, setAberta] = useState<string | null>(null);
+  const [ficha, setFicha] = useState<ClientGroup | null>(null);
   const [mes, setMes] = useState(() => todayLocalStr().slice(0, 7));
   const [linhas, setLinhas] = useState<LinhaRpc[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -340,7 +351,9 @@ const ConferenciaRecebimentos: React.FC = () => {
   // Clientes do cobrador escolhido (ou de todos) que passam na busca.
   const escopo = useMemo<LinhaCliente[]>(() => {
     const base =
-      grupoAtual != null ? grupoAtual.clientes : grupos.flatMap((g) => g.clientes);
+      grupoAtual != null
+        ? grupoAtual.clientes
+        : grupos.flatMap((g) => g.clientes);
     const termo = busca.trim();
     if (!termo) return base;
     const digitos = termo.replace(/\D/g, "");
@@ -348,7 +361,8 @@ const ConferenciaRecebimentos: React.FC = () => {
     return base.filter(
       (c) =>
         normalizar(c.cliente).includes(texto) ||
-        (digitos.length >= 3 && c.documento.replace(/\D/g, "").includes(digitos)),
+        (digitos.length >= 3 &&
+          c.documento.replace(/\D/g, "").includes(digitos)),
     );
   }, [grupos, grupoAtual, busca]);
 
@@ -357,7 +371,10 @@ const ConferenciaRecebimentos: React.FC = () => {
       base: 0,
       app: 0,
       cedrus: 0,
-      porGrupo: { acao: 0, juros: 0, confere: 0 } as Record<ConferenciaGrupo, number>,
+      porGrupo: { acao: 0, juros: 0, confere: 0 } as Record<
+        ConferenciaGrupo,
+        number
+      >,
       porSituacao: {
         confere: 0,
         sem_registro_app: 0,
@@ -387,7 +404,8 @@ const ConferenciaRecebimentos: React.FC = () => {
       .sort(
         (a, b) =>
           SITUACOES.indexOf(a.situacao) - SITUACOES.indexOf(b.situacao) ||
-          Math.abs(b.appValor - b.baseValor) - Math.abs(a.appValor - a.baseValor),
+          Math.abs(b.appValor - b.baseValor) -
+            Math.abs(a.appValor - a.baseValor),
       );
   }, [escopo, grupoFiltro, situacaoFiltro]);
 
@@ -441,6 +459,12 @@ const ConferenciaRecebimentos: React.FC = () => {
       })),
       arquivo: `Conferencia_Recebimentos_${mes}${grupoAtual ? `_${grupoAtual.nome.replace(/[^\p{L}\p{N}]+/gu, "_")}` : ""}`,
     };
+  };
+
+  // Ficha do cliente pelo documento; null se o cliente nao esta carregado.
+  const fichaDe = (documento: string): (() => void) | null => {
+    const grupo = getClientGroups().find((g) => g.document === documento);
+    return grupo ? () => setFicha(grupo) : null;
   };
 
   const pendenciasTotal = grupos.reduce((s, g) => s + g.pendencias, 0);
@@ -705,9 +729,7 @@ const ConferenciaRecebimentos: React.FC = () => {
                       : "border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/40"
                   }`}
                 >
-                  <div
-                    className={`text-xl font-bold ${GRUPO_TONE[gr].numero}`}
-                  >
+                  <div className={`text-xl font-bold ${GRUPO_TONE[gr].numero}`}>
                     {resumo.porGrupo[gr]}
                   </div>
                   <div className="text-xs font-medium text-gray-600 dark:text-dark-text-secondary">
@@ -815,62 +837,87 @@ const ConferenciaRecebimentos: React.FC = () => {
                 <tbody>
                   {listaPagina.map((c) => {
                     const outraCarteira = carteiraDeOutro(c);
+                    const expandida = aberta === c.chave;
                     return (
-                      <tr
-                        key={c.chave}
-                        className="border-t border-gray-100 dark:border-dark-border/40 hover:bg-gray-50/60 dark:hover:bg-dark-bg/30"
-                      >
-                        <td className="px-4 lg:px-5 py-2">
-                          <div className="font-medium text-gray-900 dark:text-dark-text">
-                            {c.cliente}
-                          </div>
-                          <div className="text-[11px] text-gray-400 dark:text-dark-text-secondary">
-                            {c.documento}
-                            {outraCarteira && ` · carteira: ${outraCarteira}`}
-                          </div>
-                        </td>
-                        {cobradorAtual === null && (
-                          <td className="px-3 py-2 whitespace-nowrap text-gray-600 dark:text-dark-text-secondary">
-                            {c.cobradorNome}
+                      <React.Fragment key={c.chave}>
+                        <tr
+                          onClick={() => setAberta(expandida ? null : c.chave)}
+                          className={`cursor-pointer border-t border-gray-100 dark:border-dark-border/40 ${expandida ? "bg-blue-50/50 dark:bg-blue-900/10" : "hover:bg-gray-50/60 dark:hover:bg-dark-bg/30"}`}
+                          title="Ver parcelas baixadas e lançamentos do app"
+                        >
+                          <td className="px-4 lg:px-5 py-2">
+                            <div className="flex items-center gap-1 font-medium text-gray-900 dark:text-dark-text">
+                              <ChevronDown
+                                className={`h-3.5 w-3.5 flex-shrink-0 text-gray-400 transition-transform ${expandida ? "" : "-rotate-90"}`}
+                              />
+                              {c.cliente}
+                            </div>
+                            <div className="text-[11px] text-gray-400 dark:text-dark-text-secondary">
+                              {c.documento}
+                              {outraCarteira && ` · carteira: ${outraCarteira}`}
+                            </div>
                           </td>
+                          {cobradorAtual === null && (
+                            <td className="px-3 py-2 whitespace-nowrap text-gray-600 dark:text-dark-text-secondary">
+                              {c.cobradorNome}
+                            </td>
+                          )}
+                          <td className="px-3 py-2">
+                            <span
+                              title={CONFERENCIA_SITUACAO_DICA[c.situacao]}
+                              className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ${SITUACAO_TONE[c.situacao]}`}
+                            >
+                              {CONFERENCIA_SITUACAO_LABEL[c.situacao]}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-right whitespace-nowrap text-gray-700 dark:text-dark-text">
+                            {c.baseParcelas > 0 ? (
+                              <>
+                                {formatCurrency(c.baseValor)}
+                                <div className="text-[11px] text-gray-400">
+                                  {c.baseParcelas} parcela(s)
+                                </div>
+                              </>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-right whitespace-nowrap text-gray-700 dark:text-dark-text">
+                            {c.appLancamentos > 0 ? (
+                              <>
+                                {formatCurrency(c.appValor)}
+                                <div className="text-[11px] text-gray-400">
+                                  {c.appLancamentos} lançamento(s)
+                                  {c.appCedrus !== 0 && " · Cedrus"}
+                                </div>
+                              </>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                          <td className="px-4 lg:px-5 py-2 text-right whitespace-nowrap font-medium">
+                            <Diferenca valor={c.appValor - c.baseValor} />
+                          </td>
+                        </tr>
+                        {expandida && (
+                          <tr>
+                            <td
+                              colSpan={cobradorAtual === null ? 6 : 5}
+                              className="px-4 lg:px-5 pb-4 pt-1 bg-blue-50/50 dark:bg-blue-900/10"
+                            >
+                              <ConferenciaDetalhe
+                                documento={c.documento}
+                                cobradorId={c.cobradorId}
+                                visao={visao}
+                                inicio={limitesDoMes(mes).inicio}
+                                fim={limitesDoMes(mes).fim}
+                                nomePorId={nomePorId}
+                                onAbrirFicha={fichaDe(c.documento)}
+                              />
+                            </td>
+                          </tr>
                         )}
-                        <td className="px-3 py-2">
-                          <span
-                            title={CONFERENCIA_SITUACAO_DICA[c.situacao]}
-                            className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ${SITUACAO_TONE[c.situacao]}`}
-                          >
-                            {CONFERENCIA_SITUACAO_LABEL[c.situacao]}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-right whitespace-nowrap text-gray-700 dark:text-dark-text">
-                          {c.baseParcelas > 0 ? (
-                            <>
-                              {formatCurrency(c.baseValor)}
-                              <div className="text-[11px] text-gray-400">
-                                {c.baseParcelas} parcela(s)
-                              </div>
-                            </>
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-right whitespace-nowrap text-gray-700 dark:text-dark-text">
-                          {c.appLancamentos > 0 ? (
-                            <>
-                              {formatCurrency(c.appValor)}
-                              <div className="text-[11px] text-gray-400">
-                                {c.appLancamentos} lançamento(s)
-                                {c.appCedrus !== 0 && " · Cedrus"}
-                              </div>
-                            </>
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-                        <td className="px-4 lg:px-5 py-2 text-right whitespace-nowrap font-medium">
-                          <Diferenca valor={c.appValor - c.baseValor} />
-                        </td>
-                      </tr>
+                      </React.Fragment>
                     );
                   })}
                 </tbody>
@@ -910,6 +957,14 @@ const ConferenciaRecebimentos: React.FC = () => {
             </div>
           )}
         </>
+      )}
+
+      {ficha && (
+        <ClientDetailModal
+          clientGroup={ficha}
+          userType={user?.type || "manager"}
+          onClose={() => setFicha(null)}
+        />
       )}
     </div>
   );
