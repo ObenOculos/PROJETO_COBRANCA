@@ -39,6 +39,16 @@ interface AppRow {
   estorno: boolean;
 }
 
+/** Dias antes/depois do mes em que o detalhe procura baixa ou lancamento
+ * "fora do mes" (diferenca que e so de data). */
+const JANELA_DIAS = 45;
+
+/** "YYYY-MM-DD" + n dias, em UTC (sem fuso: so aritmetica de calendario). */
+const somarDias = (dia: string, n: number): string => {
+  const [y, m, d] = dia.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+};
+
 interface Props {
   documento: string;
   cobradorId: string | null;
@@ -60,10 +70,16 @@ const ConferenciaDetalhe: React.FC<Props> = ({
 }) => {
   const [base, setBase] = useState<BaseRow[] | null>(null);
   const [app, setApp] = useState<AppRow[] | null>(null);
+  // Fora do mes, ate JANELA_DIAS antes/depois: nunca entra na soma.
+  const [basePerto, setBasePerto] = useState<BaseRow[]>([]);
+  const [appPerto, setAppPerto] = useState<AppRow[]>([]);
   const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelado = false;
+    const de = somarDias(inicio, -JANELA_DIAS);
+    const ate = somarDias(fim, JANELA_DIAS);
+    const noMes = (d: string) => d >= inicio && d <= fim;
     (async () => {
       try {
         const [rb, rs, ra] = await Promise.all([
@@ -73,8 +89,8 @@ const ConferenciaDetalhe: React.FC<Props> = ({
               "id_parcela, venda_n, numero_titulo, parcela, nome_da_loja, data_vencimento, data_de_recebimento, valor_recebido, status, user_id",
             )
             .eq("documento", documento)
-            .gte("data_de_recebimento", inicio)
-            .lte("data_de_recebimento", fim)
+            .gte("data_de_recebimento", de)
+            .lte("data_de_recebimento", ate)
             .gt("valor_recebido", 0)
             .order("data_de_recebimento")
             .order("id_parcela"),
@@ -84,8 +100,8 @@ const ConferenciaDetalhe: React.FC<Props> = ({
               "id, payment_date, payment_amount, payment_method, sale_number, collector_id, notes, estorno_de",
             )
             .eq("client_document", documento)
-            .gte("payment_date", inicio)
-            .lte("payment_date", fim)
+            .gte("payment_date", de)
+            .lte("payment_date", ate)
             .order("payment_date")
             .order("id"),
           supabase
@@ -94,8 +110,8 @@ const ConferenciaDetalhe: React.FC<Props> = ({
               "id, data_pagamento, valor_pago, collector_id, notes, estorno_de, acordo_parcelas!inner(numero, acordos!inner(client_document))",
             )
             .eq("acordo_parcelas.acordos.client_document", documento)
-            .gte("data_pagamento", inicio)
-            .lte("data_pagamento", fim)
+            .gte("data_pagamento", de)
+            .lte("data_pagamento", ate)
             .order("data_pagamento")
             .order("id"),
         ]);
@@ -104,11 +120,11 @@ const ConferenciaDetalhe: React.FC<Props> = ({
         if (ra.error) throw ra.error;
         if (cancelado) return;
 
-        setBase(
-          (rb.data as BaseRow[]).filter(
-            (b) => (b.status ?? "").trim().toLowerCase() !== "cancelado",
-          ),
+        const baixas = (rb.data as BaseRow[]).filter(
+          (b) => (b.status ?? "").trim().toLowerCase() !== "cancelado",
         );
+        setBase(baixas.filter((b) => noMes(b.data_de_recebimento)));
+        setBasePerto(baixas.filter((b) => !noMes(b.data_de_recebimento)));
 
         const linhasApp: AppRow[] = [
           ...rs.data
@@ -139,7 +155,8 @@ const ConferenciaDetalhe: React.FC<Props> = ({
             };
           }),
         ].sort((x, y) => x.data.localeCompare(y.data));
-        setApp(linhasApp);
+        setApp(linhasApp.filter((a) => noMes(a.data)));
+        setAppPerto(linhasApp.filter((a) => !noMes(a.data)));
       } catch (e) {
         console.error("Erro ao carregar detalhe da conferência:", e);
         if (!cancelado)
@@ -333,6 +350,77 @@ const ConferenciaDetalhe: React.FC<Props> = ({
           )}
         </div>
       </div>
+
+      {basePerto.length + appPerto.length > 0 && (
+        <div className="rounded-xl border border-dashed border-amber-300 dark:border-amber-700/60 bg-amber-50/60 dark:bg-amber-900/10 px-3 py-2">
+          <div className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+            Fora deste mês ({JANELA_DIAS} dias antes ou depois)
+          </div>
+          <div className="text-[11px] text-amber-700/80 dark:text-amber-300/80 mb-1.5">
+            Não entram na conferência do mês. Se cobrem a diferença acima, é só
+            data (baixa ou registro em outro mês).
+          </div>
+          <table className="min-w-full text-xs">
+            <tbody>
+              {[
+                ...basePerto.map((b) => ({
+                  chave: `b:${b.id_parcela}`,
+                  data: b.data_de_recebimento,
+                  lado: "Base",
+                  texto: `${
+                    b.venda_n
+                      ? `#${b.venda_n}`
+                      : b.numero_titulo
+                        ? `título ${b.numero_titulo}`
+                        : "—"
+                  }${b.parcela != null ? ` · ${b.parcela}ª` : ""}`,
+                  quem: b.nome_da_loja ?? "",
+                  valor: Number(b.valor_recebido),
+                })),
+                ...appPerto.map((a) => ({
+                  chave: a.chave,
+                  data: a.data,
+                  lado: "App",
+                  texto: `${a.origem}${a.venda ? ` · #${a.venda}` : ""}${a.estorno ? " · estorno" : ""}`,
+                  quem: nome(a.cobradorId),
+                  valor: a.valor,
+                })),
+              ]
+                .sort((x, y) => x.data.localeCompare(y.data))
+                .map((r) => (
+                  <tr
+                    key={r.chave}
+                    className="border-t border-amber-200/60 dark:border-amber-800/30"
+                  >
+                    <td className="py-1 pr-3 whitespace-nowrap text-gray-800 dark:text-dark-text">
+                      {formatDate(r.data)}
+                    </td>
+                    <td className="py-1 pr-3">
+                      <span
+                        className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                          r.lado === "Base"
+                            ? "bg-gray-200 text-gray-700 dark:bg-dark-bg dark:text-dark-text"
+                            : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                        }`}
+                      >
+                        {r.lado}
+                      </span>
+                    </td>
+                    <td className="py-1 pr-3 text-gray-700 dark:text-dark-text">
+                      {r.texto}
+                    </td>
+                    <td className="py-1 pr-3 text-gray-500 dark:text-dark-text-secondary">
+                      {r.quem}
+                    </td>
+                    <td className="py-1 text-right whitespace-nowrap font-medium text-gray-900 dark:text-dark-text">
+                      {formatCurrency(r.valor)}
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-[11px] text-gray-500 dark:text-dark-text-secondary">
