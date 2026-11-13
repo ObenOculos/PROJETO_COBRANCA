@@ -58,6 +58,8 @@ import {
   clientBalanceSplit,
   clientReferenceStore,
   ClientBalanceSplit,
+  QUITADO_VISIVEL_DIAS,
+  dataQuitacao,
 } from "../../filters/clientStatus";
 import { abrirWhatsApp } from "../../utils/whatsapp";
 import {
@@ -166,7 +168,8 @@ type SituacaoCarteira =
   | "todos"
   | "paraHoje"
   | "atendidosHoje"
-  | "semAtendimento";
+  | "semAtendimento"
+  | "quitados";
 type FaixaCarteira = "todas" | "critical" | "high" | "medium" | "low" | "emDia";
 
 // Colunas ordenaveis, compartilhadas pela tabela da Carteira completa e
@@ -462,14 +465,38 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   const [attemptsCarregados, setAttemptsCarregados] = useState(false);
   const [attemptsFalharam, setAttemptsFalharam] = useState(false);
 
+  // Clientes deste cobrador que ja quitaram tudo, com o dia da quitacao. O
+  // contexto carrega os quitados do cobrador de carteira junto com a
+  // carteira (carregarQuitadosDoCobrador). Os dos ultimos
+  // QUITADO_VISIVEL_DIAS dias ficam na Carteira completa com o selo
+  // "Quitado"; os mais antigos, so pela busca. Nunca entram na Fila, no
+  // painel nem nas contagens de saldo (2026-11-13).
+  const quitadoEmPorDocumento = useMemo(() => {
+    const mapa = new Map<string, string | null>();
+    clientGroups.forEach((g) => {
+      if (!hasOpenBalance(g.pendingValue)) mapa.set(g.document, dataQuitacao(g));
+    });
+    return mapa;
+  }, [clientGroups]);
+  const desdeQuitado = addDaysLocalStr(todayLocalStr(), -QUITADO_VISIVEL_DIAS);
+  const quitadoRecente = React.useCallback(
+    (doc: string) => (quitadoEmPorDocumento.get(doc) ?? "") >= desdeQuitado,
+    [quitadoEmPorDocumento, desdeQuitado],
+  );
+
   useEffect(() => {
     // Todos os titulos dos clientes que ainda devem -- inclusive os ja
     // pagos: o atendimento pode ter sido gravado num titulo quitado (ex.:
     // "diz que ja pagou") e, lendo so os em aberto, sumia da lista
-    // (2026-11-12).
+    // (2026-11-12). Mais os quitados recentes, que aparecem na Carteira
+    // completa (filtro "Atendidos hoje" e coluna "Ultima interacao").
     const docsEmAberto = new Set(
       (myCollections || [])
-        .filter((c) => hasInstallmentBalance(c))
+        .filter(
+          (c) =>
+            hasInstallmentBalance(c) ||
+            (!!c.documento && quitadoRecente(c.documento)),
+        )
         .map((c) => c.documento)
         .filter(Boolean),
     );
@@ -550,7 +577,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [myCollections, versaoRegistros, user?.type]);
+  }, [myCollections, versaoRegistros, user?.type, quitadoRecente]);
 
   // Pagamento de parcela de acordo registrado por ESTE cobrador neste mes.
   // Nao vem de `salePayments` (sale_payments) -- registrar_pagamento_acordo
@@ -665,6 +692,46 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     );
     return openClientGroups.filter((g) => matchedDocs.has(g.document));
   }, [openClientGroups, walletFiltersParaFiltragem, getFilteredCollections, user]);
+
+  // Quitados que aparecem na Carteira completa, depois de quem deve: os dos
+  // ultimos QUITADO_VISIVEL_DIAS dias, ou qualquer um com busca digitada.
+  // Mesmo motor de filtro, pedindo o status "Pago" (sem status, o motor
+  // devolve so quem ainda deve). Filtro de status escolhido a mao: respeita.
+  const quitadosNaCarteira = useMemo(() => {
+    if (quitadoEmPorDocumento.size === 0) return [] as ClientGroup[];
+    const statusEscolhido = walletFiltersParaFiltragem.status;
+    if (Array.isArray(statusEscolhido) ? statusEscolhido.length > 0 : !!statusEscolhido)
+      return [] as ClientGroup[];
+    const temBusca = !!(walletFiltersParaFiltragem.search || "").trim();
+    const matchedDocs = new Set(
+      getFilteredCollections(
+        { ...walletFiltersParaFiltragem, status: ["pago"] },
+        user?.type || "collector",
+        user?.id,
+      )
+        .map((c) => c.documento?.trim())
+        .filter((d): d is string => Boolean(d)),
+    );
+    return clientGroups
+      .filter(
+        (g) =>
+          quitadoEmPorDocumento.has(g.document) &&
+          matchedDocs.has(g.document) &&
+          (temBusca || quitadoRecente(g.document)),
+      )
+      .sort((a, b) =>
+        (quitadoEmPorDocumento.get(b.document) ?? "").localeCompare(
+          quitadoEmPorDocumento.get(a.document) ?? "",
+        ),
+      );
+  }, [
+    clientGroups,
+    quitadoEmPorDocumento,
+    quitadoRecente,
+    walletFiltersParaFiltragem,
+    getFilteredCollections,
+    user,
+  ]);
 
   // Tentou hoje sem falar com o cliente (nao atendeu, ocupado...).
   const tentouHojeSemSucesso = React.useCallback(
@@ -974,9 +1041,11 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     abrirLote,
   ]);
 
-  // Clientes do lote na ordem entregue: pendentes e ja feitos.
+  // Clientes do lote na ordem entregue: pendentes e ja feitos. So quem
+  // ainda deve: o quitado sai do lote (conta como finalizado), agora que os
+  // quitados do cobrador tambem estao carregados.
   const { lotePendentes, loteFeitos } = useMemo(() => {
-    const porDoc = new Map(clientGroups.map((g) => [g.document, g]));
+    const porDoc = new Map(openClientGroups.map((g) => [g.document, g]));
     const pendentes: ClientGroup[] = [];
     const feitos: ClientGroup[] = [];
     (lote?.itens ?? []).forEach((i) => {
@@ -985,7 +1054,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       (i.finalizado ? feitos : pendentes).push(g);
     });
     return { lotePendentes: pendentes, loteFeitos: feitos };
-  }, [lote, clientGroups]);
+  }, [lote, openClientGroups]);
 
   // Faixa de atraso do cliente (filtro da Carteira completa).
   const faixaDoCliente = React.useCallback(
@@ -1013,6 +1082,8 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   const estaNaSituacao = React.useCallback(
     (g: ClientGroup, s: Exclude<SituacaoCarteira, "todos">): boolean => {
       if (s === "paraHoje") return motivoParaHojeDe(g.document) !== null;
+      // Quitados tem lista propria (quitadosNaCarteira); quem deve nunca e.
+      if (s === "quitados") return false;
       const dias = diasDesdeAtendimento(g.document);
       if (s === "atendidosHoje") return dias !== null && dias <= 0;
       return dias === null || dias > SEM_CONTATO_DIAS;
@@ -1032,25 +1103,47 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       const f = faixaDoCliente(g);
       faixa.set(f, (faixa.get(f) ?? 0) + 1);
     });
+    // Quitado so entra em "Atendidos hoje" (nao tem faixa, nao e "Para
+    // hoje" nem "Sem atendimento") -- assim o filtro bate com o card
+    // "Quantos atendi", que conta quem foi atendido mesmo tendo quitado.
+    quitadosNaCarteira.forEach((g) => {
+      if (estaNaSituacao(g, "atendidosHoje"))
+        situacao.set("atendidosHoje", (situacao.get("atendidosHoje") ?? 0) + 1);
+    });
+    situacao.set("quitados", quitadosNaCarteira.length);
     return { situacao, faixa };
-  }, [walletFilteredGroups, estaNaSituacao, faixaDoCliente]);
+  }, [walletFilteredGroups, quitadosNaCarteira, estaNaSituacao, faixaDoCliente]);
 
-  const carteiraFiltrada = useMemo(
-    () =>
-      sortedWalletFilteredGroups.filter(
-        (g) =>
-          (situacaoCarteira === "todos" ||
-            estaNaSituacao(g, situacaoCarteira)) &&
-          (faixaCarteira === "todas" || faixaDoCliente(g) === faixaCarteira),
-      ),
-    [
-      sortedWalletFilteredGroups,
-      situacaoCarteira,
-      faixaCarteira,
-      estaNaSituacao,
-      faixaDoCliente,
-    ],
-  );
+  const carteiraFiltrada = useMemo(() => {
+    const devendo = sortedWalletFilteredGroups.filter(
+      (g) =>
+        (situacaoCarteira === "todos" ||
+          estaNaSituacao(g, situacaoCarteira)) &&
+        (faixaCarteira === "todas" || faixaDoCliente(g) === faixaCarteira),
+    );
+    // "Quitados" ignora a faixa (quitado nao tem faixa): senao o chip
+    // mostraria (n) e a lista viria vazia.
+    const quitados =
+      situacaoCarteira === "quitados"
+        ? quitadosNaCarteira
+        : faixaCarteira !== "todas"
+        ? []
+        : situacaoCarteira === "todos"
+          ? quitadosNaCarteira
+          : situacaoCarteira === "atendidosHoje"
+            ? quitadosNaCarteira.filter((g) =>
+                estaNaSituacao(g, "atendidosHoje"),
+              )
+            : [];
+    return [...devendo, ...quitados];
+  }, [
+    sortedWalletFilteredGroups,
+    quitadosNaCarteira,
+    situacaoCarteira,
+    faixaCarteira,
+    estaNaSituacao,
+    faixaDoCliente,
+  ]);
 
   // Busca digitada com a Fila aberta: vai para a Carteira completa (a fila
   // e um lote fixo, a busca e na carteira toda).
@@ -1416,7 +1509,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
             <CarteiraChips
               valor={situacaoCarteira}
               onChange={(v) => setSituacaoCarteira(v as SituacaoCarteira)}
-              total={walletFilteredGroups.length}
+              total={walletFilteredGroups.length + quitadosNaCarteira.length}
               opcoes={[
                 { key: "paraHoje", label: "Para hoje" },
                 { key: "atendidosHoje", label: "Atendidos hoje" },
@@ -1424,6 +1517,9 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
                   key: "semAtendimento",
                   label: `Sem atendimento há ${SEM_CONTATO_DIAS} dias`,
                 },
+                // Sem busca: quem quitou nos ultimos QUITADO_VISIVEL_DIAS
+                // dias. Com busca: qualquer quitado que a busca achou.
+                { key: "quitados", label: "Quitados" },
               ].map((o) => ({
                 ...o,
                 count: contagemCarteira.situacao.get(o.key) ?? 0,
@@ -1432,7 +1528,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
             <CarteiraChips
               valor={faixaCarteira}
               onChange={(v) => setFaixaCarteira(v as FaixaCarteira)}
-              total={walletFilteredGroups.length}
+              total={walletFilteredGroups.length + quitadosNaCarteira.length}
               todosKey="todas"
               todosLabel="Todas as faixas"
               opcoes={[
@@ -1472,6 +1568,15 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
                       urgenteInfo={urgenteInfoByDocument.get(group.document)}
                       scheduledContact={scheduledContactByDocument.get(group.document)}
                       aposContato={aposContato}
+                      quitadoEm={
+                        quitadoEmPorDocumento.has(group.document)
+                          ? (quitadoEmPorDocumento.get(group.document) ?? null)
+                          : undefined
+                      }
+                      contatosNaoCarregados={
+                        quitadoEmPorDocumento.has(group.document) &&
+                        !quitadoRecente(group.document)
+                      }
                     />
                   ))
                 ) : (
@@ -1582,6 +1687,13 @@ interface ClientQueueRowProps {
   adiamento?: AdiamentoDoDia;
   /** Presente so no lote da fila: mostra o botao "Depois". */
   onAdiar?: (group: ClientGroup) => void;
+  /** Cliente quitado (Carteira completa): dia da quitacao, ou null se o
+   * dia nao e conhecido. Ausente = cliente ainda deve. A linha mostra o selo
+   * "Quitado" e so a ficha -- nada de cobrar. */
+  quitadoEm?: string | null;
+  /** Quitado antigo achado pela busca: os contatos dele nao sao lidos (so
+   * os dos quitados recentes), entao "Sem registros" seria falso. */
+  contatosNaoCarregados?: boolean;
 }
 
 // Linha da agenda/fila de atendimento, reusada em cada secao priorizada
@@ -1603,12 +1715,15 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
   aposContato,
   adiamento,
   onAdiar,
+  quitadoEm,
+  contatosNaoCarregados,
 }) => {
   const { acordoAtivoOverdueMap } = useCollection();
   const maxAtraso = clientMaxOverdueDays(group, acordoAtivoOverdueMap);
   // Item 34: vencido (o que se cobra) x a vencer (ainda no prazo).
   const saldo = clientBalanceSplit(group, acordoAtivoOverdueMap);
   const emDia = saldo.vencido <= 0.01;
+  const quitado = quitadoEm !== undefined;
   const phoneValue = group.mobile || group.phone;
   const [showPhoneModal, setShowPhoneModal] = useState(false);
   // Fechar o telefone depois de Ligar/Copiar abre o Atender.
@@ -1707,7 +1822,19 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
               Em acordo
             </span>
           )}
-          {emDia && (
+          {quitado && (
+            <span
+              className="inline-flex items-center gap-1 w-fit px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800"
+              title={`Pagou tudo. Fica aqui por ${QUITADO_VISIVEL_DIAS} dias depois da quitação e não entra na Fila.`}
+            >
+              <CheckCircle className="w-3 h-3" />
+              Quitado
+              {quitadoEm
+                ? ` em ${new Date(quitadoEm + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}`
+                : ""}
+            </span>
+          )}
+          {emDia && !quitado && (
             <span
               className="w-fit px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-50 text-green-700 border border-green-200"
               title="Nenhuma parcela vencida: o saldo deste cliente ainda está dentro do prazo"
@@ -1739,7 +1866,14 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
         </div>
       </td>
       <td className="px-6 py-4 max-w-xs" onClick={() => onOpenDetail(group)}>
-        {lastContact ? (
+        {contatosNaoCarregados ? (
+          <span
+            className="text-xs text-gray-400 italic"
+            title="Os contatos de quem quitou há mais tempo não são carregados aqui"
+          >
+            Histórico na ficha
+          </span>
+        ) : lastContact ? (
           <div className="flex flex-col gap-1">
             {lastContact.efetivo &&
             todayLocalStr(lastContact.efetivo.date) === todayLocalStr() ? (
@@ -1850,15 +1984,23 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
         )}
       </td>
       <td className="px-6 py-4 text-center" onClick={() => onOpenDetail(group)}>
-        <span
-          className={`inline-block whitespace-nowrap px-3 py-1 rounded-full text-[10px] font-bold ${PRIORITY_COLOR_CLASSES[priorityBucket(maxAtraso)]}`}
-        >
-          {maxAtraso} dias
-        </span>
+        {quitado ? (
+          <span className="text-xs text-gray-300 italic">—</span>
+        ) : (
+          <span
+            className={`inline-block whitespace-nowrap px-3 py-1 rounded-full text-[10px] font-bold ${PRIORITY_COLOR_CLASSES[priorityBucket(maxAtraso)]}`}
+          >
+            {maxAtraso} dias
+          </span>
+        )}
       </td>
       <td className="px-6 py-4 text-right" onClick={() => onOpenDetail(group)}>
         <div className="flex flex-col">
-          {emDia ? (
+          {quitado ? (
+            <span className="font-bold text-emerald-600 dark:text-emerald-400">
+              Quitado
+            </span>
+          ) : emDia ? (
             <span className="font-bold text-gray-400">{formatCurrency(0)}</span>
           ) : (
             <span className="font-bold text-red-600 dark:text-red-400">
@@ -1876,6 +2018,20 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
         </div>
       </td>
       <td className="px-6 py-4">
+        {quitado ? (
+          <div className="flex items-center justify-end">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenDetail(group);
+              }}
+              className="px-3 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 dark:text-dark-text-secondary dark:hover:bg-dark-bg-tertiary rounded-xl transition-all border border-gray-200 dark:border-dark-border"
+              title="Abrir a ficha do cliente"
+            >
+              Ver ficha
+            </button>
+          </div>
+        ) : (
         <div className="flex items-center justify-end gap-2">
           <button
             onClick={(e) => {
@@ -1936,6 +2092,7 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
           {/* Agendar, remarcar e cancelar o contato agendado ficam dentro do
               "Atender" (LogContactModal). */}
         </div>
+        )}
       </td>
     </tr>
     {showPhoneModal &&

@@ -42,6 +42,7 @@ import {
   assignmentSituacaoRule,
   resolveSituacaoOnAssign,
   channelsForCollectorType,
+  isWalletCollectorType,
 } from "../config/profiles";
 import {
   visitReleaseSituacao,
@@ -84,6 +85,7 @@ import {
   fetchAllPagesByIdRange,
 } from "../utils/supabasePagination";
 import { comRetentativa } from "../utils/supabaseRetry";
+import { fetchAllRows } from "../utils/fetchAllRows";
 import { todayLocalStr } from "../config/visitStatus";
 
 // Linha crua de BANCO_DADOS. Nao ha tipos gerados para o schema, entao o alias
@@ -1195,6 +1197,36 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     return collectionsNextLoadRef.current;
   };
 
+  // Cobrador de carteira (Interno/Terceirizado/Juridico): os clientes dele
+  // que ja quitaram tudo, para a Carteira completa mostrar quem quitou ha
+  // pouco (QUITADO_VISIVEL_DIAS) e a busca achar qualquer quitado. O escopo
+  // "active" exclui justamente esses clientes. Volume pequeno (no maximo
+  // ~900 parcelas por cobrador em 2026-11-13; ~6 ms com o filtro de
+  // user_id -- sem ele a RLS varre a tabela, ver applyCollectorFilter).
+  // Recarregado junto com a carteira, para o cliente que acabou de quitar
+  // passar de um conjunto ao outro na mesma carga, sem sumir no meio.
+  // Falha devolve null: a carteira nao depende disto.
+  const carregarQuitadosDoCobrador = async (
+    userId: string,
+    registry: ClientesRegistry,
+  ): Promise<Collection[] | null> => {
+    try {
+      const source = SETTLED_COLLECTIONS_SOURCE as "BANCO_DADOS";
+      const linhas = await fetchAllRows<BancoDadosRow>((from, to) =>
+        supabase
+          .from(source)
+          .select("*")
+          .eq("user_id", userId)
+          .order("id_parcela", { ascending: true })
+          .range(from, to),
+      );
+      return linhas.map((row) => mapRowToCollection(row, registry));
+    } catch (err) {
+      console.error("Erro ao carregar clientes quitados do cobrador:", err);
+      return null;
+    }
+  };
+
   const loadCollectionsOnce = async (
     useCache: boolean,
     requestedScope: CollectionsScope,
@@ -1367,6 +1399,12 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       // junto, senao as parcelas sairiam com os contatos antigos.
       const registry = await loadClientesRegistry(!useCache);
 
+      // Em paralelo com as paginas abaixo (nunca rejeita: falha vira null).
+      const quitadosPromise =
+        effectiveScope === "active" && isWalletCollectorType(user.type)
+          ? carregarQuitadosDoCobrador(user.id, registry)
+          : Promise.resolve(null);
+
       // So o conjunto COMPLETO vai para a tela. Antes, no boot, lotes
       // parciais eram publicados a cada 2,5s; se uma faixa falhava no meio,
       // a tela ficava com a carteira pela metade ate um F5. Em erro, o que
@@ -1412,12 +1450,18 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       // do OFFSET antigo, que podia repetir linha sob escrita concorrente).
       const transformedData = buffer;
 
+      const quitadosDoCobrador = await quitadosPromise;
+
       // Sessao trocou durante a carga: o resultado e de outro usuario (ou de
       // ninguem). Nao publica, nao guarda em cache, nao mexe no escopo.
       if (!sessaoAtiva()) {
         console.log("Carga de collections de uma sessão anterior descartada.");
         return;
       }
+
+      // Mesmo lugar do complemento do filtro "Pago" (settledCollections):
+      // so o gestor usa aquele, e so o cobrador de carteira usa este.
+      if (quitadosDoCobrador) setSettledCollections(quitadosDoCobrador);
 
       if (transformedData.length === 0) {
         console.warn("Nenhum dado retornado do Supabase");

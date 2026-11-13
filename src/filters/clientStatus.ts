@@ -2,7 +2,7 @@
 // Antes essa regra vivia inline no getFilteredCollections (CollectionContext) e
 // corria o risco de divergir do ClientAssignment e do CollectorDashboard. Estes
 // helpers devem ser reutilizados por todas as telas que classificam clientes.
-import { Collection, ClientGroup } from "../types";
+import { Collection, ClientGroup, SaleGroup } from "../types";
 import { calculateOverdueDays } from "../utils/formatters";
 
 export type ClientPaymentStatus = "pago" | "parcial" | "pendente";
@@ -91,6 +91,31 @@ export const hasInstallmentBalance = (
   hasOpenBalance(
     (c.valor_original || 0) - (c.valor_recebido || 0) - (c.desconto || 0),
   );
+
+/**
+ * Quantos dias o cliente que quitou continua visivel na Carteira completa do
+ * cobrador de carteira, com o selo "Quitado" (decisao de 2026-11-13). Regra
+ * so de VISIBILIDADE e igual para todos: nao importa se o pagamento foi
+ * registrado pelo cobrador ou veio do ERP. Ele nao volta para a Fila, nao
+ * conta em "Sem atendimento" nem no valor da carteira. A busca acha qualquer
+ * quitado do cobrador, de qualquer data.
+ */
+export const QUITADO_VISIVEL_DIAS = 7;
+
+/**
+ * Dia (YYYY-MM-DD) em que o cliente quitou: o recebimento mais recente das
+ * parcelas dele. So faz sentido para quem esta quitado (!hasOpenBalance).
+ */
+export const dataQuitacao = (group: ClientGroup): string | null => {
+  let ultima: string | null = null;
+  group.sales.forEach((s) =>
+    s.installments.forEach((c) => {
+      const d = c.data_de_recebimento?.slice(0, 10);
+      if (d && (!ultima || d > ultima)) ultima = d;
+    }),
+  );
+  return ultima;
+};
 
 /**
  * Normaliza o vocabulario de status para o valor canonico. O dropdown envia
@@ -226,6 +251,20 @@ export const clientBalanceSplit = (
   });
   return { vencido: round2(vencido), aVencer: round2(aVencer) };
 };
+
+/**
+ * clientBalanceSplit para telas que tem a lista de titulos do cliente em vez
+ * do ClientGroup (ex.: Atribuicao de Cobradores). Mesma regra, sem copia.
+ */
+export const collectionsBalanceSplit = (
+  documento: string,
+  collections: Collection[],
+  acordoAtivoParcelas?: AcordoAtivoOverdueMap,
+): ClientBalanceSplit =>
+  clientBalanceSplit(
+    { document: documento, sales: [{ installments: collections } as SaleGroup] },
+    acordoAtivoParcelas,
+  );
 
 /**
  * Valor EM ATRASO do cliente: so o que ja venceu (ver clientBalanceSplit).

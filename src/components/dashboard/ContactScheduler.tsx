@@ -15,6 +15,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useCollection } from "../../contexts/CollectionContext";
 import { todayLocalStr } from "../../config/visitStatus";
 import { documentoCombina } from "../../filters/documento";
+import { hasOpenBalance } from "../../filters/clientStatus";
 import { ScheduledVisit, ScheduledVisitChannel } from "../../types";
 
 interface ContactSchedulerProps {
@@ -50,7 +51,14 @@ const ContactScheduler: React.FC<ContactSchedulerProps> = ({
     [users, collectorId],
   );
 
-  const allClients = getClientGroups(collectorId);
+  // So quem ainda deve: os quitados do cobrador de carteira tambem vem
+  // carregados (Carteira completa, selo "Quitado"), mas nao se agenda
+  // cobranca para eles (2026-11-13).
+  const allClients = useMemo(
+    () =>
+      getClientGroups(collectorId).filter((g) => hasOpenBalance(g.pendingValue)),
+    [getClientGroups, collectorId],
+  );
 
   // Mesma regra do índice único do banco (uniq_active_visit_per_client):
   // cliente com contato ativo (qualquer canal) não pode ser selecionado de
