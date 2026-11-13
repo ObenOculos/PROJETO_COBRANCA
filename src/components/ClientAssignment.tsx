@@ -29,7 +29,10 @@ import { Collection, isCollectorType, ClientGroup } from "../types";
 import { createPortal } from "react-dom";
 import ClientDetailModal from "./dashboard/ClientDetailModal";
 import { countVendas, resolveSaleKey } from "../filters/sales";
-import { getClientPending } from "../filters/clientStatus";
+import {
+  getClientPending,
+  collectionsBalanceSplit,
+} from "../filters/clientStatus";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { razaoSocialDistinta } from "../utils/clienteNome";
 import { abrirWhatsApp } from "../utils/whatsapp";
@@ -250,6 +253,7 @@ export const ClientAssignment = React.memo(
       getClientGroups,
       scheduledVisits,
       clientesRegistry,
+      acordoAtivoOverdueMap,
     } = useCollection();
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedClientGroup, setSelectedClientGroup] =
@@ -1884,6 +1888,13 @@ export const ClientAssignment = React.memo(
                       0,
                     );
                     const pendingValue = getClientPending(client.collections);
+                    // Vencido x a vencer: mesma regra da carteira (item 34;
+                    // com acordo ativo valem as parcelas do acordo).
+                    const saldo = collectionsBalanceSplit(
+                      client.documento || "",
+                      client.collections,
+                      acordoAtivoOverdueMap,
+                    );
                     const situacao = getSituacaoIndicator(client.collections);
                     const clientStores = Array.from(
                       new Set(
@@ -2079,23 +2090,40 @@ export const ClientAssignment = React.memo(
                         <td className="px-4 py-3.5 text-right w-[15%] min-w-[130px]">
                           <div className="flex flex-col gap-0.5">
                             <span
-                              className={`text-xs font-bold tracking-tight ${
-                                pendingValue >= 2500
-                                  ? "text-red-700 dark:text-red-455 flex items-center justify-end gap-1"
-                                  : "text-red-600 dark:text-red-500"
+                              className={`flex items-baseline justify-end gap-1 text-xs font-bold tracking-tight ${
+                                saldo.vencido > 0.01
+                                  ? "text-red-600 dark:text-red-400"
+                                  : "text-gray-400 dark:text-dark-text-secondary"
                               }`}
+                              title="Parcelas com vencimento passado"
                             >
-                              {pendingValue >= 2500 && (
+                              {saldo.vencido >= 2500 && (
                                 <span
-                                  className="inline-flex shrink-0"
-                                  title="Valor Pendente Crítico (>= R$ 2.500)"
+                                  className="inline-flex shrink-0 self-center"
+                                  title="Vencido crítico (>= R$ 2.500)"
                                 >
-                                  <AlertCircle className="h-3.5 w-3.5 text-red-550" />
+                                  <AlertCircle className="h-3.5 w-3.5" />
                                 </span>
                               )}
-                              {formatCurrency(pendingValue)}
+                              <span className="text-[9px] font-semibold uppercase">
+                                Vencido
+                              </span>
+                              {formatCurrency(saldo.vencido)}
                             </span>
-                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                            {saldo.aVencer > 0.01 && (
+                              <span
+                                className="flex items-baseline justify-end gap-1 text-[10px] font-semibold text-blue-600 dark:text-blue-400"
+                                title="Parcelas ainda dentro do prazo: não estão atrasadas"
+                              >
+                                <span className="text-[9px] uppercase">A vencer</span>
+                                {formatCurrency(saldo.aVencer)}
+                              </span>
+                            )}
+                            <span
+                              className="flex items-baseline justify-end gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400"
+                              title="Valor já recebido"
+                            >
+                              <span className="text-[9px] uppercase">Pago</span>
                               {formatCurrency(receivedValue)}
                             </span>
                             <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
@@ -2144,7 +2172,11 @@ export const ClientAssignment = React.memo(
                 (sum, c) => sum + (c.valor_recebido || 0),
                 0,
               );
-              const pendingValue = getClientPending(client.collections);
+              const saldo = collectionsBalanceSplit(
+                client.documento || "",
+                client.collections,
+                acordoAtivoOverdueMap,
+              );
               const situacao = getSituacaoIndicator(client.collections);
               const isSelected = selectedClients.has(client.uniqueKey);
               const clientStores = Array.from(
@@ -2205,11 +2237,21 @@ export const ClientAssignment = React.memo(
                             </div>
                           </div>
                           <div className="text-right shrink-0">
-                            <p className="text-[11px] font-semibold text-red-600 dark:text-red-400 tracking-tight leading-tight">
-                              {formatCurrency(pendingValue)}
+                            <p
+                              className={`text-[11px] font-semibold tracking-tight leading-tight ${saldo.vencido > 0.01 ? "text-red-600 dark:text-red-400" : "text-gray-400"}`}
+                            >
+                              <span className="text-[8px] uppercase mr-1">Vencido</span>
+                              {formatCurrency(saldo.vencido)}
                             </p>
+                            {saldo.aVencer > 0.01 && (
+                              <p className="text-[9px] font-semibold text-blue-600 dark:text-blue-400 tracking-tight leading-tight mt-0.5">
+                                <span className="text-[8px] uppercase mr-1">A vencer</span>
+                                {formatCurrency(saldo.aVencer)}
+                              </p>
+                            )}
                             {receivedValue > 0 && (
                               <p className="text-[9px] font-semibold text-emerald-600 dark:text-emerald-400 tracking-tight leading-tight mt-0.5">
+                                <span className="text-[8px] uppercase mr-1">Pago</span>
                                 {formatCurrency(receivedValue)}
                               </p>
                             )}
