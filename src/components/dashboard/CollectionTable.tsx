@@ -1479,24 +1479,32 @@ export const CollectionTable = React.forwardRef<
                         </div>
                         <div className="flex flex-wrap justify-start sm:justify-end gap-2 mt-4">
                           {!!clientGroup.totalReceived && (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400 border border-green-200/20">
+                            <span
+                              title="Pago"
+                              className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400 border border-green-200/20"
+                            >
                               <TrendingUp className="h-3 w-3 mr-1.5" />
-                              Pago {formatCurrency(clientGroup.totalReceived)}
+                              {formatCurrency(clientGroup.totalReceived)}
                             </span>
                           )}
                           {!!clientGroup.totalDiscount &&
                             clientGroup.totalDiscount > 0 && (
-                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400 border border-blue-200/20">
+                              <span
+                                title="Desconto já dado"
+                                className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400 border border-blue-200/20"
+                              >
                                 <TrendingDown className="h-3 w-3 mr-1.5" />
-                                Desconto já dado{" "}
                                 {formatCurrency(clientGroup.totalDiscount)}
                               </span>
                             )}
                           {!!clientGroup.pendingValue &&
                             clientGroup.pendingValue > 0 && (
-                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400 border border-red-200/20">
+                              <span
+                                title="Em aberto"
+                                className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400 border border-red-200/20"
+                              >
                                 <AlertCircle className="h-3 w-3 mr-1.5" />
-                                Em aberto {formatCurrency(clientGroup.pendingValue)}
+                                {formatCurrency(clientGroup.pendingValue)}
                               </span>
                             )}
                         </div>
