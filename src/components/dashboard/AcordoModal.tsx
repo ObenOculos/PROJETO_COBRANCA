@@ -21,6 +21,7 @@ import {
   calculateOverdueDays,
 } from "../../utils/formatters";
 import { todayLocalStr } from "../../config/visitStatus";
+import { encargosPorAtraso } from "../../config/encargos";
 import { ClientGroup } from "../../types";
 import { gerarPixCopiaECola } from "../../utils/pix";
 import {
@@ -222,12 +223,12 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
     return titulosEmAberto
       .filter((t) => selecionados.has(t.collectionId))
       .map((t) => {
-        const multaValor =
-          t.diasAtraso > 0 ? Math.round(t.saldo * (multa / 100) * 100) / 100 : 0;
-        const jurosValor =
-          t.diasAtraso > 0
-            ? Math.round(t.saldo * (juros / 100) * (t.diasAtraso / 30) * 100) / 100
-            : 0;
+        const { multa: multaValor, juros: jurosValor } = encargosPorAtraso(
+          t.saldo,
+          t.diasAtraso,
+          multa,
+          juros,
+        );
         const totalBruto = t.saldo + multaValor + jurosValor;
         const descontoValor = Math.round(totalBruto * (desconto / 100) * 100) / 100;
         const totalFinal = Math.round((totalBruto - descontoValor) * 100) / 100;
