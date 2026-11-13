@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useMemo, memo } from "react";
 import {
   X,
-  DollarSign,
+  Check,
   CheckCircle,
-  Receipt,
-  Calculator,
+  ChevronRight,
   TrendingDown,
-  RefreshCw,
   Calendar,
   Clock,
   Info,
@@ -39,6 +37,25 @@ const FORMA_PAGAMENTO_LABEL: Record<string, string> = {
   cartao_credito: "Cartão de crédito",
   cartao_debito: "Cartão de débito",
 };
+
+/**
+ * Valor digitado -> numero. Aceita "1.234,56", "1234,56" e "1234.56";
+ * "1.234" (so ponto de milhar) vale mil duzentos e trinta e quatro.
+ */
+const parseValor = (texto: string): number => {
+  const t = (texto || "").trim();
+  if (!t) return 0;
+  const normal = t.includes(",")
+    ? t.replace(/\./g, "").replace(",", ".")
+    : /^\d{1,3}(\.\d{3})+$/.test(t)
+      ? t.replace(/\./g, "")
+      : t;
+  const n = parseFloat(normal);
+  return Number.isFinite(n) ? round2(n) : 0;
+};
+
+/** Numero -> texto do campo ("1234,56"). */
+const valorParaCampo = (n: number): string => n.toFixed(2).replace(".", ",");
 
 /** Hora local "HH:MM" -- para barrar reagendamento hoje em horario que ja passou. */
 const horaLocalAgora = () => {
@@ -83,16 +100,14 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     const { addNotification } = useNotifications();
     const [loading, setLoading] = useState(false);
     const [distributionAmount, setDistributionAmount] = useState<string>("");
-    const [saleDistribution, setSaleDistribution] = useState<
-      SaleDistributionItem[]
-    >([]);
     const [paymentMethod, setPaymentMethod] = useState("dinheiro");
     const [withDiscount, setWithDiscount] = useState(false);
-    const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+    // Proxima visita do cobrador externo quando sobra vencido (etapa 3).
     const [rescheduleDate, setRescheduleDate] = useState("");
     const [rescheduleTime, setRescheduleTime] = useState("");
-    const [rescheduleError, setRescheduleError] = useState("");
-    const [observations, setObservations] = useState(""); // New state
+    const [observations, setObservations] = useState("");
+    const [etapa, setEtapa] = useState<1 | 2 | 3>(1);
+    const [erroEtapa, setErroEtapa] = useState<string | null>(null);
     // Excedente acima do vencido: juros/multa (nao abate parcela) ou
     // adiantamento das proximas parcelas. Sem escolha = nao deixa confirmar.
     const [destinoExcedente, setDestinoExcedente] = useState<
@@ -148,6 +163,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         vencimento: string;
         saldo: number;
         vencida: boolean;
+        numero: number | null;
       }[] = [];
       (clientSales || []).forEach((sale) =>
         sale.installments?.forEach((inst) => {
@@ -164,6 +180,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                 (inst.desconto || 0),
             ),
             vencida: calculateOverdueDays(inst.data_vencimento) > 0,
+            numero: inst.parcela ?? null,
           });
         }),
       );
@@ -186,35 +203,22 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
 
     // Desabilitar scroll do body quando o modal estiver aberto
     useEffect(() => {
+      // Restaura o valor anterior: aberto por cima da Ficha, "unset" soltava
+      // a rolagem da pagina com a Ficha ainda aberta.
+      const anterior = document.body.style.overflow;
       document.body.style.overflow = "hidden";
 
       return () => {
-        document.body.style.overflow = "unset";
+        document.body.style.overflow = anterior;
       };
     }, []);
-
-    // Calcular totais com validações
-    const totalValue =
-      clientSales?.reduce((sum, sale) => {
-        return sum + (sale.totalValue || 0);
-      }, 0) || 0;
-
-    const totalReceived =
-      clientSales?.reduce((sum, sale) => {
-        return sum + (sale.totalReceived || 0);
-      }, 0) || 0;
 
     const totalPending =
       clientSales?.reduce((sum, sale) => {
         return sum + (sale.pendingValue || 0);
       }, 0) || 0;
 
-    const amountToDistribute = parseFloat(distributionAmount) || 0;
-    const discountAmount =
-      withDiscount && amountToDistribute > 0
-        ? totalPending - amountToDistribute
-        : 0;
-    const showDiscountBox = discountAmount >= 0 && withDiscount;
+    const amountToDistribute = parseValor(distributionAmount);
 
     // Excedente sobre o vencido -- pergunta se e juros/multa ou adiantamento.
     // So sem desconto e sem acordo ativo (ver parcelasAbertas).
@@ -242,14 +246,38 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     }, [withDiscount, acordoAtivo, vencidoTotal, principal, parcelasAbertas]);
     const precisaAcompanhamento = vencidoRestante > 0.01;
 
-    // Calcular distribuição automática por venda
-    const calculateSaleDistribution = React.useCallback(() => {
-      const paymentAmount = parseFloat(distributionAmount) || 0;
+    // Conferencia (etapa 3): quanto cada parcela recebe, na mesma ordem do
+    // process_payment. So sem desconto e sem acordo -- nos outros casos a
+    // distribuicao e por venda (saleDistribution).
+    const abatimentoPorParcela = useMemo(() => {
+      if (withDiscount || acordoAtivo) return null;
+      let resto = principal;
+      const lista: ((typeof parcelasAbertas)[number] & {
+        aplicado: number;
+        quita: boolean;
+      })[] = [];
+      parcelasAbertas.forEach((p) => {
+        if (resto <= 0.001) return;
+        const aplicado = round2(Math.min(resto, p.saldo));
+        resto = round2(resto - aplicado);
+        lista.push({ ...p, aplicado, quita: aplicado >= p.saldo - 0.01 });
+      });
+      return lista;
+    }, [withDiscount, acordoAtivo, principal, parcelasAbertas]);
+
+    // Observacao so e obrigatoria quando ha algo a justificar: desconto ou
+    // juros/multa. Pagamento comum dispensa (virava "pagou").
+    const observacaoObrigatoria = withDiscount || jurosValor > 0;
+
+    // Distribuicao por venda, calculada no render (useMemo): antes ficava num
+    // estado atualizado por useEffect, e um Enter logo depois de digitar o
+    // valor via a lista ainda vazia ("Não há parcela em aberto").
+    const saleDistribution = useMemo((): SaleDistributionItem[] => {
+      const paymentAmount = amountToDistribute;
       // Exige um pagamento positivo mesmo na quitação com desconto: não faz
       // sentido "quitar" sem receber nada (desconto de 100%).
       if (paymentAmount <= 0) {
-        setSaleDistribution([]);
-        return;
+        return [];
       }
 
       // Sem desconto e sem acordo: distribui parcela a parcela, vencimento
@@ -276,8 +304,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
               .filter((p) => p.sale.saleNumber === saleNumber)
               .reduce((s, p) => s + p.saldo, 0),
           );
-        setSaleDistribution(
-          Array.from(porVenda.values())
+        return Array.from(porVenda.values())
             .filter((v) => v.aplicado > 0)
             .map(({ sale, aplicado }) => ({
               sale,
@@ -286,9 +313,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
               appliedDiscount: 0,
               newAmount: (sale.totalReceived || 0) + aplicado,
               willBeComplete: saldoDaVenda(sale.saleNumber) - aplicado <= 0.01,
-            })),
-        );
-        return;
+            }));
       }
 
       let remainingPayment = paymentAmount;
@@ -325,9 +350,9 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         }
       }
 
-      setSaleDistribution(newDistribution);
+      return newDistribution;
     }, [
-      distributionAmount,
+      amountToDistribute,
       clientSales,
       withDiscount,
       totalPending,
@@ -336,10 +361,6 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       parcelasAbertas,
     ]);
 
-    // Recalcular distribuição quando o valor mudar
-    useEffect(() => {
-      calculateSaleDistribution();
-    }, [distributionAmount, calculateSaleDistribution]);
 
     // Função para notificar manager sobre pagamentos com desconto
     const notifyManagerAboutDiscount = (discountAmount: number) => {
@@ -347,7 +368,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         return;
       }
 
-      const paymentAmount = parseFloat(distributionAmount) || 0;
+      const paymentAmount = amountToDistribute;
       const originalPendingAmount = totalPending;
       const discountPercentage =
         originalPendingAmount > 0
@@ -371,67 +392,92 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       }
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
+    // ---------- Etapas: 1 Valor -> 2 Pagamento -> 3 Conferir ----------
+    // Cada "Continuar" valida so a sua etapa; o erro aparece na propria tela
+    // (sem alert -- dialog nativo trava a aba).
 
-      if (!observations.trim()) {
-        alert("O campo de observações é obrigatório.");
-        return;
-      }
-
-      if (!user) {
-        alert("Usuário não identificado");
-        return;
-      }
-
-      const inputAmount = parseFloat(distributionAmount) || 0;
+    /** Erro da etapa 1 (valor), ou null. */
+    const erroDoValor = (): string | null => {
       // Exige valor positivo mesmo na quitação com desconto (sem "desconto de 100%").
-      if (inputAmount <= 0) {
-        alert("O valor a distribuir deve ser maior que zero.");
-        return;
-      }
-
+      if (amountToDistribute <= 0) return "Informe o valor que o cliente pagou.";
       // Sem desconto, não permite abater mais que o saldo devedor (o excedente
       // seria descartado silenciosamente na distribuição). Juros/multa não
       // abatem parcela, por isso ficam fora desta conta.
       if (!withDiscount && principal > totalPending + 0.01) {
-        showErrorNotification(
-          new Error(
-            `O valor não pode ser maior que o saldo devedor (${formatCurrency(totalPending)}).`,
-          ),
-        );
-        return;
+        return `O valor não pode ser maior que o saldo devedor (${formatCurrency(totalPending)}).`;
       }
-
-      const calculatedDiscount = withDiscount ? totalPending - inputAmount : 0;
-
-      if (withDiscount && calculatedDiscount < 0) {
-        showErrorNotification(
-          new Error(
-            "O valor do pagamento com desconto não pode ser maior que o saldo devedor.",
-          ),
-        );
-        return;
+      if (withDiscount && amountToDistribute > totalPending + 0.01) {
+        return "Na quitação com desconto o valor pago não pode passar do saldo devedor.";
       }
-
       if (temExcedente && !destinoExcedente) {
-        showErrorNotification(
-          new Error(
-            `Informe se os ${formatCurrency(excedente)} acima do valor vencido são juros/multa ou adiantamento das próximas parcelas.`,
-          ),
-        );
+        return `Diga se os ${formatCurrency(excedente)} acima do vencido são juros/multa ou adiantamento.`;
+      }
+      if (saleDistribution.length === 0) {
+        return acordoAtivo
+          ? "Não há títulos fora do acordo para abater. Registre o pagamento na tela do acordo."
+          : "Não há parcela em aberto para abater.";
+      }
+      return null;
+    };
+
+    /** Erro da etapa 2 (forma, data, observação), ou null. */
+    const erroDoPagamento = (): string | null => {
+      if (!dataPagamentoValida) {
+        return `Escolha uma data entre ${dataMinima.split("-").reverse().join("/")} e hoje.`;
+      }
+      if (observacaoObrigatoria && !observations.trim()) {
+        return withDiscount
+          ? "Explique o desconto na observação."
+          : "Explique os juros/multa na observação.";
+      }
+      return null;
+    };
+
+    /** Erro do agendamento da proxima visita (externo com vencido), ou null. */
+    const erroDoAgendamento = (): string | null => {
+      if (!(precisaAcompanhamento && ehExterno)) return null;
+      if (!rescheduleDate || !rescheduleTime) {
+        return "Informe a data e o horário da próxima visita.";
+      }
+      if (rescheduleDate < hoje) return "A data da visita não pode estar no passado.";
+      if (rescheduleDate === hoje && rescheduleTime <= horaLocalAgora()) {
+        return "Esse horário de hoje já passou.";
+      }
+      return null;
+    };
+
+    const avancar = () => {
+      const erro = etapa === 1 ? erroDoValor() : erroDoPagamento();
+      setErroEtapa(erro);
+      if (!erro) setEtapa((e) => (e === 1 ? 2 : 3));
+    };
+
+    const voltar = () => {
+      setErroEtapa(null);
+      setEtapa((e) => (e === 3 ? 2 : 1));
+    };
+
+    const confirmar = async () => {
+      if (!user) {
+        setErroEtapa("Usuário não identificado. Entre de novo no app.");
         return;
       }
+      const erro = erroDoValor() ?? erroDoPagamento() ?? erroDoAgendamento();
+      setErroEtapa(erro);
+      if (erro) return;
+      await registrarPagamento(
+        precisaAcompanhamento && ehExterno
+          ? { data: rescheduleDate, horario: rescheduleTime }
+          : null,
+      );
+    };
 
-      // Ainda sobra valor VENCIDO: so o cobrador EXTERNO reagenda a visita
-      // aqui. Cliente que ficou em dia -- so parcelas a vencer -- nao precisa.
-      if (precisaAcompanhamento && ehExterno) {
-        setRescheduleError("");
-        setShowRescheduleModal(true);
-        return;
-      }
-
-      await registrarPagamento(null);
+    // Enter no formulario: avanca (ou confirma na ultima etapa).
+    const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (loading) return;
+      if (etapa < 3) avancar();
+      else void confirmar();
     };
 
     /**
@@ -549,7 +595,9 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
           const detalhe = resumoDoPagamento();
           const tipo =
             contatoAgendado?.channel === "whatsapp" ? "whatsapp" : "call";
-          const notas = `${detalhe}\nObs.: ${observations.trim()}`;
+          const notas = observations.trim()
+            ? `${detalhe}\nObs.: ${observations.trim()}`
+            : detalhe;
           if (precisaAcompanhamento && contatoAgendado) {
             // Parcial com contato agendado: so registra a interacao e deixa o
             // agendamento como esta (o cobrador segue acompanhando por ele).
@@ -652,7 +700,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       }, 5000);
     };
 
-    const showErrorNotification = (error: any) => {
+    const showErrorNotification = (error: unknown) => {
       const errorMessage =
         error instanceof Error ? error.message : "Erro desconhecido";
 
@@ -664,10 +712,13 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
       </svg>
       <div>
-        <div class="font-semibold">Erro ao distribuir pagamento</div>
-        <div class="text-sm">${errorMessage}</div>
+        <div class="font-semibold">Erro ao registrar pagamento</div>
+        <div class="text-sm"></div>
       </div>
     `;
+      // Mensagem como texto (vem do servidor): nada de HTML injetado.
+      const corpo = notification.querySelector("div > div.text-sm");
+      if (corpo) corpo.textContent = errorMessage;
       document.body.appendChild(notification);
       setTimeout(() => {
         if (document.body.contains(notification)) {
@@ -676,256 +727,183 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       }, 8000);
     };
 
-    const handleConfirmReschedule = async () => {
-      if (!rescheduleDate) {
-        setRescheduleError("Informe a data.");
-        return;
-      }
-      if (!rescheduleTime) {
-        setRescheduleError("Informe a data e o horário da visita.");
-        return;
-      }
-      if (rescheduleDate < hoje) {
-        setRescheduleError("A data não pode estar no passado.");
-        return;
-      }
-      if (
-        rescheduleDate === hoje &&
-        rescheduleTime &&
-        rescheduleTime <= horaLocalAgora()
-      ) {
-        setRescheduleError("Esse horário de hoje já passou.");
-        return;
-      }
-      setRescheduleError("");
-      await registrarPagamento({
-        data: rescheduleDate,
-        horario: rescheduleTime,
-      });
-    };
+    const ETAPAS = ["Valor", "Pagamento", "Conferir"] as const;
+    const formaRotulo = FORMA_PAGAMENTO_LABEL[paymentMethod] ?? paymentMethod;
+    const dataTexto = (iso: string) => iso.split("-").reverse().join("/");
+    const desconto = withDiscount
+      ? round2(Math.max(0, totalPending - amountToDistribute))
+      : 0;
 
     return (
       <div
-        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[110]"
+        className="fixed inset-0 bg-black bg-opacity-50 flex items-stretch sm:items-center justify-center sm:p-4 z-[110]"
         onClick={(e) => {
-          if (e.target === e.currentTarget) {
-            onClose();
-          }
+          if (e.target === e.currentTarget && !loading) onClose();
         }}
       >
-        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl max-w-6xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden shadow-2xl">
-          {/* Header */}
-          <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 sm:px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center flex-1 min-w-0">
-              <Calculator className="h-5 w-5 sm:h-6 sm:w-6 text-white mr-2 sm:mr-3 flex-shrink-0" />
-              <div className="min-w-0 flex-1">
-                <h2 className="text-base sm:text-xl font-bold text-white truncate">
-                  Distribuir Pagamento
+        <form
+          onSubmit={handleSubmit}
+          className="bg-white dark:bg-dark-bg-secondary sm:rounded-2xl max-w-xl w-full h-full sm:h-auto sm:max-h-[90vh] flex flex-col overflow-hidden shadow-2xl"
+        >
+          {/* Cabecalho */}
+          <div className="px-4 sm:px-6 pt-4 pb-3 border-b border-gray-200 dark:border-dark-border shrink-0">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-dark-text">
+                  Receber pagamento
                 </h2>
-                <p className="text-sm text-purple-100 truncate">
-                  {clientGroup.client || "Cliente"} -{" "}
-                  {clientGroup.document || "Sem documento"}
+                <p className="text-sm text-gray-500 dark:text-dark-text-secondary truncate">
+                  {clientGroup.client || "Cliente"}
                 </p>
-                {!isOnline && (
-                  <div className="flex items-center mt-2">
-                    <div className="w-2 h-2 bg-yellow-300 rounded-full mr-2 animate-pulse"></div>
-                    <span className="text-xs text-yellow-200">
-                      Modo offline - Pagamentos serão adicionados à fila
-                    </span>
-                  </div>
-                )}
               </div>
+              <button
+                type="button"
+                id="close-button"
+                onClick={onClose}
+                disabled={loading}
+                className="p-2 -mr-2 text-gray-500 hover:text-gray-800 hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary rounded-full transition-colors disabled:opacity-50"
+                aria-label="Fechar"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
-            <button
-              type="button"
-              id="close-button"
-              onClick={onClose}
-              className="p-2 hover:bg-white hover:bg-opacity-20 rounded-2xl transition-colors flex-shrink-0"
-            >
-              <X className="h-5 w-5 text-white" />
-            </button>
+
+            {/* Etapas */}
+            <ol className="mt-3 flex items-center gap-2 text-xs">
+              {ETAPAS.map((rotulo, i) => {
+                const n = (i + 1) as 1 | 2 | 3;
+                const feita = n < etapa;
+                const atual = n === etapa;
+                return (
+                  <React.Fragment key={rotulo}>
+                    {i > 0 && (
+                      <span
+                        className={`h-px flex-1 ${feita || atual ? "bg-indigo-300" : "bg-gray-200"}`}
+                      />
+                    )}
+                    <li
+                      className={`flex items-center gap-1.5 ${
+                        atual
+                          ? "text-indigo-700 font-semibold"
+                          : feita
+                            ? "text-indigo-600"
+                            : "text-gray-400"
+                      }`}
+                      aria-current={atual ? "step" : undefined}
+                    >
+                      <span
+                        className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold ${
+                          atual
+                            ? "bg-indigo-600 text-white"
+                            : feita
+                              ? "bg-indigo-100 text-indigo-700"
+                              : "bg-gray-100 text-gray-500"
+                        }`}
+                      >
+                        {feita ? <Check className="h-3 w-3" /> : n}
+                      </span>
+                      {rotulo}
+                    </li>
+                  </React.Fragment>
+                );
+              })}
+            </ol>
+
+            {!isOnline && (
+              <p className="mt-2 flex items-center gap-2 text-xs text-amber-700">
+                <span className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
+                Sem conexão: o pagamento vai para a fila e é enviado depois.
+              </p>
+            )}
           </div>
 
-          <div className="overflow-y-auto max-h-[calc(95vh-180px)] sm:max-h-[calc(90vh-180px)]">
-            <form onSubmit={handleSubmit} className="p-4 sm:p-6">
-              {acordoAtivo && (
-                <div className="mb-6 p-4 border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 rounded-2xl flex items-start gap-3">
-                  <Info className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
-                  <p className="text-sm text-amber-700 dark:text-amber-300">
-                    Este cliente tem um <strong>acordo ativo</strong>. Os
-                    títulos vinculados a ele não podem ser pagos por aqui — o
-                    sistema vai recusar e manter o valor neles; só títulos
-                    fora do acordo (se houver) serão aplicados. Para pagar o
-                    acordo, use a tela dele.
-                  </p>
-                </div>
-              )}
-              {/* Resumo do Cliente */}
-              <div className="bg-gradient-to-r from-purple-50 dark:from-purple-900/20 to-indigo-50 dark:to-indigo-900/20 rounded-2xl p-4 sm:p-6 mb-6 border border-purple-200 dark:border-purple-800">
-                <h3 className="text-base font-semibold text-gray-900 dark:text-dark-text mb-4 flex items-center">
-                  <Receipt className="h-5 w-5 text-purple-600 dark:text-purple-400 mr-2" />
-                  Resumo Financeiro
-                </h3>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-4">
-                  <div className="text-center p-3 sm:p-4 bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm">
-                    <div className="text-base sm:text-xl font-bold text-gray-900 dark:text-dark-text">
-                      {formatCurrency(totalValue)}
-                    </div>
-                    <div className="text-xs sm:text-sm text-gray-600 dark:text-dark-text-secondary">
-                      Valor Total
-                    </div>
+          {/* Conteudo da etapa (unica area com rolagem) */}
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 py-5 space-y-5">
+            {etapa === 1 && (
+              <>
+                {acordoAtivo && (
+                  <div className="p-3 border border-amber-200 bg-amber-50 rounded-xl flex items-start gap-2 text-sm text-amber-800">
+                    <Info className="w-4 h-4 mt-0.5 shrink-0" />
+                    <p>
+                      Cliente com <strong>acordo ativo</strong>: aqui só entram
+                      títulos fora do acordo. Parcela do acordo se paga na tela
+                      do acordo.
+                    </p>
                   </div>
+                )}
 
-                  <div className="text-center p-3 sm:p-4 bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm">
-                    <div className="text-base sm:text-xl font-bold text-green-600 dark:text-green-400">
-                      {formatCurrency(totalReceived)}
-                    </div>
-                    <div className="text-xs sm:text-sm text-gray-600 dark:text-dark-text-secondary">
-                      Já Recebido
-                    </div>
+                <div>
+                  <label
+                    htmlFor="distribution-amount"
+                    className="block text-sm font-semibold text-gray-900 dark:text-dark-text mb-2"
+                  >
+                    Quanto o cliente pagou?
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-semibold text-gray-400">
+                      R$
+                    </span>
+                    <input
+                      id="distribution-amount"
+                      name="distributionAmount"
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      autoFocus
+                      value={distributionAmount}
+                      onChange={(e) => {
+                        setDistributionAmount(
+                          e.target.value.replace(/[^\d.,]/g, ""),
+                        );
+                        setErroEtapa(null);
+                      }}
+                      className="w-full pl-12 pr-4 py-3 border border-gray-300 dark:border-dark-border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-2xl font-semibold tabular-nums dark:bg-dark-bg dark:text-dark-text"
+                      placeholder="0,00"
+                    />
                   </div>
-
-                  {showDiscountBox ? (
-                    <div className="text-center p-3 sm:p-4 bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm">
-                      <div className="text-base sm:text-xl font-bold text-blue-600 dark:text-blue-400">
-                        {formatCurrency(discountAmount)}
-                      </div>
-                      <div className="text-xs sm:text-sm text-gray-600 dark:text-dark-text-secondary">
-                        Desconto Aplicado
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center p-3 sm:p-4 bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm">
-                      <div className="text-base sm:text-xl font-bold text-red-600 dark:text-red-400">
-                        {formatCurrency(totalPending)}
-                      </div>
-                      <div className="text-xs sm:text-sm text-gray-600 dark:text-dark-text-secondary">
-                        Saldo Devedor
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="text-center p-3 sm:p-4 bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm">
-                    <div className="text-base sm:text-xl font-bold text-purple-600 dark:text-purple-400">
-                      {clientSales?.length || 0}
-                    </div>
-                    <div className="text-xs sm:text-sm text-gray-600 dark:text-dark-text-secondary">
-                      Total Vendas
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Campo de Valor para Distribuição */}
-              <div className="mb-6">
-                <label
-                  htmlFor="distribution-amount"
-                  className="block text-base font-semibold text-gray-900 dark:text-dark-text mb-3"
-                >
-                  Valor a Distribuir
-                </label>
-                <div className="relative">
-                  <DollarSign className="absolute left-4 top-1/2 transform -translate-y-1/2 h-6 w-6 text-gray-400" />
-                  <input
-                    id="distribution-amount"
-                    name="distributionAmount"
-                    type="number"
-                    step="0.01"
-                    value={distributionAmount}
-                    onChange={(e) => setDistributionAmount(e.target.value)}
-                    className="w-full pl-12 pr-4 py-4 border-2 border-gray-300 dark:border-dark-border rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-base sm:text-2xl font-bold dark:bg-dark-bg dark:text-dark-text"
-                    placeholder="0,00"
-                    required
-                  />
-                </div>
-
-                {/* Atalhos de valor e ações */}
-                <div className="flex flex-wrap items-center justify-between gap-2 mt-3">
-                  <div className="flex flex-wrap gap-2">
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {!acordoAtivo &&
+                      vencidoTotal > 0.01 &&
+                      vencidoTotal < totalPending - 0.01 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDistributionAmount(valorParaCampo(vencidoTotal));
+                            setErroEtapa(null);
+                          }}
+                          className="px-3 py-1.5 text-xs font-medium rounded-full border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                        >
+                          Todo o vencido · {formatCurrency(vencidoTotal)}
+                        </button>
+                      )}
                     <button
                       id="total-balance-button"
                       type="button"
-                      onClick={() =>
-                        setDistributionAmount(totalPending.toFixed(2))
-                      }
-                      className="px-3 py-1.5 sm:px-4 sm:py-2 text-sm bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 rounded-full hover:bg-purple-200 dark:hover:bg-purple-900/60 transition-colors font-medium w-full sm:w-auto"
+                      onClick={() => {
+                        setDistributionAmount(valorParaCampo(totalPending));
+                        setErroEtapa(null);
+                      }}
+                      className="px-3 py-1.5 text-xs font-medium rounded-full border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100"
                     >
-                      Saldo Total ({formatCurrency(totalPending)})
-                    </button>
-                    <button
-                      id="R$-100-button"
-                      type="button"
-                      onClick={() => setDistributionAmount("100")}
-                      className="px-4 py-2 text-xs bg-gray-100 dark:bg-dark-bg-tertiary text-gray-700 dark:text-dark-text-secondary rounded-full hover:bg-gray-200 dark:hover:bg-dark-bg-tertiary transition-colors"
-                    >
-                      R$ 100
-                    </button>
-                    <button
-                      id="R$-500-button"
-                      type="button"
-                      onClick={() => setDistributionAmount("500")}
-                      className="px-4 py-2 text-xs bg-gray-100 dark:bg-dark-bg-tertiary text-gray-700 dark:text-dark-text-secondary rounded-full hover:bg-gray-200 dark:hover:bg-dark-bg-tertiary transition-colors"
-                    >
-                      R$ 500
-                    </button>
-                    <button
-                      id="R$-1000-button"
-                      type="button"
-                      onClick={() => setDistributionAmount("1000")}
-                      className="px-4 py-2 text-xs bg-gray-100 dark:bg-dark-bg-tertiary text-gray-700 dark:text-dark-text-secondary rounded-full hover:bg-gray-200 dark:hover:bg-dark-bg-tertiary transition-colors"
-                    >
-                      R$ 1.000
+                      Saldo total · {formatCurrency(totalPending)}
                     </button>
                   </div>
                 </div>
 
-                {/* Opção de Desconto */}
-                <div className="mt-4">
-                  <label
-                    className={`flex sm:inline-flex justify-center sm:justify-start items-center gap-2 px-4 py-2.5 rounded-full cursor-pointer transition-all ${
-                      withDiscount
-                        ? "bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300"
-                        : "bg-gray-100 dark:bg-dark-bg-tertiary text-gray-600 dark:text-dark-text-secondary hover:bg-gray-150"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      id="with-discount"
-                      name="withDiscount"
-                      className="sr-only"
-                      checked={withDiscount}
-                      onChange={(e) => setWithDiscount(e.target.checked)}
-                    />
-                    <TrendingDown className="h-4 w-4" />
-                    <span className="text-sm font-medium">
-                      Quitar com desconto
-                    </span>
-                  </label>
-                </div>
-
-                {/* Valor acima do vencido: juros/multa ou adiantamento */}
-                {!withDiscount && !acordoAtivo && vencidoTotal > 0.01 && (
-                  <p className="mt-3 text-xs text-gray-500 dark:text-dark-text-secondary">
-                    Vencido hoje:{" "}
-                    <span className="font-semibold text-red-600 dark:text-red-400">
-                      {formatCurrency(vencidoTotal)}
-                    </span>
-                  </p>
-                )}
+                {/* Excedente sobre o vencido: juros/multa ou adiantamento */}
                 {temExcedente && (
-                  <div className="mt-3 p-4 border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 rounded-2xl">
-                    <p className="text-sm font-semibold text-amber-900 dark:text-amber-200 mb-2">
-                      O valor passa {formatCurrency(excedente)} do vencido.
-                      Esse excedente é:
-                    </p>
-                    <div className="flex flex-col sm:flex-row gap-2">
+                  <fieldset>
+                    <legend className="text-sm font-semibold text-gray-900 dark:text-dark-text mb-2">
+                      Passou {formatCurrency(excedente)} do vencido. Esse valor
+                      a mais é:
+                    </legend>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {(
                         [
                           [
                             "juros",
                             "Juros / multa",
-                            "Fica registrado no pagamento e não abate nenhuma parcela.",
+                            "Fica registrado no pagamento e não abate parcela.",
                           ],
                           [
                             "adiantamento",
@@ -936,10 +914,10 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                       ).map(([valor, rotulo, ajuda]) => (
                         <label
                           key={valor}
-                          className={`flex-1 cursor-pointer rounded-2xl border-2 px-3 py-2 transition-colors ${
+                          className={`cursor-pointer rounded-xl border-2 px-3 py-2 transition-colors ${
                             destinoExcedente === valor
-                              ? "border-amber-500 dark:border-amber-500 bg-white dark:bg-dark-bg-secondary"
-                              : "border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 hover:bg-white dark:hover:bg-dark-bg-tertiary"
+                              ? "border-indigo-500 bg-indigo-50"
+                              : "border-gray-200 hover:border-gray-300"
                           }`}
                         >
                           <input
@@ -947,7 +925,10 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                             name="destinoExcedente"
                             value={valor}
                             checked={destinoExcedente === valor}
-                            onChange={() => setDestinoExcedente(valor)}
+                            onChange={() => {
+                              setDestinoExcedente(valor);
+                              setErroEtapa(null);
+                            }}
                             className="sr-only"
                           />
                           <span className="block text-sm font-semibold text-gray-900 dark:text-dark-text">
@@ -959,321 +940,367 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                         </label>
                       ))}
                     </div>
-                  </div>
+                  </fieldset>
                 )}
-              </div>
 
-              {/* Data do pagamento: so quem pode lancar baixa depois */}
-              {podeEscolherData && (
-                <div className="mb-6">
-                  <label
-                    htmlFor="payment-date"
-                    className="block text-base font-semibold text-gray-900 dark:text-dark-text mb-1"
-                  >
-                    Data do pagamento
-                  </label>
-                  <p className="text-xs text-gray-500 dark:text-dark-text-secondary mb-3">
-                    Dia em que o cliente pagou (pode ser antes de hoje, até{" "}
-                    {DIAS_RETROATIVOS} dias).
-                  </p>
+                {/* Quitacao com desconto */}
+                <label
+                  className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                    withDiscount
+                      ? "border-indigo-300 bg-indigo-50"
+                      : "border-gray-200 hover:bg-gray-50"
+                  }`}
+                >
                   <input
-                    id="payment-date"
-                    name="paymentDate"
-                    type="date"
-                    value={dataPagamento}
-                    min={dataMinima}
-                    max={hoje}
-                    onChange={(e) => setDataPagamento(e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-300 dark:border-dark-border rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm dark:bg-dark-bg dark:text-dark-text"
+                    type="checkbox"
+                    id="with-discount"
+                    name="withDiscount"
+                    checked={withDiscount}
+                    onChange={(e) => {
+                      setWithDiscount(e.target.checked);
+                      setErroEtapa(null);
+                    }}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                   />
-                  {!dataPagamentoValida && (
-                    <p className="text-xs text-red-600 dark:text-red-400 mt-2">
-                      Escolha uma data entre {dataMinima.split("-").reverse().join("/")} e hoje.
+                  <span className="text-sm">
+                    <span className="flex items-center gap-1.5 font-medium text-gray-900 dark:text-dark-text">
+                      <TrendingDown className="h-4 w-4 text-indigo-600" />
+                      Quitar tudo com desconto
+                    </span>
+                    <span className="block text-xs text-gray-600 dark:text-dark-text-secondary">
+                      {withDiscount && amountToDistribute > 0 && desconto > 0
+                        ? `Desconto de ${formatCurrency(desconto)} (${((desconto / totalPending) * 100).toFixed(1)}% do saldo de ${formatCurrency(totalPending)}). O gestor é avisado.`
+                        : `O que faltar para ${formatCurrency(totalPending)} vira desconto e todas as parcelas são quitadas.`}
+                    </span>
+                  </span>
+                </label>
+              </>
+            )}
+
+            {etapa === 2 && (
+              <>
+                <fieldset>
+                  <legend className="text-sm font-semibold text-gray-900 dark:text-dark-text mb-2">
+                    Como pagou?
+                  </legend>
+                  <div className="grid grid-cols-2 gap-2">
+                    {Object.entries(FORMA_PAGAMENTO_LABEL).map(
+                      ([valor, rotulo]) => (
+                        <label
+                          key={valor}
+                          className={`cursor-pointer rounded-xl border-2 px-3 py-2.5 text-sm font-medium text-center transition-colors ${
+                            paymentMethod === valor
+                              ? "border-indigo-500 bg-indigo-50 text-indigo-800"
+                              : "border-gray-200 text-gray-700 hover:border-gray-300"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="paymentMethod"
+                            value={valor}
+                            checked={paymentMethod === valor}
+                            onChange={() => setPaymentMethod(valor)}
+                            className="sr-only"
+                          />
+                          {rotulo}
+                        </label>
+                      ),
+                    )}
+                  </div>
+                </fieldset>
+
+                {/* Data: so quem pode lancar baixa depois (externo e hoje) */}
+                {podeEscolherData && (
+                  <fieldset>
+                    <legend className="text-sm font-semibold text-gray-900 dark:text-dark-text mb-2">
+                      Quando pagou?
+                    </legend>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {(
+                        [
+                          ["Hoje", hoje],
+                          ["Ontem", addDaysLocalStr(hoje, -1)],
+                        ] as const
+                      ).map(([rotulo, valor]) => (
+                        <button
+                          key={rotulo}
+                          type="button"
+                          onClick={() => {
+                            setDataPagamento(valor);
+                            setErroEtapa(null);
+                          }}
+                          className={`px-3 py-2 rounded-xl border-2 text-sm font-medium ${
+                            dataPagamento === valor
+                              ? "border-indigo-500 bg-indigo-50 text-indigo-800"
+                              : "border-gray-200 text-gray-700 hover:border-gray-300"
+                          }`}
+                        >
+                          {rotulo}
+                        </button>
+                      ))}
+                      <input
+                        id="payment-date"
+                        name="paymentDate"
+                        type="date"
+                        value={dataPagamento}
+                        min={dataMinima}
+                        max={hoje}
+                        onChange={(e) => {
+                          setDataPagamento(e.target.value);
+                          setErroEtapa(null);
+                        }}
+                        className="px-3 py-2 border border-gray-300 dark:border-dark-border rounded-xl text-sm dark:bg-dark-bg dark:text-dark-text"
+                        aria-label="Outra data"
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Até {DIAS_RETROATIVOS} dias atrás.
+                    </p>
+                  </fieldset>
+                )}
+
+                <div>
+                  <label
+                    htmlFor="observations"
+                    className="block text-sm font-semibold text-gray-900 dark:text-dark-text mb-2"
+                  >
+                    Observação{" "}
+                    <span className="font-normal text-gray-500">
+                      {observacaoObrigatoria
+                        ? withDiscount
+                          ? "(obrigatória: explique o desconto)"
+                          : "(obrigatória: explique os juros/multa)"
+                        : "(opcional)"}
+                    </span>
+                  </label>
+                  <textarea
+                    id="observations"
+                    name="observations"
+                    value={observations}
+                    onChange={(e) => {
+                      setObservations(e.target.value);
+                      setErroEtapa(null);
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm dark:bg-dark-bg dark:text-dark-text"
+                    rows={3}
+                    placeholder="Ex.: comprovante enviado pelo WhatsApp"
+                  />
+                </div>
+              </>
+            )}
+
+            {etapa === 3 && (
+              <>
+                {/* Resumo do que vai ser gravado */}
+                <div className="rounded-xl bg-gray-50 dark:bg-dark-bg-tertiary p-4">
+                  <p className="text-2xl font-semibold text-gray-900 dark:text-dark-text tabular-nums">
+                    {formatCurrency(amountToDistribute)}
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-dark-text-secondary">
+                    {formaRotulo}
+                    {podeEscolherData && ` · pago em ${dataTexto(dataPagamento)}`}
+                  </p>
+                  {(jurosValor > 0 || desconto > 0) && (
+                    <p className="mt-1 text-sm text-gray-600">
+                      {jurosValor > 0 &&
+                        `${formatCurrency(jurosValor)} de juros/multa (não abate parcela)`}
+                      {desconto > 0 && `Desconto de ${formatCurrency(desconto)}`}
+                    </p>
+                  )}
+                  {observations.trim() && (
+                    <p className="mt-1 text-xs text-gray-500 whitespace-pre-wrap">
+                      “{observations.trim()}”
                     </p>
                   )}
                 </div>
-              )}
 
-              {/* Forma de Pagamento */}
-              <div className="mb-6">
-                <label
-                  htmlFor="payment-method"
-                  className="block text-base font-semibold text-gray-900 dark:text-dark-text mb-3"
-                >
-                  Forma de Pagamento
-                </label>
-                <select
-                  id="payment-method"
-                  name="paymentMethod"
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-dark-border rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm dark:bg-dark-bg dark:text-dark-text"
-                >
-                  <option value="dinheiro">Dinheiro</option>
-                  <option value="pix">PIX</option>
-                  <option value="cartao_credito">Cartão de Crédito</option>
-                  <option value="cartao_debito">Cartão de Débito</option>
-                </select>
-              </div>
-
-              {/* Campo de Observações (New) */}
-              <div className="mb-6">
-                <label
-                  htmlFor="observations"
-                  className="block text-base font-semibold text-gray-900 dark:text-dark-text mb-3"
-                >
-                  Observações
-                </label>
-                <textarea
-                  id="observations"
-                  name="observations"
-                  value={observations}
-                  onChange={(e) => setObservations(e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-dark-border rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm dark:bg-dark-bg dark:text-dark-text"
-                  rows={3}
-                  placeholder="Adicione observações sobre este pagamento..."
-                  required
-                />
-              </div>
-
-              {/* Preview da Distribuição */}
-              {saleDistribution.length > 0 && (
-                <div className="mb-6">
-                  <div className="space-y-3 mb-6 max-h-96 overflow-y-auto">
-                    {saleDistribution.map((item) => (
-                      <div
-                        key={item.sale.saleNumber}
-                        className={`bg-white dark:bg-dark-bg-secondary rounded-2xl border-2 p-4 transition-all duration-200 ${
-                          item.appliedAmount > 0
-                            ? "border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/20 shadow-md"
-                            : "border-gray-200 dark:border-dark-border hover:border-gray-300"
-                        }`}
-                      >
-                        {/* Cabeçalho da Venda */}
-                        <div className="flex items-center justify-between mb-3">
-                          <div>
-                            <h4 className="text-base font-semibold text-gray-900 dark:text-dark-text">
-                              {item.sale.saleNumber === 0
-                                ? "Venda Renegociada"
-                                : `Venda #${item.sale.saleNumber}`}
-                            </h4>
-                            <div className="text-sm text-gray-600 dark:text-dark-text-secondary">
-                              {item.sale.installments?.length || 0} parcela
-                              {(item.sale.installments?.length || 0) !== 1
-                                ? "s"
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-dark-text mb-2">
+                    Vai abater
+                  </h3>
+                  {abatimentoPorParcela ? (
+                    <ul className="divide-y divide-gray-100 border border-gray-200 rounded-xl">
+                      {abatimentoPorParcela.map((p) => (
+                        <li
+                          key={p.idParcela}
+                          className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+                        >
+                          <span className="min-w-0">
+                            <span className="text-gray-900">
+                              {p.sale.saleNumber === 0
+                                ? "Renegociada"
+                                : `Venda #${p.sale.saleNumber}`}
+                              {p.numero != null && ` · Parcela ${p.numero}`}
+                            </span>
+                            <span
+                              className={`block text-xs ${p.vencida ? "text-red-600" : "text-gray-500"}`}
+                            >
+                              venc. {dataTexto(p.vencimento.slice(0, 10))}
+                              {p.vencida && " (vencida)"}
+                            </span>
+                          </span>
+                          <span className="text-right shrink-0">
+                            <span className="block font-medium tabular-nums">
+                              {formatCurrency(p.aplicado)}
+                            </span>
+                            <span
+                              className={`block text-xs ${p.quita ? "text-emerald-600" : "text-gray-500"}`}
+                            >
+                              {p.quita
+                                ? "quita"
+                                : `falta ${formatCurrency(p.saldo - p.aplicado)}`}
+                            </span>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <ul className="divide-y divide-gray-100 border border-gray-200 rounded-xl">
+                      {saleDistribution.map((item) => (
+                        <li
+                          key={item.sale.saleNumber}
+                          className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+                        >
+                          <span className="text-gray-900">
+                            {item.sale.saleNumber === 0
+                              ? "Venda renegociada"
+                              : `Venda #${item.sale.saleNumber}`}
+                          </span>
+                          <span className="text-right">
+                            <span className="block font-medium tabular-nums">
+                              {formatCurrency(item.appliedAmount)}
+                            </span>
+                            <span
+                              className={`block text-xs ${item.willBeComplete ? "text-emerald-600" : "text-gray-500"}`}
+                            >
+                              {item.appliedDiscount > 0
+                                ? `+ desconto ${formatCurrency(item.appliedDiscount)} · `
                                 : ""}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-xs text-gray-600 dark:text-dark-text-secondary">
-                              Valor Total
-                            </div>
-                            <div className="font-semibold text-gray-900 dark:text-dark-text text-base">
-                              {formatCurrency(item.sale.totalValue || 0)}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Informações de Pagamento */}
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                          <div className="bg-gray-50 dark:bg-dark-bg-tertiary rounded-2xl p-3">
-                            <div className="text-xs text-gray-600 dark:text-dark-text-secondary mb-1">
-                              Recebido Atualmente
-                            </div>
-                            <div className="font-semibold text-gray-900 dark:text-dark-text text-base">
-                              {formatCurrency(item.currentReceived)}
-                            </div>
-                          </div>
-
-                          <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-3">
-                            <div className="text-xs text-gray-600 dark:text-dark-text-secondary mb-1">
-                              Novo Total Recebido
-                            </div>
-                            <div className="font-semibold text-green-600 dark:text-green-400 text-base">
-                              {formatCurrency(item.newAmount)}
-                            </div>
-                          </div>
-
-                          <div className="bg-purple-50 dark:bg-purple-900/20 rounded-2xl p-3">
-                            <div className="text-xs text-gray-600 dark:text-dark-text-secondary mb-1">
-                              Valor Aplicado
-                            </div>
-                            <div className="font-semibold text-purple-600 dark:text-purple-400 text-base">
-                              +{formatCurrency(item.appliedAmount)}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Status da Venda */}
-                        <div className="mt-3 flex items-center justify-between">
-                          {item.willBeComplete ? (
-                            item.appliedDiscount > 0 ? (
-                              <div className="flex items-center text-blue-600 dark:text-blue-400 text-sm font-medium">
-                                <TrendingDown className="h-4 w-4 mr-1" />
-                                Quitado com Desconto:{" "}
-                                {formatCurrency(item.appliedDiscount)}
-                              </div>
-                            ) : (
-                              <div className="flex items-center text-green-600 dark:text-green-400 text-sm font-medium">
-                                <CheckCircle className="h-4 w-4 mr-1" />
-                                Venda Quitada
-                              </div>
-                            )
-                          ) : (
-                            <div className="text-sm text-gray-600 dark:text-dark-text-secondary">
-                              Saldo devedor:{" "}
-                              <span className="font-medium text-red-600 dark:text-red-400">
-                                {formatCurrency(
-                                  Math.max(
-                                    0,
-                                    (item.sale.totalValue || 0) -
-                                      item.newAmount -
-                                      (item.appliedDiscount || 0),
-                                  ),
-                                )}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Botões de Ação -- sticky pra nunca ficar escondido rolando o
-                  conteúdo (ex.: muitas vendas na distribuição, ou o aviso de
-                  acordo ativo empurrando o resto pra baixo). */}
-              <div className="sticky bottom-0 -mx-4 sm:-mx-6 -mb-4 sm:-mb-6 mt-6 px-4 sm:px-6 py-4 sm:py-6 bg-white dark:bg-dark-bg-secondary border-t border-gray-200 dark:border-dark-border z-10">
-                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:justify-end">
-                  <button
-                    id="confirm-button"
-                    type="submit"
-                    disabled={
-                      loading ||
-                      saleDistribution.length === 0 ||
-                      amountToDistribute <= 0 ||
-                      !dataPagamentoValida
-                    }
-                    className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold flex items-center justify-center shadow-lg text-base"
-                  >
-                    {loading ? (
-                      <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mr-2"></div>
-                    ) : (
-                      <CheckCircle className="h-5 w-5 mr-2" />
-                    )}
-                    {loading ? "Processando..." : "Confirmar Distribuição"}
-                  </button>
-
-                  <button
-                    id="cancel-button"
-                    type="button"
-                    onClick={onClose}
-                    className="w-full sm:w-auto px-6 py-2 border border-gray-300 dark:border-dark-border text-gray-700 dark:text-dark-text-secondary rounded-2xl hover:bg-gray-50 dark:hover:bg-dark-bg-tertiary transition-colors font-medium text-base"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-        {showRescheduleModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-[120]">
-            <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-xl max-w-md w-full mx-4">
-              <div className="px-4 lg:px-6 py-4 border-b border-gray-200 dark:border-dark-border">
-                <h3 className="text-base font-semibold text-gray-900 dark:text-dark-text flex items-center">
-                  <RefreshCw className="h-5 w-5 mr-2 text-blue-600 dark:text-blue-400" />
-                  Reagendar Visita
-                </h3>
-              </div>
-
-              <div className="px-4 lg:px-6 py-4">
-                <p className="text-sm text-gray-600 dark:text-dark-text-secondary mb-4">
-                  Depois deste pagamento ainda ficam{" "}
-                  <strong className="text-red-600 dark:text-red-400">
-                    {formatCurrency(vencidoRestante)}
-                  </strong>{" "}
-                  vencidos.{" "}
-                  Agende a próxima visita.
-                </p>
-                <div className="space-y-4">
-                  <div>
-                    <label
-                      htmlFor="reschedule-date"
-                      className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-2"
-                    >
-                      Nova Data *
-                    </label>
-                    <div className="relative">
-                      <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <input
-                        id="reschedule-date"
-                        name="reschedule-date"
-                        type="date"
-                        min={hoje}
-                        value={rescheduleDate}
-                        onChange={(e) => setRescheduleDate(e.target.value)}
-                        className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-dark-border rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base dark:bg-dark-bg dark:text-dark-text"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="reschedule-time"
-                      className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-2"
-                    >
-                      Novo Horário *
-                    </label>
-                    <div className="relative">
-                      <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <input
-                        id="reschedule-time"
-                        name="reschedule-time"
-                        type="time"
-                        value={rescheduleTime}
-                        onChange={(e) => setRescheduleTime(e.target.value)}
-                        className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-dark-border rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base dark:bg-dark-bg dark:text-dark-text"
-                        required
-                      />
-                    </div>
-                  </div>
-                  {rescheduleError && (
-                    <p className="text-sm text-red-600 dark:text-red-400">{rescheduleError}</p>
+                              {item.willBeComplete ? "quita a venda" : "abate parte"}
+                            </span>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
                   )}
                 </div>
-              </div>
 
-              <div className="px-4 lg:px-6 py-4 border-t border-gray-200 dark:border-dark-border flex flex-col sm:flex-row gap-3">
-                <button
-                  id="cancel-reschedule-button"
-                  type="button"
-                  onClick={() => setShowRescheduleModal(false)}
-                  disabled={loading}
-                  className="w-full sm:w-auto px-4 py-2 border border-gray-300 dark:border-dark-border text-gray-700 dark:text-dark-text-secondary rounded-2xl hover:bg-gray-50 dark:hover:bg-dark-bg-tertiary disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-base"
+                <p
+                  className={`text-sm ${precisaAcompanhamento ? "text-red-700" : "text-emerald-700"}`}
                 >
-                  Voltar
-                </button>
-                <button
-                  id="confirm-reschedule-button"
-                  type="button"
-                  onClick={handleConfirmReschedule}
-                  disabled={
-                    loading || !rescheduleDate || !rescheduleTime
-                  }
-                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-2xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center text-base"
-                >
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  {loading
-                    ? "Salvando..."
-                    : "Confirmar pagamento e agendamento"}
-                </button>
-              </div>
-            </div>
+                  {precisaAcompanhamento
+                    ? `Depois deste pagamento ainda ficam ${formatCurrency(vencidoRestante)} vencidos.`
+                    : "Depois deste pagamento o cliente fica sem valor vencido."}
+                </p>
+
+                {ehCarteira && !contatoJaRegistrado && isOnline && (
+                  <p className="text-xs text-gray-500">
+                    Fica registrado no histórico como contato “
+                    {ATTEMPT_RESULT_LABELS[
+                      precisaAcompanhamento ? "partial_payment" : "full_payment"
+                    ]}
+                    ”.
+                  </p>
+                )}
+
+                {/* Externo com vencido sobrando: proxima visita aqui mesmo */}
+                {precisaAcompanhamento && ehExterno && (
+                  <fieldset className="rounded-xl border border-gray-200 p-3">
+                    <legend className="px-1 text-sm font-semibold text-gray-900 dark:text-dark-text">
+                      Próxima visita
+                    </legend>
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="text-xs text-gray-600">
+                        <span className="flex items-center gap-1 mb-1">
+                          <Calendar className="h-3.5 w-3.5" /> Data
+                        </span>
+                        <input
+                          id="reschedule-date"
+                          name="reschedule-date"
+                          type="date"
+                          min={hoje}
+                          value={rescheduleDate}
+                          onChange={(e) => {
+                            setRescheduleDate(e.target.value);
+                            setErroEtapa(null);
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-xl text-sm dark:bg-dark-bg dark:text-dark-text"
+                        />
+                      </label>
+                      <label className="text-xs text-gray-600">
+                        <span className="flex items-center gap-1 mb-1">
+                          <Clock className="h-3.5 w-3.5" /> Horário
+                        </span>
+                        <input
+                          id="reschedule-time"
+                          name="reschedule-time"
+                          type="time"
+                          value={rescheduleTime}
+                          onChange={(e) => {
+                            setRescheduleTime(e.target.value);
+                            setErroEtapa(null);
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-xl text-sm dark:bg-dark-bg dark:text-dark-text"
+                        />
+                      </label>
+                    </div>
+                  </fieldset>
+                )}
+              </>
+            )}
+
+            {erroEtapa && (
+              <p
+                role="alert"
+                className="p-3 rounded-xl border border-red-200 bg-red-50 text-sm text-red-700"
+              >
+                {erroEtapa}
+              </p>
+            )}
           </div>
-        )}
+
+          {/* Rodape fixo */}
+          <div className="px-4 sm:px-6 py-3 border-t border-gray-200 dark:border-dark-border flex gap-3 shrink-0 bg-white dark:bg-dark-bg-secondary">
+            <button
+              id="cancel-button"
+              type="button"
+              onClick={etapa === 1 ? onClose : voltar}
+              disabled={loading}
+              className="px-4 py-2.5 border border-gray-300 dark:border-dark-border text-gray-700 dark:text-dark-text-secondary rounded-xl hover:bg-gray-50 dark:hover:bg-dark-bg-tertiary text-sm font-medium disabled:opacity-50"
+            >
+              {etapa === 1 ? "Cancelar" : "Voltar"}
+            </button>
+            <button
+              id="confirm-button"
+              type="submit"
+              disabled={loading}
+              className={`flex-1 px-4 py-2.5 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                etapa === 3
+                  ? "bg-emerald-600 hover:bg-emerald-700"
+                  : "bg-indigo-600 hover:bg-indigo-700"
+              }`}
+            >
+              {loading ? (
+                <>
+                  <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                  Gravando...
+                </>
+              ) : etapa === 3 ? (
+                <>
+                  <CheckCircle className="h-4 w-4" />
+                  {precisaAcompanhamento && ehExterno
+                    ? "Confirmar pagamento e visita"
+                    : `Confirmar ${formatCurrency(amountToDistribute)}`}
+                </>
+              ) : (
+                <>
+                  Continuar
+                  <ChevronRight className="h-4 w-4" />
+                </>
+              )}
+            </button>
+          </div>
+        </form>
       </div>
     );
   },
