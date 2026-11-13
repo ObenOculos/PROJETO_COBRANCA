@@ -4060,9 +4060,16 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
               active.reduce((sum, inst) => sum + inst.valor_recebido, 0),
             ),
           );
+          // Desconto ja concedido tambem fecha a parcela (mesma conta do
+          // saldo por parcela: original - recebido - desconto). Sem isso uma
+          // venda quitada com desconto aparecia com saldo no Receber
+          // pagamento ("Quitar com desconto" sobre um total inflado).
+          const totalDiscount = roundTo2Decimals(
+            active.reduce((sum, inst) => sum + (inst.desconto || 0), 0),
+          );
           const pendingValue = Math.max(
             0,
-            roundTo2Decimals(totalValue - totalReceived),
+            roundTo2Decimals(totalValue - totalReceived - totalDiscount),
           );
           const balance = calculateSaleBalance(saleNumber, clientDocument);
           const payments = getSalePayments(saleNumber, clientDocument);

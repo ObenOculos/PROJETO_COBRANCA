@@ -358,7 +358,14 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
 
     // Valor acima do esperado: segura o Continuar por 5 s (reinicia a cada
     // mudanca de valor ou de parcelas).
-    const avisoAcima = modoParcelas && alocacao.situacao === "acima";
+    // Sem parcela vencida na marcacao nao ha juros: o a mais nao tem para
+    // onde ir (adiantar = marcar mais parcelas) -- bloqueia.
+    const acimaSemJuros =
+      modoParcelas &&
+      alocacao.situacao === "acima" &&
+      alocacao.jurosSugerido <= 0.01;
+    const avisoAcima =
+      modoParcelas && alocacao.situacao === "acima" && !acimaSemJuros;
     useEffect(() => {
       if (!avisoAcima) {
         setSegundosAviso(0);
@@ -537,6 +544,9 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       if (amountToDistribute <= 0) return "Informe o valor que o cliente pagou.";
       if (modoParcelas && alocacao.situacao === "entre" && !escolhaFalta) {
         return `Faltam ${formatCurrency(alocacao.falta)} para fechar. Diga se o juros foi dispensado ou se o pagamento foi parcial.`;
+      }
+      if (acimaSemJuros) {
+        return `Você marcou ${formatCurrency(alocacao.esperado)} em parcelas que ainda não venceram (sem juros). O valor não pode passar disso${qtdMarcadas < parcelasAbertas.length ? " — para adiantar mais, marque mais parcelas" : ""}.`;
       }
       if (avisoAcima && segundosAviso > 0) {
         return "Confira o valor antes de continuar.";
@@ -1158,6 +1168,28 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                 </div>
 
                 {/* Conferencia do valor com as parcelas marcadas */}
+                {modoParcelas && qtdMarcadas === 0 && amountToDistribute > 0 && (
+                  <p className="p-3 rounded-xl border border-sky-200 bg-sky-50 text-sm text-sky-900">
+                    Marque acima as parcelas que o cliente está pagando — o
+                    valor é conferido com elas.
+                  </p>
+                )}
+                {acimaSemJuros && (
+                  <p
+                    role="alert"
+                    className="flex items-start gap-2 p-3 rounded-xl border-2 border-red-300 bg-red-50 text-sm text-red-800"
+                  >
+                    <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                    <span>
+                      Valor {formatCurrency(alocacao.aMais)} acima das parcelas
+                      marcadas ({formatCurrency(alocacao.esperado)}). Parcela a
+                      vencer não tem juros: confira o valor
+                      {qtdMarcadas < parcelasAbertas.length &&
+                        " ou marque mais parcelas"}
+                      .
+                    </span>
+                  </p>
+                )}
                 {modoParcelas && alocacao.situacao === "fecha" && (
                   <p className="flex items-center gap-2 text-sm text-emerald-700">
                     <CheckCircle className="h-4 w-4 shrink-0" />
@@ -1288,7 +1320,9 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                   </p>
                 )}
 
-                {/* Quitacao com desconto */}
+                {/* Quitacao com desconto: so quando o valor deixa algo a
+                    descontar (com o valor cheio a opcao confundia). */}
+                {(withDiscount || amountToDistribute < totalPending - 0.01) && (
                 <label
                   className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
                     withDiscount
@@ -1319,6 +1353,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                     </span>
                   </span>
                 </label>
+                )}
               </>
             )}
 
