@@ -41,6 +41,14 @@ interface DailyReportData {
   date: string;
   totalReceived: number;
   totalTransactions: number;
+  /** Soma dos descontos dados NOS pagamentos do período. */
+  totalPaymentDiscount: number;
+  /** Situação atual das dívidas envolvidas, cada cliente/venda contado uma vez. */
+  debtTotals: {
+    totalDebt: number;
+    totalPaidOnDebt: number;
+    remainingDebt: number;
+  };
   collectorSummary: {
     collectorId: string;
     collectorName: string;
@@ -58,7 +66,10 @@ interface DailyReportData {
     totalReceivedValue: number;
     totalPaidOnDebt: number;
     totalPendingValue: number;
-    totalDiscount: number;
+    /** Desconto dado neste pagamento. */
+    paymentDiscount: number;
+    /** Chave cliente/venda da dívida (para não somar a mesma dívida 2x). */
+    debtKey: string;
     totalDebt: number;
     remainingDebt: number;
     receivedDate: string;
@@ -465,7 +476,8 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
         totalReceivedValue: number;
         totalPaidOnDebt: number;
         totalPendingValue: number;
-        totalDiscount: number;
+        paymentDiscount: number;
+        debtKey: string;
         totalDebt: number;
         remainingDebt: number;
         receivedDate: string;
@@ -546,7 +558,12 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
             (specificInstallment?.valor_original || 0) -
               (specificInstallment?.valor_recebido || 0),
           ),
-          totalDiscount: totalDiscountValue,
+          paymentDiscount: Number(payment.discountAmount) || 0,
+          debtKey: `${payment.clientDocument}|${
+            payment.saleNumber && payment.saleNumber !== 0
+              ? payment.saleNumber
+              : "*"
+          }`,
           totalDebt: totalDebtValue,
           remainingDebt: currentRemainingDebt,
           receivedDate: payment.paymentDate || selectedDate,
@@ -597,12 +614,30 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       ),
     }));
 
+    // Dívida (total, pago, pendente) é a situação ATUAL do cliente/venda e se
+    // repete em cada pagamento dele: somar linha a linha contava em dobro quem
+    // pagou mais de uma vez no período. Aqui cada cliente/venda entra uma vez.
+    const seenDebt = new Set<string>();
+    const debtTotals = { totalDebt: 0, totalPaidOnDebt: 0, remainingDebt: 0 };
+    payments.forEach((p) => {
+      if (seenDebt.has(p.debtKey)) return;
+      seenDebt.add(p.debtKey);
+      debtTotals.totalDebt += p.totalDebt;
+      debtTotals.totalPaidOnDebt += p.totalPaidOnDebt;
+      debtTotals.remainingDebt += p.remainingDebt;
+    });
+
     return {
       date:
         dateRangeMode === "single"
           ? formatDate(selectedDate)
           : `${formatDate(selectedDate)} - ${formatDate(endDate)}`,
       totalReceived: payments.reduce((sum, p) => sum + p.totalReceivedValue, 0),
+      totalPaymentDiscount: payments.reduce(
+        (sum, p) => sum + p.paymentDiscount,
+        0,
+      ),
+      debtTotals,
       totalTransactions: salesMap.size, // Conta vendas únicas em vez de parcelas
       collectorSummary,
       payments,
@@ -671,7 +706,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       ["Total Arrecadado", reportData.totalReceived],
       [
         "Total de Descontos",
-        reportData.payments.reduce((sum, p) => sum + p.totalDiscount, 0),
+        reportData.totalPaymentDiscount,
       ],
       ["Quantidade de Vendas", reportData.totalTransactions],
       ["Cobradores Ativos", reportData.collectorSummary.length],
@@ -747,7 +782,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       p.paymentMethod,
       p.totalReceivedValue,
       p.totalPaidOnDebt,
-      p.totalDiscount,
+      p.paymentDiscount,
       p.totalDebt,
       p.remainingDebt,
       formatDate(p.receivedDate),
@@ -1447,10 +1482,10 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                         </td>
                         <td className="px-4 py-4 text-right hidden md:table-cell">
                           <p
-                            className={`text-xs font-bold ${payment.totalDiscount > 0 ? "text-orange-600" : "text-gray-350 dark:text-gray-650"}`}
+                            className={`text-xs font-bold ${payment.paymentDiscount > 0 ? "text-orange-600" : "text-gray-350 dark:text-gray-650"}`}
                           >
-                            {payment.totalDiscount > 0
-                              ? formatCurrency(payment.totalDiscount)
+                            {payment.paymentDiscount > 0
+                              ? formatCurrency(payment.paymentDiscount)
                               : "-"}
                           </p>
                         </td>
@@ -1551,7 +1586,7 @@ const generateReportContent = (
     "=".repeat(60),
     "",
     `Total Recebido: ${formatCurrency(data.totalReceived)}`,
-    `Total de Descontos: ${formatCurrency(data.payments.reduce((sum, p) => sum + p.totalDiscount, 0))}`,
+    `Total de Descontos: ${formatCurrency(data.totalPaymentDiscount)}`,
     `Total de Vendas: ${data.totalTransactions}`,
     `Cobradores Ativos: ${data.collectorSummary.length}`,
     "",
@@ -1579,7 +1614,7 @@ const generateReportContent = (
         `Data do Pagamento: ${formatDate(payment.receivedDate)}`,
         `${payment.saleNumber ? `Venda: #${payment.saleNumber}` : "Venda sem número"} | Loja: ${payment.store}`,
         `Forma de Pagamento: ${payment.paymentMethod}`,
-        `Valor Recebido: ${formatCurrency(payment.totalReceivedValue)} | Desconto: ${formatCurrency(payment.totalDiscount)}`,
+        `Valor Recebido: ${formatCurrency(payment.totalReceivedValue)} | Desconto: ${formatCurrency(payment.paymentDiscount)}`,
         `Total da Dívida: ${formatCurrency(payment.totalDebt)} | Pendente Atual: ${payment.remainingDebt > 0 ? formatCurrency(payment.remainingDebt) : "Quitado"}`,
         `Cobrador: ${payment.collector}`,
         "",
@@ -1827,7 +1862,7 @@ const generatePrintableReport = (
           </div>
           <div class="summary-item">
             <div class="label">Total Descontos</div>
-            <div class="value">${formatCurrency(data.payments.reduce((sum, p) => sum + p.totalDiscount, 0))}</div>
+            <div class="value">${formatCurrency(data.totalPaymentDiscount)}</div>
           </div>
           <div class="summary-item">
             <div class="label">Total de Vendas</div>
@@ -1895,7 +1930,7 @@ const generatePrintableReport = (
             <td>${p.paymentMethod}</td>
             <td style="font-weight: bold; text-align: right;">${formatCurrency(p.totalReceivedValue)}</td>
             <td style="text-align: right;">${formatCurrency(p.totalPaidOnDebt)}</td>
-            <td style="text-align: right; color: #e67e22;">${p.totalDiscount > 0 ? formatCurrency(p.totalDiscount) : "-"}</td>
+            <td style="text-align: right; color: #e67e22;">${p.paymentDiscount > 0 ? formatCurrency(p.paymentDiscount) : "-"}</td>
             <td style="text-align: right;">${formatCurrency(p.totalDebt)}</td>
             <td style="font-weight: bold; text-align: right; color: ${p.remainingDebt > 0 ? "#e74c3c" : "#2ecc71"};">${p.remainingDebt > 0 ? formatCurrency(p.remainingDebt) : "Quitado"}</td>
             <td>${p.collector}</td>
@@ -1914,12 +1949,12 @@ const generatePrintableReport = (
               <span class="value">${data.totalTransactions}</span>
             </div>
             <div class="total-row">
-              <span class="label">Total Original da Dívida:</span>
-              <span class="value">${formatCurrency(data.payments.reduce((sum, p) => sum + p.totalDebt, 0))}</span>
+              <span class="label">Dívida Total dos Clientes:</span>
+              <span class="value">${formatCurrency(data.debtTotals.totalDebt)}</span>
             </div>
             <div class="total-row">
-              <span class="label">Total já Pago (Histórico):</span>
-              <span class="value">${formatCurrency(data.payments.reduce((sum, p) => sum + p.totalPaidOnDebt, 0))}</span>
+              <span class="label">Já Pago pelos Clientes (Histórico):</span>
+              <span class="value">${formatCurrency(data.debtTotals.totalPaidOnDebt)}</span>
             </div>
           </div>
           <div class="totals-column">
@@ -1929,11 +1964,11 @@ const generatePrintableReport = (
             </div>
             <div class="total-row">
               <span class="label">Total Descontos:</span>
-              <span class="value">${formatCurrency(data.payments.reduce((sum, p) => sum + p.totalDiscount, 0))}</span>
+              <span class="value">${formatCurrency(data.totalPaymentDiscount)}</span>
             </div>
             <div class="total-row">
-              <span class="label">Total Pendente:</span>
-              <span class="value">${formatCurrency(data.payments.reduce((sum, p) => sum + p.remainingDebt, 0))}</span>
+              <span class="label">Pendente Atual dos Clientes:</span>
+              <span class="value">${formatCurrency(data.debtTotals.remainingDebt)}</span>
             </div>
           </div>
         </div>
@@ -1958,8 +1993,8 @@ const generatePrintableReport = (
               <span class="value">${data.totalTransactions}</span>
             </div>
             <div class="total-row">
-              <span class="label">Total Devido:</span>
-              <span class="value">${formatCurrency(data.payments.reduce((sum, p) => sum + p.totalOriginalValue, 0))}</span>
+              <span class="label">Dívida Total dos Clientes:</span>
+              <span class="value">${formatCurrency(data.debtTotals.totalDebt)}</span>
             </div>
           </div>
           <div class="totals-column">
@@ -1968,8 +2003,8 @@ const generatePrintableReport = (
               <span class="value">${formatCurrency(data.totalReceived)}</span>
             </div>
             <div class="total-row">
-              <span class="label">Total Pendente:</span>
-              <span class="value">${formatCurrency(data.payments.reduce((sum, p) => sum + p.totalPendingValue, 0))}</span>
+              <span class="label">Pendente Atual dos Clientes:</span>
+              <span class="value">${formatCurrency(data.debtTotals.remainingDebt)}</span>
             </div>
           </div>
         </div>
