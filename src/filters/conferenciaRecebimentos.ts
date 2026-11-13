@@ -43,7 +43,8 @@ export const classificarConferencia = (
 ): ConferenciaSituacao => {
   const temBase = baseValor > CONFERENCIA_TOLERANCIA;
   const temApp = Math.abs(appValor) > CONFERENCIA_TOLERANCIA;
-  if (Math.abs(appValor - baseValor) <= CONFERENCIA_TOLERANCIA) return "confere";
+  if (Math.abs(appValor - baseValor) <= CONFERENCIA_TOLERANCIA)
+    return "confere";
   if (temBase && !temApp) return "sem_registro_app";
   if (!temBase && temApp) return "sem_baixa_base";
   return appValor > baseValor ? "app_maior" : "base_maior";
@@ -57,13 +58,14 @@ export const classificarConferencia = (
  */
 export type ConferenciaGrupo = "acao" | "juros" | "confere";
 
-export const CONFERENCIA_GRUPO: Record<ConferenciaSituacao, ConferenciaGrupo> = {
-  sem_registro_app: "acao",
-  base_maior: "acao",
-  sem_baixa_base: "acao",
-  app_maior: "juros",
-  confere: "confere",
-};
+export const CONFERENCIA_GRUPO: Record<ConferenciaSituacao, ConferenciaGrupo> =
+  {
+    sem_registro_app: "acao",
+    base_maior: "acao",
+    sem_baixa_base: "acao",
+    app_maior: "juros",
+    confere: "confere",
+  };
 
 export const CONFERENCIA_GRUPO_LABEL: Record<ConferenciaGrupo, string> = {
   acao: "Precisa conferir",
@@ -77,3 +79,51 @@ export const CONFERENCIA_GRUPO_DICA: Record<ConferenciaGrupo, string> = {
     "O app tem mais que a base. Diferença pequena costuma ser juros (a base só guarda o principal).",
   confere: "Valor do app igual ao baixado na base (até R$ 1 de diferença).",
 };
+
+/**
+ * Marcacao do gestor (tabela conferencia_marcacoes, item 61 etapa D). Historico:
+ * vale a ultima do cliente no mes; reabrir e uma marcacao nova.
+ */
+export interface ConferenciaMarcacao {
+  id: string;
+  mes: string;
+  documento: string;
+  acao: "conferido" | "reaberto";
+  observacao: string | null;
+  visao: "todos" | "carteira";
+  base_valor: number;
+  app_valor: number;
+  registrado_por_id: string;
+  created_at: string;
+}
+
+export type ConferenciaEstadoMarcacao = "conferido" | "mudou" | null;
+
+/**
+ * Estado da linha pela ultima marcacao: "conferido" se marcada e os valores
+ * nao mudaram desde entao (mesma visao, ate a tolerancia); "mudou" se marcada
+ * e entrou baixa/registro novo depois -- volta a pedir conferencia. Marcacao
+ * feita na outra visao vale sem comparar valores (os totais das visoes diferem).
+ */
+export const estadoMarcacao = (
+  ultima: ConferenciaMarcacao | undefined,
+  visao: "todos" | "carteira",
+  baseValor: number,
+  appValor: number,
+): ConferenciaEstadoMarcacao => {
+  if (!ultima || ultima.acao !== "conferido") return null;
+  if (ultima.visao !== visao) return "conferido";
+  const igual =
+    Math.abs(Number(ultima.base_valor) - baseValor) <= CONFERENCIA_TOLERANCIA &&
+    Math.abs(Number(ultima.app_valor) - appValor) <= CONFERENCIA_TOLERANCIA;
+  return igual ? "conferido" : "mudou";
+};
+
+/** Conferir com diferenca acima da tolerancia exige observacao (igual ao CHECK da tabela). */
+export const marcacaoPedeObservacao = (
+  acao: "conferido" | "reaberto",
+  baseValor: number,
+  appValor: number,
+): boolean =>
+  acao === "reaberto" ||
+  Math.abs(appValor - baseValor) > CONFERENCIA_TOLERANCIA;

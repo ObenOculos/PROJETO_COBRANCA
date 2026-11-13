@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -36,6 +37,9 @@ import {
   ConferenciaSituacao,
   CONFERENCIA_SITUACAO_DICA,
   CONFERENCIA_SITUACAO_LABEL,
+  ConferenciaEstadoMarcacao,
+  ConferenciaMarcacao,
+  estadoMarcacao,
 } from "../../filters/conferenciaRecebimentos";
 
 // Item 50: conferencia mensal do gestor -- base do app (BANCO_DADOS, atualizada
@@ -48,6 +52,11 @@ import {
 // Tela (2026-11-13): cobrador em chips no topo, busca por nome/CPF, cards de
 // grupo (precisa conferir / provavel juros / confere) que filtram a lista, e
 // uma lista unica de clientes logo abaixo.
+//
+// Etapa D: o gestor marca o cliente do mes como conferido (tabela
+// conferencia_marcacoes, migration 20261113000005, so INSERT). Conferido e
+// sem mudanca desde a marcacao sai de "Precisa conferir" e vai para "Ja
+// conferidos"; se entrou baixa/registro novo depois, volta a pedir conferencia.
 
 interface LinhaRpc {
   cobrador_id: string | null;
@@ -77,7 +86,25 @@ interface LinhaCliente {
   appLancamentos: number;
   appCedrus: number;
   situacao: ConferenciaSituacao;
+  marcacao: ConferenciaEstadoMarcacao;
+  ultima: ConferenciaMarcacao | undefined;
 }
+
+// Grupo da tela: os da regra + "conferido" (marcado pelo gestor).
+type GrupoTela = ConferenciaGrupo | "conferido";
+
+const grupoDe = (c: LinhaCliente): GrupoTela =>
+  c.marcacao === "conferido" ? "conferido" : CONFERENCIA_GRUPO[c.situacao];
+
+const GRUPO_TELA_LABEL: Record<GrupoTela, string> = {
+  ...CONFERENCIA_GRUPO_LABEL,
+  conferido: "Já conferidos",
+};
+const GRUPO_TELA_DICA: Record<GrupoTela, string> = {
+  ...CONFERENCIA_GRUPO_DICA,
+  conferido:
+    "Marcados como conferidos pelo gestor neste mês, sem baixa ou registro novo depois.",
+};
 
 interface GrupoCobrador {
   id: string; // "" = sem cobrador (so na visao "todos")
@@ -98,7 +125,7 @@ const SITUACOES: ConferenciaSituacao[] = [
   "confere",
 ];
 
-const GRUPOS: ConferenciaGrupo[] = ["acao", "juros", "confere"];
+const GRUPOS: GrupoTela[] = ["acao", "juros", "confere", "conferido"];
 
 const SITUACAO_TONE: Record<ConferenciaSituacao, string> = {
   confere:
@@ -113,24 +140,28 @@ const SITUACAO_TONE: Record<ConferenciaSituacao, string> = {
 };
 
 // Card de grupo: borda/numero quando selecionado e quando nao.
-const GRUPO_TONE: Record<ConferenciaGrupo, { ativo: string; numero: string }> =
-  {
-    acao: {
-      ativo:
-        "border-red-300 bg-red-50 ring-1 ring-red-200 dark:border-red-700 dark:bg-red-900/20 dark:ring-red-800/50",
-      numero: "text-red-600 dark:text-red-400",
-    },
-    juros: {
-      ativo:
-        "border-blue-300 bg-blue-50 ring-1 ring-blue-200 dark:border-blue-700 dark:bg-blue-900/20 dark:ring-blue-800/50",
-      numero: "text-blue-600 dark:text-blue-400",
-    },
-    confere: {
-      ativo:
-        "border-green-300 bg-green-50 ring-1 ring-green-200 dark:border-green-700 dark:bg-green-900/20 dark:ring-green-800/50",
-      numero: "text-green-600 dark:text-green-400",
-    },
-  };
+const GRUPO_TONE: Record<GrupoTela, { ativo: string; numero: string }> = {
+  conferido: {
+    ativo:
+      "border-teal-300 bg-teal-50 ring-1 ring-teal-200 dark:border-teal-700 dark:bg-teal-900/20 dark:ring-teal-800/50",
+    numero: "text-teal-600 dark:text-teal-400",
+  },
+  acao: {
+    ativo:
+      "border-red-300 bg-red-50 ring-1 ring-red-200 dark:border-red-700 dark:bg-red-900/20 dark:ring-red-800/50",
+    numero: "text-red-600 dark:text-red-400",
+  },
+  juros: {
+    ativo:
+      "border-blue-300 bg-blue-50 ring-1 ring-blue-200 dark:border-blue-700 dark:bg-blue-900/20 dark:ring-blue-800/50",
+    numero: "text-blue-600 dark:text-blue-400",
+  },
+  confere: {
+    ativo:
+      "border-green-300 bg-green-50 ring-1 ring-green-200 dark:border-green-700 dark:bg-green-900/20 dark:ring-green-800/50",
+    numero: "text-green-600 dark:text-green-400",
+  },
+};
 
 const POR_PAGINA = 50;
 
@@ -210,9 +241,12 @@ const ConferenciaRecebimentos: React.FC = () => {
   const [infoOpen, setInfoOpen] = useState(false);
   // null = todos os cobradores; "" = "Sem cobrador".
   const [cobradorSel, setCobradorSel] = useState<string | null>(null);
-  const [grupoFiltro, setGrupoFiltro] = useState<ConferenciaGrupo | "todos">(
-    "acao",
+  const [grupoFiltro, setGrupoFiltro] = useState<GrupoTela | "todos">("acao");
+  // Marcacoes do mes (historico; vale a ultima por cliente). null = carregando.
+  const [marcacoes, setMarcacoes] = useState<ConferenciaMarcacao[] | null>(
+    null,
   );
+  const [versaoMarcacoes, setVersaoMarcacoes] = useState(0);
   const [situacaoFiltro, setSituacaoFiltro] =
     useState<ConferenciaSituacao | null>(null);
   const [busca, setBusca] = useState("");
@@ -268,6 +302,73 @@ const ConferenciaRecebimentos: React.FC = () => {
     };
   }, [mes, visao]);
 
+  useEffect(() => {
+    let cancelado = false;
+    const { inicio } = limitesDoMes(mes);
+    (async () => {
+      try {
+        const dados = await fetchAllRows<ConferenciaMarcacao>((from, to) =>
+          supabase
+            .from("conferencia_marcacoes")
+            .select("*")
+            .eq("mes", inicio)
+            .order("created_at")
+            .order("id")
+            .range(from, to)
+            .returns<ConferenciaMarcacao[]>(),
+        );
+        if (!cancelado) setMarcacoes(dados);
+      } catch (e) {
+        // Sem a tabela (migration nao aplicada) a conferencia segue sem
+        // marcacoes; o detalhe avisa ao tentar marcar.
+        console.error("Erro ao carregar marcações da conferência:", e);
+        if (!cancelado) setMarcacoes([]);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [mes, versaoMarcacoes]);
+
+  // Historico por documento, em ordem de registro (a ultima vale).
+  const marcacoesPorDoc = useMemo(() => {
+    const m = new Map<string, ConferenciaMarcacao[]>();
+    (marcacoes ?? []).forEach((x) => {
+      const lista = m.get(x.documento);
+      if (lista) lista.push(x);
+      else m.set(x.documento, [x]);
+    });
+    return m;
+  }, [marcacoes]);
+
+  const marcar = async (
+    c: LinhaCliente,
+    acao: "conferido" | "reaberto",
+    observacao: string,
+  ) => {
+    if (!user?.id) throw new Error("Sessão sem usuário.");
+    const r2 = (v: number) => Math.round(v * 100) / 100;
+    const { error, status } = await supabase
+      .from("conferencia_marcacoes")
+      .insert({
+        mes: limitesDoMes(mes).inicio,
+        documento: c.documento,
+        acao,
+        observacao: observacao.trim() || null,
+        visao,
+        base_valor: r2(c.baseValor),
+        app_valor: r2(c.appValor),
+        registrado_por_id: user.id,
+      });
+    // Insert sem retorno: tabela inexistente volta 404 com erro vazio.
+    if (error)
+      throw {
+        code: error.code || (status === 404 ? "PGRST205" : undefined),
+        message: error.message || `HTTP ${status}`,
+      };
+    setVersaoMarcacoes((v) => v + 1);
+  };
+
   // Lista volta a 1a pagina quando o recorte muda.
   useEffect(() => {
     setPagina(1);
@@ -315,7 +416,11 @@ const ConferenciaRecebimentos: React.FC = () => {
         return;
       }
       const situacao = classificarConferencia(baseValor, appValor);
-      if (CONFERENCIA_GRUPO[situacao] === "acao") g.pendencias++;
+      const historico = marcacoesPorDoc.get(l.documento ?? "");
+      const ultima = historico?.[historico.length - 1];
+      const marcacao = estadoMarcacao(ultima, visao, baseValor, appValor);
+      if (marcacao !== "conferido" && CONFERENCIA_GRUPO[situacao] === "acao")
+        g.pendencias++;
       g.clientes.push({
         chave: `${l.documento ?? ""}:${id}:${i}`,
         cobradorId: l.cobrador_id,
@@ -329,6 +434,8 @@ const ConferenciaRecebimentos: React.FC = () => {
         appLancamentos: l.app_lancamentos,
         appCedrus: num(l.app_cedrus),
         situacao,
+        marcacao,
+        ultima,
       });
     });
     // "Sem cobrador" por ultimo; os demais pelo nome.
@@ -338,7 +445,7 @@ const ConferenciaRecebimentos: React.FC = () => {
         if (!a.id !== !b.id) return a.id ? -1 : 1;
         return a.nome.localeCompare(b.nome, "pt-BR");
       });
-  }, [linhas, nomePorId]);
+  }, [linhas, nomePorId, marcacoesPorDoc, visao]);
 
   // Cobrador escolhido que sumiu (troca de mes/visao) volta para "Todos".
   const cobradorAtual =
@@ -371,8 +478,8 @@ const ConferenciaRecebimentos: React.FC = () => {
       base: 0,
       app: 0,
       cedrus: 0,
-      porGrupo: { acao: 0, juros: 0, confere: 0 } as Record<
-        ConferenciaGrupo,
+      porGrupo: { acao: 0, juros: 0, confere: 0, conferido: 0 } as Record<
+        GrupoTela,
         number
       >,
       porSituacao: {
@@ -387,18 +494,20 @@ const ConferenciaRecebimentos: React.FC = () => {
       r.base += c.baseValor;
       r.app += c.appValor;
       r.cedrus += c.appCedrus;
-      r.porGrupo[CONFERENCIA_GRUPO[c.situacao]]++;
-      r.porSituacao[c.situacao]++;
+      const grupo = grupoDe(c);
+      r.porGrupo[grupo]++;
+      // Sub-chips de situacao contam so dentro do grupo escolhido.
+      if (grupoFiltro === "todos" || grupo === grupoFiltro)
+        r.porSituacao[c.situacao]++;
     });
     return r;
-  }, [escopo]);
+  }, [escopo, grupoFiltro]);
 
   const lista = useMemo(() => {
     return escopo
       .filter(
         (c) =>
-          (grupoFiltro === "todos" ||
-            CONFERENCIA_GRUPO[c.situacao] === grupoFiltro) &&
+          (grupoFiltro === "todos" || grupoDe(c) === grupoFiltro) &&
           (situacaoFiltro === null || c.situacao === situacaoFiltro),
       )
       .sort(
@@ -409,7 +518,7 @@ const ConferenciaRecebimentos: React.FC = () => {
       );
   }, [escopo, grupoFiltro, situacaoFiltro]);
 
-  const escolherGrupo = (g: ConferenciaGrupo | "todos") => {
+  const escolherGrupo = (g: GrupoTela | "todos") => {
     setGrupoFiltro(g);
     setSituacaoFiltro(null);
   };
@@ -432,12 +541,21 @@ const ConferenciaRecebimentos: React.FC = () => {
         : "sem cobrador"
       : "";
 
+  // "Conferido por Fulano em 13/11/2026 - obs" (ou mudou depois), para o relatorio.
+  const textoMarcacao = (c: LinhaCliente): string => {
+    if (!c.ultima || !c.marcacao) return "";
+    const quem = nomePorId.get(c.ultima.registrado_por_id) ?? "gestor";
+    const quando = new Date(c.ultima.created_at).toLocaleDateString("pt-BR");
+    const obs = c.ultima.observacao ? ` — ${c.ultima.observacao}` : "";
+    return `${c.marcacao === "mudou" ? "Conferido (valores mudaram depois)" : "Conferido"} por ${quem} em ${quando}${obs}`;
+  };
+
   // Relatorio = a lista filtrada inteira (todas as paginas).
   const dadosRelatorio = (): DadosRelatorio => {
     const filtros: string[] = [];
     if (grupoAtual) filtros.push(`Cobrador: ${grupoAtual.nome}`);
     if (grupoFiltro !== "todos")
-      filtros.push(`Grupo: ${CONFERENCIA_GRUPO_LABEL[grupoFiltro]}`);
+      filtros.push(`Grupo: ${GRUPO_TELA_LABEL[grupoFiltro]}`);
     if (situacaoFiltro)
       filtros.push(`Situação: ${CONFERENCIA_SITUACAO_LABEL[situacaoFiltro]}`);
     if (busca.trim()) filtros.push(`Busca: "${busca.trim()}"`);
@@ -456,6 +574,7 @@ const ConferenciaRecebimentos: React.FC = () => {
         appValor: c.appValor,
         appLancamentos: c.appLancamentos,
         appCedrus: c.appCedrus,
+        conferencia: textoMarcacao(c),
       })),
       arquivo: `Conferencia_Recebimentos_${mes}${grupoAtual ? `_${grupoAtual.nome.replace(/[^\p{L}\p{N}]+/gu, "_")}` : ""}`,
     };
@@ -469,7 +588,7 @@ const ConferenciaRecebimentos: React.FC = () => {
 
   const pendenciasTotal = grupos.reduce((s, g) => s + g.pendencias, 0);
   const situacoesDoGrupo =
-    grupoFiltro === "todos"
+    grupoFiltro === "todos" || grupoFiltro === "conferido"
       ? []
       : SITUACOES.filter((s) => CONFERENCIA_GRUPO[s] === grupoFiltro);
 
@@ -715,14 +834,14 @@ const ConferenciaRecebimentos: React.FC = () => {
           )}
 
           {/* Grupos (filtro da lista) */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
             {GRUPOS.map((gr) => {
               const ativo = grupoFiltro === gr;
               return (
                 <button
                   key={gr}
                   onClick={() => escolherGrupo(gr)}
-                  title={CONFERENCIA_GRUPO_DICA[gr]}
+                  title={GRUPO_TELA_DICA[gr]}
                   className={`rounded-xl border px-3 py-2 text-left transition-colors ${
                     ativo
                       ? GRUPO_TONE[gr].ativo
@@ -733,7 +852,7 @@ const ConferenciaRecebimentos: React.FC = () => {
                     {resumo.porGrupo[gr]}
                   </div>
                   <div className="text-xs font-medium text-gray-600 dark:text-dark-text-secondary">
-                    {CONFERENCIA_GRUPO_LABEL[gr]}
+                    {GRUPO_TELA_LABEL[gr]}
                   </div>
                 </button>
               );
@@ -869,6 +988,23 @@ const ConferenciaRecebimentos: React.FC = () => {
                             >
                               {CONFERENCIA_SITUACAO_LABEL[c.situacao]}
                             </span>
+                            {c.marcacao === "conferido" && (
+                              <span
+                                title={textoMarcacao(c)}
+                                className="mt-0.5 flex items-center gap-1 text-[11px] font-medium text-teal-600 dark:text-teal-400"
+                              >
+                                <CheckCircle2 className="h-3 w-3" />
+                                Conferido
+                              </span>
+                            )}
+                            {c.marcacao === "mudou" && (
+                              <span
+                                title={textoMarcacao(c)}
+                                className="mt-0.5 block text-[11px] font-medium text-amber-600 dark:text-amber-400"
+                              >
+                                Mudou depois de conferido
+                              </span>
+                            )}
                           </td>
                           <td className="px-3 py-2 text-right whitespace-nowrap text-gray-700 dark:text-dark-text">
                             {c.baseParcelas > 0 ? (
@@ -913,6 +1049,13 @@ const ConferenciaRecebimentos: React.FC = () => {
                                 fim={limitesDoMes(mes).fim}
                                 nomePorId={nomePorId}
                                 onAbrirFicha={fichaDe(c.documento)}
+                                baseValor={c.baseValor}
+                                appValor={c.appValor}
+                                marcacoes={
+                                  marcacoesPorDoc.get(c.documento) ?? []
+                                }
+                                estadoMarcacao={c.marcacao}
+                                onMarcar={(acao, obs) => marcar(c, acao, obs)}
                               />
                             </td>
                           </tr>

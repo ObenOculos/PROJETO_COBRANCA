@@ -1037,6 +1037,45 @@ export type Database = {
         ];
       };
       // Migration 20261109000012 (Fila de Cobranca: deixar para depois).
+      conferencia_marcacoes: {
+        Row: {
+          acao: string;
+          app_valor: number;
+          base_valor: number;
+          created_at: string;
+          documento: string;
+          id: string;
+          mes: string;
+          observacao: string | null;
+          registrado_por_id: string;
+          visao: string;
+        };
+        Insert: {
+          acao: string;
+          app_valor: number;
+          base_valor: number;
+          created_at?: string;
+          documento: string;
+          id?: string;
+          mes: string;
+          observacao?: string | null;
+          registrado_por_id: string;
+          visao: string;
+        };
+        Update: {
+          acao?: string;
+          app_valor?: number;
+          base_valor?: number;
+          created_at?: string;
+          documento?: string;
+          id?: string;
+          mes?: string;
+          observacao?: string | null;
+          registrado_por_id?: string;
+          visao?: string;
+        };
+        Relationships: [];
+      };
       fila_adiamentos: {
         Row: {
           collector_id: string;

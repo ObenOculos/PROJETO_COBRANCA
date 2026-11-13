@@ -21,6 +21,7 @@ export interface LinhaRelatorio {
   appValor: number;
   appLancamentos: number;
   appCedrus: number;
+  conferencia: string; // marcacao do gestor ("" = nao conferido)
 }
 
 export interface DadosRelatorio {
@@ -52,7 +53,15 @@ const resumir = (linhas: LinhaRelatorio[]) => {
     total[grupo]++;
     let c = porCobrador.get(l.cobradorNome);
     if (!c) {
-      c = { nome: l.cobradorNome, base: 0, app: 0, acao: 0, juros: 0, confere: 0, clientes: 0 };
+      c = {
+        nome: l.cobradorNome,
+        base: 0,
+        app: 0,
+        acao: 0,
+        juros: 0,
+        confere: 0,
+        clientes: 0,
+      };
       porCobrador.set(l.cobradorNome, c);
     }
     c.base += l.baseValor;
@@ -112,6 +121,7 @@ export const exportarTxt = (d: DadosRelatorio) => {
         `   Cobrador: ${l.cobradorNome}${l.carteiraNome ? ` · carteira: ${l.carteiraNome}` : ""}`,
         `   Situação: ${CONFERENCIA_SITUACAO_LABEL[l.situacao]}`,
         `   Base: ${formatCurrency(l.baseValor)} (${l.baseParcelas} parcela(s))   App: ${formatCurrency(l.appValor)} (${l.appLancamentos} lançamento(s))   Diferença: ${formatCurrency(l.appValor - l.baseValor)}`,
+        ...(l.conferencia ? [`   ${l.conferencia}`] : []),
         "",
       );
     });
@@ -139,7 +149,16 @@ export const exportarExcel = (d: DadosRelatorio) => {
     ["Confere", total.confere],
     [""],
     ["POR COBRADOR"],
-    ["Cobrador", "Base", "App", "Diferença", "Clientes", "Precisa conferir", "App maior", "Confere"],
+    [
+      "Cobrador",
+      "Base",
+      "App",
+      "Diferença",
+      "Clientes",
+      "Precisa conferir",
+      "App maior",
+      "Confere",
+    ],
     ...cobradores.map((c) => [
       c.nome,
       c.base,
@@ -175,6 +194,7 @@ export const exportarExcel = (d: DadosRelatorio) => {
       "Lançamentos",
       "Do Cedrus",
       "Diferença (app − base)",
+      "Conferência",
     ],
     ...d.linhas.map((l) => [
       l.cliente,
@@ -188,6 +208,7 @@ export const exportarExcel = (d: DadosRelatorio) => {
       l.appLancamentos,
       l.appCedrus,
       l.appValor - l.baseValor,
+      l.conferencia,
     ]),
   ]);
   clientesWS["!cols"] = [
@@ -202,6 +223,7 @@ export const exportarExcel = (d: DadosRelatorio) => {
     { wch: 12 },
     { wch: 12 },
     { wch: 16 },
+    { wch: 50 },
   ];
 
   const wb = XLSX.utils.book_new();
@@ -275,7 +297,7 @@ export const imprimir = (d: DadosRelatorio) => {
       ${d.linhas
         .map((l) => {
           const df = l.appValor - l.baseValor;
-          return `<tr><td>${esc(l.cliente)}<div class="doc">${esc(l.documento)}${l.carteiraNome ? ` · carteira: ${esc(l.carteiraNome)}` : ""}</div></td><td>${esc(l.cobradorNome)}</td><td>${esc(CONFERENCIA_SITUACAO_LABEL[l.situacao])}</td><td class="n">${l.baseParcelas > 0 ? formatCurrency(l.baseValor) : "—"}</td><td class="n">${l.appLancamentos > 0 ? formatCurrency(l.appValor) : "—"}</td><td class="n" style="color:${corDif(df)}">${Math.abs(df) < 0.005 ? "—" : formatCurrency(df)}</td></tr>`;
+          return `<tr><td>${esc(l.cliente)}<div class="doc">${esc(l.documento)}${l.carteiraNome ? ` · carteira: ${esc(l.carteiraNome)}` : ""}</div></td><td>${esc(l.cobradorNome)}</td><td>${esc(CONFERENCIA_SITUACAO_LABEL[l.situacao])}${l.conferencia ? `<div class="doc">${esc(l.conferencia)}</div>` : ""}</td><td class="n">${l.baseParcelas > 0 ? formatCurrency(l.baseValor) : "—"}</td><td class="n">${l.appLancamentos > 0 ? formatCurrency(l.appValor) : "—"}</td><td class="n" style="color:${corDif(df)}">${Math.abs(df) < 0.005 ? "—" : formatCurrency(df)}</td></tr>`;
         })
         .join("")}
     </tbody>

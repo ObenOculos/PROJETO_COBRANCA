@@ -1,7 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { ExternalLink } from "lucide-react";
+import { CheckCircle2, ExternalLink, RotateCcw } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { formatCurrency, formatDate } from "../../utils/formatters";
+import {
+  ConferenciaEstadoMarcacao,
+  ConferenciaMarcacao,
+  marcacaoPedeObservacao,
+} from "../../filters/conferenciaRecebimentos";
 
 // Item 61, etapa B: detalhe de um cliente da Conferencia de recebimentos --
 // as parcelas que a base baixou no mes x os lancamentos do app no mes, lado a
@@ -57,7 +62,162 @@ interface Props {
   fim: string;
   nomePorId: Map<string, string>;
   onAbrirFicha: (() => void) | null;
+  // Etapa D: marcacao do gestor (valores da linha, historico do mes, gravar).
+  baseValor: number;
+  appValor: number;
+  marcacoes: ConferenciaMarcacao[];
+  estadoMarcacao: ConferenciaEstadoMarcacao;
+  onMarcar: (
+    acao: "conferido" | "reaberto",
+    observacao: string,
+  ) => Promise<void>;
 }
+
+/** Bloco "Conferencia do gestor": historico + marcar/reabrir com observacao. */
+const PainelMarcacao: React.FC<{
+  baseValor: number;
+  appValor: number;
+  marcacoes: ConferenciaMarcacao[];
+  estado: ConferenciaEstadoMarcacao;
+  nomePorId: Map<string, string>;
+  onMarcar: Props["onMarcar"];
+}> = ({ baseValor, appValor, marcacoes, estado, nomePorId, onMarcar }) => {
+  const [obs, setObs] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  // Conferido (e sem mudanca) -> a acao disponivel e reabrir.
+  const acao: "conferido" | "reaberto" =
+    estado === "conferido" ? "reaberto" : "conferido";
+  const pedeObs = marcacaoPedeObservacao(
+    acao,
+    Math.round(baseValor * 100) / 100,
+    Math.round(appValor * 100) / 100,
+  );
+  const podeSalvar = !salvando && (!pedeObs || obs.trim().length > 0);
+
+  const salvar = async () => {
+    if (!podeSalvar) return;
+    setSalvando(true);
+    setErro(null);
+    try {
+      await onMarcar(acao, obs);
+      setObs("");
+    } catch (e) {
+      console.error("Erro ao gravar marcação da conferência:", e);
+      // PostgrestError: message/code/details (tabela inexistente = PGRST205
+      // ou 42P01; sem mensagem, mostra o objeto).
+      const err = (e ?? {}) as {
+        message?: string;
+        code?: string;
+        details?: string;
+      };
+      const msg =
+        err.message || err.details || JSON.stringify(e) || "Falha ao gravar";
+      setErro(
+        err.code === "PGRST205" ||
+          err.code === "42P01" ||
+          /conferencia_marcacoes|schema cache/i.test(msg)
+          ? "A tabela de marcações ainda não existe no banco (falta aplicar a migration)."
+          : msg,
+      );
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg-secondary px-3 py-2.5 space-y-2">
+      <div className="text-xs font-semibold text-gray-700 dark:text-dark-text">
+        Conferência do gestor
+      </div>
+      {marcacoes.length > 0 && (
+        <ul className="space-y-1">
+          {[...marcacoes].reverse().map((m) => (
+            <li
+              key={m.id}
+              className="text-[11px] text-gray-600 dark:text-dark-text-secondary"
+            >
+              <span
+                className={
+                  m.acao === "conferido"
+                    ? "font-semibold text-teal-600 dark:text-teal-400"
+                    : "font-semibold text-amber-600 dark:text-amber-400"
+                }
+              >
+                {m.acao === "conferido" ? "Conferido" : "Reaberto"}
+              </span>{" "}
+              por {nomePorId.get(m.registrado_por_id) ?? "gestor"} em{" "}
+              {new Date(m.created_at).toLocaleString("pt-BR", {
+                dateStyle: "short",
+                timeStyle: "short",
+              })}{" "}
+              (base {formatCurrency(Number(m.base_valor))}, app{" "}
+              {formatCurrency(Number(m.app_valor))}
+              {m.visao === "carteira" ? ", visão só carteira" : ""})
+              {m.observacao && (
+                <span className="text-gray-800 dark:text-dark-text">
+                  {" "}
+                  — {m.observacao}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {estado === "mudou" && (
+        <div className="text-[11px] font-medium text-amber-700 dark:text-amber-400">
+          Os valores mudaram depois da última conferência (baixa ou registro
+          novo no mês). Confira de novo.
+        </div>
+      )}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <input
+          type="text"
+          value={obs}
+          onChange={(e) => setObs(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void salvar();
+          }}
+          placeholder={
+            pedeObs
+              ? acao === "reaberto"
+                ? "Motivo para reabrir (obrigatório)"
+                : "Por que a diferença está certa? (obrigatório)"
+              : "Observação (opcional)"
+          }
+          className="flex-1 rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg px-2.5 py-1.5 text-xs text-gray-900 dark:text-dark-text placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500"
+        />
+        <button
+          onClick={() => void salvar()}
+          disabled={!podeSalvar}
+          className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40 disabled:cursor-not-allowed ${
+            acao === "conferido"
+              ? "bg-teal-600 hover:bg-teal-700"
+              : "bg-amber-600 hover:bg-amber-700"
+          }`}
+        >
+          {acao === "conferido" ? (
+            <CheckCircle2 className="h-3.5 w-3.5" />
+          ) : (
+            <RotateCcw className="h-3.5 w-3.5" />
+          )}
+          {salvando
+            ? "Gravando…"
+            : acao === "conferido"
+              ? estado === "mudou"
+                ? "Conferir de novo"
+                : "Marcar como conferido"
+              : "Reabrir"}
+        </button>
+      </div>
+      {erro && (
+        <div className="text-[11px] text-red-600 dark:text-red-400">
+          Não foi possível gravar: {erro}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const ConferenciaDetalhe: React.FC<Props> = ({
   documento,
@@ -67,6 +227,11 @@ const ConferenciaDetalhe: React.FC<Props> = ({
   fim,
   nomePorId,
   onAbrirFicha,
+  baseValor,
+  appValor,
+  marcacoes,
+  estadoMarcacao,
+  onMarcar,
 }) => {
   const [base, setBase] = useState<BaseRow[] | null>(null);
   const [app, setApp] = useState<AppRow[] | null>(null);
@@ -421,6 +586,15 @@ const ConferenciaDetalhe: React.FC<Props> = ({
           </table>
         </div>
       )}
+
+      <PainelMarcacao
+        baseValor={baseValor}
+        appValor={appValor}
+        marcacoes={marcacoes}
+        estado={estadoMarcacao}
+        nomePorId={nomePorId}
+        onMarcar={onMarcar}
+      />
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-[11px] text-gray-500 dark:text-dark-text-secondary">
