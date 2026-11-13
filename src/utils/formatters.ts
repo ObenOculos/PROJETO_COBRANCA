@@ -404,16 +404,3 @@ export const parseAndFormatDate = (
 
   return "Data Inválida";
 };
-
-/**
- * Telefone para exibicao: (75) 98167-9252 / (71) 9226-2511. Tira o DDI 55
- * quando vem junto. Formato desconhecido volta como veio.
- */
-export const formatTelefone = (telefone: string | null | undefined): string => {
-  const bruto = (telefone ?? "").trim();
-  let d = bruto.replace(/\D/g, "");
-  if (d.length > 11 && d.startsWith("55")) d = d.slice(2);
-  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
-  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
-  return bruto;
-};

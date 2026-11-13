@@ -22,11 +22,9 @@ import {
 } from "../../types";
 import {
   formatCurrency,
-  formatTelefone,
   calculateOverdueDays,
 } from "../../utils/formatters";
 import { isForaDaCobranca, seloForaDaCobranca } from "../../types/status";
-import { abrirWhatsApp } from "../../utils/whatsapp";
 import {
   clientBalanceSplit,
   clientMaxOverdueDays,
@@ -217,24 +215,6 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     cadastroErp?.contato_telefone,
     cadastroErp?.contato_telefone2,
   ].filter((t): t is string => Boolean(t?.trim()));
-  // Telefones do cabecalho (Ligar/WhatsApp sem sair da ficha): celular e
-  // fixo do cliente, depois os da pessoa de contato do Ciclone. Sem repetir
-  // o mesmo numero.
-  const telefonesCabecalho: { numero: string; rotulo?: string }[] = [];
-  {
-    const vistos = new Set<string>();
-    const add = (numero: string | null | undefined, rotulo?: string) => {
-      const digitos = (numero ?? "").replace(/\D/g, "");
-      if (!digitos || vistos.has(digitos)) return;
-      vistos.add(digitos);
-      telefonesCabecalho.push({ numero: (numero ?? "").trim(), rotulo });
-    };
-    add(clientGroup.mobile);
-    add(clientGroup.phone);
-    telefonesContato.forEach((t) =>
-      add(t, cadastroErp?.contato_nome?.trim() || "Contato"),
-    );
-  }
   const codigoErp = cadastroErp?.codigo_cliente_erp?.trim() || undefined;
   const temDadosErp = Boolean(
     codigoErp ||
@@ -789,7 +769,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   {razaoSocial}
                 </p>
               )}
-              {/* Documento, codigo e telefones numa linha so */}
+              {/* Documento e codigo numa linha so */}
               <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
                 <span className="tabular-nums">{clientGroup.document}</span>
                 {codigoErp && (
@@ -797,33 +777,6 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                     Cód. {codigoErp}
                   </span>
                 )}
-                {telefonesCabecalho.map((tel) => (
-                  <span
-                    key={tel.numero}
-                    className="inline-flex items-center gap-1"
-                  >
-                    {tel.rotulo && (
-                      <span className="text-gray-400">{tel.rotulo}:</span>
-                    )}
-                    <a
-                      href={`tel:${tel.numero.replace(/[^\d+]/g, "")}`}
-                      className="inline-flex items-center gap-1 text-blue-700 hover:underline tabular-nums"
-                      title="Ligar"
-                    >
-                      <Phone className="h-3.5 w-3.5" />
-                      {formatTelefone(tel.numero)}
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => abrirWhatsApp(tel.numero)}
-                      className="p-0.5 rounded text-emerald-600 hover:bg-emerald-50"
-                      title="Abrir conversa no WhatsApp"
-                      aria-label={`WhatsApp de ${tel.numero}`}
-                    >
-                      <MessageCircle className="h-3.5 w-3.5" />
-                    </button>
-                  </span>
-                ))}
               </div>
             </div>
 
@@ -831,47 +784,29 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 acordo ativo, as parcelas do acordo) + 3. acoes, lado a lado
                 no computador. So mostra o que tem valor. */}
             <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              {/* So o que pede atencao: valor vencido (com o atraso) e acordo
+                  ativo. Em dia / a vencer nao aparece (pedido do usuario). */}
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                {!(hasRealPendingValue || acordoAtivo) ? (
-                  <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-medium">
-                    Sem saldo em aberto
+                {saldoCliente.vencido > 0.01 && (
+                  <span className="px-2 py-0.5 rounded-md bg-red-50 text-red-700">
+                    Vencido{" "}
+                    <strong>{formatCurrency(saldoCliente.vencido)}</strong>
+                    {atrasoCliente > 0 && (
+                      <span className="text-red-600">
+                        {" "}
+                        · {atrasoCliente} dia{atrasoCliente !== 1 ? "s" : ""}{" "}
+                        de atraso
+                      </span>
+                    )}
                   </span>
-                ) : (
-                  <>
-                    {saldoCliente.vencido > 0.01 ? (
-                      <span className="px-2 py-0.5 rounded-md bg-red-50 text-red-700">
-                        Vencido{" "}
-                        <strong>{formatCurrency(saldoCliente.vencido)}</strong>
-                        {atrasoCliente > 0 && (
-                          <span className="text-red-600">
-                            {" "}
-                            · {atrasoCliente} dia{atrasoCliente !== 1 ? "s" : ""}{" "}
-                            de atraso
-                          </span>
-                        )}
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-medium">
-                        Em dia
-                      </span>
-                    )}
-                    {saldoCliente.aVencer > 0.01 && (
-                      <span className="text-gray-600">
-                        A vencer{" "}
-                        <strong className="text-gray-900">
-                          {formatCurrency(saldoCliente.aVencer)}
-                        </strong>
-                      </span>
-                    )}
-                    {acordoAtivo && (
-                      <span
-                        className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 text-xs font-medium"
-                        title="Valores e atraso seguem as parcelas do acordo, não o vencimento original dos títulos"
-                      >
-                        Em acordo
-                      </span>
-                    )}
-                  </>
+                )}
+                {acordoAtivo && (
+                  <span
+                    className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 text-xs font-medium"
+                    title="Valores e atraso seguem as parcelas do acordo, não o vencimento original dos títulos"
+                  >
+                    Em acordo
+                  </span>
                 )}
               </div>
 
