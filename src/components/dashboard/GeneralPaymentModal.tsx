@@ -65,6 +65,40 @@ const horaLocalAgora = () => {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 };
 
+/**
+ * Aviso da tela de pagamento -- um formato so (icone + texto), muda a cor:
+ * ok = confere; info = explica; atencao = confira antes de seguir;
+ * erro = nao deixa seguir.
+ */
+const AVISO_ESTILO = {
+  ok: "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300",
+  info: "border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-200",
+  atencao:
+    "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200",
+  erro: "border-red-300 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300",
+} as const;
+
+const Aviso: React.FC<{
+  tom: keyof typeof AVISO_ESTILO;
+  titulo?: React.ReactNode;
+  children: React.ReactNode;
+}> = ({ tom, titulo, children }) => {
+  const Icone =
+    tom === "ok" ? CheckCircle : tom === "info" ? Info : AlertTriangle;
+  return (
+    <div
+      role={tom === "erro" || tom === "atencao" ? "alert" : undefined}
+      className={`flex items-start gap-2 p-3 rounded-xl border text-sm ${AVISO_ESTILO[tom]}`}
+    >
+      <Icone className="h-4 w-4 mt-0.5 shrink-0" />
+      <div className="min-w-0 space-y-1">
+        {titulo && <p className="font-semibold">{titulo}</p>}
+        <div>{children}</div>
+      </div>
+    </div>
+  );
+};
+
 interface GeneralPaymentModalProps {
   clientGroup: ClientGroup;
   clientSales: SaleGroup[];
@@ -1167,58 +1201,41 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                   )}
                 </div>
 
-                {/* Conferencia do valor com as parcelas marcadas */}
+                {/* Conferencia do valor com as parcelas marcadas: um aviso
+                    por situacao, no mesmo formato (Aviso). */}
                 {modoParcelas && qtdMarcadas === 0 && amountToDistribute > 0 && (
-                  <p className="p-3 rounded-xl border border-sky-200 bg-sky-50 text-sm text-sky-900">
+                  <Aviso tom="info">
                     Marque acima as parcelas que o cliente está pagando — o
                     valor é conferido com elas.
-                  </p>
+                  </Aviso>
                 )}
                 {acimaSemJuros && (
-                  <p
-                    role="alert"
-                    className="flex items-start gap-2 p-3 rounded-xl border-2 border-red-300 bg-red-50 text-sm text-red-800"
+                  <Aviso
+                    tom="erro"
+                    titulo={`Valor ${formatCurrency(alocacao.aMais)} acima das parcelas marcadas`}
                   >
-                    <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-                    <span>
-                      Valor {formatCurrency(alocacao.aMais)} acima das parcelas
-                      marcadas ({formatCurrency(alocacao.esperado)}). Parcela a
-                      vencer não tem juros: confira o valor
-                      {qtdMarcadas < parcelasAbertas.length &&
-                        " ou marque mais parcelas"}
-                      .
-                    </span>
-                  </p>
+                    Você marcou {formatCurrency(alocacao.esperado)} em parcelas
+                    que ainda não venceram (sem juros). Confira o valor
+                    {qtdMarcadas < parcelasAbertas.length &&
+                      " ou marque mais parcelas"}
+                    .
+                  </Aviso>
                 )}
                 {modoParcelas && alocacao.situacao === "fecha" && (
-                  <p className="flex items-center gap-2 text-sm text-emerald-700">
-                    <CheckCircle className="h-4 w-4 shrink-0" />
-                    Fecha com as parcelas marcadas.
-                  </p>
+                  <Aviso tom="ok">Fecha com as parcelas marcadas.</Aviso>
                 )}
-
                 {avisoAcima && (
-                  <div
-                    role="alert"
-                    className="p-3 rounded-xl border-2 border-amber-300 bg-amber-50 text-sm text-amber-900 space-y-1"
+                  <Aviso
+                    tom="atencao"
+                    titulo={`Valor ${formatCurrency(alocacao.aMais)} acima do esperado`}
                   >
-                    <p className="flex items-center gap-2 font-semibold">
-                      <AlertTriangle className="h-4 w-4 shrink-0" />
-                      Valor {formatCurrency(alocacao.aMais)} acima do esperado
-                    </p>
-                    <p>
-                      Você marcou {formatCurrency(alocacao.esperado)} e digitou{" "}
-                      <strong>{formatCurrency(amountToDistribute)}</strong>. O
-                      valor a mais fica como <strong>juros/multa</strong> e não
-                      abate parcela.
-                    </p>
-                    {qtdMarcadas < parcelasAbertas.length && (
-                      <p className="text-xs">
-                        Se o cliente está pagando mais parcelas, marque-as na
-                        lista acima.
-                      </p>
-                    )}
-                  </div>
+                    Você marcou {formatCurrency(alocacao.esperado)} e digitou{" "}
+                    <strong>{formatCurrency(amountToDistribute)}</strong>. O
+                    valor a mais fica como <strong>juros/multa</strong> e não
+                    abate parcela.
+                    {qtdMarcadas < parcelasAbertas.length &&
+                      " Se o cliente está pagando mais parcelas, marque-as na lista."}
+                  </Aviso>
                 )}
 
                 {modoParcelas && alocacao.situacao === "entre" && (
@@ -1276,8 +1293,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                 {modoParcelas &&
                   (alocacao.situacao === "parcial" ||
                     (alocacao.situacao === "entre" && escolhaFalta === "parcial")) && (
-                    <p className="p-3 rounded-xl border border-sky-200 bg-sky-50 text-sm text-sky-900">
-                      Pagamento parcial:{" "}
+                    <Aviso tom="info" titulo="Pagamento parcial">
                       {(() => {
                         const quitadas = alocacao.itens.filter((p) => p.quita).length;
                         const parcial = alocacao.itens.find(
@@ -1294,31 +1310,29 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                             `abate ${formatCurrency(parcial.aplicado)} da parcela de ${dataTexto(parcial.vencimento.slice(0, 10))} (o juros dela entra quando for quitada)`,
                           );
                         }
-                        return partes.join(" e ") || "nada é quitado";
+                        const t = partes.join(" e ") || "nada é quitado";
+                        return t.charAt(0).toUpperCase() + t.slice(1) + ".";
                       })()}
-                      .
-                    </p>
+                    </Aviso>
                   )}
 
-                {modoParcelas && quitaTudo && (
-                  <p className="flex items-start gap-2 p-3 rounded-xl border-2 border-amber-300 bg-amber-50 text-sm text-amber-900">
-                    <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-                    <span>
-                      Este pagamento <strong>quita toda a dívida</strong> do
-                      cliente
-                      {qtdAVencerPagas > 0 &&
-                        `, inclusive ${qtdAVencerPagas} ${qtdAVencerPagas === 1 ? "parcela que ainda não venceu" : "parcelas que ainda não venceram"}`}
-                      .
-                    </span>
-                  </p>
+                {modoParcelas && quitaTudo && !acimaSemJuros && (
+                  <Aviso tom="atencao" titulo="Quita toda a dívida do cliente">
+                    {qtdAVencerPagas > 0
+                      ? `Inclusive ${qtdAVencerPagas} ${qtdAVencerPagas === 1 ? "parcela que ainda não venceu" : "parcelas que ainda não venceram"}.`
+                      : "Todas as parcelas em aberto ficam pagas."}
+                  </Aviso>
                 )}
-                {modoParcelas && !quitaTudo && qtdAVencerPagas > 0 && (
-                  <p className="text-sm text-indigo-800">
-                    Inclui {qtdAVencerPagas}{" "}
-                    {qtdAVencerPagas === 1 ? "parcela a vencer" : "parcelas a vencer"}{" "}
-                    (adiantamento).
-                  </p>
-                )}
+                {modoParcelas &&
+                  !quitaTudo &&
+                  !acimaSemJuros &&
+                  qtdAVencerPagas > 0 && (
+                    <Aviso tom="info">
+                      Inclui {qtdAVencerPagas}{" "}
+                      {qtdAVencerPagas === 1 ? "parcela a vencer" : "parcelas a vencer"}{" "}
+                      (adiantamento).
+                    </Aviso>
+                  )}
 
                 {/* Quitacao com desconto: so quando o valor deixa algo a
                     descontar (com o valor cheio a opcao confundia). */}
@@ -1601,13 +1615,11 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                 </div>
 
                 {quitaTudo && (
-                  <p className="flex items-start gap-2 p-3 rounded-xl border-2 border-amber-300 bg-amber-50 text-sm text-amber-900">
-                    <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-                    <span>
-                      Atenção: este pagamento <strong>quita toda a dívida</strong>{" "}
-                      do cliente.
-                    </span>
-                  </p>
+                  <Aviso tom="atencao" titulo="Quita toda a dívida do cliente">
+                    {qtdAVencerPagas > 0
+                      ? `Inclusive ${qtdAVencerPagas} ${qtdAVencerPagas === 1 ? "parcela que ainda não venceu" : "parcelas que ainda não venceram"}.`
+                      : "Todas as parcelas em aberto ficam pagas."}
+                  </Aviso>
                 )}
 
                 <p
@@ -1674,13 +1686,8 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
               </>
             )}
 
-            {erroEtapa && (
-              <p
-                role="alert"
-                className="p-3 rounded-xl border border-red-200 bg-red-50 text-sm text-red-700"
-              >
-                {erroEtapa}
-              </p>
+            {erroEtapa && !(etapa === 1 && acimaSemJuros) && (
+              <Aviso tom="erro">{erroEtapa}</Aviso>
             )}
           </div>
 
