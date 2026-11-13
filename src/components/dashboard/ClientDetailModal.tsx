@@ -40,7 +40,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { AuthorizationHistoryService } from "../../services/authorizationHistoryService";
 
 import GeneralPaymentModal from "./GeneralPaymentModal";
-import GeneralPaymentEditModal from "./GeneralPaymentEditModal";
+import CorrigirPagamentoModal from "./CorrigirPagamentoModal";
 import LogContactModal from "./LogContactModal";
 import AcordoModal from "./AcordoModal";
 import AcordoDetailModal from "./AcordoDetailModal";
@@ -728,6 +728,12 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   };
 
   const handleEditPaymentClick = () => {
+    // Item 62: o gestor corrige direto (sem token para si mesmo); a trava
+    // real e a RPC estornar_pagamento, que so aceita gestor.
+    if (souGestor) {
+      setIsGeneralEditModalOpen(true);
+      return;
+    }
     setShowAuthModal(true);
     setAuthError("");
     setAuthToken("");
@@ -920,7 +926,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                             >
                               <Edit className="h-4 w-4 text-gray-500" />
                               {souGestor
-                                ? "Editar pagamentos"
+                                ? "Corrigir pagamento"
                                 : "Editar pagamentos (pede autorização)"}
                             </button>
                           </div>
@@ -1803,9 +1809,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
 
       {/* General Payment Edit Modal */}
       {isGeneralEditModalOpen && (
-        <GeneralPaymentEditModal
+        <CorrigirPagamentoModal
           clientGroup={clientGroup}
-          clientSales={clientSales}
           onClose={() => setIsGeneralEditModalOpen(false)}
           onSuccess={handleGeneralEditSuccess}
         />

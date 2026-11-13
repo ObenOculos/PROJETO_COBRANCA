@@ -2246,6 +2246,14 @@ export type Database = {
           isSetofReturn: true;
         };
       };
+      estornar_pagamento: {
+        Args: {
+          p_pagamento: string;
+          p_valor: number;
+          p_motivo: string;
+        };
+        Returns: Json;
+      };
       registrar_ajuste_recebimento: {
         Args: {
           p_client_document: string;

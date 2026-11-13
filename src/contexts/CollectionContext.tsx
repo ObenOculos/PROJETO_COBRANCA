@@ -3932,6 +3932,39 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       }
     };
 
+  // Item 62: estorno de um pagamento do app (RPC estornar_pagamento, migration
+  // 20261113000006). A RPC valida gestor, motivo e saldo do pagamento, grava o
+  // estorno e desfaz nas parcelas so o que ele aplicou, numa transacao.
+  const estornarPagamento: CollectionContextType["estornarPagamento"] = async ({
+    pagamentoId,
+    valor,
+    motivo,
+  }) => {
+    setGlobalLoading(true, "Registrando estorno...");
+    try {
+      const { data, error } = await supabase.rpc("estornar_pagamento", {
+        p_pagamento: pagamentoId,
+        p_valor: Math.round(valor * 100) / 100,
+        p_motivo: motivo,
+      });
+      if (error) throw new Error(error.message);
+      const r = (data ?? {}) as {
+        valor?: number;
+        revertido_parcelas?: number;
+        parcelas?: number;
+      };
+      invalidatePayments();
+      await fetchSalePayments(false);
+      return {
+        valor: Number(r.valor ?? valor),
+        revertidoParcelas: Number(r.revertido_parcelas ?? 0),
+        parcelas: Number(r.parcelas ?? 0),
+      };
+    } finally {
+      setGlobalLoading(false);
+    }
+  };
+
   // useCallback: identidade estavel entre renders, para os useMemo de quem
   // consome (getSalesByClient, Detalhes do Cliente) nao recalcularem a toa.
   const getSalePayments = React.useCallback(
@@ -5272,6 +5305,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     processSalePayment,
     processGeneralPayment,
     registrarAjusteRecebimento,
+    estornarPagamento,
     getSalePayments,
     calculateSaleBalance,
     getSalesByClient,

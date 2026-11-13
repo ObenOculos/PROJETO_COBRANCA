@@ -629,6 +629,13 @@ export interface CollectionContextType {
     usuarioId: string;
     pagamentoEstornadoId?: string | null;
   }) => Promise<void>;
+  // Item 62: estorno (total ou parcial) de um pagamento do app, so gestor.
+  // Desfaz nas parcelas so o que o pagamento aplicou (recebimentos_historico).
+  estornarPagamento: (params: {
+    pagamentoId: string;
+    valor: number;
+    motivo: string;
+  }) => Promise<{ valor: number; revertidoParcelas: number; parcelas: number }>;
   getSalePayments: (
     saleNumber: number,
     clientDocument: string,
