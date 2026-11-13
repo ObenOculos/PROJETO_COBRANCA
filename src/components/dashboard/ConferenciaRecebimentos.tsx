@@ -1,5 +1,23 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Info, Scale, Search, X } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  Info,
+  Printer,
+  Scale,
+  Search,
+  X,
+} from "lucide-react";
+import {
+  DadosRelatorio,
+  exportarExcel,
+  exportarTxt,
+  imprimir,
+} from "./conferenciaRelatorio";
 import { useCollection } from "../../contexts/CollectionContext";
 import { supabase } from "../../lib/supabase";
 import { fetchAllRows } from "../../utils/fetchAllRows";
@@ -112,7 +130,7 @@ const GRUPO_TONE: Record<
   },
 };
 
-const PAGINA = 100;
+const POR_PAGINA = 50;
 
 const MESES = [
   "janeiro",
@@ -187,7 +205,9 @@ const ConferenciaRecebimentos: React.FC = () => {
   const [situacaoFiltro, setSituacaoFiltro] =
     useState<ConferenciaSituacao | null>(null);
   const [busca, setBusca] = useState("");
-  const [limite, setLimite] = useState(PAGINA);
+  const [pagina, setPagina] = useState(1);
+  const [exportAberto, setExportAberto] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
   const [visao, setVisao] = useState<Visao>(() => {
     try {
       return localStorage.getItem("conferenciaVisao") === "carteira"
@@ -237,10 +257,21 @@ const ConferenciaRecebimentos: React.FC = () => {
     };
   }, [mes, visao]);
 
-  // Lista volta ao inicio quando o recorte muda.
+  // Lista volta a 1a pagina quando o recorte muda.
   useEffect(() => {
-    setLimite(PAGINA);
+    setPagina(1);
   }, [mes, visao, cobradorSel, grupoFiltro, situacaoFiltro, busca]);
+
+  // Menu de exportar fecha ao clicar fora.
+  useEffect(() => {
+    if (!exportAberto) return;
+    const fora = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node))
+        setExportAberto(false);
+    };
+    document.addEventListener("mousedown", fora);
+    return () => document.removeEventListener("mousedown", fora);
+  }, [exportAberto]);
 
   const nomePorId = useMemo(() => {
     const m = new Map<string, string>();
@@ -365,6 +396,53 @@ const ConferenciaRecebimentos: React.FC = () => {
     setSituacaoFiltro(null);
   };
 
+  const totalPaginas = Math.max(1, Math.ceil(lista.length / POR_PAGINA));
+  const paginaAtual = Math.min(pagina, totalPaginas);
+  const listaPagina = lista.slice(
+    (paginaAtual - 1) * POR_PAGINA,
+    paginaAtual * POR_PAGINA,
+  );
+
+  // Visao "todos": registrado por alguem que nao e o dono da carteira.
+  const carteiraDeOutro = (c: LinhaCliente): string =>
+    visao === "todos" &&
+    !!c.cobradorId &&
+    c.appLancamentos > 0 &&
+    c.carteiraId !== c.cobradorId
+      ? c.carteiraId
+        ? (nomePorId.get(c.carteiraId) ?? "outro")
+        : "sem cobrador"
+      : "";
+
+  // Relatorio = a lista filtrada inteira (todas as paginas).
+  const dadosRelatorio = (): DadosRelatorio => {
+    const filtros: string[] = [];
+    if (grupoAtual) filtros.push(`Cobrador: ${grupoAtual.nome}`);
+    if (grupoFiltro !== "todos")
+      filtros.push(`Grupo: ${CONFERENCIA_GRUPO_LABEL[grupoFiltro]}`);
+    if (situacaoFiltro)
+      filtros.push(`Situação: ${CONFERENCIA_SITUACAO_LABEL[situacaoFiltro]}`);
+    if (busca.trim()) filtros.push(`Busca: "${busca.trim()}"`);
+    return {
+      periodo: rotuloMes(mes),
+      visao: visao === "carteira" ? "Só carteira" : "Todos os recebimentos",
+      filtros,
+      linhas: lista.map((c) => ({
+        cliente: c.cliente,
+        documento: c.documento,
+        cobradorNome: c.cobradorNome,
+        carteiraNome: carteiraDeOutro(c),
+        situacao: c.situacao,
+        baseValor: c.baseValor,
+        baseParcelas: c.baseParcelas,
+        appValor: c.appValor,
+        appLancamentos: c.appLancamentos,
+        appCedrus: c.appCedrus,
+      })),
+      arquivo: `Conferencia_Recebimentos_${mes}${grupoAtual ? `_${grupoAtual.nome.replace(/[^\p{L}\p{N}]+/gu, "_")}` : ""}`,
+    };
+  };
+
   const pendenciasTotal = grupos.reduce((s, g) => s + g.pendencias, 0);
   const situacoesDoGrupo =
     grupoFiltro === "todos"
@@ -451,6 +529,55 @@ const ConferenciaRecebimentos: React.FC = () => {
             >
               <ChevronRight className="h-4 w-4" />
             </button>
+          </div>
+          <div className="flex items-center">
+            <button
+              onClick={() => imprimir(dadosRelatorio())}
+              disabled={lista.length === 0}
+              className="p-2 text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Imprimir"
+              aria-label="Imprimir"
+            >
+              <Printer className="h-5 w-5" />
+            </button>
+            <div className="relative" ref={exportRef}>
+              <button
+                onClick={() => setExportAberto((v) => !v)}
+                disabled={lista.length === 0}
+                className="flex items-center gap-1 p-2 text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Exportar"
+                aria-label="Exportar"
+              >
+                <Download className="h-5 w-5" />
+                <ChevronDown
+                  className={`h-3 w-3 transition-transform ${exportAberto ? "rotate-180" : ""}`}
+                />
+              </button>
+              {exportAberto && (
+                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-xl border border-gray-100 dark:border-dark-border py-2 z-30">
+                  <button
+                    onClick={() => {
+                      exportarTxt(dadosRelatorio());
+                      setExportAberto(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-bg transition-colors"
+                  >
+                    <FileText className="h-4 w-4 text-blue-500" />
+                    Salvar em TXT
+                  </button>
+                  <button
+                    onClick={() => {
+                      exportarExcel(dadosRelatorio());
+                      setExportAberto(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-bg transition-colors"
+                  >
+                    <FileSpreadsheet className="h-4 w-4 text-green-600" />
+                    Salvar em Excel
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -686,14 +813,8 @@ const ConferenciaRecebimentos: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {lista.slice(0, limite).map((c) => {
-                    // Visao "todos": registrado por alguem que nao e o dono
-                    // da carteira do cliente.
-                    const outraCarteira =
-                      visao === "todos" &&
-                      !!c.cobradorId &&
-                      c.appLancamentos > 0 &&
-                      c.carteiraId !== c.cobradorId;
+                  {listaPagina.map((c) => {
+                    const outraCarteira = carteiraDeOutro(c);
                     return (
                       <tr
                         key={c.chave}
@@ -705,8 +826,7 @@ const ConferenciaRecebimentos: React.FC = () => {
                           </div>
                           <div className="text-[11px] text-gray-400 dark:text-dark-text-secondary">
                             {c.documento}
-                            {outraCarteira &&
-                              ` · carteira: ${c.carteiraId ? (nomePorId.get(c.carteiraId) ?? "outro") : "sem cobrador"}`}
+                            {outraCarteira && ` · carteira: ${outraCarteira}`}
                           </div>
                         </td>
                         {cobradorAtual === null && (
@@ -755,14 +875,36 @@ const ConferenciaRecebimentos: React.FC = () => {
                   })}
                 </tbody>
               </table>
-              {lista.length > limite && (
-                <div className="px-4 lg:px-5 pt-3 text-center">
-                  <button
-                    onClick={() => setLimite((l) => l + PAGINA)}
-                    className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
-                  >
-                    Mostrar mais ({lista.length - limite} restantes)
-                  </button>
+              {totalPaginas > 1 && (
+                <div className="flex items-center justify-between gap-4 px-4 lg:px-5 pt-3 border-t border-gray-100 dark:border-dark-border/40">
+                  <span className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
+                    Mostrando {(paginaAtual - 1) * POR_PAGINA + 1}–
+                    {Math.min(paginaAtual * POR_PAGINA, lista.length)} de{" "}
+                    {lista.length}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setPagina(Math.max(1, paginaAtual - 1))}
+                      disabled={paginaAtual === 1}
+                      className="flex items-center px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 dark:text-dark-text-secondary border border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      aria-label="Página anterior"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <span className="px-3 text-sm font-semibold text-gray-700 dark:text-dark-text tabular-nums">
+                      {paginaAtual} / {totalPaginas}
+                    </span>
+                    <button
+                      onClick={() =>
+                        setPagina(Math.min(totalPaginas, paginaAtual + 1))
+                      }
+                      disabled={paginaAtual === totalPaginas}
+                      className="flex items-center px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 dark:text-dark-text-secondary border border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      aria-label="Próxima página"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
