@@ -18,8 +18,8 @@
 #
 # Substitui (2026-11-12): Atualizar_BI, DRE_Atualizacao e "Python Oticas"
 # (removidas aqui) e os antigos scripts/ssotica/agendar_*.ps1.
-# Rodar_Todos_os_Scripts_e_Upload_Cedrus fica ate o Cedrus acabar (15/11/2026):
-# depois, rodar com -RemoverCedrus.
+# Cedrus encerrado em 13/11/2026 (decisao do usuario): -RemoverCedrus tira a
+# tarefa Rodar_Todos_os_Scripts_e_Upload_Cedrus.
 
 param([switch]$RemoverCedrus)
 
