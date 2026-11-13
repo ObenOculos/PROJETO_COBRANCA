@@ -3973,6 +3973,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         valor?: number;
         revertido_parcelas?: number;
         parcelas?: number;
+        desconto_revertido?: number;
       };
       invalidatePayments();
       await fetchSalePayments(false);
@@ -3980,6 +3981,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         valor: Number(r.valor ?? valor),
         revertidoParcelas: Number(r.revertido_parcelas ?? 0),
         parcelas: Number(r.parcelas ?? 0),
+        descontoRevertido: Number(r.desconto_revertido ?? 0),
       };
     } finally {
       setGlobalLoading(false);
@@ -4002,6 +4004,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           valor?: number;
           revertido_parcelas?: number;
           parcelas?: number;
+          desconto_revertido?: number;
         };
         invalidatePayments();
         await fetchSalePayments(false);
@@ -4009,6 +4012,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           valor: Number(r.valor ?? valor ?? 0),
           revertidoParcelas: Number(r.revertido_parcelas ?? 0),
           parcelas: Number(r.parcelas ?? 0),
+          descontoRevertido: Number(r.desconto_revertido ?? 0),
         };
       } finally {
         setGlobalLoading(false);

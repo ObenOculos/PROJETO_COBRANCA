@@ -142,6 +142,10 @@ const PedidosCorrecao: React.FC = () => {
               r.parcelas > 0
                 ? ` ${formatCurrency(r.revertidoParcelas)} desfeito em ${r.parcelas} parcela(s).`
                 : ""
+            }${
+              r.descontoRevertido > 0.009
+                ? ` Desconto de ${formatCurrency(r.descontoRevertido)} desfeito.`
+                : ""
             }`
           : `Pedido recusado (${p.cliente ?? p.documento}).`,
       );

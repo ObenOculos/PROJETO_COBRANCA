@@ -17,6 +17,10 @@
 --   ou das lojas continua valendo por cima (o ERP e a fonte da baixa).
 -- * As mudancas de parcela entram no historico com origem 'estorno' e
 --   sale_payment_id = o registro do estorno.
+-- * Desconto (decisao do usuario, 2026-11-13): o estorno que zera o pagamento
+--   (total) desfaz tambem o desconto que ele aplicou nas parcelas (pelo
+--   historico) e leva discount_amount negativo, para os relatorios nao
+--   seguirem contando o desconto; estorno parcial mantem o desconto.
 
 ALTER TABLE public.recebimentos_historico
   DROP CONSTRAINT IF EXISTS recebimentos_historico_origem_check;
@@ -52,6 +56,9 @@ DECLARE
   r              record;
   v_tirar        numeric;
   v_novo         numeric;
+  v_total        boolean;
+  v_desc_rev     numeric := 0;
+  v_desc_novo    numeric;
 BEGIN
   IF (SELECT app_current_user_type()) IS DISTINCT FROM 'manager' THEN
     RAISE EXCEPTION 'Apenas gestores podem executar esta ação.';
@@ -84,19 +91,23 @@ BEGIN
       to_char(v_disponivel, 'FM999G999G990D00');
   END IF;
 
+  v_total := v_disponivel - v_valor < 0.01;
+
   SELECT name INTO v_usuario_nome FROM public.users WHERE id = v_usuario_id;
 
   INSERT INTO public.sale_payments (
     sale_number, client_document, client_name, payment_amount, payment_date,
     payment_method, notes, collector_id, collector_name, estorno_de, motivo,
-    registrado_por_id
+    registrado_por_id, discount_amount
   ) VALUES (
     v_original.sale_number, v_original.client_document,
     v_original.client_name, -v_valor, v_hoje, 'Estorno',
     'Estorno do pagamento de ' || to_char(v_original.payment_date, 'DD/MM/YYYY')
       || COALESCE(' registrado por ' || v_usuario_nome, ''),
     v_original.collector_id, v_original.collector_name, v_original.id,
-    trim(p_motivo), v_usuario_id
+    trim(p_motivo), v_usuario_id,
+    CASE WHEN v_total AND COALESCE(v_original.discount_amount, 0) > 0
+         THEN -v_original.discount_amount ELSE 0 END
   )
   RETURNING id INTO v_estorno_id;
 
@@ -154,6 +165,46 @@ BEGIN
     v_parcelas := v_parcelas + 1;
   END LOOP;
 
+  -- Estorno total: desfaz o desconto que o pagamento aplicou (liquido por
+  -- parcela no historico), sem passar do desconto atual da parcela.
+  IF v_total THEN
+    FOR r IN
+      SELECT h.id_parcela,
+             sum(COALESCE(h.desconto_depois, 0) - COALESCE(h.desconto_antes, 0)) AS liquido
+      FROM public.recebimentos_historico h
+      WHERE h.sale_payment_id = v_original.id
+         OR h.sale_payment_id IN (
+              SELECT e.id FROM public.sale_payments e
+              WHERE e.estorno_de = v_original.id)
+      GROUP BY h.id_parcela
+      HAVING sum(COALESCE(h.desconto_depois, 0) - COALESCE(h.desconto_antes, 0)) > 0.009
+    LOOP
+      CONTINUE WHEN public.titulo_em_acordo_ativo(r.id_parcela);
+      SELECT COALESCE(desconto, 0), COALESCE(valor_recebido, 0)
+        INTO v_desc_novo, v_novo
+      FROM public."BANCO_DADOS"
+      WHERE id_parcela = r.id_parcela
+      FOR UPDATE;
+      CONTINUE WHEN NOT FOUND;
+      v_tirar := round(LEAST(r.liquido, v_desc_novo), 2);
+      CONTINUE WHEN v_tirar < 0.01;
+      v_desc_novo := round(v_desc_novo - v_tirar, 2);
+
+      UPDATE public."BANCO_DADOS"
+      SET desconto = v_desc_novo,
+          status = CASE
+            WHEN COALESCE(valor_original, 0) - v_novo - v_desc_novo <= 0.01
+              THEN 'Pago'
+            WHEN v_novo + v_desc_novo > 0 THEN 'Pago Parcial'
+            WHEN data_vencimento < v_hoje THEN 'Em atraso'
+            ELSE 'A vencer'
+          END
+      WHERE id_parcela = r.id_parcela;
+
+      v_desc_rev := v_desc_rev + v_tirar;
+    END LOOP;
+  END IF;
+
   PERFORM set_config('cobranca.origem', '', true);
   PERFORM set_config('cobranca.sale_payment_id', '', true);
 
@@ -161,7 +212,8 @@ BEGIN
     'estorno_id', v_estorno_id,
     'valor', v_valor,
     'revertido_parcelas', round(v_revertido, 2),
-    'parcelas', v_parcelas
+    'parcelas', v_parcelas,
+    'desconto_revertido', round(v_desc_rev, 2)
   );
 END;
 $function$;

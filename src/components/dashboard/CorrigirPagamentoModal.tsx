@@ -68,6 +68,7 @@ const CorrigirPagamentoModal: React.FC<Props> = ({
         valor: number;
         revertidoParcelas: number;
         parcelas: number;
+        descontoRevertido: number;
       }
     | { tipo: "pedido"; valor: number }
     | null
@@ -226,6 +227,8 @@ const CorrigirPagamentoModal: React.FC<Props> = ({
                   : "Nenhuma parcela foi alterada."}
                 {resultado.revertidoParcelas < resultado.valor - 0.009 &&
                   " O restante não estava aplicado em parcela por este pagamento (pagamento antigo, parcela em acordo ou já alterada pelo ERP/loja) — a parcela segue o sistema de origem."}
+                {resultado.descontoRevertido > 0.009 &&
+                  ` Desconto de ${formatCurrency(resultado.descontoRevertido)} desfeito (estorno total).`}
               </p>
             )}
             {resultado.tipo === "pedido" && (

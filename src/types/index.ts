@@ -635,7 +635,12 @@ export interface CollectionContextType {
     pagamentoId: string;
     valor: number;
     motivo: string;
-  }) => Promise<{ valor: number; revertidoParcelas: number; parcelas: number }>;
+  }) => Promise<{
+    valor: number;
+    revertidoParcelas: number;
+    parcelas: number;
+    descontoRevertido: number;
+  }>;
   // Item 62 etapa 2: gestor decide o pedido de correcao do cobrador
   // (aprovar = estorna e liga ao pedido; recusar exige resposta).
   decidirPedidoCorrecao: (params: {
@@ -643,7 +648,12 @@ export interface CollectionContextType {
     aprovar: boolean;
     valor?: number;
     resposta?: string;
-  }) => Promise<{ valor: number; revertidoParcelas: number; parcelas: number } | null>;
+  }) => Promise<{
+    valor: number;
+    revertidoParcelas: number;
+    parcelas: number;
+    descontoRevertido: number;
+  } | null>;
   getSalePayments: (
     saleNumber: number,
     clientDocument: string,
