@@ -23,7 +23,6 @@ import { useNotifications } from "../../contexts/NotificationContext";
 import { calculateOverdueDays, formatCurrency } from "../../utils/formatters";
 import { supabase } from "../../lib/supabase";
 import { addDaysLocalStr, todayLocalStr } from "../../config/visitStatus";
-import { encargosPorAtraso } from "../../config/encargos";
 import { isWalletCollectorType } from "../../config/profiles";
 import { ATTEMPT_RESULT_LABELS } from "../../config/collectionAttempts";
 import { isForaDaCobranca } from "../../types/status";
@@ -127,7 +126,6 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       acordoAtivoOverdueMap,
       scheduledVisits,
       fetchScheduledVisits,
-      acordoConfiguracaoPadrao,
     } = useCollection();
     const acordoAtivo = clientGroup.document
       ? getAcordoAtivoDoCliente(clientGroup.document)
@@ -152,13 +150,10 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     >(null);
     // Parcelas a vencer ficam fechadas: adiantar e uma acao deliberada.
     const [mostrarAVencer, setMostrarAVencer] = useState(false);
-    // Valor entre "so parcelas" e "parcelas + juros": o cobrador diz se
-    // dispensou juros ou se o cliente pagou so parte.
-    const [escolhaFalta, setEscolhaFalta] = useState<"juros" | "parcial" | null>(
-      null,
-    );
-    // Valor acima do esperado: aviso + 5 s ate liberar o Continuar.
-    const [segundosAviso, setSegundosAviso] = useState(0);
+    // Juros/multa: so o que o cobrador INFORMA (acordado com o cliente).
+    // O app nunca presume encargo (decisao do usuario 2026-11-13).
+    const [mostrarJuros, setMostrarJuros] = useState(false);
+    const [jurosTexto, setJurosTexto] = useState("");
 
     // Perfil de quem registra: cobrador de carteira so registra a interacao
     // (agenda o proximo contato pelo "Atender", nao aqui -- decisao do
@@ -202,10 +197,6 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     // do acordo nao sao pagaveis aqui e nao temos a lista deles nesta tela --
     // ai a distribuicao segue a regra antiga (por venda) e o excedente nao e
     // tratado como juros.
-    // Cada parcela vencida traz a multa/juros SUGERIDOS (config/encargos,
-    // mesma regra do acordo; padrao do gestor), calculados ate hoje.
-    const multaPct = acordoConfiguracaoPadrao?.multaPercentual ?? 0;
-    const jurosPct = acordoConfiguracaoPadrao?.jurosPercentualAm ?? 0;
     const parcelasAbertas = useMemo(() => {
       const lista: {
         sale: SaleGroup;
@@ -214,7 +205,6 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         saldo: number;
         vencida: boolean;
         diasAtraso: number;
-        encargo: number;
         valorOriginal: number;
         jaPago: number;
         numero: number | null;
@@ -237,8 +227,6 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
             saldo,
             vencida: diasAtraso > 0,
             diasAtraso,
-            encargo: encargosPorAtraso(saldo, diasAtraso, multaPct, jurosPct)
-              .total,
             valorOriginal: round2(inst.valor_original || 0),
             jaPago: round2((inst.valor_recebido || 0) + (inst.desconto || 0)),
             numero: inst.parcela ?? null,
@@ -249,7 +237,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         (a, b) =>
           a.vencimento.localeCompare(b.vencimento) || a.idParcela - b.idParcela,
       );
-    }, [clientSales, multaPct, jurosPct]);
+    }, [clientSales]);
     const qtdVencidas = parcelasAbertas.filter((p) => p.vencida).length;
     const qtdMarcadas = Math.min(
       qtdMarcadasEscolhida ?? qtdVencidas,
@@ -293,94 +281,59 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     // o modo antigo, so por valor (ver parcelasAbertas).
     const modoParcelas = !withDiscount && !acordoAtivo;
 
+    // Juros/multa informados pelo cobrador (0 se nao informou).
+    const jurosInformado = modoParcelas && mostrarJuros ? parseValor(jurosTexto) : 0;
+
     /**
-     * Para onde vai cada real, parcela a parcela (vencimento mais antigo
-     * primeiro, a mesma ordem do process_payment):
-     *  - "fecha":   valor = parcelas marcadas + juros sugeridos;
-     *  - "acima":   passou do esperado -- o a mais fica como juros/multa
-     *               (decisao do usuario 2026-11-13: o juros do app pode estar
-     *               abaixo do cobrado); aviso + 5 s antes de continuar;
-     *  - "entre":   cobre as parcelas mas nao todo o juros -- o cobrador diz
-     *               se dispensou juros ("juros") ou se foi parcial;
-     *  - "parcial": cada parcela leva saldo + juros ate o dinheiro acabar; a
-     *               ultima recebe o resto so no valor da parcela (o juros dela
-     *               entra quando for quitada).
+     * Para onde vai cada real. A base e sempre o valor ORIGINAL das parcelas
+     * marcadas; juros/multa so entram se o cobrador informar (decisao do
+     * usuario 2026-11-13: o sistema nunca presume encargo). O juros
+     * informado sai do valor recebido; o resto abate as parcelas na ordem do
+     * vencimento (a mesma do process_payment):
+     *  - "fecha":      resto = parcelas marcadas;
+     *  - "parcial":    resto < parcelas -- a ultima fica parcial;
+     *  - "acima":      resto > parcelas -- o cobrador diz se o a mais sao
+     *                  juros/multa acordados ou erro de digitacao (sem
+     *                  parcela vencida marcada, bloqueia: a vencer nao tem
+     *                  juros);
+     *  - "jurosMaior": juros informado maior que o valor recebido.
      */
     const alocacao = useMemo(() => {
       const marcadas = parcelasAbertas.slice(0, qtdMarcadas);
       const somaParcelas = round2(marcadas.reduce((s, p) => s + p.saldo, 0));
-      const jurosSugerido = round2(marcadas.reduce((s, p) => s + p.encargo, 0));
-      const esperado = round2(somaParcelas + jurosSugerido);
       const v = amountToDistribute;
-      const situacao: "vazio" | "fecha" | "acima" | "entre" | "parcial" =
+      const disponivel = round2(v - jurosInformado);
+      const situacao: "vazio" | "jurosMaior" | "fecha" | "acima" | "parcial" =
         v <= 0 || marcadas.length === 0
           ? "vazio"
-          : Math.abs(v - esperado) <= 0.01
-            ? "fecha"
-            : v > esperado
-              ? "acima"
-              : v >= somaParcelas - 0.01 && jurosSugerido > 0
-                ? "entre"
+          : disponivel < -0.001
+            ? "jurosMaior"
+            : Math.abs(disponivel - somaParcelas) <= 0.01
+              ? "fecha"
+              : disponivel > somaParcelas
+                ? "acima"
                 : "parcial";
-      const sequencial =
-        situacao === "parcial" || (situacao === "entre" && escolhaFalta !== "juros");
-      let resto = v;
+      let resto = Math.max(0, Math.min(disponivel, somaParcelas));
       const itens = marcadas.map((p) => {
-        if (!sequencial) {
-          return { ...p, aplicado: p.saldo, juros: 0, quita: true };
-        }
-        // Cobre a parcela: quita, e o que passar dela (ate o juros
-        // sugerido) e juros -- nada do dinheiro fica sem destino.
-        if (resto >= p.saldo - 0.001) {
-          const juros = round2(Math.min(p.encargo, resto - p.saldo));
-          resto = round2(resto - p.saldo - juros);
-          return { ...p, aplicado: p.saldo, juros, quita: true };
-        }
         const aplicado = round2(Math.max(0, Math.min(resto, p.saldo)));
         resto = round2(resto - aplicado);
-        return { ...p, aplicado, juros: 0, quita: false };
+        return { ...p, aplicado, quita: aplicado >= p.saldo - 0.01 };
       });
-      const principalAloc = round2(itens.reduce((s, p) => s + p.aplicado, 0));
-      const jurosAloc = sequencial
-        ? round2(itens.reduce((s, p) => s + p.juros, 0))
-        : round2(Math.max(0, v - principalAloc));
-      // Sem sequencial o juros e um total (sugerido, dispensado em parte ou
-      // com valor a mais): reparte so para exibir, na proporcao sugerida.
-      if (!sequencial) {
-        itens.forEach((p) => {
-          p.juros =
-            jurosSugerido > 0
-              ? round2((jurosAloc * p.encargo) / jurosSugerido)
-              : 0;
-        });
-        const sobra = round2(jurosAloc - itens.reduce((s, p) => s + p.juros, 0));
-        if (itens.length && Math.abs(sobra) > 0.001) {
-          const ult = itens[itens.length - 1];
-          ult.juros = round2(ult.juros + sobra);
-        }
-      }
       return {
         itens,
         somaParcelas,
-        jurosSugerido,
-        esperado,
+        esperado: round2(somaParcelas + jurosInformado),
         situacao,
-        principal: principalAloc,
-        juros: jurosAloc,
-        aMais: situacao === "acima" ? round2(v - esperado) : 0,
-        falta: round2(Math.max(0, esperado - v)),
+        temVencida: marcadas.some((p) => p.vencida),
+        principal: round2(itens.reduce((s, p) => s + p.aplicado, 0)),
+        aMais:
+          situacao === "acima" ? round2(disponivel - somaParcelas) : 0,
       };
-    }, [parcelasAbertas, qtdMarcadas, amountToDistribute, escolhaFalta]);
+    }, [parcelasAbertas, qtdMarcadas, amountToDistribute, jurosInformado]);
 
-    const jurosValor = modoParcelas ? alocacao.juros : 0;
+    const jurosValor = modoParcelas ? jurosInformado : 0;
     // Principal = o que abate parcelas.
     const principal = modoParcelas ? alocacao.principal : amountToDistribute;
-    // Juros abaixo do sugerido sem ser pagamento parcial = dispensa.
-    const jurosDispensado =
-      modoParcelas &&
-      alocacao.situacao === "entre" &&
-      escolhaFalta === "juros" &&
-      alocacao.jurosSugerido - alocacao.juros > 0.01;
     const qtdAVencerPagas = modoParcelas
       ? alocacao.itens.filter((p) => !p.vencida && p.aplicado > 0).length
       : 0;
@@ -390,28 +343,13 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       principal > 0 &&
       principal >= totalPending - 0.01;
 
-    // Valor acima do esperado: segura o Continuar por 5 s (reinicia a cada
-    // mudanca de valor ou de parcelas).
-    // Sem parcela vencida na marcacao nao ha juros: o a mais nao tem para
-    // onde ir (adiantar = marcar mais parcelas) -- bloqueia.
+    // Valor acima: com parcela vencida marcada, pergunta (juros acordados ×
+    // erro de digitacao) e nao deixa seguir sem resposta; so com parcelas a
+    // vencer, bloqueia.
     const acimaSemJuros =
-      modoParcelas &&
-      alocacao.situacao === "acima" &&
-      alocacao.jurosSugerido <= 0.01;
+      modoParcelas && alocacao.situacao === "acima" && !alocacao.temVencida;
     const avisoAcima =
-      modoParcelas && alocacao.situacao === "acima" && !acimaSemJuros;
-    useEffect(() => {
-      if (!avisoAcima) {
-        setSegundosAviso(0);
-        return;
-      }
-      setSegundosAviso(5);
-      const id = window.setInterval(
-        () => setSegundosAviso((s) => (s <= 1 ? (window.clearInterval(id), 0) : s - 1)),
-        1000,
-      );
-      return () => window.clearInterval(id);
-    }, [avisoAcima, amountToDistribute, qtdMarcadas]);
+      modoParcelas && alocacao.situacao === "acima" && alocacao.temVencida;
 
     // Vencido que sobra depois deste pagamento: decide se pede reagendamento.
     const vencidoRestante = useMemo(() => {
@@ -431,18 +369,15 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     // Conferencia (etapa 3): o que cada parcela recebe. So no modo parcelas
     // -- nos outros casos a distribuicao e por venda (saleDistribution).
     const abatimentoPorParcela = modoParcelas
-      ? alocacao.itens.filter((p) => p.aplicado > 0 || p.juros > 0)
+      ? alocacao.itens.filter((p) => p.aplicado > 0)
       : null;
 
-    // Observacao obrigatoria quando ha algo a justificar: desconto, juros
-    // dispensado ou valor acima do esperado.
-    const observacaoObrigatoria =
-      withDiscount || jurosDispensado || (modoParcelas && alocacao.aMais > 0);
+    // Observacao obrigatoria quando ha algo a justificar: desconto ou
+    // juros/multa (regra do item 58).
+    const observacaoObrigatoria = withDiscount || jurosValor > 0;
     const motivoObservacao = withDiscount
       ? "o desconto"
-      : jurosDispensado
-        ? "por que o juros foi dispensado"
-        : "o valor recebido acima do esperado";
+      : "os juros/multa acordados";
 
     // Distribuicao por venda, calculada no render (useMemo): antes ficava num
     // estado atualizado por useEffect, e um Enter logo depois de digitar o
@@ -576,14 +511,14 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       }
       // Exige valor positivo mesmo na quitação com desconto (sem "desconto de 100%").
       if (amountToDistribute <= 0) return "Informe o valor que o cliente pagou.";
-      if (modoParcelas && alocacao.situacao === "entre" && !escolhaFalta) {
-        return `Faltam ${formatCurrency(alocacao.falta)} para fechar. Diga se o juros foi dispensado ou se o pagamento foi parcial.`;
+      if (modoParcelas && alocacao.situacao === "jurosMaior") {
+        return "Os juros/multa informados são maiores que o valor recebido.";
       }
       if (acimaSemJuros) {
-        return `Você marcou ${formatCurrency(alocacao.esperado)} em parcelas que ainda não venceram (sem juros). O valor não pode passar disso${qtdMarcadas < parcelasAbertas.length ? " — para adiantar mais, marque mais parcelas" : ""}.`;
+        return `Você marcou ${formatCurrency(alocacao.somaParcelas)} em parcelas que ainda não venceram (sem juros). O valor não pode passar disso${qtdMarcadas < parcelasAbertas.length ? " — para adiantar mais, marque mais parcelas" : ""}.`;
       }
-      if (avisoAcima && segundosAviso > 0) {
-        return "Confira o valor antes de continuar.";
+      if (avisoAcima) {
+        return `Diga se os ${formatCurrency(alocacao.aMais)} a mais são juros/multa acordados ou erro de digitação.`;
       }
       // Sem desconto, não permite abater mais que o saldo devedor (o excedente
       // seria descartado silenciosamente na distribuição). Juros/multa não
@@ -687,14 +622,6 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       }
       if (jurosValor > 0) {
         partes.push(`${formatCurrency(jurosValor)} de juros/multa`);
-      }
-      if (jurosDispensado) {
-        partes.push(
-          `juros sugerido ${formatCurrency(alocacao.jurosSugerido)} dispensado em ${formatCurrency(round2(alocacao.jurosSugerido - jurosValor))}`,
-        );
-      }
-      if (modoParcelas && alocacao.aMais > 0) {
-        partes.push(`${formatCurrency(alocacao.aMais)} acima do esperado`);
       }
       const forma = FORMA_PAGAMENTO_LABEL[paymentMethod] ?? paymentMethod;
       const situacao = precisaAcompanhamento
@@ -1037,7 +964,6 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                                 type="button"
                                 onClick={() => {
                                   setQtdMarcadasEscolhida(marcada ? i : i + 1);
-                                  setEscolhaFalta(null);
                                   setErroEtapa(null);
                                 }}
                                 className={`w-full flex items-start gap-3 px-3 py-2.5 text-left text-sm transition-colors ${
@@ -1079,14 +1005,8 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                                 </span>
                                 <span className="text-right shrink-0">
                                   <span className="block font-semibold tabular-nums text-gray-900 dark:text-dark-text">
-                                    {formatCurrency(round2(p.saldo + p.encargo))}
+                                    {formatCurrency(p.saldo)}
                                   </span>
-                                  {p.encargo > 0 && (
-                                    <span className="block text-xs text-gray-500 tabular-nums">
-                                      {formatCurrency(p.saldo)} + juros{" "}
-                                      {formatCurrency(p.encargo)}
-                                    </span>
-                                  )}
                                 </span>
                               </button>
                             </li>
@@ -1126,10 +1046,10 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                           <strong className="text-gray-900 dark:text-dark-text tabular-nums">
                             {formatCurrency(alocacao.esperado)}
                           </strong>
-                          {alocacao.jurosSugerido > 0 && (
+                          {jurosInformado > 0 && (
                             <span className="block text-xs">
                               parcelas {formatCurrency(alocacao.somaParcelas)} +
-                              juros/multa {formatCurrency(alocacao.jurosSugerido)}
+                              juros/multa {formatCurrency(jurosInformado)}
                             </span>
                           )}
                         </span>
@@ -1137,7 +1057,6 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                           type="button"
                           onClick={() => {
                             setDistributionAmount(valorParaCampo(alocacao.esperado));
-                            setEscolhaFalta(null);
                             setErroEtapa(null);
                           }}
                           className="px-3 py-1.5 text-xs font-medium rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
@@ -1174,7 +1093,6 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                         setDistributionAmount(
                           e.target.value.replace(/[^\d.,]/g, ""),
                         );
-                        setEscolhaFalta(null);
                         setErroEtapa(null);
                       }}
                       className="w-full pl-12 pr-4 py-3 border border-gray-300 dark:border-dark-border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-2xl font-semibold tabular-nums dark:bg-dark-bg dark:text-dark-text"
@@ -1201,6 +1119,61 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                   )}
                 </div>
 
+                {/* Juros/multa: so informados pelo cobrador (acordados com o
+                    cliente). Fechado por padrao. */}
+                {modoParcelas &&
+                  (mostrarJuros ? (
+                    <div>
+                      <label
+                        htmlFor="juros-informado"
+                        className="flex items-center justify-between text-sm font-semibold text-gray-900 dark:text-dark-text mb-2"
+                      >
+                        Juros/multa acordados com o cliente
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMostrarJuros(false);
+                            setJurosTexto("");
+                            setErroEtapa(null);
+                          }}
+                          className="text-xs font-normal text-gray-500 hover:text-gray-800"
+                        >
+                          Remover
+                        </button>
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-400">
+                          R$
+                        </span>
+                        <input
+                          id="juros-informado"
+                          type="text"
+                          inputMode="decimal"
+                          autoComplete="off"
+                          value={jurosTexto}
+                          onChange={(e) => {
+                            setJurosTexto(e.target.value.replace(/[^\d.,]/g, ""));
+                            setErroEtapa(null);
+                          }}
+                          className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-dark-border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-base tabular-nums dark:bg-dark-bg dark:text-dark-text"
+                          placeholder="0,00"
+                        />
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">
+                        Sai do valor recebido e não abate parcela. Explique na
+                        observação.
+                      </p>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setMostrarJuros(true)}
+                      className="text-sm font-medium text-indigo-700 hover:text-indigo-900"
+                    >
+                      + Informar juros/multa acordados
+                    </button>
+                  ))}
+
                 {/* Conferencia do valor com as parcelas marcadas: um aviso
                     por situacao, no mesmo formato (Aviso). */}
                 {modoParcelas && qtdMarcadas === 0 && amountToDistribute > 0 && (
@@ -1214,8 +1187,8 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                     tom="erro"
                     titulo={`Valor ${formatCurrency(alocacao.aMais)} acima das parcelas marcadas`}
                   >
-                    Você marcou {formatCurrency(alocacao.esperado)} em parcelas
-                    que ainda não venceram (sem juros). Confira o valor
+                    Você marcou {formatCurrency(alocacao.somaParcelas)} em
+                    parcelas que ainda não venceram (sem juros). Confira o valor
                     {qtdMarcadas < parcelasAbertas.length &&
                       " ou marque mais parcelas"}
                     .
@@ -1224,75 +1197,71 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                 {modoParcelas && alocacao.situacao === "fecha" && (
                   <Aviso tom="ok">Fecha com as parcelas marcadas.</Aviso>
                 )}
+                {modoParcelas && alocacao.situacao === "jurosMaior" && (
+                  <Aviso tom="erro">
+                    Os juros/multa informados (
+                    {formatCurrency(jurosInformado)}) são maiores que o valor
+                    recebido.
+                  </Aviso>
+                )}
                 {avisoAcima && (
                   <Aviso
                     tom="atencao"
                     titulo={`Valor ${formatCurrency(alocacao.aMais)} acima do esperado`}
                   >
-                    Você marcou {formatCurrency(alocacao.esperado)} e digitou{" "}
-                    <strong>{formatCurrency(amountToDistribute)}</strong>. O
-                    valor a mais fica como <strong>juros/multa</strong> e não
-                    abate parcela.
-                    {qtdMarcadas < parcelasAbertas.length &&
-                      " Se o cliente está pagando mais parcelas, marque-as na lista."}
+                    <p>
+                      As parcelas marcadas somam{" "}
+                      {formatCurrency(alocacao.esperado)} e você digitou{" "}
+                      <strong>{formatCurrency(amountToDistribute)}</strong>. O
+                      que são esses {formatCurrency(alocacao.aMais)}?
+                    </p>
+                    <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setJurosTexto(
+                            valorParaCampo(round2(jurosInformado + alocacao.aMais)),
+                          );
+                          setMostrarJuros(true);
+                          setErroEtapa(null);
+                        }}
+                        className="rounded-xl border-2 border-amber-300 bg-white dark:bg-dark-bg px-3 py-2 text-left hover:border-amber-500"
+                      >
+                        <span className="block font-semibold">
+                          Juros/multa acordados
+                        </span>
+                        <span className="block text-xs">
+                          Combinado com o cliente; não abate parcela.
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDistributionAmount("");
+                          setErroEtapa(null);
+                          document.getElementById("distribution-amount")?.focus();
+                        }}
+                        className="rounded-xl border-2 border-amber-300 bg-white dark:bg-dark-bg px-3 py-2 text-left hover:border-amber-500"
+                      >
+                        <span className="block font-semibold">
+                          Erro de digitação
+                        </span>
+                        <span className="block text-xs">
+                          Apaga o valor para digitar de novo.
+                        </span>
+                      </button>
+                    </div>
+                    {qtdMarcadas < parcelasAbertas.length && (
+                      <p className="mt-2 text-xs">
+                        Se o cliente está pagando mais parcelas, marque-as na
+                        lista.
+                      </p>
+                    )}
                   </Aviso>
                 )}
 
-                {modoParcelas && alocacao.situacao === "entre" && (
-                  <fieldset>
-                    <legend className="text-sm font-semibold text-gray-900 dark:text-dark-text mb-2">
-                      Faltam {formatCurrency(alocacao.falta)} para o valor
-                      esperado. O que aconteceu?
-                    </legend>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {(
-                        [
-                          [
-                            "juros",
-                            "Dispensei juros",
-                            "As parcelas marcadas são quitadas; juros menor (explique na observação).",
-                          ],
-                          [
-                            "parcial",
-                            "Pagou só uma parte",
-                            "Quita na ordem com juros; a última fica parcial.",
-                          ],
-                        ] as const
-                      ).map(([valor, rotulo, ajuda]) => (
-                        <label
-                          key={valor}
-                          className={`cursor-pointer rounded-xl border-2 px-3 py-2 transition-colors ${
-                            escolhaFalta === valor
-                              ? "border-indigo-500 bg-indigo-50"
-                              : "border-gray-200 hover:border-gray-300"
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="escolhaFalta"
-                            value={valor}
-                            checked={escolhaFalta === valor}
-                            onChange={() => {
-                              setEscolhaFalta(valor);
-                              setErroEtapa(null);
-                            }}
-                            className="sr-only"
-                          />
-                          <span className="block text-sm font-semibold text-gray-900 dark:text-dark-text">
-                            {rotulo}
-                          </span>
-                          <span className="block text-xs text-gray-600 dark:text-dark-text-secondary">
-                            {ajuda}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  </fieldset>
-                )}
-
                 {modoParcelas &&
-                  (alocacao.situacao === "parcial" ||
-                    (alocacao.situacao === "entre" && escolhaFalta === "parcial")) && (
+                  alocacao.situacao === "parcial" && (
                     <Aviso tom="info" titulo="Pagamento parcial">
                       {(() => {
                         const quitadas = alocacao.itens.filter((p) => p.quita).length;
@@ -1307,7 +1276,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                         }
                         if (parcial) {
                           partes.push(
-                            `abate ${formatCurrency(parcial.aplicado)} da parcela de ${dataTexto(parcial.vencimento.slice(0, 10))} (o juros dela entra quando for quitada)`,
+                            `abate ${formatCurrency(parcial.aplicado)} da parcela de ${dataTexto(parcial.vencimento.slice(0, 10))}`,
                           );
                         }
                         const t = partes.join(" e ") || "nada é quitado";
@@ -1499,9 +1468,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                         {formatCurrency(principal)}
                       </dd>
                       <dt className="text-gray-600">
-                        Juros/multa
-                        {jurosDispensado &&
-                          ` (sugerido ${formatCurrency(alocacao.jurosSugerido)})`}
+                        Juros/multa acordados
                       </dt>
                       <dd className="text-right tabular-nums">
                         {formatCurrency(jurosValor)}
@@ -1558,11 +1525,6 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                           <span className="text-right shrink-0">
                             <span className="block font-medium tabular-nums">
                               {formatCurrency(p.aplicado)}
-                              {p.juros > 0 && (
-                                <span className="font-normal text-gray-500">
-                                  {" "}+ {formatCurrency(p.juros)} juros
-                                </span>
-                              )}
                             </span>
                             <span
                               className={`block text-xs ${
@@ -1686,7 +1648,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
               </>
             )}
 
-            {erroEtapa && !(etapa === 1 && acimaSemJuros) && (
+            {erroEtapa && !(etapa === 1 && (acimaSemJuros || avisoAcima)) && (
               <Aviso tom="erro">{erroEtapa}</Aviso>
             )}
           </div>
@@ -1705,7 +1667,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
             <button
               id="confirm-button"
               type="submit"
-              disabled={loading || (etapa === 1 && avisoAcima && segundosAviso > 0)}
+              disabled={loading}
               className={`flex-1 px-4 py-2.5 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
                 etapa === 3
                   ? "bg-emerald-600 hover:bg-emerald-700"
@@ -1726,9 +1688,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                 </>
               ) : (
                 <>
-                  {etapa === 1 && avisoAcima && segundosAviso > 0
-                    ? `Confira o valor (${segundosAviso})`
-                    : "Continuar"}
+                  Continuar
                   <ChevronRight className="h-4 w-4" />
                 </>
               )}
