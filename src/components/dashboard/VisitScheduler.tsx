@@ -1963,11 +1963,14 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     }
   };
 
-  const handleCloseClientModal = async () => {
+  const handleCloseClientModal = async (acordoMexeu?: boolean) => {
     setShowClientModal(false);
     setSelectedClientForModal(null);
 
-    // Fazer refresh dos dados apenas quando o modal for fechado
+    // So acordo (criar/cancelar) muda parcelas sem recarregar sozinho; o
+    // resto da ficha (Atender, pagamento, estorno) ja se atualiza. Recarregar
+    // a cada fechamento baixava a carteira inteira de novo (item 65).
+    if (!acordoMexeu) return;
     try {
       await refreshData();
     } catch (error) {

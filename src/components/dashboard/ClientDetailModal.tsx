@@ -59,7 +59,11 @@ import { USER_TYPE_LABELS, isWalletCollectorType } from "../../config/profiles";
 interface ClientDetailModalProps {
   clientGroup: ClientGroup;
   userType: UserType;
-  onClose: () => void;
+  /** `acordoMexeu`: um acordo foi criado ou o detalhe de um acordo foi
+   * aberto (onde se cancela). Sao as unicas acoes da ficha que mudam
+   * parcelas sem recarregar a carteira sozinhas -- quem fecha a ficha usa
+   * isto para so recarregar quando precisa (item 65). */
+  onClose: (acordoMexeu?: boolean) => void;
   /** Abre ja na lista de vendas com esta venda expandida (ex.: "Ver
    * detalhes da venda" na Cobrancas). */
   vendaInicial?: number;
@@ -352,6 +356,9 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     emNomeDe && cobradorDaCarteira && isWalletCollectorType(cobradorDaCarteira.type)
       ? emNomeDe
       : null;
+  // Ver `onClose`: criar acordo ou abrir o detalhe de um (cancelamento).
+  const acordoMexeuRef = React.useRef(false);
+  const fecharFicha = () => onClose(acordoMexeuRef.current);
   const [isAtenderOpen, setIsAtenderOpen] = useState(false);
   // Pagamento aberto depois do Atender: o contato ja foi registrado la.
   const [pagamentoSemContato, setPagamentoSemContato] = useState(false);
@@ -370,6 +377,9 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   }, []);
   const [isAcordoOpen, setIsAcordoOpen] = useState(false);
   const [acordoDetalheId, setAcordoDetalheId] = useState<string | null>(null);
+  useEffect(() => {
+    if (acordoDetalheId) acordoMexeuRef.current = true;
+  }, [acordoDetalheId]);
   // O ClientGroup recebido pode nao trazer todas as vendas: os modais
   // recebem as vendas completas do cliente.
   const clienteCompleto = React.useMemo(
@@ -587,7 +597,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
         className={`fixed inset-0 bg-black/50 ${fichaMinimizada ? "hidden" : "flex"} items-stretch sm:items-center justify-center sm:p-4 z-[100]`}
         onClick={(e) => {
           if (e.target === e.currentTarget) {
-            onClose();
+            fecharFicha();
           }
         }}
       >
@@ -599,7 +609,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
             <button
               id="close-modal"
               name="closeModal"
-              onClick={onClose}
+              onClick={fecharFicha}
               className="absolute top-3 right-3 p-2 text-gray-500 hover:text-gray-800 rounded-full hover:bg-gray-100 transition-colors"
               aria-label="Fechar modal"
             >
@@ -1613,7 +1623,10 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           client={clienteCompleto}
           emNomeDe={acordoEmNomeDe}
           onClose={() => setIsAcordoOpen(false)}
-          onSuccess={() => setIsAcordoOpen(false)}
+          onSuccess={() => {
+            acordoMexeuRef.current = true;
+            setIsAcordoOpen(false);
+          }}
         />
       )}
       {acordoDetalheId && (
