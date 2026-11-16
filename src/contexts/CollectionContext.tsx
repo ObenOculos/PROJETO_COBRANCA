@@ -211,13 +211,9 @@ const COLLECTIONS_CONCURRENCY = 8;
 // Cada publicacao redispara os consumidores de `collections` (notificacoes,
 // derivacoes), entao vale espacar em vez de publicar a cada lote.
 
-// Realtime: uma importacao em massa dispara centenas de eventos em BANCO_DADOS,
-// e cada recarga varre a tabela inteira. Em vez de recarregar por evento,
-// espera a rajada silenciar...
-const REALTIME_QUIET_MS = 8000;
-// ...mas nao adia para sempre se os eventos nunca param (importacao longa):
-// passado esse teto desde o primeiro evento da rajada, recarrega assim mesmo.
-const REALTIME_MAX_WAIT_MS = 60000;
+// Sem realtime em BANCO_DADOS: ao voltar para a aba, a carteira so e
+// recarregada se a ultima carga tiver mais que isto.
+const COLLECTIONS_STALE_MS = 30 * 60 * 1000;
 
 const CollectionContext = createContext<CollectionContextType | undefined>(
   undefined,
@@ -353,12 +349,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   // Carga em voo, compartilhada entre os chamadores concorrentes.
   const registryLoadRef = React.useRef<Promise<ClientesRegistry> | null>(null);
 
-  const realtimeRefreshTimer = React.useRef<ReturnType<
-    typeof setTimeout
-  > | null>(null);
-  // Inicio da rajada de eventos em andamento (null = sem rajada aberta).
-  const realtimeBurstStartRef = React.useRef<number | null>(null);
-  const realtimeBurstCountRef = React.useRef(0);
+  // Quando a carteira terminou de carregar pela ultima vez (0 = nunca).
+  const collectionsCarregadasEmRef = React.useRef(0);
   const paymentsRefreshTimer = React.useRef<ReturnType<
     typeof setTimeout
   > | null>(null);
@@ -1026,46 +1018,15 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
       // Configurar listener em tempo real para mudanças nas tabelas
       console.log("Configurando listeners em tempo real...");
+      // BANCO_DADOS NAO e escutada em tempo real (2026-11-16, egress do
+      // Supabase): cada rotina (Ciclone 3x/dia, SSOtica, carteira 7h) altera
+      // milhares de linhas, e o Supabase mandava cada linha para cada aba
+      // aberta, que depois baixava a carteira inteira de novo. As acoes do
+      // proprio usuario ja recarregam (refreshData); o que outros mudaram
+      // entra ao voltar para a aba depois de COLLECTIONS_STALE_MS (efeito
+      // de visibilitychange abaixo) ou no F5.
       realtimeChannel = supabase
         .channel("database_changes")
-        .on(
-          "postgres_changes",
-          {
-            event: "*", // Escutar todos os eventos (INSERT, UPDATE, DELETE)
-            schema: "public",
-            table: "BANCO_DADOS",
-          },
-          () => {
-            // Sem log por evento: uma importacao manda milhares, e logar o
-            // payload (a linha inteira) retinha tudo na memoria e travava a
-            // aba. Conta a rajada e loga uma vez, na recarga.
-            realtimeBurstCountRef.current += 1;
-
-            const now = Date.now();
-            if (realtimeBurstStartRef.current === null) {
-              realtimeBurstStartRef.current = now;
-            }
-
-            // Recarrega so depois de REALTIME_QUIET_MS sem eventos novos —
-            // uma importacao inteira vira uma unica recarga no fim. O teto
-            // evita que uma importacao muito longa adie isso para sempre.
-            const waited = now - realtimeBurstStartRef.current;
-            const delay =
-              waited >= REALTIME_MAX_WAIT_MS ? 0 : REALTIME_QUIET_MS;
-
-            if (realtimeRefreshTimer.current)
-              clearTimeout(realtimeRefreshTimer.current);
-            realtimeRefreshTimer.current = setTimeout(() => {
-              realtimeRefreshTimer.current = null;
-              realtimeBurstStartRef.current = null;
-              console.log(
-                `BANCO_DADOS: ${realtimeBurstCountRef.current} mudança(s) em tempo real; recarregando`,
-              );
-              realtimeBurstCountRef.current = 0;
-              refreshCollections();
-            }, delay);
-          },
-        )
         .on(
           "postgres_changes",
           {
@@ -1133,16 +1094,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
 
     // Cleanup: remover listener quando o componente for desmontado ou usuário mudar
     return () => {
-      // Recarga do realtime agendada (8 s apos o ultimo evento) e a valvula
-      // de 60 s do boot pertencem a esta sessao: disparadas depois do logout
-      // recarregariam a carteira ou derrubariam o loading da proxima.
+      // A valvula de 60 s do boot e a releitura de pagamentos agendada
+      // pertencem a esta sessao: disparadas depois do logout derrubariam o
+      // loading da proxima.
       if (timeoutId) clearTimeout(timeoutId);
-      if (realtimeRefreshTimer.current) {
-        clearTimeout(realtimeRefreshTimer.current);
-        realtimeRefreshTimer.current = null;
-        realtimeBurstStartRef.current = null;
-      }
-      realtimeBurstCountRef.current = 0;
+      collectionsCarregadasEmRef.current = 0;
       if (paymentsRefreshTimer.current) {
         clearTimeout(paymentsRefreshTimer.current);
         paymentsRefreshTimer.current = null;
@@ -1158,6 +1114,27 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       }
     };
   }, [user, isAuthLoading]);
+
+  // Sem realtime em BANCO_DADOS: ao voltar para a aba (celular desbloqueado,
+  // troca de aba), recarrega a carteira se a ultima carga passou de
+  // COLLECTIONS_STALE_MS. So para quem ja pediu a carteira (gestor que nao
+  // abriu nenhuma aba que dependa dela nao baixa nada).
+  useEffect(() => {
+    if (!user) return;
+    const aoVoltar = () => {
+      if (document.visibilityState !== "visible") return;
+      if (!collectionsRequestedRef.current) return;
+      const carregadaEm = collectionsCarregadasEmRef.current;
+      if (carregadaEm === 0) return; // primeira carga ainda em andamento
+      if (Date.now() - carregadaEm < COLLECTIONS_STALE_MS) return;
+      console.log("Carteira com mais de 30 min; recarregando ao voltar.");
+      collectionsCarregadasEmRef.current = Date.now(); // evita rajada
+      refreshCollections();
+    };
+    document.addEventListener("visibilitychange", aoVoltar);
+    return () => document.removeEventListener("visibilitychange", aoVoltar);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   // Escutar evento de sincronização offline para recarregar dados
   useEffect(() => {
@@ -1196,7 +1173,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       const carga = loadCollectionsOnce(
         useCache,
         requestedScope ?? collectionsScopeRef.current,
-      ).finally(() => {
+      )
+        .then(() => {
+          collectionsCarregadasEmRef.current = Date.now();
+        })
+        .finally(() => {
         collectionsLoadRef.current = null;
       });
       collectionsLoadRef.current = carga;
