@@ -34,6 +34,7 @@ import {
   Eye,
   EyeOff,
   CalendarClock,
+  AlertTriangle,
 } from "lucide-react";
 import FilterBar from "../common/FilterBar";
 import { CollectionTable, CollectionTableRef } from "./CollectionTable";
@@ -62,6 +63,7 @@ import {
   QUITADO_VISIVEL_DIAS,
   dataQuitacao,
 } from "../../filters/clientStatus";
+import { encargoCliente, EncargoCliente } from "../../filters/encargos";
 import { abrirWhatsApp } from "../../utils/whatsapp";
 import {
   priorityBucket,
@@ -1641,15 +1643,24 @@ const handleWhatsApp = (
   client: Pick<ClientGroup, "client" | "mobile" | "phone">,
   user: { name?: string } | null | undefined,
   valorEmAtraso: number,
+  encargo?: EncargoCliente | null,
 ) => {
   const phone = client.mobile || client.phone || "";
   // Botao fica desabilitado quando o cliente nao tem telefone (ver render
   // acima); sem numero, abrirWhatsApp so ignora -- sem dialog nativo.
   // Valor da mensagem = so o que ja venceu (clientOverdueAmount), nao o
-  // total em aberto com parcelas a vencer.
+  // total em aberto com parcelas a vencer. Titulo do Ciclone com multa/juros
+  // (item 67): o encargo vai separado, para o cliente ver o total de hoje.
+  const comEncargo = !!encargo && encargo.encargo > 0.009;
   const assunto =
     valorEmAtraso > 0.01
-      ? `sua pendência em atraso de ${formatCurrency(valorEmAtraso)}`
+      ? comEncargo
+        ? `sua pendência em atraso de ${formatCurrency(valorEmAtraso)} + ${formatCurrency(
+            encargo!.encargo,
+          )} de multa e juros até hoje (total ${formatCurrency(
+            valorEmAtraso + encargo!.encargo,
+          )})`
+        : `sua pendência em atraso de ${formatCurrency(valorEmAtraso)}`
       : "suas parcelas em aberto";
   abrirWhatsApp(
     phone,
@@ -1725,6 +1736,9 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
   const saldo = clientBalanceSplit(group, acordoAtivoOverdueMap);
   const emDia = saldo.vencido <= 0.01;
   const quitado = quitadoEm !== undefined;
+  // Item 67: multa e juros do Ciclone sobre o vencido (referencia de hoje).
+  const encargo =
+    quitado || emDia ? null : encargoCliente(group, acordoAtivoOverdueMap);
   const phoneValue = group.mobile || group.phone;
   const [showPhoneModal, setShowPhoneModal] = useState(false);
   // Fechar o telefone depois de Ligar/Copiar abre o Atender.
@@ -2022,6 +2036,29 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
               {formatCurrency(saldo.vencido)}
             </span>
           )}
+          {encargo && encargo.encargo > 0.009 && (
+            <span
+              className="mt-1 self-end inline-flex flex-col items-end rounded-lg border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+              title={`Multa ${formatCurrency(encargo.multa)} + juros ${formatCurrency(encargo.juros)} do Ciclone até hoje. Cobre o total de hoje, não só o vencido.`}
+            >
+              <span className="inline-flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />+{" "}
+                {formatCurrency(encargo.encargo)} multa e juros
+              </span>
+              <span className="text-[11px]">
+                Hoje: {formatCurrency(saldo.vencido + encargo.encargo)}
+              </span>
+            </span>
+          )}
+          {encargo?.conferirNoErp && (
+            <span
+              className="mt-1 self-end inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800"
+              title="O percentual de juros cadastrado no Ciclone parece errado. Confira o valor no Ciclone antes de cobrar."
+            >
+              <AlertTriangle className="h-3 w-3" />
+              Conferir juros no Ciclone
+            </span>
+          )}
           {saldo.aVencer > 0.01 && (
             <span
               className="text-[10px] font-semibold text-gray-500 dark:text-dark-text-secondary"
@@ -2062,7 +2099,7 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              handleWhatsApp(group, user, saldo.vencido);
+              handleWhatsApp(group, user, saldo.vencido, encargo);
               aposContato(group, "whatsapp");
             }}
             disabled={!(group.mobile || group.phone)}

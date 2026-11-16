@@ -31,6 +31,7 @@ import {
   hasInstallmentBalance,
   round2,
 } from "../../filters/clientStatus";
+import { encargoParcela } from "../../filters/encargos";
 
 const FORMA_PAGAMENTO_LABEL: Record<string, string> = {
   dinheiro: "Dinheiro",
@@ -247,6 +248,8 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         valorOriginal: number;
         jaPago: number;
         numero: number | null;
+        /** Multa + juros do Ciclone hoje (item 67); 0 se nao ha. */
+        encargo: number;
       }[] = [];
       (clientSales || []).forEach((sale) =>
         sale.installments?.forEach((inst) => {
@@ -272,6 +275,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
             valorOriginal: round2(inst.valor_original || 0),
             jaPago: round2((inst.valor_recebido || 0) + (inst.desconto || 0)),
             numero: inst.parcela ?? null,
+            encargo: encargoParcela(inst)?.encargo ?? 0,
           });
         }),
       );
@@ -333,6 +337,19 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       qtdMarcadasEscolhida ?? qtdVencidas,
       parcelasAbertas.length,
     );
+    // Item 67: multa + juros do Ciclone das parcelas marcadas (referencia de
+    // hoje). So SUGERE o valor -- o juro continua informado pelo cobrador
+    // (item 60: o sistema nunca presume encargo).
+    const encargoMarcadas = round2(
+      parcelasAbertas
+        .slice(0, qtdMarcadas)
+        .reduce((soma, p) => soma + p.encargo, 0),
+    );
+    const usarEncargoCiclone = () => {
+      setMostrarJuros(true);
+      setJurosTexto(encargoMarcadas.toFixed(2).replace(".", ","));
+      setErroEtapa(null);
+    };
     // Sem nada vencido, a lista a vencer ja aparece aberta.
     const aVencerVisivel = mostrarAVencer || qtdVencidas === 0;
 
@@ -1343,6 +1360,42 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                         </div>
                       )}
                     </div>
+
+                    {/* Item 67: parcela marcada do Ciclone com multa/juros --
+                    avisa o total de hoje para o cobrador nao receber so o
+                    vencido. */}
+                    {modoParcelas && encargoMarcadas > 0.009 && (
+                      <div className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200">
+                        <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                          <div>
+                            <strong>
+                              As parcelas marcadas têm{" "}
+                              {formatCurrency(encargoMarcadas)} de multa e juros
+                              até hoje
+                            </strong>{" "}
+                            (regra do Ciclone). Com eles, o cliente paga{" "}
+                            <strong>
+                              {formatCurrency(
+                                round2(alocacao.somaParcelas + encargoMarcadas),
+                              )}
+                            </strong>
+                            .
+                          </div>
+                          {round2(parseValor(jurosTexto)) !==
+                            encargoMarcadas && (
+                            <button
+                              type="button"
+                              onClick={usarEncargoCiclone}
+                              className="text-xs font-semibold text-amber-900 underline hover:text-amber-700 dark:text-amber-200"
+                            >
+                              Usar multa e juros do Ciclone (
+                              {formatCurrency(encargoMarcadas)})
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Juros/multa: so informados pelo cobrador (acordados com o
                     cliente). Fechado por padrao. */}

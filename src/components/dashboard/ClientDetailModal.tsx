@@ -34,6 +34,7 @@ import {
   round2,
 } from "../../filters/clientStatus";
 import { parseAndNormalizeDate } from "../../filters/dates";
+import { encargoCliente, encargoParcela } from "../../filters/encargos";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useClientBirthDate } from "../../hooks/useClientBirthDate";
 import { razaoSocialDistinta } from "../../utils/clienteNome";
@@ -277,6 +278,14 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     { document: clientGroup.document, sales: clientSales },
     acordoAtivoOverdueMap,
   );
+  // Item 67: multa e juros do Ciclone sobre o vencido (referencia de hoje).
+  const encargoFicha =
+    saldoCliente.vencido > 0.01
+      ? encargoCliente(
+          { document: clientGroup.document, sales: clientSales },
+          acordoAtivoOverdueMap,
+        )
+      : null;
   const [menuMaisAberto, setMenuMaisAberto] = useState(false);
   // Item 66: cliente pagou na loja depois da cobranca -> pedido ao gestor.
   const [isAtribuirOpen, setIsAtribuirOpen] = useState(false);
@@ -573,6 +582,17 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                     Em acordo
                   </span>
                 )}
+                {encargoFicha && encargoFicha.encargo > 0.009 && (
+                  <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 font-medium inline-flex items-center gap-1">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Com multa e juros, hoje:{" "}
+                    <strong>
+                      {formatCurrency(
+                        saldoCliente.vencido + encargoFicha.encargo,
+                      )}
+                    </strong>
+                  </span>
+                )}
               </div>
 
               {/* Atender e Receber pagamento sao o dia a dia; Acordo ao lado;
@@ -689,6 +709,37 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   )}
               </div>
             </div>
+
+            {/* Item 67: aviso de multa e juros (Ciclone) -- o cobrador nao
+                pode cobrar so o vencido. */}
+            {encargoFicha && encargoFicha.encargo > 0.009 && (
+              <div className="mt-2 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <div>
+                  <strong>Este cliente tem multa e juros de atraso.</strong>{" "}
+                  Cobre o valor de hoje, não só o vencido: vencido{" "}
+                  {formatCurrency(saldoCliente.vencido)} + multa{" "}
+                  {formatCurrency(encargoFicha.multa)} + juros{" "}
+                  {formatCurrency(encargoFicha.juros)} ={" "}
+                  <strong>
+                    {formatCurrency(
+                      saldoCliente.vencido + encargoFicha.encargo,
+                    )}
+                  </strong>
+                  . Mesma conta do Ciclone (Prev. Baixa); o valor sobe a cada
+                  dia de atraso.
+                </div>
+              </div>
+            )}
+            {encargoFicha?.conferirNoErp && (
+              <div className="mt-2 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <div>
+                  O juro cadastrado no Ciclone para uma parcela deste cliente
+                  parece errado. Confira o valor no Ciclone antes de cobrar.
+                </div>
+              </div>
+            )}
 
             {/* Gestor: em nome de quem fica o registro. Sem cobrador de
                 carteira nao ha escolha (fica no nome dele) -- nada a mostrar. */}
@@ -1144,6 +1195,11 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                       (installment.valor_recebido || 0) -
                                       (installment.desconto || 0),
                                   );
+                                  // Item 67: multa/juros do Ciclone (sem
+                                  // acordo ativo, que tem encargo proprio).
+                                  const encargo = acordoAtivo
+                                    ? null
+                                    : encargoParcela(installment);
                                   const reajusteDiferente =
                                     installment.valor_reajustado > 0 &&
                                     round2(installment.valor_reajustado) !==
@@ -1250,6 +1306,21 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                               {formatCurrency(saldoParcela)}
                                             </div>
                                           )}
+                                        {encargo && encargo.encargo > 0.009 && (
+                                          <div
+                                            className="mt-0.5 rounded bg-amber-50 px-1 text-[10px] font-semibold text-amber-800"
+                                            title={`Multa ${encargo.percentualMulta}% = ${formatCurrency(encargo.multa)} + juros ${encargo.percentualJurosDia}% ao dia × ${encargo.dias} dias = ${formatCurrency(encargo.juros)}`}
+                                          >
+                                            + {formatCurrency(encargo.encargo)}{" "}
+                                            multa/juros · hoje{" "}
+                                            {formatCurrency(encargo.totalHoje)}
+                                          </div>
+                                        )}
+                                        {encargo?.conferirNoErp && (
+                                          <div className="mt-0.5 text-[10px] font-semibold text-amber-800">
+                                            conferir juros no Ciclone
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
                                   );
