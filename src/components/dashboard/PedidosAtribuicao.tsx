@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { invalidarHistoricoCliente } from "../../utils/cacheHistoricoCliente";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -154,6 +155,7 @@ const PedidosAtribuicao: React.FC = () => {
     setSalvando(true);
     setErroAcao(null);
     try {
+      invalidarHistoricoCliente(l.itens[0].documento);
       const r = await decidirAtribuicaoPagamento({
         lote: l.lote,
         aprovar: acao === "aprovar",

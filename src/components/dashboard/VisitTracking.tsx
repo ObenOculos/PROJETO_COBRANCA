@@ -2794,7 +2794,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
 
       {/* Modal de Confirmação para Cancelamentos */}
       {showApprovalModal && selectedRequest && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
             <div className="px-6 py-4 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900">
@@ -2931,7 +2931,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
       {/* Scheduler Modal */}
       {showSchedulerModal && selectedCollectorForScheduler && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+          className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
           onClick={() => {
             setShowSchedulerModal(false);
             setSelectedCollectorForScheduler(null);

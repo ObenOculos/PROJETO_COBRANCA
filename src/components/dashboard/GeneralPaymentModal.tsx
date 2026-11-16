@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, memo } from "react";
+import React, { useState, useEffect, useMemo, useRef, memo } from "react";
+import { invalidarHistoricoCliente } from "../../utils/cacheHistoricoCliente";
 import {
   X,
   Check,
@@ -36,11 +37,15 @@ import {
 } from "../../filters/clientStatus";
 import { encargoParcela, isTituloCiclone } from "../../filters/encargos";
 
+/** A partir deste valor recebido o "Confirmar" pede "Conferi os valores". */
+const VALOR_ALTO_CONFERENCIA = 2000;
+
 const FORMA_PAGAMENTO_LABEL: Record<string, string> = {
   dinheiro: "Dinheiro",
   pix: "PIX",
   cartao_credito: "Cartão de crédito",
   cartao_debito: "Cartão de débito",
+  boleto: "Boleto",
 };
 
 /**
@@ -178,7 +183,16 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     const [rescheduleDate, setRescheduleDate] = useState("");
     const [rescheduleTime, setRescheduleTime] = useState("");
     const [observations, setObservations] = useState("");
+    // Ultimo texto que o sistema pos na observacao (item 67): se o cobrador
+    // nao mexeu, pode ser trocado quando a situacao muda.
+    const observacaoAutomatica = useRef("");
     const [etapa, setEtapa] = useState<1 | 2 | 3>(1);
+    // Trava de confirmacao nos casos de risco (marcar "Conferi os valores");
+    // volta a desmarcada a cada troca de etapa.
+    const [conferido, setConferido] = useState(false);
+    useEffect(() => {
+      setConferido(false);
+    }, [etapa]);
     const [erroEtapa, setErroEtapa] = useState<string | null>(null);
     // Quantas parcelas (na ordem, da mais antiga) o cliente esta pagando.
     // null = padrao: todas as vencidas.
@@ -368,6 +382,54 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         .slice(0, qtdMarcadas)
         .reduce((soma, p) => soma + p.encargo, 0),
     );
+    /** Data do pagamento numa linha so ("Pago em"): a multa e os juros do
+     * Ciclone sao calculados ate ela. So quem pode lancar baixa depois
+     * (externo e sempre hoje). */
+    const seletorData = podeEscolherData ? (
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="font-semibold text-gray-900 dark:text-dark-text">
+          Pago em
+        </span>
+        {(
+          [
+            ["Hoje", hoje],
+            ["Ontem", addDaysLocalStr(hoje, -1)],
+          ] as const
+        ).map(([rotulo, valor]) => (
+          <button
+            key={rotulo}
+            type="button"
+            onClick={() => {
+              setDataPagamento(valor);
+              setErroEtapa(null);
+            }}
+            className={`px-2.5 py-1 rounded-lg border text-xs font-medium ${
+              dataPagamento === valor
+                ? "border-indigo-500 bg-indigo-50 text-indigo-800"
+                : "border-gray-200 text-gray-700 hover:border-gray-300"
+            }`}
+          >
+            {rotulo}
+          </button>
+        ))}
+        <input
+          id="payment-date"
+          name="paymentDate"
+          type="date"
+          value={dataPagamento}
+          min={dataMinima}
+          max={hoje}
+          onChange={(e) => {
+            setDataPagamento(e.target.value);
+            setErroEtapa(null);
+          }}
+          className="px-2 py-1 border border-gray-300 dark:border-dark-border rounded-lg text-xs dark:bg-dark-bg dark:text-dark-text"
+          aria-label="Outra data do pagamento"
+          title={`Até ${DIAS_RETROATIVOS} dias atrás`}
+        />
+      </div>
+    ) : null;
+
     /** "ate hoje" ou "ate dd/mm/aaaa" (dia em que o cliente pagou). */
     const ateDataPagamento =
       dataPagamento === hoje
@@ -757,18 +819,24 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       setErroEtapa(erro);
       if (erro) return;
       // Item 67: indo para "Pagamento", deixa a observacao pronta quando ha
-      // multa/juros do Ciclone -- so se o cobrador ainda nao escreveu nada.
-      if (etapa === 1 && !observations.trim()) {
-        if (encargoNaoCobrado > 0.009) {
-          setObservations(`${prefixoNaoCobrado} `);
-        } else if (
-          modoParcelas &&
-          encargoMarcadas > 0.009 &&
-          Math.abs(jurosInformado - encargoMarcadas) <= 0.01
+      // multa/juros do Ciclone. So mexe se o cobrador nao escreveu nada ou se
+      // o texto ainda e o que o sistema preencheu (voltou e mudou o valor:
+      // o texto antigo nao vale mais).
+      if (etapa === 1) {
+        const automatica =
+          encargoNaoCobrado > 0.009
+            ? `${prefixoNaoCobrado} `
+            : modoParcelas &&
+                encargoMarcadas > 0.009 &&
+                Math.abs(jurosInformado - encargoMarcadas) <= 0.01
+              ? `Multa e juros do Ciclone ${ateDataPagamento} (${formatCurrency(encargoMarcadas)}).`
+              : "";
+        if (
+          !observations.trim() ||
+          observations === observacaoAutomatica.current
         ) {
-          setObservations(
-            `Multa e juros do Ciclone ${ateDataPagamento} (${formatCurrency(encargoMarcadas)}).`,
-          );
+          setObservations(automatica);
+          observacaoAutomatica.current = automatica;
         }
       }
       setEtapa((e) => (e === 1 ? 2 : 3));
@@ -787,6 +855,10 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       const erro = erroDoValor() ?? erroDoPagamento() ?? erroDoAgendamento();
       setErroEtapa(erro);
       if (erro) return;
+      if (precisaConferir && !conferido) {
+        setErroEtapa('Marque "Conferi os valores" para confirmar.');
+        return;
+      }
       await registrarPagamento(
         precisaAcompanhamento && ehExterno
           ? { data: rescheduleDate, horario: rescheduleTime }
@@ -990,6 +1062,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
             : "Pagamento distribuído com sucesso!",
         );
       }
+      invalidarHistoricoCliente(clientGroup.document);
       onSuccess();
       onClose();
     };
@@ -1059,9 +1132,26 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       ? round2(Math.max(0, totalPending - amountToDistribute))
       : 0;
 
+    // O "Confirmar" so libera depois de marcar "Conferi os valores", em todo
+    // pagamento -- evita clique acidental (decisao do usuario, 2026-11-16).
+    // Os casos de risco aparecem destacados na mesma caixa.
+    const motivosConferencia: string[] = [
+      ...(desconto > 0.009
+        ? [`desconto de ${formatCurrency(desconto)}`]
+        : []),
+      ...(encargoNaoCobrado > 0.009
+        ? [`${formatCurrency(encargoNaoCobrado)} de multa e juros não cobrados`]
+        : []),
+      ...(quitaTudo || withDiscount ? ["quita toda a dívida do cliente"] : []),
+      ...(amountToDistribute >= VALOR_ALTO_CONFERENCIA
+        ? [`valor acima de ${formatCurrency(VALOR_ALTO_CONFERENCIA)}`]
+        : []),
+    ];
+    const precisaConferir = true;
+
     return (
       <div
-        className="fixed inset-0 bg-black bg-opacity-50 flex items-stretch sm:items-center justify-center sm:p-4 z-[110]"
+        className="fixed inset-0 bg-black/50 flex items-stretch sm:items-center justify-center sm:p-4 z-[110]"
         onClick={(e) => {
           if (e.target === e.currentTarget && !loading) onClose();
         }}
@@ -1160,6 +1250,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                 <div className={grade}>
                   {modoParcelas && (
                     <div>
+                      {seletorData && <div className="mb-4">{seletorData}</div>}
                       <h3 className="text-sm font-semibold text-gray-900 dark:text-dark-text mb-2">
                         O que o cliente está pagando?
                       </h3>
@@ -1384,10 +1475,10 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                                 )}
                               </strong>
                               <span
-                                className="block text-xs text-amber-700 dark:text-amber-400"
+                                className="ml-1 text-xs text-amber-700 dark:text-amber-400 whitespace-nowrap"
                                 title={`Multa e juros de atraso calculados pela regra do Ciclone (Prev. Baixa), ${ateDataPagamento}`}
                               >
-                                {formatCurrency(alocacao.somaParcelas)} +{" "}
+                                · {formatCurrency(alocacao.somaParcelas)} +{" "}
                                 {formatCurrency(encargoMarcadas)} multa/juros
                               </span>
                             </div>
@@ -1405,6 +1496,10 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                                 )}{" "}
                                 com multa e juros
                               </button>
+                              {/* So quando o valor ainda nao e o das parcelas. */}
+                              {Math.abs(
+                                amountToDistribute - alocacao.somaParcelas,
+                              ) > 0.009 && (
                               <button
                                 type="button"
                                 onClick={receberSemEncargo}
@@ -1412,6 +1507,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                               >
                                 Recebi só {formatCurrency(alocacao.somaParcelas)}
                               </button>
+                              )}
                             </div>
                           </div>
                         )}
@@ -1434,76 +1530,32 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                               </span>
                             )}
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setDistributionAmount(
-                                valorParaCampo(alocacao.esperado),
-                              );
-                              setErroEtapa(null);
-                            }}
-                            className="px-3 py-1.5 text-xs font-medium rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
-                          >
-                            Recebi exatamente este valor
-                          </button>
+                          {/* So quando o valor ainda nao e este. */}
+                          {Math.abs(amountToDistribute - alocacao.esperado) >
+                            0.009 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDistributionAmount(
+                                  valorParaCampo(alocacao.esperado),
+                                );
+                                setErroEtapa(null);
+                              }}
+                              className="px-3 py-1.5 text-xs font-medium rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                            >
+                              Recebi exatamente este valor
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
                   )}
 
                   <div className="space-y-5 min-w-0">
-                    {/* Data do pagamento: um lugar so, antes do valor -- a multa e os
-                    juros do Ciclone sao calculados ate ela. So quem pode lancar
-                    baixa depois (externo e sempre hoje). */}
-                    {podeEscolherData && (
-                      <fieldset>
-                        <legend className="text-sm font-semibold text-gray-900 dark:text-dark-text mb-2">
-                          Quando pagou?
-                        </legend>
-                        <div className="flex flex-wrap items-center gap-2">
-                          {(
-                            [
-                              ["Hoje", hoje],
-                              ["Ontem", addDaysLocalStr(hoje, -1)],
-                            ] as const
-                          ).map(([rotulo, valor]) => (
-                            <button
-                              key={rotulo}
-                              type="button"
-                              onClick={() => {
-                                setDataPagamento(valor);
-                                setErroEtapa(null);
-                              }}
-                              className={`px-3 py-2 rounded-xl border-2 text-sm font-medium ${
-                                dataPagamento === valor
-                                  ? "border-indigo-500 bg-indigo-50 text-indigo-800"
-                                  : "border-gray-200 text-gray-700 hover:border-gray-300"
-                              }`}
-                            >
-                              {rotulo}
-                            </button>
-                          ))}
-                          <input
-                            id="payment-date"
-                            name="paymentDate"
-                            type="date"
-                            value={dataPagamento}
-                            min={dataMinima}
-                            max={hoje}
-                            onChange={(e) => {
-                              setDataPagamento(e.target.value);
-                              setErroEtapa(null);
-                            }}
-                            className="px-3 py-2 border border-gray-300 dark:border-dark-border rounded-xl text-sm dark:bg-dark-bg dark:text-dark-text"
-                            aria-label="Outra data"
-                          />
-                        </div>
-                        <p className="mt-1 text-xs text-gray-500">
-                          Até {DIAS_RETROATIVOS} dias atrás.
-                        </p>
-                      </fieldset>
-                    )}
+                    {!modoParcelas && seletorData}
                     <div>
+                      <div className="flex gap-3 items-end">
+                      <div className="flex-1 min-w-0">
                       <label
                         htmlFor="distribution-amount"
                         className="block text-sm font-semibold text-gray-900 dark:text-dark-text mb-2"
@@ -1536,6 +1588,66 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                           placeholder="0,00"
                         />
                       </div>
+                      </div>
+                      {/* Juros/multa ao lado: estao DENTRO do valor recebido
+                      (sai dele e nao abate parcela). So informados pelo
+                      cobrador; fechado por padrao. */}
+                      {modoParcelas && mostrarJuros && (
+                        <div
+                          className="w-36 shrink-0"
+                          title="Os juros/multa estão dentro do valor recebido: saem dele e não abatem parcela. Explique na observação."
+                        >
+                          <label
+                            htmlFor="juros-informado"
+                            className="flex items-center justify-between text-xs font-semibold text-gray-700 dark:text-dark-text mb-2"
+                          >
+                            dos quais juros/multa
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMostrarJuros(false);
+                                setJurosTexto("");
+                                setErroEtapa(null);
+                              }}
+                              className="text-gray-400 hover:text-gray-700"
+                              aria-label="Remover juros/multa"
+                              title="Remover juros/multa"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-400">
+                              R$
+                            </span>
+                            <input
+                              id="juros-informado"
+                              type="text"
+                              inputMode="decimal"
+                              autoComplete="off"
+                              value={jurosTexto}
+                              onChange={(e) => {
+                                setJurosTexto(
+                                  e.target.value.replace(/[^\d.,]/g, ""),
+                                );
+                                setErroEtapa(null);
+                              }}
+                              className="w-full pl-9 pr-2 py-3 border border-gray-300 dark:border-dark-border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-lg font-semibold tabular-nums dark:bg-dark-bg dark:text-dark-text"
+                              placeholder="0,00"
+                            />
+                          </div>
+                        </div>
+                      )}
+                      </div>
+                      {modoParcelas && !mostrarJuros && (
+                        <button
+                          type="button"
+                          onClick={() => setMostrarJuros(true)}
+                          className="mt-1.5 text-xs font-medium text-indigo-700 hover:text-indigo-900"
+                        >
+                          + Juros/multa acordados
+                        </button>
+                      )}
                       {/* Com acordo ativo (modo so por valor) segue o atalho do
                       saldo; no modo parcelas o atalho e "Recebi exatamente
                       este valor", limitado ao que foi marcado. */}
@@ -1557,63 +1669,6 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                         </div>
                       )}
                     </div>
-
-                    {/* Juros/multa: so informados pelo cobrador (acordados com o
-                    cliente). Fechado por padrao. */}
-                    {modoParcelas &&
-                      (mostrarJuros ? (
-                        <div>
-                          <label
-                            htmlFor="juros-informado"
-                            className="flex items-center justify-between text-sm font-semibold text-gray-900 dark:text-dark-text mb-2"
-                          >
-                            Juros/multa acordados com o cliente
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setMostrarJuros(false);
-                                setJurosTexto("");
-                                setErroEtapa(null);
-                              }}
-                              className="text-xs font-normal text-gray-500 hover:text-gray-800"
-                            >
-                              Remover
-                            </button>
-                          </label>
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-400">
-                              R$
-                            </span>
-                            <input
-                              id="juros-informado"
-                              type="text"
-                              inputMode="decimal"
-                              autoComplete="off"
-                              value={jurosTexto}
-                              onChange={(e) => {
-                                setJurosTexto(
-                                  e.target.value.replace(/[^\d.,]/g, ""),
-                                );
-                                setErroEtapa(null);
-                              }}
-                              className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-dark-border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-base tabular-nums dark:bg-dark-bg dark:text-dark-text"
-                              placeholder="0,00"
-                            />
-                          </div>
-                          <p className="mt-1 text-xs text-gray-500">
-                            Sai do valor recebido e não abate parcela. Explique
-                            na observação.
-                          </p>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setMostrarJuros(true)}
-                          className="text-sm font-medium text-indigo-700 hover:text-indigo-900"
-                        >
-                          + Informar juros/multa acordados
-                        </button>
-                      ))}
 
                     {/* Item 67: multa/juros do Ciclone sem cobrar (todos ou
                     parte) -- avisa ja aqui que vai pedir o motivo. */}
@@ -1899,7 +1954,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
 
             {etapa === 2 && (
               <>
-                <div className={grade}>
+                <div className={grade.replace("md:items-start", "md:items-stretch")}>
                   <div className="space-y-5">
                     <fieldset>
                       <legend className="text-sm font-semibold text-gray-900 dark:text-dark-text mb-2">
@@ -1932,7 +1987,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                     </fieldset>
 
                   </div>
-                  <div>
+                  <div className="flex flex-col">
                     <label
                       htmlFor="observations"
                       className="block text-sm font-semibold text-gray-900 dark:text-dark-text mb-2"
@@ -1952,7 +2007,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                         setObservations(e.target.value);
                         setErroEtapa(null);
                       }}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm dark:bg-dark-bg dark:text-dark-text"
+                      className="w-full flex-1 min-h-[5rem] resize-none px-3 py-2 border border-gray-300 dark:border-dark-border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm dark:bg-dark-bg dark:text-dark-text"
                       rows={3}
                       placeholder={
                         encargoNaoCobrado > 0.009
@@ -2181,6 +2236,34 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
               </>
             )}
 
+            {etapa === 3 && precisaConferir && (
+              <label
+                className={`flex items-start gap-3 rounded-xl border-2 p-3 text-sm cursor-pointer ${
+                  motivosConferencia.length > 0
+                    ? "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200"
+                    : "border-gray-200 bg-gray-50 text-gray-800 dark:border-dark-border dark:bg-dark-bg-tertiary dark:text-dark-text"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={conferido}
+                  onChange={(e) => {
+                    setConferido(e.target.checked);
+                    setErroEtapa(null);
+                  }}
+                  className="mt-0.5 h-4 w-4 rounded border-amber-400 text-amber-600 focus:ring-amber-500"
+                />
+                <span>
+                  <strong>Conferi os valores</strong>
+                  <span className="block text-xs">
+                    {motivosConferencia.length > 0
+                      ? `Atenção: ${motivosConferencia.join(" · ")}.`
+                      : "Valor, forma de pagamento e parcelas conferidos com o cliente."}
+                  </span>
+                </span>
+              </label>
+            )}
+
             {erroEtapa && !(etapa === 1 && (acimaSemJuros || avisoAcima)) && (
               <Aviso tom="erro">{erroEtapa}</Aviso>
             )}
@@ -2200,7 +2283,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
             <button
               id="confirm-button"
               type="submit"
-              disabled={loading}
+              disabled={loading || (etapa === 3 && precisaConferir && !conferido)}
               className={`flex-1 px-4 py-2.5 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
                 etapa === 3
                   ? "bg-emerald-600 hover:bg-emerald-700"

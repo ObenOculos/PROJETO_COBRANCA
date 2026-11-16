@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { invalidarHistoricoCliente } from "../../utils/cacheHistoricoCliente";
 import { CheckCircle2, ChevronDown, ChevronRight, Send, X } from "lucide-react";
 import { ClientGroup } from "../../types";
 import { formatCurrency, formatDate } from "../../utils/formatters";
@@ -100,6 +101,7 @@ const AtribuirPagamentoModal: React.FC<Props> = ({ clientGroup, onClose }) => {
         parcelas: selecionadas.map((p) => p.id_parcela),
         observacao,
       });
+      invalidarHistoricoCliente(clientGroup.document);
       setEnviado({ valor: total, qtd: selecionadas.length });
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao enviar o pedido.");
@@ -124,7 +126,7 @@ const AtribuirPagamentoModal: React.FC<Props> = ({ clientGroup, onClose }) => {
   }, [pedidos]);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[110]">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[110]">
       <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
         <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-gray-100 dark:border-dark-border">
           <div>

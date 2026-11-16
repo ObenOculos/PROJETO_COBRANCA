@@ -3141,7 +3141,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
           overdueVisits.length > 0 &&
           createPortal(
             <div
-              className="fixed inset-0 backdrop-blur-sm bg-black/30 flex items-center justify-center p-2 sm:p-4 z-50"
+              className="fixed inset-0 bg-black/50 flex items-center justify-center p-2 sm:p-4 z-50"
               onClick={() => setShowOverdueNotificationModal(false)}
             >
               <div
@@ -3348,7 +3348,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         {showCancellationModal &&
           selectedVisitForCancellation &&
           createPortal(
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
                 <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
                   <h3 className="text-lg font-semibold text-gray-900">
@@ -3423,7 +3423,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         {showRescheduleModal &&
           selectedVisitForReschedule &&
           createPortal(
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 max-h-[90vh] flex flex-col">
                 <div className="px-4 lg:px-6 py-4 border-b border-gray-200 flex-shrink-0">
                   <h3 className="text-lg font-semibold text-gray-900 flex items-center">
@@ -3612,7 +3612,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         {showCompletedModal &&
           selectedVisitForCompletion &&
           createPortal(
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 max-h-[90vh] flex flex-col">
                 <div className="px-4 lg:px-6 py-4 border-b border-gray-200 flex-shrink-0">
                   <h3 className="text-lg font-semibold text-gray-900 flex items-center">
@@ -3728,7 +3728,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         {showNotFoundConfirmModal &&
           selectedVisitForNotFound &&
           createPortal(
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
                 <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
                   <h3 className="text-lg font-semibold text-gray-900 flex items-center">
@@ -3784,7 +3784,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         {showNotFoundObservationModal &&
           selectedVisitForNotFound &&
           createPortal(
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 max-h-[90vh] flex flex-col">
                 <div className="px-4 lg:px-6 py-4 border-b border-gray-200 flex-shrink-0">
                   <h3 className="text-lg font-semibold text-gray-900 flex items-center">
@@ -3906,7 +3906,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         {showPaymentQuestionModal &&
           selectedVisitForPayment &&
           createPortal(
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
                 <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
                   <h3 className="text-lg font-semibold text-gray-900 flex items-center">
@@ -3948,7 +3948,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         {showTimeWarningModal &&
           timeWarningData &&
           createPortal(
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-4">
@@ -4027,7 +4027,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
         {showScheduleModal &&
           createPortal(
             <div
-              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-hidden"
+              className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-hidden"
               onClick={(e) => {
                 // Fechar modal ao clicar fora dele
                 if (e.target === e.currentTarget) {

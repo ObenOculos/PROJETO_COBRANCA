@@ -73,7 +73,7 @@ const VersionChecker: React.FC<VersionCheckerProps> = ({
 
   // Render the update modal using createPortal
   return renderInPortal(
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-[9999]">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[9999]">
       <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full mx-4 p-6 text-center">
         <RefreshCw className="h-12 w-12 text-blue-600 mx-auto mb-4 animate-spin-slow" />
         <h3 className="text-xl font-bold text-gray-900 mb-2">

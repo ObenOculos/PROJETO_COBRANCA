@@ -37,7 +37,7 @@ export function Modal({
     >
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 transition-opacity z-modal-backdrop"
+        className="fixed inset-0 bg-black/50 transition-opacity z-modal-backdrop"
         onClick={onClose}
       />
 

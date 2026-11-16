@@ -20,6 +20,11 @@ import {
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { fetchAllRows } from "../../utils/fetchAllRows";
+import {
+  guardarHistoricoCliente,
+  invalidarHistoricoCliente,
+  lerHistoricoCliente,
+} from "../../utils/cacheHistoricoCliente";
 import { comRetentativa } from "../../utils/supabaseRetry";
 import { formatCurrency, parseAndFormatDate } from "../../utils/formatters";
 import { round2 } from "../../filters/clientStatus";
@@ -181,6 +186,10 @@ const LinhaDoTempoCliente: React.FC<Props> = ({
   );
   const [carregando, setCarregando] = useState(true);
   const [falhas, setFalhas] = useState<string[]>([]);
+  // Cache do historico (utils/cacheHistoricoCliente): quando os dados
+  // mostrados foram buscados e um contador para o "Atualizar".
+  const [atualizadoEm, setAtualizadoEm] = useState<number | null>(null);
+  const [versaoBusca, setVersaoBusca] = useState(0);
 
   const [filtro, setFiltro] = useState<Categoria | "todos">("todos");
   const [limite, setLimite] = useState(POR_PAGINA);
@@ -207,6 +216,28 @@ const LinhaDoTempoCliente: React.FC<Props> = ({
   useEffect(() => {
     if (!clientDocument) return;
     let cancelado = false;
+
+    // Ja buscado ha pouco e nada gravado no cliente desde entao: usa o cache.
+    const chaveCache = `${mostrarCarteira ? "gestor" : "cobrador"}|${idsParcelas}`;
+    const guardado = lerHistoricoCliente<{
+      contatos: ContatoRow[];
+      acordos: AcordoLinha[];
+      carteira: CarteiraRow[];
+      recebimentos: RecebimentoRow[];
+      pagamentos: Map<string, PagamentoApp>;
+    }>(clientDocument, chaveCache);
+    if (guardado) {
+      setContatos(guardado.dados.contatos);
+      setAcordos(guardado.dados.acordos);
+      setCarteira(guardado.dados.carteira);
+      setRecebimentos(guardado.dados.recebimentos);
+      setPagamentos(guardado.dados.pagamentos);
+      setFalhas([]);
+      setAtualizadoEm(guardado.quando);
+      setCarregando(false);
+      return;
+    }
+
     setCarregando(true);
     setFalhas([]);
 
@@ -316,12 +347,37 @@ const LinhaDoTempoCliente: React.FC<Props> = ({
       });
       setFalhas(erros);
       setCarregando(false);
+      // So guarda quando veio tudo (com falha, a proxima abertura tenta de novo).
+      if (
+        erros.length === 0 &&
+        rc.status === "fulfilled" &&
+        ra.status === "fulfilled" &&
+        rcart.status === "fulfilled" &&
+        rrec.status === "fulfilled"
+      ) {
+        setAtualizadoEm(
+          guardarHistoricoCliente(clientDocument, chaveCache, {
+            contatos: rc.value,
+            acordos: ra.value,
+            carteira: rcart.value,
+            recebimentos: rrec.value.linhas,
+            pagamentos: rrec.value.mapa,
+          }),
+        );
+      } else {
+        setAtualizadoEm(Date.now());
+      }
     })();
 
     return () => {
       cancelado = true;
     };
-  }, [clientDocument, mostrarCarteira, idsParcelas]);
+  }, [clientDocument, mostrarCarteira, idsParcelas, versaoBusca]);
+
+  const atualizarHistorico = () => {
+    invalidarHistoricoCliente(clientDocument);
+    setVersaoBusca((v) => v + 1);
+  };
 
   const nome = useCallback(
     (id: string | null | undefined): string | null => {
@@ -803,7 +859,26 @@ const LinhaDoTempoCliente: React.FC<Props> = ({
       {falhas.length > 0 && (
         <p className="text-sm text-red-600">
           Não foi possível carregar: {falhas.join(", ")}. O histórico abaixo
-          está incompleto — feche e abra a ficha de novo.
+          está incompleto — clique em Atualizar.
+        </p>
+      )}
+
+      {!carregando && atualizadoEm != null && (
+        <p className="text-[11px] text-gray-400 dark:text-dark-text-secondary">
+          {(() => {
+            const min = Math.floor((Date.now() - atualizadoEm) / 60000);
+            return min < 1
+              ? "Atualizado agora"
+              : `Atualizado há ${min} min`;
+          })()}{" "}
+          ·{" "}
+          <button
+            type="button"
+            onClick={atualizarHistorico}
+            className="font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-400"
+          >
+            Atualizar
+          </button>
         </p>
       )}
 

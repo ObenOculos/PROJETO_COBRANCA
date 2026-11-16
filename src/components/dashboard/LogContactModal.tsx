@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { invalidarHistoricoCliente } from "../../utils/cacheHistoricoCliente";
 import {
   X,
   Save,
@@ -414,6 +415,7 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
           channel: nextChannel,
         });
       }
+      invalidarHistoricoCliente(client.document);
       onSuccess();
     } catch (err) {
       console.error("Erro ao agendar/remarcar contato:", err);
@@ -474,6 +476,7 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
         );
         if (vendaError) throw vendaError;
         await reload(true);
+        invalidarHistoricoCliente(client.document);
         onSuccess();
         return;
       }
@@ -524,6 +527,7 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
       if (rpcError) throw rpcError;
 
       await reload(!!releaseSituacao);
+      invalidarHistoricoCliente(client.document);
       onSuccess();
       if (pagouComComprovante) onRegistrarPagamento?.();
     } catch (err) {
@@ -569,7 +573,7 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
   const stepLabels = ["O que aconteceu", "Próximo contato"] as const;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[100] backdrop-blur-sm">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[100]">
       <div className="bg-white dark:bg-dark-bg rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden border border-gray-200 dark:border-dark-border animate-in fade-in zoom-in duration-200 max-h-[95vh] flex flex-col">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-100 dark:border-dark-border flex items-center justify-between bg-gray-50 dark:bg-dark-bg-secondary">

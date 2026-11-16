@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { invalidarHistoricoCliente } from "../../utils/cacheHistoricoCliente";
 import { X, Ban, AlertCircle } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { ScheduledVisit } from "../../types";
@@ -35,6 +36,7 @@ const CancelContactModal: React.FC<CancelContactModalProps> = ({
     setError("");
     try {
       await cancelScheduledContact(visit.id, reason.trim());
+      invalidarHistoricoCliente(visit.clientDocument);
       onSuccess();
     } catch (err) {
       console.error("Erro ao cancelar contato:", err);
@@ -46,7 +48,7 @@ const CancelContactModal: React.FC<CancelContactModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[100] backdrop-blur-sm">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[100]">
       <div className="bg-white dark:bg-dark-bg rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden border border-gray-200 dark:border-dark-border animate-in fade-in zoom-in duration-200">
         <div className="px-6 py-4 border-b border-gray-100 dark:border-dark-border flex items-center justify-between bg-gray-50 dark:bg-dark-bg-secondary">
           <div>

@@ -584,7 +584,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   return (
     <>
       <div
-        className={`fixed inset-0 bg-black bg-opacity-50 ${fichaMinimizada ? "hidden" : "flex"} items-stretch sm:items-center justify-center sm:p-4 z-[100] backdrop-blur-sm`}
+        className={`fixed inset-0 bg-black/50 ${fichaMinimizada ? "hidden" : "flex"} items-stretch sm:items-center justify-center sm:p-4 z-[100]`}
         onClick={(e) => {
           if (e.target === e.currentTarget) {
             onClose();
@@ -1556,7 +1556,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           migration 20261102000005); o cobrador precisa confirmar que sabe
           disso antes de continuar. */}
       {showAcordoAtivoConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-[130]">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[130]">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4">
             <div className="px-6 py-5">
               <div className="flex items-center gap-3 mb-3">

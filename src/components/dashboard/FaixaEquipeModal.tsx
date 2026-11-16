@@ -60,7 +60,7 @@ const FaixaEquipeModal: React.FC<FaixaEquipeModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-white dark:bg-dark-bg-secondary rounded-xl shadow-xl max-w-md w-full">
         <div className="p-6 border-b border-gray-200 dark:border-dark-border flex items-center justify-between">
           <h3 className="text-lg font-semibold flex items-center gap-2 text-gray-900 dark:text-dark-text">

@@ -1214,7 +1214,7 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
       aria-modal="true"
       aria-labelledby="store-modal-title"
       onMouseDown={onClose}
-      className="fixed inset-0 bg-black/60 flex items-center justify-center p-2 sm:p-4 z-50 animate-in fade-in duration-300"
+      className="fixed inset-0 bg-black/50 flex items-center justify-center p-2 sm:p-4 z-50 animate-in fade-in duration-300"
     >
       <div
         onMouseDown={(e) => e.stopPropagation()}

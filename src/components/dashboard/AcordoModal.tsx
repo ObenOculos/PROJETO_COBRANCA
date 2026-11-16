@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { invalidarHistoricoCliente } from "../../utils/cacheHistoricoCliente";
 import QRCode from "qrcode";
 import {
   X,
@@ -500,6 +501,7 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
         );
       }
 
+      invalidarHistoricoCliente(client.document);
       onSuccess();
     } catch (err) {
       console.error("Erro ao criar acordo:", err);
@@ -707,7 +709,7 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[100] backdrop-blur-sm">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[100]">
       <div className="bg-white dark:bg-dark-bg rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden border border-gray-200 dark:border-dark-border animate-in fade-in zoom-in duration-200 max-h-[90vh] flex flex-col">
         <div className="px-6 py-4 border-b border-gray-100 dark:border-dark-border flex items-center justify-between bg-gray-50 dark:bg-dark-bg-secondary shrink-0">
           <div>
@@ -1245,7 +1247,7 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
       </div>
 
       {aVencerPendentes.length > 0 && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[110] backdrop-blur-sm">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[110]">
           <div className="bg-white dark:bg-dark-bg rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4 border border-gray-200 dark:border-dark-border">
             <div className="flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />

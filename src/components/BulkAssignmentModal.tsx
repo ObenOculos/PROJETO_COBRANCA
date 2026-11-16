@@ -642,7 +642,7 @@ const BulkAssignmentModal: React.FC<Props> = ({
 
       {/* Confirmação: transferir agendamentos em aberto junto com os clientes? */}
       {showVisitPrompt && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[60]">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[60]">
           <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl max-w-sm w-full p-6 shadow-2xl">
             <div className="flex items-start gap-3 mb-5">
               <div className="p-2.5 bg-amber-50 dark:bg-amber-900/20 rounded-xl shrink-0">

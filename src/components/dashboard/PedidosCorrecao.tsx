@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { invalidarHistoricoCliente } from "../../utils/cacheHistoricoCliente";
 import { CheckCircle2, RotateCcw, Undo2, XCircle } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { supabase } from "../../lib/supabase";
@@ -130,6 +131,7 @@ const PedidosCorrecao: React.FC = () => {
     setSalvando(true);
     setErroAcao(null);
     try {
+      invalidarHistoricoCliente(p.documento);
       const r = await decidirPedidoCorrecao({
         pedidoId: p.id,
         aprovar: acao === "estornar",

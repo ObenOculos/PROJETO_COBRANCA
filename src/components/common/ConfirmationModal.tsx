@@ -42,7 +42,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center p-4 z-50 transition-colors"
+      className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 transition-colors"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
