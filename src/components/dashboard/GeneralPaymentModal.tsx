@@ -251,8 +251,9 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         valorOriginal: number;
         jaPago: number;
         numero: number | null;
-        /** Multa + juros do Ciclone hoje (item 67); 0 se nao ha. */
+        /** Multa + juros do Ciclone ate a data do pagamento (item 67); 0 se nao ha. */
         encargo: number;
+        temEncargoHoje: boolean;
       }[] = [];
       (clientSales || []).forEach((sale) =>
         sale.installments?.forEach((inst) => {
@@ -278,7 +279,10 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
             valorOriginal: round2(inst.valor_original || 0),
             jaPago: round2((inst.valor_recebido || 0) + (inst.desconto || 0)),
             numero: inst.parcela ?? null,
-            encargo: encargoParcela(inst)?.encargo ?? 0,
+            // Ate o dia em que o cliente pagou (nao ate hoje).
+            encargo: encargoParcela(inst, dataPagamento)?.encargo ?? 0,
+            // Hoje: decide se a data do pagamento aparece ja na etapa 1.
+            temEncargoHoje: (encargoParcela(inst)?.encargo ?? 0) > 0.009,
           });
         }),
       );
@@ -286,7 +290,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         (a, b) =>
           a.vencimento.localeCompare(b.vencimento) || a.idParcela - b.idParcela,
       );
-    }, [clientSales]);
+    }, [clientSales, dataPagamento]);
     const qtdVencidas = parcelasAbertas.filter((p) => p.vencida).length;
     // Vendas com parcela em aberto, na ordem em que aparecem (vencimento).
     // Com mais de uma, cada venda ganha uma cor (faixa + etiqueta) -- a lista
@@ -367,6 +371,11 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         .slice(0, qtdMarcadas)
         .reduce((soma, p) => soma + p.encargo, 0),
     );
+    /** "ate hoje" ou "ate dd/mm/aaaa" (dia em que o cliente pagou). */
+    const ateDataPagamento =
+      dataPagamento === hoje
+        ? "até hoje"
+        : `até ${dataPagamento.split("-").reverse().join("/")}`;
     /** "Recebi com multa e juros": valor = parcelas + encargo e o encargo vai
      * para o campo de juros (um clique do cobrador -- nada presumido). */
     const receberComEncargo = () => {
@@ -761,7 +770,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
           Math.abs(jurosInformado - encargoMarcadas) <= 0.01
         ) {
           setObservations(
-            `Multa e juros do Ciclone até hoje (${formatCurrency(encargoMarcadas)}).`,
+            `Multa e juros do Ciclone ${ateDataPagamento} (${formatCurrency(encargoMarcadas)}).`,
           );
         }
       }
@@ -1361,13 +1370,64 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                             )}
                         </ul>
                       )}
+                      {/* Item 67: multa/juros dependem do dia em que o cliente
+                      pagou -- a data vem antes dos atalhos (a mesma da
+                      etapa 2). Externo registra sempre hoje. */}
+                      {qtdMarcadas > 0 &&
+                        modoParcelas &&
+                        podeEscolherData &&
+                        parcelasAbertas
+                          .slice(0, qtdMarcadas)
+                          .some((p) => p.temEncargoHoje) && (
+                          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                            <span className="text-gray-600 dark:text-dark-text-secondary">
+                              Quando pagou?
+                            </span>
+                            {(
+                              [
+                                ["Hoje", hoje],
+                                ["Ontem", addDaysLocalStr(hoje, -1)],
+                              ] as const
+                            ).map(([rotulo, valor]) => (
+                              <button
+                                key={rotulo}
+                                type="button"
+                                onClick={() => {
+                                  setDataPagamento(valor);
+                                  setErroEtapa(null);
+                                }}
+                                className={`px-2.5 py-1 rounded-lg border text-xs font-medium ${
+                                  dataPagamento === valor
+                                    ? "border-indigo-500 bg-indigo-50 text-indigo-800"
+                                    : "border-gray-200 text-gray-700 hover:border-gray-300"
+                                }`}
+                              >
+                                {rotulo}
+                              </button>
+                            ))}
+                            <input
+                              type="date"
+                              value={dataPagamento}
+                              min={dataMinima}
+                              max={hoje}
+                              onChange={(e) => {
+                                setDataPagamento(e.target.value);
+                                setErroEtapa(null);
+                              }}
+                              className="px-2 py-1 border border-gray-300 dark:border-dark-border rounded-lg text-xs dark:bg-dark-bg dark:text-dark-text"
+                              aria-label="Outra data do pagamento"
+                            />
+                          </div>
+                        )}
                       {qtdMarcadas > 0 &&
                         modoParcelas &&
                         encargoMarcadas > 0.009 &&
                         jurosInformado <= 0 && (
                           <div className="mt-2 space-y-2 text-sm">
                             <div className="text-gray-600 dark:text-dark-text-secondary">
-                              A cobrar hoje{" "}
+                              {dataPagamento === hoje
+                                ? "A cobrar hoje"
+                                : `A cobrar em ${dataPagamento.split("-").reverse().join("/")}`}{" "}
                               <strong className="text-gray-900 dark:text-dark-text tabular-nums">
                                 {formatCurrency(
                                   round2(
@@ -1377,7 +1437,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                               </strong>
                               <span
                                 className="block text-xs text-amber-700 dark:text-amber-400"
-                                title="Multa e juros de atraso calculados pela regra do Ciclone (Prev. Baixa), até hoje"
+                                title={`Multa e juros de atraso calculados pela regra do Ciclone (Prev. Baixa), ${ateDataPagamento}`}
                               >
                                 {formatCurrency(alocacao.somaParcelas)} +{" "}
                                 {formatCurrency(encargoMarcadas)} multa/juros
@@ -1565,7 +1625,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                       >
                         <p>
                           {jurosInformado > 0
-                            ? `Multa e juros do Ciclone até hoje: ${formatCurrency(encargoMarcadas)}; recebidos ${formatCurrency(jurosInformado)}.`
+                            ? `Multa e juros do Ciclone ${ateDataPagamento}: ${formatCurrency(encargoMarcadas)}; recebidos ${formatCurrency(jurosInformado)}.`
                             : `O cliente não está pagando a multa e os juros do Ciclone (${formatCurrency(encargoMarcadas)}).`}{" "}
                           Isso só vale com autorização do gestor. Na próxima
                           etapa, escreva o motivo na observação (ex.: "gestor
@@ -1620,7 +1680,8 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                       >
                         {aMaisEhParteDoEncargo ? (
                           <p>
-                            A multa e os juros do Ciclone até hoje são{" "}
+                            A multa e os juros do Ciclone {ateDataPagamento}{" "}
+                            são{" "}
                             {formatCurrency(encargoMarcadas)} e você recebeu{" "}
                             <strong>{formatCurrency(alocacao.aMais)}</strong>.
                             Os{" "}
@@ -1636,7 +1697,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                             Você digitou{" "}
                             <strong>{formatCurrency(amountToDistribute)}</strong>:
                             parcelas {formatCurrency(alocacao.esperado)} + multa e
-                            juros de atraso até hoje{" "}
+                            juros de atraso {ateDataPagamento}{" "}
                             {formatCurrency(alocacao.aMais)}.
                           </p>
                         ) : (

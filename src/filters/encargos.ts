@@ -19,6 +19,7 @@
 // Cliente com acordo ativo segue as parcelas do acordo: sem encargo daqui.
 import { ClientGroup, Collection } from "../types";
 import { calculateOverdueDays } from "../utils/formatters";
+import { todayLocalStr } from "../config/visitStatus";
 import {
   AcordoAtivoOverdueMap,
   hasInstallmentBalance,
@@ -61,11 +62,29 @@ type ParcelaEncargo = Pick<
   | "juros_por_dia"
 >;
 
-/** Encargo de UMA parcela hoje, ou null quando nao ha (fora do Ciclone,
+/** Dias corridos de `de` ate `ate` (YYYY-MM-DD, calendario local). */
+const diasEntre = (de: string, ate: string): number => {
+  const [y1, m1, d1] = de.split("-").map(Number);
+  const [y2, m2, d2] = ate.split("-").map(Number);
+  return Math.round(
+    (Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86400000,
+  );
+};
+
+/** Encargo de UMA parcela ate hoje -- ou ate `ate` (YYYY-MM-DD, dia em que o
+ * cliente pagou, no maximo hoje) -- ou null quando nao ha (fora do Ciclone,
  * quitada, no prazo ou sem multa/juros cadastrados). */
-export const encargoParcela = (inst: ParcelaEncargo): EncargoParcela | null => {
+export const encargoParcela = (
+  inst: ParcelaEncargo,
+  ate?: string,
+): EncargoParcela | null => {
   if (!isTituloCiclone(inst) || !hasInstallmentBalance(inst)) return null;
-  const dias = calculateOverdueDays(inst.data_vencimento);
+  const hoje = todayLocalStr();
+  const recuo =
+    ate && /^\d{4}-\d{2}-\d{2}$/.test(ate) && ate < hoje
+      ? diasEntre(ate, hoje)
+      : 0;
+  const dias = calculateOverdueDays(inst.data_vencimento) - recuo;
   if (dias <= 0) return null;
   const pm = Number(inst.multa) || 0;
   const pj = Number(inst.juros_por_dia) || 0;
