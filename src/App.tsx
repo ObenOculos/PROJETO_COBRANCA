@@ -32,6 +32,18 @@ const AppContent: React.FC = () => {
     const savedTab = localStorage.getItem("managerActiveTab");
     // "performance" (Desempenho) saiu do menu em 16/11: cai no Resumo.
     if (savedTab === "performance") return "collectors-summary";
+    // Upload e Config. de Acordos viraram abas de Configuracoes Gerais (16/11).
+    if (savedTab === "database-upload" || savedTab === "acordo-config") {
+      try {
+        localStorage.setItem(
+          "managerConfigView",
+          savedTab === "database-upload" ? "upload" : "acordos",
+        );
+      } catch {
+        // sem storage: abre em Usuarios
+      }
+      return "users";
+    }
     // "carteira-distribuicao" virou a aba Automatica da Atribuicao (16/11).
     if (savedTab === "carteira-distribuicao") {
       try {

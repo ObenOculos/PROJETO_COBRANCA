@@ -5,9 +5,7 @@ import {
   Store,
   CircleCheckBig,
   ClipboardList,
-  User,
-  CloudUpload,
-  FileSignature,
+  Settings,
   PhoneCall,
   Shuffle,
   LucideIcon,
@@ -94,21 +92,11 @@ export const navigationItems: NavItemConfig[] = [
     roles: ["manager"],
   },
   {
+    // Configuracoes Gerais: abas Usuarios, Acordos e Upload de Dados
+    // (reuniao 16/11, item 9). O id segue "users" (aba padrao).
     id: "users",
-    managerName: "Usuários",
-    managerIcon: User,
-    roles: ["manager"],
-  },
-  {
-    id: "database-upload",
-    managerName: "Upload de Dados",
-    managerIcon: CloudUpload,
-    roles: ["manager"],
-  },
-  {
-    id: "acordo-config",
-    managerName: "Config. de Acordos",
-    managerIcon: FileSignature,
+    managerName: "Configurações Gerais",
+    managerIcon: Settings,
     roles: ["manager"],
   },
 ];

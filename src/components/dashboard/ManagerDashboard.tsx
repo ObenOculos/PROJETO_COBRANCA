@@ -9,6 +9,9 @@ import {
   Search,
   Shuffle,
   UserStar,
+  Users,
+  CloudUpload,
+  FileSignature,
 } from "lucide-react";
 import FilterBar from "../common/FilterBar";
 import { CollectionTable } from "./CollectionTable";
@@ -78,8 +81,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     | "clients"
     | "visit-tracking"
     | "authorization"
-    | "database-upload"
-    | "acordo-config"
   >(() => {
     const savedTab = localStorage.getItem("managerActiveTab");
     return (savedTab as any) || "collections";
@@ -151,6 +152,25 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     setAtribuicaoView(v);
     try {
       localStorage.setItem("managerAtribuicaoView", v);
+    } catch {
+      // sem storage: so nao lembra a aba
+    }
+  };
+
+  // Abas de Configuracoes Gerais (reuniao 16/11, item 9).
+  type ConfigView = "usuarios" | "acordos" | "upload";
+  const [configView, setConfigView] = useState<ConfigView>(() => {
+    try {
+      const saved = localStorage.getItem("managerConfigView");
+      return saved === "acordos" || saved === "upload" ? saved : "usuarios";
+    } catch {
+      return "usuarios";
+    }
+  });
+  const changeConfigView = (v: ConfigView) => {
+    setConfigView(v);
+    try {
+      localStorage.setItem("managerConfigView", v);
     } catch {
       // sem storage: so nao lembra a aba
     }
@@ -323,10 +343,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     }
 
     switch (activeTab) {
-      case "database-upload":
-        return <DatabaseUpload />;
-      case "acordo-config":
-        return <AcordoConfiguracaoPadrao />;
       case "collections":
         return (
           <div className="space-y-3 sm:space-y-4">
@@ -549,15 +565,52 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
       case "authorization":
         return <AbaPedidosGestor />;
 
-      case "users":
+      case "users": {
+        const abasConfig: {
+          id: ConfigView;
+          icon: React.ElementType;
+          label: string;
+        }[] = [
+          { id: "usuarios", icon: Users, label: "Usuários" },
+          { id: "acordos", icon: FileSignature, label: "Acordos" },
+          { id: "upload", icon: CloudUpload, label: "Upload de Dados" },
+        ];
         return (
-          <UserManagement
-            onOpenDistribuicao={() => {
-              changeAtribuicaoView("automatica");
-              setActiveTab("clients");
-            }}
-          />
+          <div className="space-y-4">
+            <div className="flex bg-gray-100 dark:bg-dark-bg rounded-md p-0.5 w-full sm:w-fit">
+              {abasConfig.map((aba) => {
+                const Icon = aba.icon;
+                return (
+                  <button
+                    key={aba.id}
+                    onClick={() => changeConfigView(aba.id)}
+                    className={`flex-1 sm:flex-none inline-flex items-center justify-center px-3 lg:px-4 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap touch-manipulation ${
+                      configView === aba.id
+                        ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
+                        : "text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
+                    }`}
+                  >
+                    <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 lg:mr-2" />
+                    {aba.label}
+                  </button>
+                );
+              })}
+            </div>
+            {configView === "usuarios" ? (
+              <UserManagement
+                onOpenDistribuicao={() => {
+                  changeAtribuicaoView("automatica");
+                  setActiveTab("clients");
+                }}
+              />
+            ) : configView === "acordos" ? (
+              <AcordoConfiguracaoPadrao />
+            ) : (
+              <DatabaseUpload />
+            )}
+          </div>
         );
+      }
 
       default:
         return null;
