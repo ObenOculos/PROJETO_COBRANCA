@@ -912,6 +912,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     try {
       console.log("Atualizando collections em tempo real...");
       invalidateCollections(); // Invalidate cache before fetching
+      // Carteira nunca pedida (gestor que nao abriu tela que dependa dela):
+      // nada a atualizar, e baixa-la aqui custava ~59 MB de egress (item 65).
+      // O cache ja foi invalidado: quando ela for pedida, vem fresca.
+      if (!collectionsRequestedRef.current) return;
       await fetchCollections(false); // Force fresh fetch
     } catch (error) {
       console.error("Erro ao atualizar collections:", error);
@@ -3331,7 +3335,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       invalidateUsers(); // Ensure users are fresh
       invalidateVisits(); // Ensure visits are fresh
       await Promise.all([
-        fetchCollections(false), // Force fetch
+        // So recarrega a carteira se ela ja foi pedida (ver refreshCollections).
+        collectionsRequestedRef.current
+          ? fetchCollections(false)
+          : Promise.resolve(),
         fetchUsers(false), // Force fetch
         fetchSalePayments(false), // Force fetch
         fetchScheduledVisits(false), // Force fetch
