@@ -35,6 +35,42 @@ import {
   getClientPending,
 } from "../../filters/clientStatus";
 import { todayLocalStr } from "../../config/visitStatus";
+import {
+  inadimplenciaDe,
+  nivelInadimplencia,
+  NivelInadimplencia,
+} from "../../filters/inadimplencia";
+
+// Cores por nivel de inadimplencia (loja sem cobrador fica em ambar).
+const COR_NIVEL: Record<
+  NivelInadimplencia | "sem",
+  { bg: string; text: string; light: string; border: string }
+> = {
+  baixa: {
+    bg: "bg-green-500",
+    text: "text-green-600 dark:text-green-400",
+    light: "bg-green-50 dark:bg-green-900/20",
+    border: "border-green-500/10 dark:border-green-500/20",
+  },
+  media: {
+    bg: "bg-blue-500",
+    text: "text-blue-600 dark:text-blue-400",
+    light: "bg-blue-50 dark:bg-blue-900/20",
+    border: "border-blue-500/10 dark:border-blue-500/20",
+  },
+  alta: {
+    bg: "bg-red-500",
+    text: "text-red-600 dark:text-red-400",
+    light: "bg-red-50 dark:bg-red-900/20",
+    border: "border-red-500/10 dark:border-red-500/20",
+  },
+  sem: {
+    bg: "bg-amber-500",
+    text: "text-amber-600 dark:text-amber-400",
+    light: "bg-amber-50 dark:bg-amber-900/20",
+    border: "border-amber-500/10 dark:border-amber-500/20",
+  },
+};
 
 interface StoreStats {
   storeName: string;
@@ -54,8 +90,10 @@ interface StoreStats {
   discountAmount: number;
   overdueAmount: number; // saldo em aberto de parcelas já vencidas
   overdueTitles: number; // nº de parcelas vencidas com saldo
-  conversionRate: number;
-  efficiency: number;
+  /** Valor original das parcelas ja vencidas (base da inadimplencia). */
+  dueAmount: number;
+  /** Do que venceu, quanto nao foi pago (%) -- filters/inadimplencia. */
+  inadimplencia: number;
   averageTicket: number;
   clientsCount: number;
 }
@@ -79,7 +117,7 @@ const EnhancedStoreManagement: React.FC = () => {
   );
 
   const [sortBy, setSortBy] = useState<
-    "storeName" | "conversionRate" | "totalAmount"
+    "storeName" | "inadimplencia" | "totalAmount"
   >("storeName");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [selectedStoreForModal, setSelectedStoreForModal] =
@@ -181,8 +219,7 @@ const EnhancedStoreManagement: React.FC = () => {
       const completedSales = salesArray.filter(
         (s) => s.totalValue - s.paidValue - s.discountValue <= 0.01,
       ).length;
-      const conversionRate =
-        salesArray.length > 0 ? (completedSales / salesArray.length) * 100 : 0;
+      const inad = inadimplenciaDe(periodCollections);
 
       // ATRASO: saldo em aberto (valor - recebido - desconto) das PARCELAS cujo
       // vencimento já passou. Calculado por parcela (não por venda) para refletir
@@ -249,8 +286,8 @@ const EnhancedStoreManagement: React.FC = () => {
         discountAmount: totalDiscount,
         overdueAmount,
         overdueTitles,
-        conversionRate,
-        efficiency: totalAmount > 0 ? (receivedAmount / totalAmount) * 100 : 0,
+        dueAmount: inad.venceu,
+        inadimplencia: inad.pct,
         averageTicket:
           salesArray.length > 0 ? totalAmount / salesArray.length : 0,
         clientsCount: new Set(salesArray.map((s) => s.clientDocument)).size,
@@ -304,7 +341,6 @@ const EnhancedStoreManagement: React.FC = () => {
       0,
     );
     const totalGross = storeStats.reduce((sum, s) => sum + s.totalAmount, 0);
-    const receivedRate = totalGross > 0 ? (totalRevenue / totalGross) * 100 : 0;
     const totalPending = storeStats.reduce(
       (sum, s) => sum + s.pendingAmount,
       0,
@@ -313,15 +349,8 @@ const EnhancedStoreManagement: React.FC = () => {
       (sum, s) => sum + s.overdueAmount,
       0,
     );
-    const completedSales = storeStats.reduce(
-      (sum, s) => sum + s.completedSales,
-      0,
-    );
-    const avgConversionRate =
-      storeStats.length > 0
-        ? storeStats.reduce((sum, s) => sum + s.conversionRate, 0) /
-          storeStats.length
-        : 0;
+    // Inadimplencia geral: soma dos valores (nao media dos % das lojas).
+    const inadGeral = inadimplenciaDe(sourceCollections);
 
     return {
       totalStores,
@@ -332,11 +361,9 @@ const EnhancedStoreManagement: React.FC = () => {
       totalClients,
       totalRevenue,
       totalGross,
-      receivedRate,
       totalPending,
       totalOverdue,
-      completedSales,
-      avgConversionRate,
+      inadGeral,
     };
   }, [storeStats, sourceCollections]);
 
@@ -351,14 +378,14 @@ const EnhancedStoreManagement: React.FC = () => {
       "Vendas Finalizadas",
       "Vendas Pendentes",
       "Clientes com Pendências",
-      "Taxa de Conversão (%)",
+      "Inadimplência (%)",
       "Valor Total (R$)",
       "Valor Recebido (R$)",
       "Valor Pendente (R$)",
       "Valor Atrasado (R$)",
       "Títulos Atrasados",
       "Total de Clientes",
-      "Eficiência (%)",
+      "Valor que Venceu (R$)",
       "Ticket Médio (R$)",
     ];
 
@@ -376,14 +403,14 @@ const EnhancedStoreManagement: React.FC = () => {
       s.completedSales.toString(),
       s.pendingSales.toString(),
       s.clientsWithPending.toString(),
-      s.conversionRate.toFixed(1),
+      s.inadimplencia.toFixed(1),
       s.totalAmount.toFixed(2),
       s.receivedAmount.toFixed(2),
       s.pendingAmount.toFixed(2),
       s.overdueAmount.toFixed(2),
       s.overdueTitles.toString(),
       s.clientsCount.toString(),
-      s.efficiency.toFixed(1),
+      s.dueAmount.toFixed(2),
       s.averageTicket.toFixed(2),
     ]);
 
@@ -535,7 +562,8 @@ const EnhancedStoreManagement: React.FC = () => {
           <p className="text-2xl sm:text-3xl font-extrabold text-green-600 dark:text-green-400 tracking-tight truncate mb-3">
             {formatCurrency(overviewStats.totalRevenue)}
           </p>
-          {/* Apoios: Em aberto · Atrasado */}
+          {/* Apoios: Em aberto · A vencer (o atrasado/nao pago fica no card
+              Inadimplencia, para nao repetir o mesmo numero). */}
           <div className="grid grid-cols-2 gap-x-4 pt-3 border-t border-gray-100 dark:border-dark-border">
             <div className="min-w-0">
               <p className="text-[10px] font-semibold text-amber-600/80 dark:text-amber-400/80 tracking-wide truncate">
@@ -546,50 +574,57 @@ const EnhancedStoreManagement: React.FC = () => {
               </p>
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold text-red-600/80 dark:text-red-400/80 tracking-wide truncate">
-                Atrasado
+              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide truncate">
+                A vencer
               </p>
-              <p className="text-sm font-bold text-red-600 dark:text-red-400 tracking-tight truncate">
-                {formatCurrency(overviewStats.totalOverdue)}
+              <p className="text-sm font-bold text-gray-700 dark:text-dark-text tracking-tight truncate">
+                {formatCurrency(
+                  Math.max(
+                    0,
+                    overviewStats.totalPending - overviewStats.totalOverdue,
+                  ),
+                )}
               </p>
             </div>
           </div>
         </div>
 
-        {/* Card: Performance (KPIs) */}
+        {/* Card: Inadimplencia -- do que venceu, quanto nao foi pago
+            (filters/inadimplencia; substitui Conversao e % Recebido,
+            reuniao 16/11, itens 19-21). */}
         <div className="bg-white dark:bg-dark-bg-secondary p-4 sm:p-5 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm hover:shadow-md transition-all duration-300">
           <div className="flex items-center gap-2.5 mb-3">
-            <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl shrink-0">
-              <Award className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-600 dark:text-indigo-400" />
+            <div className="p-2 bg-red-50 dark:bg-red-900/20 rounded-xl shrink-0">
+              <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 dark:text-red-400" />
             </div>
             <h3 className="text-sm font-bold text-gray-900 dark:text-dark-text tracking-tight">
-              Performance
+              Inadimplência
             </h3>
           </div>
-          {/* Destaque: Conversão média */}
           <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">
-            Conversão média · fichas quitadas
+            Do que já venceu, não foi pago
           </p>
-          <p className="text-2xl sm:text-3xl font-extrabold text-indigo-600 dark:text-indigo-400 tracking-tight mb-3">
-            {overviewStats.avgConversionRate.toFixed(1)}%
+          <p
+            className={`text-2xl sm:text-3xl font-extrabold tracking-tight mb-3 ${COR_NIVEL[nivelInadimplencia(overviewStats.inadGeral.pct)].text}`}
+          >
+            {overviewStats.inadGeral.pct.toFixed(1)}%
           </p>
-          {/* Apoio: % Recebido com barra */}
-          <div className="pt-3 border-t border-gray-100 dark:border-dark-border">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">
-                % Recebido · financeiro
+          <div className="pt-3 border-t border-gray-100 dark:border-dark-border space-y-1 text-[11px] font-medium">
+            <div className="flex justify-between gap-2">
+              <span className="text-gray-500 dark:text-dark-text-secondary">
+                Venceu
               </span>
-              <span className="text-xs font-bold text-green-600 dark:text-green-400">
-                {overviewStats.receivedRate.toFixed(1)}%
+              <span className="font-semibold text-gray-700 dark:text-dark-text truncate">
+                {formatCurrency(overviewStats.inadGeral.venceu)}
               </span>
             </div>
-            <div className="w-full bg-gray-100 dark:bg-dark-bg rounded-full h-1.5">
-              <div
-                className="h-1.5 rounded-full bg-green-500 transition-all duration-1000 ease-out"
-                style={{
-                  width: `${Math.min(overviewStats.receivedRate, 100)}%`,
-                }}
-              />
+            <div className="flex justify-between gap-2">
+              <span className="text-gray-500 dark:text-dark-text-secondary">
+                Não pago
+              </span>
+              <span className="font-semibold text-red-600 dark:text-red-400 truncate">
+                {formatCurrency(overviewStats.inadGeral.naoPago)}
+              </span>
             </div>
           </div>
         </div>
@@ -620,7 +655,7 @@ const EnhancedStoreManagement: React.FC = () => {
               className="pl-10 pr-9 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium text-gray-700 dark:text-dark-text appearance-none cursor-pointer focus:ring-2 focus:ring-blue-500/20 transition-all"
             >
               <option value="storeName">Nome</option>
-              <option value="conversionRate">Taxa</option>
+              <option value="inadimplencia">Inadimplência</option>
               <option value="totalAmount">Valor</option>
             </select>
             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
@@ -650,37 +685,14 @@ const EnhancedStoreManagement: React.FC = () => {
         {filteredAndSortedStores.map((store) => {
           const isUnassigned = !store.assignedCollector;
 
-          const statusBgColor = isUnassigned
-            ? "bg-amber-500"
-            : store.conversionRate >= 70
-              ? "bg-green-500"
-              : store.conversionRate >= 40
-                ? "bg-blue-500"
-                : "bg-red-500";
-
-          const statusTextColor = isUnassigned
-            ? "text-amber-600 dark:text-amber-400"
-            : store.conversionRate >= 70
-              ? "text-green-600 dark:text-green-400"
-              : store.conversionRate >= 40
-                ? "text-blue-600 dark:text-blue-400"
-                : "text-red-600 dark:text-red-400";
-
-          const statusBgLight = isUnassigned
-            ? "bg-amber-50 dark:bg-amber-900/20"
-            : store.conversionRate >= 70
-              ? "bg-green-50 dark:bg-green-900/20"
-              : store.conversionRate >= 40
-                ? "bg-blue-50 dark:bg-blue-900/20"
-                : "bg-red-50 dark:bg-red-900/20";
-
-          const statusBorderColor = isUnassigned
-            ? "border-amber-500/10 dark:border-amber-500/20"
-            : store.conversionRate >= 70
-              ? "border-green-500/10 dark:border-green-500/20"
-              : store.conversionRate >= 40
-                ? "border-blue-500/10 dark:border-blue-500/20"
-                : "border-red-500/10 dark:border-red-500/20";
+          const cor =
+            COR_NIVEL[
+              isUnassigned ? "sem" : nivelInadimplencia(store.inadimplencia)
+            ];
+          const statusBgColor = cor.bg;
+          const statusTextColor = cor.text;
+          const statusBgLight = cor.light;
+          const statusBorderColor = cor.border;
 
           return (
             <div
@@ -702,8 +714,9 @@ const EnhancedStoreManagement: React.FC = () => {
                     </h4>
                     <span
                       className={`text-xs font-bold shrink-0 ${statusTextColor}`}
+                      title="Inadimplência: do que já venceu, não foi pago"
                     >
-                      {store.conversionRate.toFixed(1)}%
+                      {store.inadimplencia.toFixed(1)}%
                     </span>
                   </div>
                   <p className="flex items-center gap-1 mt-0.5 text-[11px] text-gray-400 dark:text-dark-text-secondary truncate">
@@ -765,11 +778,12 @@ const EnhancedStoreManagement: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Destaque de Conversão como Pill Tag */}
+                  {/* Inadimplencia da loja como Pill Tag */}
                   <div
                     className={`inline-flex items-center px-2.5 py-1 rounded-xl text-xs font-bold ${statusTextColor} ${statusBgLight} border ${statusBorderColor} shrink-0`}
+                    title="Inadimplência: do que já venceu, não foi pago"
                   >
-                    {store.conversionRate.toFixed(1)}%
+                    {store.inadimplencia.toFixed(1)}%
                   </div>
                 </div>
 
@@ -861,46 +875,26 @@ const EnhancedStoreManagement: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Barras: Conversão (fichas quitadas) e % Recebido (financeiro) */}
-                    <div className="space-y-2.5 mt-3">
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-[10px] font-semibold tracking-wide text-gray-400 dark:text-dark-text-secondary">
-                            Conversão · {store.completedSales}/
-                            {store.totalSales} quitadas
-                          </span>
-                          <span
-                            className={`text-xs font-bold ${statusTextColor}`}
-                          >
-                            {store.conversionRate.toFixed(0)}%
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-100 dark:bg-dark-bg rounded-full h-1.5">
-                          <div
-                            className={`h-1.5 rounded-full ${statusBgColor} transition-all duration-1000 ease-out`}
-                            style={{
-                              width: `${Math.min(store.conversionRate, 100)}%`,
-                            }}
-                          />
-                        </div>
+                    {/* Barra: inadimplencia (do que venceu, quanto nao foi pago) */}
+                    <div className="mt-3">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-[10px] font-semibold tracking-wide text-gray-400 dark:text-dark-text-secondary truncate">
+                          Inadimplência · {formatCurrencyCompact(store.overdueAmount)}{" "}
+                          de {formatCurrencyCompact(store.dueAmount)} vencidos
+                        </span>
+                        <span
+                          className={`text-xs font-bold ${statusTextColor}`}
+                        >
+                          {store.inadimplencia.toFixed(0)}%
+                        </span>
                       </div>
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-[10px] font-semibold tracking-wide text-gray-400 dark:text-dark-text-secondary">
-                            % Recebido · financeiro
-                          </span>
-                          <span className="text-xs font-bold text-green-600 dark:text-green-400">
-                            {store.efficiency.toFixed(0)}%
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-100 dark:bg-dark-bg rounded-full h-1.5">
-                          <div
-                            className="h-1.5 rounded-full bg-green-500 transition-all duration-1000 ease-out"
-                            style={{
-                              width: `${Math.min(store.efficiency, 100)}%`,
-                            }}
-                          />
-                        </div>
+                      <div className="w-full bg-gray-100 dark:bg-dark-bg rounded-full h-1.5">
+                        <div
+                          className={`h-1.5 rounded-full ${statusBgColor} transition-all duration-1000 ease-out`}
+                          style={{
+                            width: `${Math.min(store.inadimplencia, 100)}%`,
+                          }}
+                        />
                       </div>
                     </div>
                   </>
@@ -1164,11 +1158,12 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
   const hasClientFilters =
     !!search || !!statusFilter || !!cityFilter || onlyOverdue;
 
+  const nivel = nivelInadimplencia(store.inadimplencia);
   const statusColor = !store.assignedCollector
     ? "amber"
-    : store.conversionRate >= 70
+    : nivel === "baixa"
       ? "green"
-      : store.conversionRate >= 40
+      : nivel === "media"
         ? "blue"
         : "red";
 
@@ -1299,14 +1294,17 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
                   <Award className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
                 <span className="text-[9px] sm:text-[10px] font-bold text-blue-500 dark:text-blue-400 tracking-wider uppercase">
-                  Taxa
+                  Inadimpl.
                 </span>
               </div>
-              <p className="text-base sm:text-xl font-extrabold whitespace-nowrap text-blue-950 dark:text-blue-200">
-                {store.conversionRate.toFixed(1)}%
+              <p
+                className="text-base sm:text-xl font-extrabold whitespace-nowrap text-blue-950 dark:text-blue-200"
+                title={`${formatCurrency(store.overdueAmount)} não pago de ${formatCurrency(store.dueAmount)} que venceu`}
+              >
+                {store.inadimplencia.toFixed(1)}%
               </p>
               <p className="text-[10px] sm:text-xs text-blue-650/70 dark:text-blue-400/70 mt-1 truncate">
-                Eficiência de Conversão
+                Do que venceu, não pago
               </p>
             </div>
 
