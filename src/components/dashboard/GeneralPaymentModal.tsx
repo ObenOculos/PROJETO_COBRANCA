@@ -865,6 +865,14 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       if (modoParcelas && alocacao.situacao === "jurosMaior") {
         return "Os juros/multa informados são maiores que o valor recebido.";
       }
+      // Opcao de desconto escolhida para PEDIR ao gestor (item 71): nao
+      // registra o pagamento enquanto isso -- ou envia e espera, ou volta
+      // para "Fica devendo".
+      if (pedidoTipoAtivo) {
+        return pedidoEnviado
+          ? "Pedido enviado ao gestor. Espere a aprovação ou escolha “Fica devendo” para registrar sem desconto."
+          : "Envie o pedido de desconto ao gestor ou escolha “Fica devendo”.";
+      }
       if (acimaSemJuros) {
         return `Você marcou ${formatCurrency(alocacao.somaParcelas)} em parcelas que ainda não venceram (sem juros). O valor não pode passar disso${qtdMarcadas < parcelasAbertas.length ? " — para adiantar mais, marque mais parcelas" : ""}.`;
       }
@@ -1312,13 +1320,17 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         chave: "devendo" | "marcadas" | "tudo";
         titulo: string;
         detalhe: string;
-        bloqueada: boolean;
+        /** Interno/terceirizado/juridico sem autorizacao que cubra: clicar
+         * abre o pedido ao gestor dentro da propria opcao (item 71). */
+        precisaGestor: boolean;
+        tipoPedido: TipoPedidoDesconto | null;
       }[] = [
         {
           chave: "devendo",
           titulo: parcial ? "Fica devendo" : "Sem desconto",
           detalhe: detalheBase,
-          bloqueada: false,
+          precisaGestor: false,
+          tipoPedido: null,
         },
       ];
       if (parcial) {
@@ -1326,7 +1338,8 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
           chave: "marcadas",
           titulo: `Desconto de ${formatCurrency(diferenca)} (${pct(diferenca, alocacao.somaParcelas)})`,
           detalhe: `Quita ${n === 1 ? "a parcela marcada" : `as ${n} parcelas marcadas`}.${outrasTexto}`,
-          bloqueada: !cabe(diferenca),
+          precisaGestor: !cabe(diferenca),
+          tipoPedido: "parcelas",
         });
       }
       opcoes.push({
@@ -1337,15 +1350,11 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
             ? `, inclusive ${nAVencer} que ainda não ${nAVencer === 1 ? "venceu" : "venceram"}`
             : ""
         }.`,
-        bloqueada: !cabe(descontoTudo),
+        precisaGestor: !cabe(descontoTudo),
+        tipoPedido: "tudo",
       });
 
       return {
-        // Para o pedido ao gestor: o que cada opcao de desconto pediria.
-        pedido: {
-          parcelas: parcial ? diferenca : null,
-          tudo: descontoTudo,
-        },
         pergunta: parcial
           ? `O cliente pagou ${formatCurrency(diferenca)} a menos que as parcelas marcadas (${formatCurrency(alocacao.somaParcelas)}). O que fazer com a diferença?`
           : "Dar desconto no restante da dívida?",
@@ -1357,6 +1366,16 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
             : ("devendo" as const),
       };
     })();
+
+    /** Pedido escolhido so vale enquanto a opcao dele estiver na tela (mudar
+     * o valor pode tira-la; ai volta a valer o registro normal). */
+    const pedidoTipoAtivo =
+      pedidoTipo &&
+      escolhaDiferenca?.opcoes.some(
+        (o) => o.precisaGestor && o.tipoPedido === pedidoTipo,
+      )
+        ? pedidoTipo
+        : null;
 
     /** Pedido de desconto ao gestor (item 71): o banco confere o devido das
      * parcelas marcadas (ou do cliente inteiro) e grava o retrato. */
@@ -1372,8 +1391,8 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
           valorPago: amountToDistribute,
           motivo: pedidoMotivo,
         });
+        // A opcao continua marcada e mostra a confirmacao dentro dela.
         setPedidoEnviado(true);
-        setPedidoTipo(null);
         setPedidoMotivo("");
         setVersaoPedidos((v) => v + 1);
       } catch (e) {
@@ -2166,162 +2185,129 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                         <legend className="px-1 text-sm font-semibold text-gray-900 dark:text-dark-text">
                           {escolhaDiferenca.pergunta}
                         </legend>
-                        {escolhaDiferenca.opcoes.map((o) => (
-                          <label
-                            key={o.chave}
-                            className={`flex items-start gap-3 p-2.5 rounded-lg border transition-colors ${
-                              o.bloqueada
-                                ? "border-gray-100 opacity-60 cursor-not-allowed"
-                                : escolhaDiferenca.atual === o.chave
-                                  ? o.chave === "tudo"
-                                    ? "border-amber-300 bg-amber-50 cursor-pointer"
-                                    : "border-indigo-300 bg-indigo-50 cursor-pointer"
-                                  : "border-gray-200 hover:bg-gray-50 cursor-pointer"
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name="destino-diferenca"
-                              disabled={o.bloqueada}
-                              checked={escolhaDiferenca.atual === o.chave}
-                              onChange={() => {
-                                setWithDiscount(o.chave === "tudo");
-                                setDescontoNasMarcadas(o.chave === "marcadas");
-                                setErroEtapa(null);
-                              }}
-                              className="mt-0.5 h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                            />
-                            <span className="text-sm">
-                              <span className="block font-medium text-gray-900 dark:text-dark-text">
-                                {o.titulo}
-                              </span>
-                              <span className="block text-xs text-gray-600 dark:text-dark-text-secondary">
-                                {o.detalhe}
-                              </span>
-                            </span>
-                          </label>
-                        ))}
-                        {!descontoDireto && (
-                          <div className="space-y-2 border-t border-gray-100 dark:border-dark-border pt-2 text-xs">
-                            {/* Situacao do ultimo pedido deste cobrador */}
-                            {pedidoDescontoAberto ? (
-                              <p className="text-amber-800 dark:text-amber-300">
-                                Pedido de desconto de{" "}
-                                {formatCurrency(pedidoDescontoAberto.desconto_pedido)}{" "}
-                                em análise pelo gestor. Quando ele aprovar, abra o
-                                Receber pagamento de novo.
-                              </p>
-                            ) : autorizacao ? (
-                              <p className="text-emerald-800 dark:text-emerald-300">
-                                Gestor autorizou até{" "}
-                                <strong>{formatCurrency(autorizacao.disponivel)}</strong>{" "}
-                                de desconto, válido até{" "}
-                                {dataTexto(autorizacao.valido_ate ?? "")}.
-                                {autorizacao.resposta
-                                  ? ` "${autorizacao.resposta}"`
-                                  : ""}
-                              </p>
-                            ) : ultimoPedidoDesconto?.decisao === "recusado" ? (
-                              <p className="text-red-700 dark:text-red-300">
-                                Gestor recusou o último pedido de desconto: "
-                                {ultimoPedidoDesconto.resposta}"
-                              </p>
-                            ) : null}
-
-                            {pedidoEnviado ? (
-                              <p className="font-medium text-emerald-800 dark:text-emerald-300">
-                                Pedido enviado ao gestor. Ele decide na aba
-                                Correções.
-                              </p>
-                            ) : (
-                              !pedidoDescontoAberto &&
-                              (() => {
-                                const opcoesPedido: {
-                                  tipo: TipoPedidoDesconto;
-                                  valor: number;
-                                  rotulo: string;
-                                }[] = [];
-                                const v = escolhaDiferenca.pedido;
-                                if (v.parcelas != null && v.parcelas > descontoMaximo + 0.009) {
-                                  opcoesPedido.push({
-                                    tipo: "parcelas",
-                                    valor: v.parcelas,
-                                    rotulo: `Pedir ${formatCurrency(v.parcelas)} nas parcelas marcadas`,
-                                  });
-                                }
-                                if (v.tudo > descontoMaximo + 0.009) {
-                                  opcoesPedido.push({
-                                    tipo: "tudo",
-                                    valor: v.tudo,
-                                    rotulo: `Pedir ${formatCurrency(v.tudo)} para quitar tudo`,
-                                  });
-                                }
-                                if (opcoesPedido.length === 0) return null;
-                                return (
-                                  <div className="space-y-2">
-                                    <p className="text-gray-600 dark:text-dark-text-secondary">
-                                      Desconto precisa do gestor. Peça aqui; ele
-                                      aprova ou recusa na aba Correções.
-                                    </p>
-                                    <div className="flex flex-wrap gap-2">
-                                      {opcoesPedido.map((o) => (
-                                        <button
-                                          key={o.tipo}
-                                          type="button"
-                                          disabled={!isOnline}
-                                          onClick={() => {
-                                            setPedidoTipo(o.tipo);
-                                            setPedidoErro(null);
-                                          }}
-                                          className={`rounded-full border px-3 py-1 font-semibold ${
-                                            pedidoTipo === o.tipo
-                                              ? "border-indigo-500 bg-indigo-600 text-white"
-                                              : "border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-50 dark:bg-dark-bg"
-                                          } disabled:opacity-50`}
-                                        >
-                                          {o.rotulo}
-                                        </button>
-                                      ))}
-                                    </div>
-                                    {pedidoTipo &&
-                                      opcoesPedido.some((o) => o.tipo === pedidoTipo) && (
-                                        <div className="space-y-1.5">
-                                          <textarea
-                                            value={pedidoMotivo}
-                                            onChange={(e) =>
-                                              setPedidoMotivo(e.target.value)
-                                            }
-                                            rows={2}
-                                            placeholder="Por que o desconto? (ex.: cliente só tem R$ 224 hoje e quita as duas atrasadas)"
-                                            className="w-full rounded-lg border border-gray-300 dark:border-dark-border px-2 py-1.5 text-xs dark:bg-dark-bg dark:text-dark-text"
-                                          />
-                                          {pedidoErro && (
-                                            <p className="text-red-700 dark:text-red-300">
-                                              {pedidoErro}
-                                            </p>
-                                          )}
-                                          <button
-                                            type="button"
-                                            disabled={
-                                              pedidoEnviando ||
-                                              !pedidoMotivo.trim() ||
-                                              !isOnline
-                                            }
-                                            onClick={() => void enviarPedidoDesconto()}
-                                            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
-                                          >
-                                            {pedidoEnviando
-                                              ? "Enviando..."
-                                              : "Enviar pedido ao gestor"}
-                                          </button>
-                                        </div>
+                        {escolhaDiferenca.opcoes.map((o) => {
+                          // Opcao que precisa do gestor: marcar = pedir
+                          // (item 71). As demais registram o pagamento.
+                          const pedindo =
+                            o.precisaGestor && pedidoTipo === o.tipoPedido;
+                          const marcada = o.precisaGestor
+                            ? pedindo
+                            : !pedidoTipoAtivo && escolhaDiferenca.atual === o.chave;
+                          const indisponivel = o.precisaGestor && !isOnline;
+                          return (
+                            <div
+                              key={o.chave}
+                              className={`rounded-lg border transition-colors ${
+                                indisponivel
+                                  ? "border-gray-100 opacity-60"
+                                  : marcada
+                                    ? o.chave === "tudo"
+                                      ? "border-amber-300 bg-amber-50"
+                                      : "border-indigo-300 bg-indigo-50"
+                                    : "border-gray-200 hover:bg-gray-50"
+                              }`}
+                            >
+                              <label
+                                className={`flex items-start gap-3 p-2.5 ${
+                                  indisponivel ? "cursor-not-allowed" : "cursor-pointer"
+                                }`}
+                              >
+                                <input
+                                  type="radio"
+                                  name="destino-diferenca"
+                                  disabled={indisponivel}
+                                  checked={marcada}
+                                  onChange={() => {
+                                    if (o.precisaGestor) {
+                                      setWithDiscount(false);
+                                      setDescontoNasMarcadas(false);
+                                      setPedidoTipo(o.tipoPedido);
+                                      setPedidoErro(null);
+                                    } else {
+                                      setPedidoTipo(null);
+                                      setWithDiscount(o.chave === "tudo");
+                                      setDescontoNasMarcadas(o.chave === "marcadas");
+                                    }
+                                    setErroEtapa(null);
+                                  }}
+                                  className="mt-0.5 h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                />
+                                <span className="text-sm min-w-0">
+                                  <span className="block font-medium text-gray-900 dark:text-dark-text">
+                                    {o.titulo}
+                                    {o.precisaGestor && (
+                                      <span className="ml-1.5 text-xs font-normal text-gray-500">
+                                        · pedir ao gestor
+                                      </span>
+                                    )}
+                                    {!o.precisaGestor &&
+                                      o.tipoPedido &&
+                                      autorizacao && (
+                                        <span className="ml-1.5 text-xs font-normal text-emerald-700">
+                                          · autorizado até{" "}
+                                          {formatCurrency(autorizacao.disponivel)} (até{" "}
+                                          {dataTexto(autorizacao.valido_ate ?? "")})
+                                        </span>
                                       )}
-                                  </div>
-                                );
-                              })()
-                            )}
-                          </div>
-                        )}
+                                  </span>
+                                  <span className="block text-xs text-gray-600 dark:text-dark-text-secondary">
+                                    {o.detalhe}
+                                  </span>
+                                </span>
+                              </label>
+
+                              {/* Pedido ao gestor dentro da propria opcao */}
+                              {pedindo && (
+                                <div className="px-2.5 pb-2.5 pl-9 space-y-1.5 text-xs">
+                                  {pedidoDescontoAberto ? (
+                                    <p className="text-amber-800 dark:text-amber-300">
+                                      Já tem pedido de{" "}
+                                      {formatCurrency(pedidoDescontoAberto.desconto_pedido)}{" "}
+                                      em análise. Quando o gestor aprovar, abra o
+                                      Receber pagamento de novo.
+                                    </p>
+                                  ) : pedidoEnviado ? (
+                                    <p className="font-medium text-emerald-800 dark:text-emerald-300">
+                                      Pedido enviado. Quando o gestor aprovar, abra o
+                                      Receber pagamento de novo.
+                                    </p>
+                                  ) : (
+                                    <>
+                                      {ultimoPedidoDesconto?.decisao === "recusado" && (
+                                        <p className="text-red-700 dark:text-red-300">
+                                          Último pedido recusado: “
+                                          {ultimoPedidoDesconto.resposta}”
+                                        </p>
+                                      )}
+                                      <textarea
+                                        value={pedidoMotivo}
+                                        onChange={(e) => setPedidoMotivo(e.target.value)}
+                                        rows={2}
+                                        placeholder="Por que o desconto? (ex.: cliente só tem R$ 224 hoje)"
+                                        className="w-full rounded-lg border border-gray-300 dark:border-dark-border px-2 py-1.5 text-xs dark:bg-dark-bg dark:text-dark-text"
+                                      />
+                                      {pedidoErro && (
+                                        <p className="text-red-700 dark:text-red-300">
+                                          {pedidoErro}
+                                        </p>
+                                      )}
+                                      <button
+                                        type="button"
+                                        disabled={
+                                          pedidoEnviando || !pedidoMotivo.trim() || !isOnline
+                                        }
+                                        onClick={() => void enviarPedidoDesconto()}
+                                        className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                                      >
+                                        {pedidoEnviando ? "Enviando..." : "Enviar ao gestor"}
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </fieldset>
                     )}
 
