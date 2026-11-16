@@ -553,7 +553,9 @@ def resolver_ids_parcela(sb: SupabaseRestClient, uuids: list[str]) -> dict:
         resp = sb.request(
             "POST",
             "ciclone_titulo_map",
-            params={"on_conflict": "fncrt_uuid"},
+            # select=: so as 2 colunas usadas voltam (sem created_at) -- menos
+            # egress, rodando 3x/dia sobre ~36 mil titulos (item 65).
+            params={"on_conflict": "fncrt_uuid", "select": "fncrt_uuid,id_parcela"},
             body=[{"fncrt_uuid": u} for u in lote],
             upsert=True,
             return_representation=True,
