@@ -37,6 +37,7 @@ import {
   SistemaLancamentoAcordo,
 } from "../types";
 import { supabase } from "../lib/supabase";
+import { avisarPendenciasMudaram } from "../services/pendenciasCorrecoes";
 import {
   situacoesOutsideProfile,
   assignmentSituacaoRule,
@@ -4019,6 +4020,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
           p_resposta: resposta?.trim() || undefined,
         });
         if (error) throw new Error(error.message);
+        avisarPendenciasMudaram();
         if (!aprovar) return null;
         const r = (data ?? {}) as {
           valor?: number;

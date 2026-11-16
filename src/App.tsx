@@ -17,6 +17,7 @@ import CollectorDashboard from "./components/dashboard/CollectorDashboard";
 import GlobalLoading from "./components/common/GlobalLoading";
 import OfflineIndicator from "./components/common/OfflineIndicator";
 import { navigationItems } from "./config/navigation";
+import { usePendenciasCorrecoes } from "./services/pendenciasCorrecoes";
 
 import VersionChecker from "./components/common/VersionChecker"; // Import VersionChecker
 
@@ -111,6 +112,9 @@ const AppContent: React.FC = () => {
     return () => window.removeEventListener("notificationClick", listener);
   }, [user]);
 
+  // Ponto vermelho no menu "Correções" (pedidos sem decisão).
+  const pendingCorrecoes = usePendenciasCorrecoes(user?.type === "manager");
+
   // Mostra loading baseado no estado controlado
   if (loadingState.show) {
     return <GlobalLoading message={loadingState.message} />;
@@ -148,6 +152,7 @@ const AppContent: React.FC = () => {
             : handleCollectorTabChange
         }
         pendingCancellations={pendingCancellations.length}
+        pendingCorrecoes={pendingCorrecoes}
       />
       <main className="flex-1 overflow-y-auto text-gray-900 dark:text-dark-text transition-colors duration-300">
         {user.type === "manager" ? (

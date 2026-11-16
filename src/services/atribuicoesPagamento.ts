@@ -1,5 +1,6 @@
 import { supabase } from "../lib/supabase";
 import { fetchAllRows } from "../utils/fetchAllRows";
+import { avisarPendenciasMudaram } from "./pendenciasCorrecoes";
 
 // Item 66: atribuir ao cobrador a baixa do ERP (cliente pagou na loja/banco
 // depois da tratativa). Tabela atribuicoes_pagamento + RPCs
@@ -96,6 +97,7 @@ export const decidirAtribuicaoPagamento = async (p: {
     p_resposta: p.resposta?.trim() || undefined,
   });
   if (error) throw new Error(mensagem(error, "Falha ao registrar a decisão."));
+  avisarPendenciasMudaram();
   return data as { decisao: string; parcelas: number; valor?: number };
 };
 

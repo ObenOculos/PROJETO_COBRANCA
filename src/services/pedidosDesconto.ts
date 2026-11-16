@@ -1,6 +1,7 @@
 import { supabase } from "../lib/supabase";
 import { fetchAllRows } from "../utils/fetchAllRows";
 import { todayLocalStr } from "../config/visitStatus";
+import { avisarPendenciasMudaram } from "./pendenciasCorrecoes";
 
 // Item 71, etapa 2: cobrador (interno/terceirizado/juridico) pede desconto ao
 // gestor ANTES de registrar o pagamento. Tabela pedidos_desconto + RPCs
@@ -113,6 +114,7 @@ export const decidirPedidoDesconto = async (p: {
     p_resposta: p.resposta?.trim() || undefined,
   });
   if (error) throw new Error(mensagem(error, "Falha ao registrar a decisão."));
+  avisarPendenciasMudaram();
   return data as { decisao: string; desconto?: number; valido_ate?: string };
 };
 

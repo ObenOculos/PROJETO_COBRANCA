@@ -24,6 +24,8 @@ interface HeaderProps {
   activeTab?: string;
   onTabChange?: (tabId: string) => void;
   pendingCancellations?: number;
+  /** Pedidos sem decisão na aba Correções (ponto vermelho no menu). */
+  pendingCorrecoes?: number;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -31,6 +33,7 @@ const Header: React.FC<HeaderProps> = ({
   activeTab = "",
   onTabChange = () => {},
   pendingCancellations = 0,
+  pendingCorrecoes = 0,
 }) => {
   const { user, logout, isLoading } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -177,7 +180,7 @@ const Header: React.FC<HeaderProps> = ({
                     onTabChange(tab.id);
                     setIsMobileMenuOpen(false);
                   }}
-                  className={`group w-full flex items-center px-3 py-2 rounded-2xl text-left transition-all duration-200 ${isCollapsed && !isMobile ? "justify-center" : ""} ${
+                  className={`group relative w-full flex items-center px-3 py-2 rounded-2xl text-left transition-all duration-200 ${isCollapsed && !isMobile ? "justify-center" : ""} ${
                     activeTab === tab.id
                       ? "bg-blue-50 dark:bg-dark-bg-secondary text-blue-700 dark:text-primary"
                       : "text-gray-700 dark:text-dark-text-secondary hover:bg-gray-50 dark:hover:bg-dark-bg-secondary"
@@ -199,6 +202,17 @@ const Header: React.FC<HeaderProps> = ({
                         {pendingCancellations}
                       </span>
                     )}
+                  {tab.id === "authorization" && pendingCorrecoes > 0 && (
+                    <span
+                      className={
+                        showDesktopText || isMobile
+                          ? "ml-auto h-2.5 w-2.5 rounded-full bg-red-500"
+                          : "absolute top-1.5 right-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-dark-bg"
+                      }
+                      title={`${pendingCorrecoes} pedido(s) aguardando decisão`}
+                      aria-label={`${pendingCorrecoes} pedido(s) aguardando decisão`}
+                    />
+                  )}
                 </button>
               );
             })}
