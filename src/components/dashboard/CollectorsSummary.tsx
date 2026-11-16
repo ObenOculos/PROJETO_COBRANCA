@@ -15,6 +15,7 @@ import {
   PhoneCall,
   UserX,
   History,
+  Shuffle,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
@@ -30,7 +31,19 @@ import {
   REMARCACOES_REINCIDENTE,
   ReincidenteCliente,
 } from "../../config/visitStatus";
-import { hasInstallmentBalance } from "../../filters/clientStatus";
+import {
+  hasInstallmentBalance,
+  clientMaxOverdueDays,
+  clientReferenceStore,
+  collectionsBalanceSplit,
+} from "../../filters/clientStatus";
+import {
+  diasAteSairDasRegras,
+  URGENTE_SAIDA_CARTEIRA_DIAS,
+} from "../../filters/priority";
+import { supabase } from "../../lib/supabase";
+import { fetchAllRows } from "../../utils/fetchAllRows";
+import { Collection, CollectorOverdueRange, SaleGroup } from "../../types";
 import { toYYYYMMDD } from "../../filters/dates";
 import { formatCurrency, calculateOverdueDays } from "../../utils/formatters";
 import ContactScheduler from "./ContactScheduler";
@@ -204,6 +217,8 @@ const CollectorsSummary: React.FC = () => {
     salePayments,
     monthlyGoals,
     managerCollectorLinks,
+    collectorOverdueRanges,
+    acordoAtivoOverdueMap,
   } = useCollection();
   const { user: currentUser } = useAuth();
 
@@ -699,6 +714,127 @@ const CollectorsSummary: React.FC = () => {
     return mapa;
   }, [rows, monthlyGoals, salePayments, today]);
 
+  // ---- Card "Carteira automatica" (reuniao 16/11, itens 7/18/35) ----
+  // O que a Atribuicao Automatica faz com a carteira de cada cobrador:
+  // alcance (faixas e lojas), quem esta perto de sair (mesma conta da Fila
+  // do cobrador: diasAteSairDasRegras, aviso a URGENTE_SAIDA_CARTEIRA_DIAS)
+  // e quem entrou/saiu no periodo (atribuicoes_historico).
+  type VaiSair = {
+    documento: string;
+    nome: string;
+    diasRestantes: number;
+    vencido: number;
+  };
+  const carteiraAuto = useMemo(() => {
+    const regrasPor = new Map<string, CollectorOverdueRange[]>();
+    collectorOverdueRanges.forEach((r) => {
+      const l = regrasPor.get(r.collectorId);
+      if (l) l.push(r);
+      else regrasPor.set(r.collectorId, [r]);
+    });
+    const vaoSairPor = new Map<string, VaiSair[]>();
+    regrasPor.forEach((regras, collectorId) => {
+      if (!regras.some((r) => r.maxDias != null)) return;
+      const porCliente = new Map<string, Collection[]>();
+      collections.forEach((c) => {
+        if (c.user_id !== collectorId || !c.documento) return;
+        if (!hasInstallmentBalance(c)) return;
+        const l = porCliente.get(c.documento);
+        if (l) l.push(c);
+        else porCliente.set(c.documento, [c]);
+      });
+      const lista: VaiSair[] = [];
+      porCliente.forEach((titulos, documento) => {
+        const group = {
+          document: documento,
+          sales: [{ installments: titulos } as SaleGroup],
+        };
+        const atraso = clientMaxOverdueDays(group, acordoAtivoOverdueMap);
+        const dias = diasAteSairDasRegras(
+          regras,
+          atraso,
+          clientReferenceStore(group),
+        );
+        if (dias == null || dias > URGENTE_SAIDA_CARTEIRA_DIAS) return;
+        lista.push({
+          documento,
+          nome: titulos[0].cliente || titulos[0].apelido || documento,
+          diasRestantes: dias,
+          vencido: collectionsBalanceSplit(
+            documento,
+            titulos,
+            acordoAtivoOverdueMap,
+          ).vencido,
+        });
+      });
+      lista.sort((a, b) => a.diasRestantes - b.diasRestantes);
+      vaoSairPor.set(collectorId, lista);
+    });
+    return { regrasPor, vaoSairPor };
+  }, [collectorOverdueRanges, collections, acordoAtivoOverdueMap]);
+
+  // Entradas e saidas de carteira no periodo do filtro (clientes distintos).
+  const [movCarteira, setMovCarteira] = useState<
+    Map<string, { entraram: number; sairam: number }>
+  >(new Map());
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      const linhas = await fetchAllRows<{
+        documento: string;
+        cobrador_novo_id: string | null;
+        cobrador_anterior_id: string | null;
+      }>(
+        (from, to) =>
+          supabase
+            .from("atribuicoes_historico")
+            .select("id, documento, cobrador_novo_id, cobrador_anterior_id")
+            // Datas do filtro sao do fuso de Brasilia (UTC-3, sem horario de
+            // verao): o dia local comeca as 03:00 UTC.
+            .gte("assigned_at", `${dateFrom}T00:00:00-03:00`)
+            .lte("assigned_at", `${dateTo}T23:59:59.999-03:00`)
+            .order("id", { ascending: true })
+            .range(from, to),
+        () => cancelado,
+      );
+      if (cancelado) return;
+      const ent = new Map<string, Set<string>>();
+      const sai = new Map<string, Set<string>>();
+      const add = (m: Map<string, Set<string>>, k: string, d: string) => {
+        const set = m.get(k);
+        if (set) set.add(d);
+        else m.set(k, new Set([d]));
+      };
+      linhas.forEach((l) => {
+        if (l.cobrador_novo_id === l.cobrador_anterior_id) return;
+        if (l.cobrador_novo_id) add(ent, l.cobrador_novo_id, l.documento);
+        if (l.cobrador_anterior_id)
+          add(sai, l.cobrador_anterior_id, l.documento);
+      });
+      const mapa = new Map<string, { entraram: number; sairam: number }>();
+      new Set([...ent.keys(), ...sai.keys()]).forEach((id) =>
+        mapa.set(id, {
+          entraram: ent.get(id)?.size ?? 0,
+          sairam: sai.get(id)?.size ?? 0,
+        }),
+      );
+      setMovCarteira(mapa);
+    })().catch((err) =>
+      // Sem o historico o card mostra o resto (nao numero pela metade).
+      console.error("Erro ao carregar entradas/saídas da carteira:", err),
+    );
+    return () => {
+      cancelado = true;
+    };
+  }, [dateFrom, dateTo]);
+
+  const textoFaixa = (r: CollectorOverdueRange) =>
+    `${r.minDias}–${r.maxDias ?? "+"}${r.lojas && r.lojas.length > 0 ? ` (${r.lojas.length} ${r.lojas.length === 1 ? "loja" : "lojas"})` : ""}${r.ativa ? "" : " pausada"}`;
+
+  const [expandedVaoSair, setExpandedVaoSair] = useState<string | null>(
+    null,
+  );
+
   const nomeMesAtual = new Date(
     Number(today.slice(0, 4)),
     Number(today.slice(5, 7)) - 1,
@@ -1141,7 +1277,8 @@ const CollectorsSummary: React.FC = () => {
                         false,
                       ),
                     },
-                    ...(isWalletCollectorType(row.type)
+                    ...(isWalletCollectorType(row.type) &&
+                    !carteiraAuto.regrasPor.has(row.id)
                       ? [
                           {
                             label: "Saíram sem ação",
@@ -1205,6 +1342,92 @@ const CollectorsSummary: React.FC = () => {
                     },
                   ]}
                 />
+                {carteiraAuto.regrasPor.has(row.id) &&
+                  (() => {
+                    const regras = carteiraAuto.regrasPor.get(row.id) ?? [];
+                    const vaoSair = carteiraAuto.vaoSairPor.get(row.id) ?? [];
+                    const mov = movCarteira.get(row.id);
+                    return (
+                      <div className="sm:col-span-2">
+                        <SummaryCard
+                          icon={Shuffle}
+                          title="Carteira automática"
+                          value={fmtNum(vaoSair.length)}
+                          valueTone={vaoSair.length > 0 ? "red" : "neutral"}
+                          caption={`vão sair da carteira em até ${URGENTE_SAIDA_CARTEIRA_DIAS} dias`}
+                          rows={[
+                            {
+                              label: "Alcance",
+                              value: [...regras]
+                                .sort((x, y) => x.minDias - y.minDias)
+                                .map(textoFaixa)
+                                .join(" · "),
+                              hint: "Faixas de atraso (dias) e lojas que a Atribuição Automática entrega a este cobrador",
+                            },
+                            ...(vaoSair.length > 0
+                              ? [
+                                  {
+                                    label: "Vencido de quem vai sair",
+                                    value: formatCurrency(
+                                      vaoSair.reduce(
+                                        (s, v) => s + v.vencido,
+                                        0,
+                                      ),
+                                      false,
+                                    ),
+                                    tone: "red" as const,
+                                    onClick: () =>
+                                      setExpandedVaoSair((cur) =>
+                                        cur === row.id ? null : row.id,
+                                      ),
+                                    hint: "Clique para ver os clientes",
+                                  },
+                                ]
+                              : []),
+                            {
+                              label: "Entraram no período",
+                              value: mov ? fmtNum(mov.entraram) : "—",
+                            },
+                            {
+                              label: "Saíram no período",
+                              value: mov ? fmtNum(mov.sairam) : "—",
+                            },
+                            {
+                              label: "Saíram sem ação",
+                              value: fmtNum(qtdSaidas(row.id)),
+                              tone:
+                                qtdSaidas(row.id) > 0
+                                  ? ("red" as const)
+                                  : undefined,
+                              onClick:
+                                qtdSaidas(row.id) > 0
+                                  ? () => setSaidasCobradorId(row.id)
+                                  : undefined,
+                              hint: "Clientes que passaram da faixa no período sem nenhuma ação do cobrador. Clique para ver e devolver.",
+                            },
+                          ]}
+                        />
+                        {expandedVaoSair === row.id && vaoSair.length > 0 && (
+                          <ul className="mt-1.5 rounded-lg bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-800/30 px-3 py-2 text-xs text-red-800 dark:text-red-300 space-y-0.5 max-h-56 overflow-y-auto">
+                            {vaoSair.map((v) => (
+                              <li
+                                key={v.documento}
+                                className="flex justify-between gap-3"
+                              >
+                                <span className="truncate">{v.nome}</span>
+                                <span className="shrink-0 font-semibold">
+                                  {v.diasRestantes <= 0
+                                    ? "sai hoje"
+                                    : `${v.diasRestantes} ${v.diasRestantes === 1 ? "dia" : "dias"}`}{" "}
+                                  · {formatCurrency(v.vencido, false)}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    );
+                  })()}
               </div>
 
               {row.reincidentes.length > 0 && (
@@ -1398,6 +1621,16 @@ const CollectorsSummary: React.FC = () => {
                         <CalendarClock className="h-3 w-3" />
                         Agendar visitas
                       </button>
+                    )}
+                    {(carteiraAuto.vaoSairPor.get(row.id)?.length ?? 0) > 0 && (
+                      <div
+                        className="mt-1 flex items-center gap-1 text-[10px] font-bold text-red-600 dark:text-red-400"
+                        title={`Clientes que saem da carteira em até ${URGENTE_SAIDA_CARTEIRA_DIAS} dias (veja no modo Cards)`}
+                      >
+                        <Shuffle className="h-3 w-3" />
+                        {fmtNum(carteiraAuto.vaoSairPor.get(row.id)!.length)}{" "}
+                        vão sair em até {URGENTE_SAIDA_CARTEIRA_DIAS} dias
+                      </div>
                     )}
                     {qtdSaidas(row.id) > 0 && (
                       <button
