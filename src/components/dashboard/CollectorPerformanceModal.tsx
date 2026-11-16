@@ -15,6 +15,8 @@ import {
 import { formatCurrency } from "../../utils/formatters";
 import { useCollection } from "../../contexts/CollectionContext";
 import { resolveSaleKey, valorRecebidoTotal } from "../../filters/sales";
+import { metasPorMes } from "../../filters/metas";
+import { todayLocalStr } from "../../config/visitStatus";
 import { Modal } from "../Modal";
 import TabTransition from "../common/TabTransition";
 import { supabase } from "../../lib/supabase";
@@ -251,8 +253,14 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
   const performanceHistory = useMemo(() => {
     if (!collector) return [];
 
-    const collectorGoals = monthlyGoals
-      .filter((g) => g.user_id === collector.collectorId)
+    // Um item por mes com meta valendo (inclui meses que herdaram a meta de
+    // um mes anterior -- vigencia, ver filters/metas).
+    const collectorGoals = metasPorMes(
+      monthlyGoals,
+      collector.collectorId,
+      todayLocalStr().slice(0, 7),
+    )
+      .map(({ ym, goal }) => ({ ...goal, month: `${ym}-01` }))
       .sort((a, b) => {
         const dateA = new Date(a.month + "T00:00:00").getTime();
         const dateB = new Date(b.month + "T00:00:00").getTime();

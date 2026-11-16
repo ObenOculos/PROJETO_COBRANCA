@@ -25,6 +25,7 @@ import ClearVisitsModal, { pendingVisitsCount } from "./ClearVisitsModal";
 import { USER_TYPE_LABELS, isWalletCollectorType } from "../../config/profiles";
 import { todayLocalStr } from "../../config/visitStatus";
 import { formatCurrencyCompact } from "../../utils/formatters";
+import { metaDoMes } from "../../filters/metas";
 import FaixaEquipeModal from "./FaixaEquipeModal";
 import MonthlyGoalEditModal from "./MonthlyGoalEditModal";
 import RedefinirSenhaModal from "./RedefinirSenhaModal";
@@ -268,14 +269,17 @@ const UserManagement: React.FC<UserManagementProps> = ({
       managerCollectorLinks.map((l) => [l.collectorId, names.get(l.managerId)]),
     );
   }, [managerCollectorLinks, users]);
+  // Meta que vale no mes atual (pode ter sido gravada num mes anterior --
+  // vigencia, ver filters/metas).
   const goalByCollector = useMemo(
     () =>
       new Map(
-        monthlyGoals
-          .filter((g) => g.month?.slice(0, 10) === currentMonth)
-          .map((g) => [g.user_id, g]),
+        users.map((u) => [
+          u.id,
+          metaDoMes(monthlyGoals, u.id, currentMonth.slice(0, 7)),
+        ]),
       ),
-    [monthlyGoals, currentMonth],
+    [users, monthlyGoals, currentMonth],
   );
 
   const inactiveCount = users.filter((u) => u.active === false).length;

@@ -36,6 +36,7 @@ import ContactScheduler from "./ContactScheduler";
 import SaidasSemAcaoModal from "./SaidasSemAcao";
 import { useSaidasSemAcao } from "../../hooks/useSaidasSemAcao";
 import { valorRecebidoTotal } from "../../filters/sales";
+import { metaDoMes } from "../../filters/metas";
 
 interface CollectorRow {
   id: string;
@@ -631,11 +632,11 @@ const CollectorsSummary: React.FC = () => {
     );
     if (teamCollectorIds.size === 0) return null;
 
-    const targetValue = monthlyGoals
-      .filter(
-        (g) => teamCollectorIds.has(g.user_id) && g.month.startsWith(mesAtual),
-      )
-      .reduce((sum, g) => sum + (g.payments_goal || 0), 0);
+    const targetValue = Array.from(teamCollectorIds).reduce(
+      (sum, id) =>
+        sum + Number(metaDoMes(monthlyGoals, id, mesAtual)?.payments_goal || 0),
+      0,
+    );
     const actualValue = salePayments
       .filter(
         (p) =>

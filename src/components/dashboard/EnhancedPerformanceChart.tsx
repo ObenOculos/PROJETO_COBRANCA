@@ -16,6 +16,7 @@ import { supabase } from "../../lib/supabase";
 import { formatCurrency } from "../../utils/formatters";
 import { getClientPaymentStatus } from "../../filters/clientStatus";
 import { resolveSaleKey, valorRecebidoTotal } from "../../filters/sales";
+import { metaDoMes, mesesEntre } from "../../filters/metas";
 import {
   visitEffectiveDate,
   isVisitOverdue,
@@ -994,10 +995,21 @@ const EnhancedPerformanceChart: React.FC = () => {
       const clientsCount = new Set(salesArray.map((s) => s.clientDocument))
         .size;
 
-      const currentMonthGoals = monthlyGoals.filter((g) => {
-        const goalDate = parseDateSafely(g.month + "-01");
-        return isDateInSelectedMonths(goalDate) && g.user_id === collector.id;
-      });
+      // Meta de cada mes do filtro que tenha meta valendo (inclui meses que
+      // herdaram a meta de um mes anterior -- vigencia, ver filters/metas).
+      const primeiroMesComMeta = monthlyGoals
+        .filter((g) => g.user_id === collector.id)
+        .map((g) => g.month.slice(0, 7))
+        .sort()[0];
+      const currentMonthGoals = primeiroMesComMeta
+        ? mesesEntre(primeiroMesComMeta, todayLocalStr().slice(0, 7))
+            .filter((ym) => {
+              const [y, m] = ym.split("-").map(Number);
+              return isDateInSelectedMonths(new Date(y, m - 1, 1));
+            })
+            .map((ym) => metaDoMes(monthlyGoals, collector.id, ym))
+            .filter((g): g is NonNullable<typeof g> => !!g)
+        : [];
 
       const currentMonthVisitsGoal = currentMonthGoals.reduce(
         (sum, goal) => sum + (goal.visits_goal ?? 0),

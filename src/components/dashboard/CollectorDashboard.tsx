@@ -52,6 +52,7 @@ import {
 import { FilterOptions, ClientGroup, User, ScheduledVisit } from "../../types";
 import { Notification } from "../../contexts/NotificationContext";
 import { resolveSaleKey, valorRecebidoTotal } from "../../filters/sales";
+import { metaDoMes } from "../../filters/metas";
 import {
   hasOpenBalance,
   hasInstallmentBalance,
@@ -1195,9 +1196,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       (sum, g) => sum + (saldoPorDocumento.get(g.document)?.aVencer ?? 0),
       0,
     );
-    const goal = monthlyGoals.find(
-      (g) => g.user_id === user?.id && g.month.startsWith(mesAtual),
-    );
+    const goal = metaDoMes(monthlyGoals, user?.id, mesAtual);
     // Sem fallback fixo: meta nao cadastrada mostra "sem meta" em vez de
     // comparar o recuperado contra um numero arbitrario (R$100mil) que o
     // gestor nunca definiu -- isso inflava a barra de progresso sem sentido.
@@ -2755,9 +2754,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     const currentMonthStr = todayLocalStr(now).slice(0, 7); // "YYYY-MM"
 
     // Find the goal for the current month
-    const currentMonthGoal = monthlyGoals.find(
-      (g) => g.user_id === user?.id && g.month.startsWith(currentMonthStr),
-    );
+    const currentMonthGoal = metaDoMes(monthlyGoals, user?.id, currentMonthStr);
 
     // Define default goals
     const defaultGoals = {

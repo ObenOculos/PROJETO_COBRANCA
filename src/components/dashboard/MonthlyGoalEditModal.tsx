@@ -14,6 +14,7 @@ import {
   validarFaixas,
 } from "../../filters/comissao";
 import { formatCurrency } from "../../utils/formatters";
+import { metaDoMes } from "../../filters/metas";
 import { todayLocalStr } from "../../config/visitStatus";
 
 interface MonthlyGoalEditModalProps {
@@ -79,7 +80,7 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
   onClose,
   collector,
 }) => {
-  const { salePayments, managerCollectorLinks, salvarMetasDoMes } =
+  const { salePayments, managerCollectorLinks, monthlyGoals, salvarMetasDoMes } =
     useCollection();
 
   const mesAtualYM = todayLocalStr().slice(0, 7);
@@ -98,6 +99,9 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
   const [carregando, setCarregando] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  // Mes em que a meta que vale em `mes` foi gravada (vigencia: vale dali em
+  // diante ate a proxima alteracao). null = sem meta.
+  const [mesOrigem, setMesOrigem] = useState<string | null>(null);
 
   const isManager = collector?.type === "manager";
   const isWallet = isWalletCollectorType(collector?.type);
@@ -108,29 +112,37 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
     if (isOpen) setMes(mesAtual);
   }, [isOpen, mesAtual]);
 
+  // So a linha que vale no mes (nao a lista inteira) dispara recarga: um
+  // refresh de monthlyGoals no meio da edicao nao apaga o que foi digitado.
+  const vigente = useMemo(
+    () =>
+      collector ? metaDoMes(monthlyGoals, collector.id, mes.slice(0, 7)) : undefined,
+    [monthlyGoals, collector, mes],
+  );
+  const vigenteKey = vigente
+    ? `${vigente.id}|${vigente.month}|${vigente.updated_at}`
+    : "";
+
   useEffect(() => {
     if (!collector || !isOpen) return;
     let cancelado = false;
     setCarregando(true);
     setErro(null);
+    const origem = vigente ? `${vigente.month.slice(0, 7)}-01` : null;
+    setMesOrigem(origem);
     (async () => {
-      const [faixasRes, goalRes] = await Promise.all([
-        supabase
-          .from("comissao_faixas")
-          .select("meta_valor, forma, valor")
-          .eq("user_id", collector.id)
-          .eq("month", mes)
-          .is("substituida_em", null)
-          .order("meta_valor"),
-        supabase
-          .from("monthly_goals")
-          .select("visits_goal, payments_goal")
-          .eq("user_id", collector.id)
-          .eq("month", mes)
-          .maybeSingle(),
-      ]);
+      const faixasRes = origem
+        ? await supabase
+            .from("comissao_faixas")
+            .select("meta_valor, forma, valor")
+            .eq("user_id", collector.id)
+            .eq("month", origem)
+            .is("substituida_em", null)
+            .order("meta_valor")
+        : { data: [], error: null };
+      const goalRes = { data: vigente ?? null };
       if (cancelado) return;
-      if (faixasRes.error || goalRes.error) {
+      if (faixasRes.error) {
         setErro("Não foi possível carregar as metas deste mês.");
         setFaixas([]);
         setVisitsGoal("");
@@ -160,7 +172,8 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
     return () => {
       cancelado = true;
     };
-  }, [collector, isOpen, mes]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- vigenteKey cobre `vigente`
+  }, [collector, isOpen, mes, vigenteKey]);
 
   // Média recebida nos 3 meses anteriores ao mês escolhido (referência).
   const media3Meses = useMemo(() => {
@@ -272,6 +285,14 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
             </p>
           )}
         </div>
+
+        {!carregando && !somenteLeitura && (
+          <p className="-mt-2 text-xs text-gray-500 dark:text-dark-text-secondary">
+            {mesOrigem && mesOrigem !== mes
+              ? `Meta vinda de ${rotuloMes(mesOrigem)}. Salvando, a alteração vale de ${rotuloMes(mes)} em diante.`
+              : `Vale de ${rotuloMes(mes)} em diante, até a próxima alteração.`}
+          </p>
+        )}
 
         {somenteLeitura && (
           <div className="flex items-center gap-2 rounded-lg bg-gray-50 dark:bg-dark-bg px-3 py-2 text-xs text-gray-600 dark:text-dark-text-secondary">
