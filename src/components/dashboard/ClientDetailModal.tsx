@@ -398,19 +398,69 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     }, 150);
     return () => window.clearTimeout(t);
   }, [vendaInicial]);
+  // Por venda: o que esta em atraso x a vencer (mesma regra do cabecalho e
+  // da carteira, item 34), para o cobrador achar a venda atrasada sem abrir
+  // uma por uma. Com acordo ativo o atraso segue o acordo: nao resume aqui.
+  const resumoPorVenda = React.useMemo(() => {
+    const mapa = new Map<
+      number,
+      {
+        vencido: number;
+        qtdAtrasadas: number;
+        maiorAtraso: number;
+        encargo: number;
+        aVencer: number;
+        proximoVencimento: string | null;
+      }
+    >();
+    clientSales.forEach((sale) => {
+      const r = {
+        vencido: 0,
+        qtdAtrasadas: 0,
+        maiorAtraso: 0,
+        encargo: 0,
+        aVencer: 0,
+        proximoVencimento: null as string | null,
+      };
+      let proximoTs = Infinity;
+      sale.installments.forEach((inst) => {
+        if (isForaDaCobranca(inst.status) || !hasInstallmentBalance(inst)) {
+          return;
+        }
+        const saldo =
+          (inst.valor_original || 0) -
+          (inst.valor_recebido || 0) -
+          (inst.desconto || 0);
+        const dias = calculateOverdueDays(inst.data_vencimento);
+        if (dias > 0) {
+          r.vencido += saldo;
+          r.qtdAtrasadas += 1;
+          if (dias > r.maiorAtraso) r.maiorAtraso = dias;
+          r.encargo += encargoParcela(inst)?.encargo ?? 0;
+        } else {
+          r.aVencer += saldo;
+          const ts =
+            parseAndNormalizeDate(inst.data_vencimento)?.getTime() ?? Infinity;
+          if (ts < proximoTs) {
+            proximoTs = ts;
+            r.proximoVencimento = inst.data_vencimento ?? null;
+          }
+        }
+      });
+      r.vencido = round2(r.vencido);
+      r.aVencer = round2(r.aVencer);
+      r.encargo = round2(r.encargo);
+      mapa.set(sale.saleNumber, r);
+    });
+    return mapa;
+  }, [clientSales]);
+
   const vendasPorAba = React.useMemo(() => {
     const classificadas = clientSales.map((sale) => {
       const fora =
         seloForaDaCobranca(sale.installments.map((i) => i.status)) !== null;
       const saldo = saldoPorVenda.get(sale.saleNumber)?.remainingBalance ?? 0;
-      let maiorAtraso = 0;
-      sale.installments.forEach((inst) => {
-        if (isForaDaCobranca(inst.status) || !hasInstallmentBalance(inst)) {
-          return;
-        }
-        const dias = calculateOverdueDays(inst.data_vencimento);
-        if (dias > maiorAtraso) maiorAtraso = dias;
-      });
+      const maiorAtraso = resumoPorVenda.get(sale.saleNumber)?.maiorAtraso ?? 0;
       return { sale, fora, aberto: !fora && saldo > 0.01, maiorAtraso };
     });
     const abertas = classificadas
@@ -422,7 +472,22 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
       pagos: classificadas.filter((c) => !c.fora && !c.aberto).map((c) => c.sale),
       emAtraso: abertas.filter((c) => c.maiorAtraso > 0).length,
     };
-  }, [clientSales, saldoPorVenda]);
+  }, [clientSales, saldoPorVenda, resumoPorVenda]);
+
+  // Ao abrir a ficha, as vendas com parcela em atraso ja vem abertas (uma
+  // vez; depois o cobrador abre/fecha a vontade). Aberta numa venda
+  // especifica (vendaInicial), nao mexe.
+  const autoExpandiuAtrasadas = React.useRef(vendaInicial != null);
+  useEffect(() => {
+    if (autoExpandiuAtrasadas.current || clientSales.length === 0) return;
+    autoExpandiuAtrasadas.current = true;
+    if (acordoAtivo) return;
+    const atrasadas = clientSales
+      .filter((sale) => (resumoPorVenda.get(sale.saleNumber)?.vencido ?? 0) > 0.01)
+      .map((sale) => sale.saleNumber);
+    if (atrasadas.length > 0)
+      setExpandedSales((atual) => new Set([...atual, ...atrasadas]));
+  }, [clientSales, resumoPorVenda, acordoAtivo]);
   const abaEfetiva: AbaVendas =
     abaVendas ?? (vendasPorAba.aberto.length > 0 ? "aberto" : "todos");
   const vendasVisiveis = vendasPorAba[abaEfetiva];
@@ -1079,12 +1144,21 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                     const saleSeloFora = seloForaDaCobranca(
                       sale.installments.map((i) => i.status),
                     );
+                    // Selos de atraso / a vencer (sem acordo ativo).
+                    const resumo = acordoAtivo
+                      ? undefined
+                      : resumoPorVenda.get(sale.saleNumber);
+                    const vendaAtrasada = !!resumo && resumo.vencido > 0.01;
 
                     return (
                       <div
                         key={sale.saleNumber}
                         id={`ficha-venda-${sale.saleNumber}`}
-                        className="border border-gray-200 rounded-xl overflow-hidden bg-white"
+                        className={`border rounded-xl overflow-hidden bg-white ${
+                          vendaAtrasada
+                            ? "border-red-300 border-l-4 border-l-red-500"
+                            : "border-gray-200"
+                        }`}
                       >
                         {/* Sale Header - Minimalista */}
                         <div
@@ -1116,6 +1190,33 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                     <StatusBadge status={saleBalance.status} />
                                   )}
                                 </div>
+                                {resumo &&
+                                  (resumo.vencido > 0.01 ||
+                                    resumo.aVencer > 0.01) && (
+                                    <div className="mt-1 flex flex-wrap gap-1.5 text-[11px]">
+                                      {resumo.vencido > 0.01 && (
+                                        <span className="inline-flex items-center gap-1 rounded-md bg-red-100 px-1.5 py-0.5 font-semibold text-red-700">
+                                          <AlertTriangle className="h-3 w-3" />
+                                          Em atraso{" "}
+                                          {formatCurrency(resumo.vencido)} ·{" "}
+                                          {resumo.qtdAtrasadas} parcela
+                                          {resumo.qtdAtrasadas !== 1 ? "s" : ""}{" "}
+                                          · {resumo.maiorAtraso} dia
+                                          {resumo.maiorAtraso !== 1 ? "s" : ""}
+                                          {resumo.encargo > 0.009 &&
+                                            ` · + ${formatCurrency(resumo.encargo)} multa/juros`}
+                                        </span>
+                                      )}
+                                      {resumo.aVencer > 0.01 && (
+                                        <span className="inline-flex items-center rounded-md bg-gray-100 px-1.5 py-0.5 font-medium text-gray-600">
+                                          A vencer{" "}
+                                          {formatCurrency(resumo.aVencer)}
+                                          {resumo.proximoVencimento &&
+                                            ` · próxima ${formatDate(resumo.proximoVencimento)}`}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
                                 <p className="text-xs text-gray-500">
                                   {sale.installments.length} parcela
                                   {sale.installments.length !== 1 ? "s" : ""}
@@ -1208,7 +1309,11 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                   return (
                                     <div
                                       key={installment.id_parcela}
-                                      className="flex items-center justify-between py-1.5 px-2 border-b border-gray-100 last:border-0 hover:bg-gray-50 rounded transition-colors"
+                                      className={`flex items-center justify-between py-1.5 px-2 border-b border-gray-100 last:border-0 rounded transition-colors ${
+                                        situacao === "atrasada" && !acordoAtivo
+                                          ? "bg-red-50 hover:bg-red-100"
+                                          : "hover:bg-gray-50"
+                                      }`}
                                     >
                                       {/* Left: ID, Data, Status */}
                                       <div className="flex items-center gap-2 min-w-0 flex-1">
