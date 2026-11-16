@@ -1,245 +1,238 @@
-import React, { useState, FormEvent, useEffect } from "react";
-import {
-  DollarSign,
-  Calendar,
-  Save,
-  Target,
-  ChevronDown,
-  Bell,
-} from "lucide-react";
+import React, { useState, FormEvent, useEffect, useMemo } from "react";
+import { Save, Plus, Trash2, ChevronDown, Lock } from "lucide-react";
 import { User } from "../../types";
 import { supabase } from "../../lib/supabase";
 import { useCollection } from "../../contexts/CollectionContext";
 import { Modal } from "../Modal";
 import { isWalletCollectorType } from "../../config/profiles";
 import { valorRecebidoTotal } from "../../filters/sales";
+import {
+  FaixaComissao,
+  FormaComissao,
+  calcularComissao,
+  ordenarFaixas,
+  validarFaixas,
+} from "../../filters/comissao";
+import { formatCurrency } from "../../utils/formatters";
+import { todayLocalStr } from "../../config/visitStatus";
 
 interface MonthlyGoalEditModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Cobrador ou gestor (gestor: meta sobre o recebido da equipe dele). */
   collector: User | null;
 }
+
+const MESES = [
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
+];
+
+// Faixa na tela: textos como o gestor digita ("90000", "0,889" ou "100").
+interface FaixaForm {
+  meta: string;
+  valor: string;
+}
+
+const parseNumero = (s: string): number => {
+  const limpo = s.trim().replace(/\s/g, "");
+  if (!limpo) return NaN;
+  // "90.000,50" -> 90000.5 ; "0,889" -> 0.889 ; "0.889" -> 0.889
+  const normal = limpo.includes(",")
+    ? limpo.replace(/\./g, "").replace(",", ".")
+    : limpo;
+  return Number(normal);
+};
+
+const formatNum = (n: number) =>
+  n.toLocaleString("pt-BR", { maximumFractionDigits: 3 });
+
+/** "YYYY-MM-01" deslocado n meses a partir de "YYYY-MM". */
+const mesDeslocado = (ym: string, n: number) => {
+  const [y, m] = ym.split("-").map(Number);
+  const total = y * 12 + (m - 1) + n;
+  const yy = Math.floor(total / 12);
+  const mm = (total % 12) + 1;
+  return `${yy}-${String(mm).padStart(2, "0")}-01`;
+};
+
+const rotuloMes = (mes: string) => {
+  const [y, m] = mes.split("-").map(Number);
+  return `${MESES[m - 1]} ${y}`;
+};
+
+const inputClass =
+  "w-full px-3 py-2 border border-gray-200 dark:border-dark-border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 dark:bg-dark-bg disabled:bg-gray-50 disabled:text-gray-500 dark:disabled:bg-dark-bg/50";
 
 const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
   isOpen,
   onClose,
   collector,
 }) => {
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [visitsGoal, setVisitsGoal] = useState(0);
-  const [paymentsGoal, setPaymentsGoal] = useState(0);
-  const [isSaving, setIsSaving] = useState(false);
-  const { scheduledVisits, salePayments, setMonthlyGoal } = useCollection();
+  const { salePayments, managerCollectorLinks, salvarMetasDoMes } =
+    useCollection();
 
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(["period", "goals"]),
+  const mesAtualYM = todayLocalStr().slice(0, 7);
+  const mesAtual = `${mesAtualYM}-01`;
+  // 3 meses para trás (consulta) e 3 para frente (planejar).
+  const opcoesMes = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => mesDeslocado(mesAtualYM, i - 3)),
+    [mesAtualYM],
   );
-  const [sendNotification, setSendNotification] = useState(false);
-  const [saveAsTemplate, setSaveAsTemplate] = useState(false);
 
-  const [suggestVisits3, setSuggestVisits3] = useState<number | null>(null);
-  const [suggestVisits6, setSuggestVisits6] = useState<number | null>(null);
+  const [mes, setMes] = useState(mesAtual);
+  const [faixas, setFaixas] = useState<FaixaForm[]>([]);
+  const [forma, setForma] = useState<FormaComissao>("percentual");
+  const [visitsGoal, setVisitsGoal] = useState("");
+  const [mostrarAtendimentos, setMostrarAtendimentos] = useState(false);
+  const [carregando, setCarregando] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
 
-  // Mesma coluna (visits_goal) para os dois mundos -- so o rotulo muda: pro
-  // cobrador de carteira (interno/terceirizado/jurídico) "visita" não existe,
-  // o que ele cumpre é contato (ligação/WhatsApp) efetivo. Ver
-  // isEffectiveLabel/WALLET_COLLECTOR_TYPES e o adendo do plano desta feature.
-  const isWalletCollector = isWalletCollectorType(collector?.type);
-  const visitsGoalLabel = isWalletCollector
-    ? "Meta de Atendimentos"
-    : "Meta de Visitas";
-  const [suggestPayments3, setSuggestPayments3] = useState<number | null>(null);
-  const [suggestPayments6, setSuggestPayments6] = useState<number | null>(null);
-
-  const toggleSection = (sectionId: string) => {
-    const newExpanded = new Set(expandedSections);
-    if (newExpanded.has(sectionId)) {
-      newExpanded.delete(sectionId);
-    } else {
-      newExpanded.add(sectionId);
-    }
-    setExpandedSections(newExpanded);
-  };
+  const isManager = collector?.type === "manager";
+  const isWallet = isWalletCollectorType(collector?.type);
+  const somenteLeitura = mes < mesAtual;
+  const baseLabel = isManager ? "recebido da equipe" : "recebido no mês";
 
   useEffect(() => {
-    const fetchGoal = async () => {
-      if (!collector || !isOpen) return;
-
-      const monthPadded = (selectedMonth + 1).toString().padStart(2, "0");
-      const dateString = `${selectedYear}-${monthPadded}-01`;
-
-      const { data, error } = await supabase
-        .from("monthly_goals")
-        .select("*")
-        .eq("user_id", collector.id)
-        .eq("month", dateString);
-
-      if (error) {
-        console.error("Error fetching monthly goal:", error);
-        setVisitsGoal(0);
-        setPaymentsGoal(0);
-        return;
-      }
-
-      if (data && data.length > 0) {
-        const goal = data[0];
-        setVisitsGoal(goal.visits_goal);
-        setPaymentsGoal(goal.payments_goal);
-      } else {
-        setVisitsGoal(0);
-        setPaymentsGoal(0);
-      }
-    };
-
-    fetchGoal();
-  }, [selectedMonth, selectedYear, collector, isOpen]);
-
-  // Helpers
-  const safeParseDate = (d: string | null | undefined) => {
-    if (!d) return null;
-    const t = new Date(d);
-    return isNaN(t.getTime()) ? null : t;
-  };
-
-  const monthYearKey = (y: number, m: number) => `${y}-${m}`;
+    if (isOpen) setMes(mesAtual);
+  }, [isOpen, mesAtual]);
 
   useEffect(() => {
     if (!collector || !isOpen) return;
-
-    const collectorVisits = scheduledVisits.filter(
-      (v) => v.collectorId === collector.id,
-    );
-    const collectorPayments = salePayments.filter(
-      (p) => p.collectorId === collector.id,
-    );
-
-    const buildWindow = (monthsBack: number) => {
-      const keys: string[] = [];
-      let y = selectedYear;
-      let m = selectedMonth;
-      for (let i = 0; i < monthsBack; i++) {
-        keys.push(monthYearKey(y, m));
-        m--;
-        if (m < 0) {
-          m = 11;
-          y -= 1;
-        }
+    let cancelado = false;
+    setCarregando(true);
+    setErro(null);
+    (async () => {
+      const [faixasRes, goalRes] = await Promise.all([
+        supabase
+          .from("comissao_faixas")
+          .select("meta_valor, forma, valor")
+          .eq("user_id", collector.id)
+          .eq("month", mes)
+          .is("substituida_em", null)
+          .order("meta_valor"),
+        supabase
+          .from("monthly_goals")
+          .select("visits_goal, payments_goal")
+          .eq("user_id", collector.id)
+          .eq("month", mes)
+          .maybeSingle(),
+      ]);
+      if (cancelado) return;
+      if (faixasRes.error || goalRes.error) {
+        setErro("Não foi possível carregar as metas deste mês.");
+        setFaixas([]);
+        setVisitsGoal("");
+      } else {
+        const lidas = (faixasRes.data ?? []).map((f) => ({
+          meta: String(Number(f.meta_valor)),
+          valor: formatNum(Number(f.valor)),
+        }));
+        setForma(
+          faixasRes.data?.[0]?.forma === "fixo" ? "fixo" : "percentual",
+        );
+        // Mês antigo sem faixas mas com meta de valor (antes do item 72).
+        const pg = Number(goalRes.data?.payments_goal ?? 0);
+        setFaixas(
+          lidas.length > 0
+            ? lidas
+            : pg > 0
+              ? [{ meta: String(pg), valor: "0" }]
+              : [],
+        );
+        const vg = Number(goalRes.data?.visits_goal ?? 0);
+        setVisitsGoal(vg > 0 ? String(vg) : "");
+        setMostrarAtendimentos(vg > 0);
       }
-      return keys.reverse();
+      setCarregando(false);
+    })();
+    return () => {
+      cancelado = true;
     };
+  }, [collector, isOpen, mes]);
 
-    const calcVisitsAvg = (monthsBack: number) => {
-      const window = buildWindow(monthsBack);
-      const countsByKey: Record<string, number> = {};
-      window.forEach((k) => (countsByKey[k] = 0));
+  // Média recebida nos 3 meses anteriores ao mês escolhido (referência).
+  const media3Meses = useMemo(() => {
+    if (!collector || !isOpen) return 0;
+    const ids = isManager
+      ? new Set(
+          managerCollectorLinks
+            .filter((l) => l.managerId === collector.id)
+            .map((l) => l.collectorId),
+        )
+      : new Set([collector.id]);
+    const ym = mes.slice(0, 7);
+    const janela = new Set(
+      [1, 2, 3].map((n) => mesDeslocado(ym, -n).slice(0, 7)),
+    );
+    const total = salePayments
+      .filter(
+        (p) => ids.has(p.collectorId) && janela.has(p.paymentDate.slice(0, 7)),
+      )
+      .reduce((s, p) => s + valorRecebidoTotal(p), 0);
+    return Math.round(total / 3);
+  }, [collector, isOpen, isManager, managerCollectorLinks, salePayments, mes]);
 
-      collectorVisits.forEach((v) => {
-        const d = safeParseDate(v.dataVisitaRealizada || v.scheduledDate);
-        if (!d) return;
-        const key = monthYearKey(d.getFullYear(), d.getMonth());
-        if (key in countsByKey) {
-          if (v.status === "realizada") countsByKey[key]++;
-        }
-      });
+  const faixasNum: FaixaComissao[] = faixas.map((f) => ({
+    metaValor: parseNumero(f.meta),
+    valor: parseNumero(f.valor),
+  }));
+  const faixasValidas = faixasNum.every(
+    (f) => Number.isFinite(f.metaValor) && Number.isFinite(f.valor),
+  );
+  const problema = !faixasValidas
+    ? "Preencha meta e comissão de todas as faixas."
+    : validarFaixas(faixasNum, forma);
 
-      const sum = Object.values(countsByKey).reduce((s, n) => s + n, 0);
-      return Math.round(sum / monthsBack);
-    };
+  const atualizarFaixa = (i: number, campo: keyof FaixaForm, valor: string) =>
+    setFaixas((fs) => fs.map((f, j) => (j === i ? { ...f, [campo]: valor } : f)));
 
-    const calcPaymentsAvg = (monthsBack: number) => {
-      const window = buildWindow(monthsBack);
-      const sumsByKey: Record<string, number> = {};
-      window.forEach((k) => (sumsByKey[k] = 0));
-
-      collectorPayments.forEach((p) => {
-        const d = safeParseDate(p.paymentDate);
-        if (!d) return;
-        const key = monthYearKey(d.getFullYear(), d.getMonth());
-        if (key in sumsByKey) {
-          sumsByKey[key] += valorRecebidoTotal(p);
-        }
-      });
-
-      const sum = Object.values(sumsByKey).reduce((s, n) => s + n, 0);
-      return Math.round(sum / monthsBack);
-    };
-
-    try {
-      setSuggestVisits3(calcVisitsAvg(3));
-      setSuggestVisits6(calcVisitsAvg(6));
-      setSuggestPayments3(calcPaymentsAvg(3));
-      setSuggestPayments6(calcPaymentsAvg(6));
-    } catch (err) {
-      setSuggestVisits3(null);
-      setSuggestVisits6(null);
-      setSuggestPayments3(null);
-      setSuggestPayments6(null);
-    }
-  }, [
-    collector,
-    scheduledVisits,
-    salePayments,
-    selectedMonth,
-    selectedYear,
-    isOpen,
-  ]);
+  const adicionarFaixa = () =>
+    setFaixas((fs) => {
+      const ultima = fs.length ? parseNumero(fs[fs.length - 1].meta) : NaN;
+      const sugestao = Number.isFinite(ultima)
+        ? String(Math.round(ultima * 1.2))
+        : media3Meses > 0
+          ? String(media3Meses)
+          : "";
+      return [...fs, { meta: sugestao, valor: "" }];
+    });
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setIsSaving(true);
-
-    if (!collector) return;
-
-    const monthPadded = (selectedMonth + 1).toString().padStart(2, "0");
-    const dateString = `${selectedYear}-${monthPadded}-01`;
-
+    if (!collector || somenteLeitura || problema) return;
+    const vg = visitsGoal.trim() ? Math.round(parseNumero(visitsGoal)) : 0;
+    if (!Number.isFinite(vg) || vg < 0) {
+      setErro("Meta de atendimentos inválida.");
+      return;
+    }
+    setSalvando(true);
+    setErro(null);
     try {
-      // setMonthlyGoal faz upsert por (user_id, month) e atualiza o estado
-      // global (monthlyGoals) -- usar o insert/update direto daqui, como
-      // antes, deixava o resto do app (card de meta do cobrador, meta da
-      // equipe, comparativo do gestor) com o valor velho ate recarregar a
-      // pagina, porque nenhum deles soube que uma meta nova foi salva.
-      await setMonthlyGoal({
-        user_id: collector.id,
-        month: dateString,
-        visits_goal: visitsGoal,
-        payments_goal: paymentsGoal,
-      });
+      await salvarMetasDoMes(
+        collector.id,
+        mes,
+        vg,
+        forma,
+        ordenarFaixas(faixasNum),
+      );
       onClose();
     } catch (err) {
-      console.error("Error saving monthly goal:", err);
+      setErro(err instanceof Error ? err.message : "Erro ao salvar metas.");
+    } finally {
+      setSalvando(false);
     }
-
-    setIsSaving(false);
-  };
-
-  const months = [
-    "Janeiro",
-    "Fevereiro",
-    "Março",
-    "Abril",
-    "Maio",
-    "Junho",
-    "Julho",
-    "Agosto",
-    "Setembro",
-    "Outubro",
-    "Novembro",
-    "Dezembro",
-  ];
-
-  const years = Array.from(
-    { length: 5 },
-    (_, i) => new Date().getFullYear() - 2 + i,
-  );
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-      minimumFractionDigits: 0,
-    }).format(value);
   };
 
   if (!collector) return null;
@@ -248,304 +241,240 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={`Metas Mensais: ${collector.name}`}
+      title={`Metas de ${collector.name}`}
       size="lg"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-2 custom-scrollbar">
-          {/* Período Section */}
-          <div className="border border-gray-200 dark:border-dark-border rounded-xl overflow-hidden">
-            <button
-              type="button"
-              onClick={() => toggleSection("period")}
-              className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-dark-bg transition-colors"
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 dark:text-dark-text-secondary mb-1">
+              Mês
+            </label>
+            <select
+              value={mes}
+              onChange={(e) => setMes(e.target.value)}
+              className={`${inputClass} w-44`}
             >
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-blue-500" />
-                <span className="font-semibold text-gray-800 dark:text-dark-text text-sm tracking-wide">
-                  Período
-                </span>
-              </div>
-              <ChevronDown
-                className={`w-4 h-4 text-gray-400 transition-transform ${expandedSections.has("period") ? "" : "-rotate-90"}`}
-              />
-            </button>
-
-            {expandedSections.has("period") && (
-              <div className="px-4 pb-4 grid grid-cols-2 gap-4 border-t border-gray-100 dark:border-dark-border bg-gray-50/30 dark:bg-dark-bg/30">
-                <div className="mt-4">
-                  <label className="block text-xs font-bold text-gray-500 dark:text-dark-text-secondary mb-1.5 tracking-wide">
-                    Mês
-                  </label>
-                  <select
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-200 dark:border-dark-border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 dark:bg-dark-bg transition-all"
-                  >
-                    {months.map((month, index) => (
-                      <option key={index} value={index}>
-                        {month}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="mt-4">
-                  <label className="block text-xs font-bold text-gray-500 dark:text-dark-text-secondary mb-1.5 tracking-wide">
-                    Ano
-                  </label>
-                  <select
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-200 dark:border-dark-border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 dark:bg-dark-bg transition-all"
-                  >
-                    {years.map((year) => (
-                      <option key={year} value={year}>
-                        {year}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            )}
+              {opcoesMes.map((m) => (
+                <option key={m} value={m}>
+                  {rotuloMes(m)}
+                </option>
+              ))}
+            </select>
           </div>
-
-          {/* Goals Section */}
-          <div className="border border-gray-200 dark:border-dark-border rounded-xl overflow-hidden">
-            <button
-              type="button"
-              onClick={() => toggleSection("goals")}
-              className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-dark-bg transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <Target className="w-4 h-4 text-green-500" />
-                <span className="font-semibold text-gray-800 dark:text-dark-text text-sm tracking-wide">
-                  Objetivos
-                </span>
-              </div>
-              <ChevronDown
-                className={`w-4 h-4 text-gray-400 transition-transform ${expandedSections.has("goals") ? "" : "-rotate-90"}`}
-              />
-            </button>
-
-            {expandedSections.has("goals") && (
-              <div className="px-4 pb-4 space-y-4 border-t border-gray-100 dark:border-dark-border bg-gray-50/30 dark:bg-dark-bg/30">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 dark:text-dark-text-secondary mb-1.5 tracking-wide">
-                      {visitsGoalLabel}
-                    </label>
-                    <div className="relative">
-                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="number"
-                        value={visitsGoal}
-                        onChange={(e) => setVisitsGoal(Number(e.target.value))}
-                        className="w-full pl-10 pr-3 py-2 border border-gray-200 dark:border-dark-border rounded-lg text-sm font-bold text-blue-600 focus:ring-2 focus:ring-blue-500 dark:bg-dark-bg"
-                        placeholder="0"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 dark:text-dark-text-secondary mb-1.5 tracking-wide">
-                      Meta de Pagamentos
-                    </label>
-                    <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="number"
-                        value={paymentsGoal}
-                        onChange={(e) =>
-                          setPaymentsGoal(Number(e.target.value))
-                        }
-                        className="w-full pl-10 pr-3 py-2 border border-gray-200 dark:border-dark-border rounded-lg text-sm font-bold text-green-600 focus:ring-2 focus:ring-green-500 dark:bg-dark-bg"
-                        placeholder="0"
-                      />
-                    </div>
-                    <p className="text-[10px] text-gray-400 mt-1 font-medium">
-                      {formatCurrency(paymentsGoal)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Insights Section */}
-          <div className="border border-gray-200 dark:border-dark-border rounded-xl overflow-hidden">
-            <button
-              type="button"
-              onClick={() => toggleSection("insights")}
-              className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-dark-bg transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <DollarSign className="w-4 h-4 text-amber-500" />
-                <span className="font-semibold text-gray-800 dark:text-dark-text text-sm tracking-wide">
-                  Sugestões e Insights
-                </span>
-              </div>
-              <ChevronDown
-                className={`w-4 h-4 text-gray-400 transition-transform ${expandedSections.has("insights") ? "" : "-rotate-90"}`}
-              />
-            </button>
-
-            {expandedSections.has("insights") && (
-              <div className="px-4 pb-4 border-t border-gray-100 dark:border-dark-border bg-gray-50/30 dark:bg-dark-bg/30">
-                <div className="mt-4 overflow-hidden border border-gray-200 dark:border-dark-border rounded-lg">
-                  <table className="w-full text-xs text-left">
-                    <thead className="bg-gray-50 dark:bg-dark-bg text-gray-500">
-                      <tr>
-                        <th className="px-3 py-2 font-bold">Métrica</th>
-                        <th className="px-3 py-2 font-bold text-center">
-                          3 Meses
-                        </th>
-                        <th className="px-3 py-2 font-bold text-center">
-                          6 Meses
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-dark-border dark:text-dark-text">
-                      <tr>
-                        <td className="px-3 py-2 font-medium">
-                          Média {isWalletCollector ? "Atendimentos" : "Visitas"}
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          <button
-                            type="button"
-                            onClick={() => setVisitsGoal(suggestVisits3 || 0)}
-                            className="text-blue-600 hover:bg-blue-50 px-2 py-1 rounded transition-colors"
-                          >
-                            {suggestVisits3 ?? "—"}
-                          </button>
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          <button
-                            type="button"
-                            onClick={() => setVisitsGoal(suggestVisits6 || 0)}
-                            className="text-blue-600 hover:bg-blue-50 px-2 py-1 rounded transition-colors"
-                          >
-                            {suggestVisits6 ?? "—"}
-                          </button>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="px-3 py-2 font-medium">Média Receb.</td>
-                        <td className="px-3 py-2 text-center">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setPaymentsGoal(suggestPayments3 || 0)
-                            }
-                            className="text-green-600 hover:bg-green-50 px-2 py-1 rounded transition-colors"
-                          >
-                            {suggestPayments3
-                              ? formatCurrency(suggestPayments3)
-                              : "—"}
-                          </button>
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setPaymentsGoal(suggestPayments6 || 0)
-                            }
-                            className="text-green-600 hover:bg-green-50 px-2 py-1 rounded transition-colors"
-                          >
-                            {suggestPayments6
-                              ? formatCurrency(suggestPayments6)
-                              : "—"}
-                          </button>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <div className="mt-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (suggestVisits3)
-                        setVisitsGoal(Math.round(suggestVisits3 * 1.1));
-                      if (suggestPayments3)
-                        setPaymentsGoal(Math.round(suggestPayments3 * 1.1));
-                    }}
-                    className="w-full py-2 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded-lg text-xs font-bold tracking-wide hover:bg-blue-100 transition-colors"
-                  >
-                    Aplicar +10% sobre média de 3 meses
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Advanced Section */}
-          <div className="border border-gray-200 dark:border-dark-border rounded-xl overflow-hidden">
-            <button
-              type="button"
-              onClick={() => toggleSection("advanced")}
-              className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-dark-bg transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <Bell className="w-4 h-4 text-gray-500" />
-                <span className="font-semibold text-gray-800 dark:text-dark-text text-sm tracking-wide">
-                  Configurações Extras
-                </span>
-              </div>
-              <ChevronDown
-                className={`w-4 h-4 text-gray-400 transition-transform ${expandedSections.has("advanced") ? "" : "-rotate-90"}`}
-              />
-            </button>
-
-            {expandedSections.has("advanced") && (
-              <div className="px-4 pb-4 space-y-3 border-t border-gray-100 dark:border-dark-border bg-gray-50/30 dark:bg-dark-bg/30">
-                <label className="flex items-center gap-3 cursor-pointer mt-4 p-2 hover:bg-white dark:hover:bg-dark-bg rounded-lg transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={sendNotification}
-                    onChange={(e) => setSendNotification(e.target.checked)}
-                    className="rounded text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-xs font-medium text-gray-700 dark:text-dark-text">
-                    Notificar cobrador ao salvar
-                  </span>
-                </label>
-                <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-white dark:hover:bg-dark-bg rounded-lg transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={saveAsTemplate}
-                    onChange={(e) => setSaveAsTemplate(e.target.checked)}
-                    className="rounded text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-xs font-medium text-gray-700 dark:text-dark-text">
-                    Salvar como modelo reutilizável
-                  </span>
-                </label>
-              </div>
-            )}
-          </div>
+          {media3Meses > 0 && (
+            <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
+              Média dos 3 meses anteriores:{" "}
+              <span className="font-semibold text-gray-700 dark:text-dark-text">
+                {formatCurrency(media3Meses, false)}
+              </span>{" "}
+              {isManager ? "(equipe)" : ""}
+            </p>
+          )}
         </div>
 
-        <div className="flex gap-3 pt-4 border-t border-gray-100 dark:border-dark-border mt-6">
+        {somenteLeitura && (
+          <div className="flex items-center gap-2 rounded-lg bg-gray-50 dark:bg-dark-bg px-3 py-2 text-xs text-gray-600 dark:text-dark-text-secondary">
+            <Lock className="h-3.5 w-3.5 shrink-0" />
+            Mês encerrado: as metas ficam só para consulta.
+          </div>
+        )}
+
+        <div>
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h4 className="text-sm font-semibold text-gray-800 dark:text-dark-text">
+                Faixas de comissão
+              </h4>
+              <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
+                {forma === "percentual"
+                  ? `Vale o % da maior faixa atingida sobre todo o ${baseLabel}.`
+                  : "Vale o valor da maior faixa atingida."}{" "}
+                Abaixo da 1ª faixa não há comissão.
+              </p>
+            </div>
+            <div className="inline-flex rounded-lg border border-gray-200 dark:border-dark-border p-0.5 text-xs font-semibold">
+              {(
+                [
+                  ["percentual", "% do recebido"],
+                  ["fixo", "Valor fixo"],
+                ] as const
+              ).map(([v, label]) => (
+                <button
+                  key={v}
+                  type="button"
+                  disabled={somenteLeitura}
+                  onClick={() => setForma(v)}
+                  className={`px-2.5 py-1 rounded-md transition-colors disabled:cursor-default ${
+                    forma === v
+                      ? "bg-blue-600 text-white"
+                      : "text-gray-500 hover:bg-gray-50 dark:hover:bg-dark-bg"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {carregando ? (
+            <p className="py-6 text-center text-sm text-gray-400">
+              Carregando…
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {faixas.length > 0 && (
+                <div className="grid grid-cols-[1fr_7rem_2rem] gap-2 px-1 text-[11px] font-semibold text-gray-400">
+                  <span>Meta ({baseLabel})</span>
+                  <span>
+                    {forma === "percentual" ? "Comissão (%)" : "Comissão (R$)"}
+                  </span>
+                  <span />
+                </div>
+              )}
+              {faixas.map((f, i) => {
+                const meta = parseNumero(f.meta);
+                const valor = parseNumero(f.valor);
+                // Só no %: quanto dá exatamente na meta (no fixo é o próprio valor).
+                const ganho =
+                  forma === "percentual" &&
+                  Number.isFinite(meta) &&
+                  Number.isFinite(valor)
+                    ? calcularComissao(meta, [{ metaValor: meta, valor }], forma)
+                    : null;
+                return (
+                  <div key={i}>
+                    <div className="grid grid-cols-[1fr_7rem_2rem] gap-2 items-center">
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                          R$
+                        </span>
+                        <input
+                          inputMode="decimal"
+                          value={f.meta}
+                          onChange={(e) =>
+                            atualizarFaixa(i, "meta", e.target.value)
+                          }
+                          disabled={somenteLeitura}
+                          className={`${inputClass} pl-9 font-semibold`}
+                          placeholder="90000"
+                        />
+                      </div>
+                      <div className="relative">
+                        {forma === "fixo" && (
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                            R$
+                          </span>
+                        )}
+                        <input
+                          inputMode="decimal"
+                          value={f.valor}
+                          onChange={(e) =>
+                            atualizarFaixa(i, "valor", e.target.value)
+                          }
+                          disabled={somenteLeitura}
+                          className={`${inputClass} text-right font-semibold ${forma === "fixo" ? "pl-9" : "pr-7"}`}
+                          placeholder={forma === "fixo" ? "100" : "0,889"}
+                        />
+                        {forma === "percentual" && (
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                            %
+                          </span>
+                        )}
+                      </div>
+                      {!somenteLeitura ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFaixas((fs) => fs.filter((_, j) => j !== i))
+                          }
+                          className="h-8 w-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          title="Remover faixa"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      ) : (
+                        <span />
+                      )}
+                    </div>
+                    {ganho !== null && meta > 0 && (
+                      <p className="mt-0.5 px-1 text-[11px] text-gray-400">
+                        Batendo {formatCurrency(meta, false)}: comissão de{" "}
+                        {formatCurrency(ganho)}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+
+              {faixas.length === 0 && (
+                <p className="rounded-lg border border-dashed border-gray-200 dark:border-dark-border py-4 text-center text-xs text-gray-400">
+                  Sem meta neste mês.
+                </p>
+              )}
+
+              {!somenteLeitura && (
+                <button
+                  type="button"
+                  onClick={adicionarFaixa}
+                  className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Adicionar faixa
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {!isManager && (
+          <div className="border-t border-gray-100 dark:border-dark-border pt-3">
+            <button
+              type="button"
+              onClick={() => setMostrarAtendimentos((v) => !v)}
+              className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-dark-text-secondary"
+            >
+              <ChevronDown
+                className={`h-3.5 w-3.5 transition-transform ${mostrarAtendimentos ? "" : "-rotate-90"}`}
+              />
+              Meta de {isWallet ? "atendimentos" : "visitas"} (opcional)
+            </button>
+            {mostrarAtendimentos && (
+              <input
+                inputMode="numeric"
+                value={visitsGoal}
+                onChange={(e) => setVisitsGoal(e.target.value)}
+                disabled={somenteLeitura}
+                className={`${inputClass} mt-2 w-40`}
+                placeholder="0"
+              />
+            )}
+          </div>
+        )}
+
+        {!somenteLeitura && !carregando && problema && faixas.length > 0 && (
+          <p className="text-xs text-amber-600">{problema}</p>
+        )}
+        {erro && <p className="text-xs text-red-600">{erro}</p>}
+
+        <div className="flex gap-3 pt-4 border-t border-gray-100 dark:border-dark-border">
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 px-4 py-2.5 text-sm font-bold text-gray-500 tracking-wide hover:bg-gray-50 dark:hover:bg-dark-bg rounded-xl transition-all"
+            className="flex-1 px-4 py-2.5 text-sm font-semibold text-gray-500 hover:bg-gray-50 dark:hover:bg-dark-bg rounded-xl transition-all"
           >
-            Cancelar
+            {somenteLeitura ? "Fechar" : "Cancelar"}
           </button>
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 font-bold tracking-wide shadow-lg shadow-blue-200 dark:shadow-none transition-all"
-          >
-            {isSaving ? (
-              <span className="animate-pulse">Salvando...</span>
-            ) : (
-              <>
-                <Save className="w-4 h-4" />
-                Salvar Metas
-              </>
-            )}
-          </button>
+          {!somenteLeitura && (
+            <button
+              type="submit"
+              disabled={salvando || carregando || !!problema}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 font-semibold transition-all"
+            >
+              <Save className="w-4 h-4" />
+              {salvando ? "Salvando…" : "Salvar metas"}
+            </button>
+          )}
         </div>
       </form>
     </Modal>

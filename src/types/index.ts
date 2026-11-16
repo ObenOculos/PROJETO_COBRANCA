@@ -590,6 +590,14 @@ export interface CollectionContextType {
   setMonthlyGoal: (
     goal: Omit<MonthlyGoal, "id" | "created_at" | "updated_at">,
   ) => Promise<any>; // Added
+  /** Item 72: meta de atendimentos + faixas de comissão do mês (RPC definir_metas_mes). */
+  salvarMetasDoMes: (
+    userId: string,
+    month: string,
+    visitsGoal: number,
+    forma: "percentual" | "fixo",
+    faixas: { metaValor: number; valor: number }[],
+  ) => Promise<void>;
   getDashboardStats: () => DashboardStats;
   getCollectorPerformance: () => CollectorPerformance[];
   getCollectorCollections: (collectorId: string) => Collection[];

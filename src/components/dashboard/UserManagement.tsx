@@ -411,6 +411,16 @@ const UserManagement: React.FC<UserManagementProps> = ({
               const goalUnit = isWalletCollectorType(user.type)
                 ? "atend."
                 : "visitas";
+              // payments_goal = meta da 1a faixa de comissao (item 72).
+              const metaPartes = [
+                goal && goal.payments_goal > 0
+                  ? formatCurrencyCompact(goal.payments_goal)
+                  : null,
+                goal && goal.visits_goal > 0
+                  ? `${goal.visits_goal} ${goalUnit}`
+                  : null,
+              ].filter(Boolean);
+              const metaLabel = metaPartes.length ? metaPartes.join(" · ") : null;
               const inactive = user.active === false;
               return (
                 <li
@@ -502,13 +512,11 @@ const UserManagement: React.FC<UserManagementProps> = ({
                         <button
                           type="button"
                           onClick={() => setMetaFor(user)}
-                          className={goal ? valueChipClass : emptyChipClass}
-                          title="Editar meta mensal"
+                          className={metaLabel ? valueChipClass : emptyChipClass}
+                          title="Metas e faixas de comissão do mês"
                         >
                           <Target className="h-3.5 w-3.5" />
-                          {goal
-                            ? `${goal.visits_goal} ${goalUnit} · ${formatCurrencyCompact(goal.payments_goal)}`
-                            : "Definir"}
+                          {metaLabel ?? "Definir"}
                         </button>
                       </div>
                     </>
@@ -516,7 +524,24 @@ const UserManagement: React.FC<UserManagementProps> = ({
                     <>
                       <span className="hidden lg:block text-xs text-gray-300">—</span>
                       <span className="hidden lg:block text-xs text-gray-300">—</span>
-                      <span className="hidden lg:block text-xs text-gray-300">—</span>
+                      {user.type === "manager" ? (
+                        <div className="flex items-center gap-2 lg:block">
+                          <span className="lg:hidden text-xs text-gray-400 w-24 shrink-0">
+                            Meta da equipe
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setMetaFor(user)}
+                            className={metaLabel ? valueChipClass : emptyChipClass}
+                            title="Metas e faixas de comissão do gestor (sobre o recebido da equipe)"
+                          >
+                            <Target className="h-3.5 w-3.5" />
+                            {metaLabel ?? "Definir"}
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="hidden lg:block text-xs text-gray-300">—</span>
+                      )}
                     </>
                   )}
 

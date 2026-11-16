@@ -2593,6 +2593,30 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     }
   };
 
+  // Item 72: meta de atendimentos + faixas de comissao do mes numa chamada
+  // so (RPC definir_metas_mes; tambem grava monthly_goals.payments_goal = meta
+  // da 1a faixa). Erro sobe para o modal mostrar -- nao vai para setError.
+  const salvarMetasDoMes = async (
+    userId: string,
+    month: string,
+    visitsGoal: number,
+    forma: "percentual" | "fixo",
+    faixas: { metaValor: number; valor: number }[],
+  ) => {
+    const { error } = await supabase.rpc("definir_metas_mes", {
+      p_user_id: userId,
+      p_month: month,
+      p_visits_goal: visitsGoal,
+      p_forma: forma,
+      p_faixas: faixas.map((f) => ({
+        meta_valor: f.metaValor,
+        valor: f.valor,
+      })),
+    });
+    if (error) throw new Error(error.message);
+    await fetchMonthlyGoals(false);
+  };
+
   const getFilteredCollections = React.useCallback((
     filters: FilterOptions,
     userType: UserType,
@@ -5345,6 +5369,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     updateUser,
     deleteUser,
     setMonthlyGoal,
+    salvarMetasDoMes,
     getDashboardStats,
     getCollectorPerformance,
     getCollectorCollections,

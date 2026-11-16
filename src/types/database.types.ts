@@ -1372,6 +1372,24 @@ export type Database = {
           },
         ];
       };
+      // Migration 20261116000007 (item 72). Escrita so pela RPC definir_metas_mes.
+      comissao_faixas: {
+        Row: {
+          id: string;
+          user_id: string;
+          month: string;
+          meta_valor: number;
+          forma: "percentual" | "fixo";
+          valor: number;
+          created_at: string;
+          created_by: string | null;
+          substituida_em: string | null;
+          substituida_por: string | null;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       monthly_goals: {
         Row: {
           created_at: string;
@@ -2420,6 +2438,17 @@ export type Database = {
           isOneToOne: false;
           isSetofReturn: true;
         };
+      };
+      // Migration 20261116000007 (item 72).
+      definir_metas_mes: {
+        Args: {
+          p_user_id: string;
+          p_month: string;
+          p_visits_goal: number;
+          p_forma: string;
+          p_faixas: Json;
+        };
+        Returns: undefined;
       };
       // Migration 20261116000004 (item 66, etapa 2).
       atribuicoes_painel_gestor: {
