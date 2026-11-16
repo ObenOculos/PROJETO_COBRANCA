@@ -1199,6 +1199,106 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       ? round2(Math.max(0, totalPending - amountToDistribute))
       : descontoMarcadas;
 
+    /** "O que fazer com a diferenca?" -- as 3 saidas de um valor menor que o
+     * devido, lado a lado e com o desconto em R$ e %: fica devendo (padrao),
+     * desconto so nas marcadas, ou quitar a divida inteira. null = nao ha o
+     * que perguntar (valor cheio, juros informado, acordo ativo). */
+    const escolhaDiferenca = (() => {
+      if (acordoAtivo || amountToDistribute <= 0) return null;
+      if (!withDiscount && amountToDistribute >= totalPending - 0.01) return null;
+      if (modoParcelas && jurosInformado > 0) return null;
+      const pode = podeDarDescontoNaQuitacao(user?.type);
+      const parcial = alocacao.situacao === "parcial";
+      const fecha = alocacao.situacao === "fecha";
+      if (!withDiscount && !(parcial || (fecha && pode))) return null;
+
+      const pct = (v: number, base: number) =>
+        base > 0 ? `${((v / base) * 100).toFixed(1).replace(".", ",")}%` : "";
+      const n = alocacao.itens.length;
+      const nAbertas = parcelasAbertas.length;
+      const nOutras = Math.max(0, nAbertas - n);
+      const nAVencer = parcelasAbertas.filter((p) => !p.vencida).length;
+      const outrasTexto =
+        nOutras > 0
+          ? ` ${nOutras === 1 ? "A outra parcela continua" : `As outras ${nOutras} continuam`} em aberto.`
+          : "";
+      const diferenca = round2(alocacao.somaParcelas - alocacao.principal);
+      const descontoTudo = round2(Math.max(0, totalPending - amountToDistribute));
+
+      let detalheBase = "Só as parcelas marcadas, sem desconto.";
+      if (parcial) {
+        const partes: string[] = [];
+        const quitadas = alocacao.itens.filter((p) => p.quita).length;
+        if (quitadas > 0) {
+          partes.push(
+            `quita ${quitadas} ${quitadas === 1 ? "parcela" : "parcelas"}`,
+          );
+        }
+        const parcialItem = alocacao.itens.find(
+          (p) => !p.quita && p.aplicado > 0,
+        );
+        if (parcialItem) {
+          partes.push(
+            `a de ${dataTexto(parcialItem.vencimento.slice(0, 10))} fica faltando ${formatCurrency(round2(parcialItem.saldo - parcialItem.aplicado))}`,
+          );
+        }
+        const semNada = alocacao.itens.filter((p) => p.aplicado <= 0).length;
+        if (semNada > 0) {
+          partes.push(
+            `${semNada} ${semNada === 1 ? "parcela marcada fica" : "parcelas marcadas ficam"} sem pagamento`,
+          );
+        }
+        const t = partes.join(", ") || "nada é quitado";
+        detalheBase = t.charAt(0).toUpperCase() + t.slice(1) + ".";
+      } else if (fecha) {
+        detalheBase = `Quita ${n === 1 ? "a parcela marcada" : `as ${n} parcelas marcadas`}.${outrasTexto}`;
+      }
+
+      const opcoes: {
+        chave: "devendo" | "marcadas" | "tudo";
+        titulo: string;
+        detalhe: string;
+        bloqueada: boolean;
+      }[] = [
+        {
+          chave: "devendo",
+          titulo: parcial ? "Fica devendo" : "Sem desconto",
+          detalhe: detalheBase,
+          bloqueada: false,
+        },
+      ];
+      if (parcial) {
+        opcoes.push({
+          chave: "marcadas",
+          titulo: `Desconto de ${formatCurrency(diferenca)} (${pct(diferenca, alocacao.somaParcelas)})`,
+          detalhe: `Quita ${n === 1 ? "a parcela marcada" : `as ${n} parcelas marcadas`}.${outrasTexto}`,
+          bloqueada: !pode,
+        });
+      }
+      opcoes.push({
+        chave: "tudo",
+        titulo: `Quitar a dívida inteira — desconto de ${formatCurrency(descontoTudo)} (${pct(descontoTudo, totalPending)})`,
+        detalhe: `Quita ${nAbertas === 1 ? "a parcela" : `as ${nAbertas} parcelas`} do cliente${
+          nAVencer > 0
+            ? `, inclusive ${nAVencer} que ainda não ${nAVencer === 1 ? "venceu" : "venceram"}`
+            : ""
+        }.`,
+        bloqueada: !pode,
+      });
+
+      return {
+        pergunta: parcial
+          ? `O cliente pagou ${formatCurrency(diferenca)} a menos que as parcelas marcadas (${formatCurrency(alocacao.somaParcelas)}). O que fazer com a diferença?`
+          : "Dar desconto no restante da dívida?",
+        opcoes,
+        atual: withDiscount
+          ? ("tudo" as const)
+          : descontoMarcadas > 0
+            ? ("marcadas" as const)
+            : ("devendo" as const),
+      };
+    })();
+
     // O "Confirmar" so libera depois de marcar "Conferi os valores", em todo
     // pagamento -- evita clique acidental (decisao do usuario, 2026-11-16).
     // Os casos de risco aparecem destacados na mesma caixa.
@@ -1886,26 +1986,14 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                       </Aviso>
                     )}
 
-                    {modoParcelas && alocacao.situacao === "parcial" && (
-                      <Aviso
-                        tom={descontoMarcadas > 0 ? "atencao" : "info"}
-                        titulo={
-                          descontoMarcadas > 0
-                            ? "Quita as parcelas marcadas com desconto"
-                            : "Pagamento parcial"
-                        }
-                      >
-                        {descontoMarcadas > 0 ? (
-                          <p>
-                            {itensPagamento.length}{" "}
-                            {itensPagamento.length === 1
-                              ? "parcela fica quitada"
-                              : "parcelas ficam quitadas"}
-                            : {formatCurrency(alocacao.principal)} recebidos +{" "}
-                            {formatCurrency(descontoMarcadas)} de desconto. As
-                            outras parcelas continuam em aberto.
-                          </p>
-                        ) : (() => {
+                    {/* Pagamento parcial COM juros informado: explica de onde
+                        sai o juro (sem juros, a pergunta "O que fazer com a
+                        diferenca?" abaixo cobre o parcial). */}
+                    {modoParcelas &&
+                      alocacao.situacao === "parcial" &&
+                      jurosInformado > 0 && (
+                      <Aviso tom="info" titulo="Pagamento parcial">
+                        {(() => {
                           const quitadas = alocacao.itens.filter(
                             (p) => p.quita,
                           ).length;
@@ -1926,33 +2014,6 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                           const t = partes.join(" e ") || "nada é quitado";
                           return t.charAt(0).toUpperCase() + t.slice(1) + ".";
                         })()}
-                        {/* Desconto so nas marcadas (gestor/externo, item 69).
-                            Interno/terceirizado/juridico: aviso abaixo diz
-                            a quem pedir. */}
-                        {podeDescontoNasMarcadas && (
-                          <label className="mt-2 flex items-start gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={descontoNasMarcadasEscolhido}
-                              onChange={(e) => {
-                                setDescontoNasMarcadas(e.target.checked);
-                                setErroEtapa(null);
-                              }}
-                              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                            />
-                            <span>
-                              Dar{" "}
-                              <strong>
-                                {formatCurrency(
-                                  round2(
-                                    alocacao.somaParcelas - alocacao.principal,
-                                  ),
-                                )}
-                              </strong>{" "}
-                              de desconto e quitar as parcelas marcadas
-                            </span>
-                          </label>
-                        )}
                         {/* Juros informados saem do valor recebido: explica a
                         diferenca e oferece o valor com os juros por cima
                         (confusao vista com o usuario, 2026-11-16). */}
@@ -2009,11 +2070,65 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                         </Aviso>
                       )}
 
-                    {/* Quitacao com desconto: so quando o valor deixa algo a
-                    descontar (com o valor cheio a opcao confundia). */}
-                    {/* Item 69: sem desconto para interno/terceirizado/
-                    juridico -- diz a quem pedir. */}
-                    {!podeDarDescontoNaQuitacao(user?.type) &&
+                    {/* Diferenca entre o recebido e as parcelas: UMA pergunta
+                        com as respostas lado a lado e o desconto a vista
+                        (antes eram 2 caixinhas de "quitar" em lugares
+                        diferentes -- confundia, 2026-11-16). Com acordo
+                        ativo segue o bloco antigo, abaixo. */}
+                    {escolhaDiferenca && (
+                      <fieldset className="rounded-xl border border-gray-200 dark:border-dark-border p-3 space-y-2">
+                        <legend className="px-1 text-sm font-semibold text-gray-900 dark:text-dark-text">
+                          {escolhaDiferenca.pergunta}
+                        </legend>
+                        {escolhaDiferenca.opcoes.map((o) => (
+                          <label
+                            key={o.chave}
+                            className={`flex items-start gap-3 p-2.5 rounded-lg border transition-colors ${
+                              o.bloqueada
+                                ? "border-gray-100 opacity-60 cursor-not-allowed"
+                                : escolhaDiferenca.atual === o.chave
+                                  ? o.chave === "tudo"
+                                    ? "border-amber-300 bg-amber-50 cursor-pointer"
+                                    : "border-indigo-300 bg-indigo-50 cursor-pointer"
+                                  : "border-gray-200 hover:bg-gray-50 cursor-pointer"
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="destino-diferenca"
+                              disabled={o.bloqueada}
+                              checked={escolhaDiferenca.atual === o.chave}
+                              onChange={() => {
+                                setWithDiscount(o.chave === "tudo");
+                                setDescontoNasMarcadas(o.chave === "marcadas");
+                                setErroEtapa(null);
+                              }}
+                              className="mt-0.5 h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <span className="text-sm">
+                              <span className="block font-medium text-gray-900 dark:text-dark-text">
+                                {o.titulo}
+                              </span>
+                              <span className="block text-xs text-gray-600 dark:text-dark-text-secondary">
+                                {o.detalhe}
+                              </span>
+                            </span>
+                          </label>
+                        ))}
+                        {!podeDarDescontoNaQuitacao(user?.type) && (
+                          <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
+                            Só o gestor pode dar desconto: peça para ele
+                            registrar este pagamento pela ficha, em seu nome.
+                          </p>
+                        )}
+                      </fieldset>
+                    )}
+
+                    {/* Com acordo ativo (sem parcelas marcadas): bloco antigo.
+                        Item 69: sem desconto para interno/terceirizado/
+                        juridico -- diz a quem pedir. */}
+                    {acordoAtivo &&
+                      !podeDarDescontoNaQuitacao(user?.type) &&
                       amountToDistribute > 0 &&
                       amountToDistribute < totalPending - 0.01 && (
                         <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
@@ -2022,7 +2137,8 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                           ficha, em seu nome.
                         </p>
                       )}
-                    {podeDarDescontoNaQuitacao(user?.type) &&
+                    {acordoAtivo &&
+                      podeDarDescontoNaQuitacao(user?.type) &&
                       (withDiscount ||
                       amountToDistribute < totalPending - 0.01) && (
                       <label
