@@ -38,8 +38,9 @@ import { todayLocalStr } from "../../config/visitStatus";
 import {
   inadimplenciaDe,
   descricaoRecorteInadimplencia,
+  formatarInadimplencia,
   INADIMPLENCIA_CORTE_DIAS,
-  INADIMPLENCIA_JANELA_DIAS,
+  janelaDoRecorte,
   nivelInadimplencia,
   NivelInadimplencia,
 } from "../../filters/inadimplencia";
@@ -118,8 +119,11 @@ const EnhancedStoreManagement: React.FC = () => {
   const [filters, setFilters] = useState<FilterOptions>({});
   // Inadimplencia: com filtro de vencimento vale o recorte do usuario; sem
   // ele, os vencimentos dos ultimos 12 meses (filters/inadimplencia).
-  const janelaInad =
-    filters.dateFrom || filters.dateTo ? null : INADIMPLENCIA_JANELA_DIAS;
+  // Seletor do card (12 meses | Tudo); filtro de vencimento prevalece.
+  const [periodoInad, setPeriodoInad] = useState<"janela" | "tudo">("janela");
+  const recorteInad =
+    filters.dateFrom || filters.dateTo ? ("filtro" as const) : periodoInad;
+  const janelaInad = janelaDoRecorte(recorteInad);
   const sourceCollections = useMemo(
     () => getFilteredCollections(filters, "manager"),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -617,18 +621,50 @@ const EnhancedStoreManagement: React.FC = () => {
             <h3 className="text-sm font-bold text-gray-900 dark:text-dark-text tracking-tight">
               Inadimplência
             </h3>
+            {recorteInad !== "filtro" && (
+              <div className="ml-auto flex bg-gray-100 dark:bg-dark-bg rounded-md p-0.5 shrink-0">
+                {(
+                  [
+                    ["janela", "12 meses"],
+                    ["tudo", "Tudo"],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setPeriodoInad(id)}
+                    className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors ${
+                      periodoInad === id
+                        ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
+                        : "text-gray-500 dark:text-dark-text-secondary hover:text-gray-800"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <p
             className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide"
             title="Do que venceu no período, quanto não foi pago. Parcela com até 30 dias de atraso conta como atraso, não como inadimplência."
           >
-            {descricaoRecorteInadimplencia(janelaInad)}
+            {descricaoRecorteInadimplencia(recorteInad)}
           </p>
           <p
-            className={`text-2xl sm:text-3xl font-extrabold tracking-tight mb-3 ${COR_NIVEL[nivelInadimplencia(overviewStats.inadGeral.pct)].text}`}
+            className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${overviewStats.inadGeral.venceu > 0 ? `mb-3 ${COR_NIVEL[nivelInadimplencia(overviewStats.inadGeral.pct)].text}` : "text-gray-400 dark:text-dark-text-secondary"}`}
           >
-            {overviewStats.inadGeral.pct.toFixed(1)}%
+            {formatarInadimplencia(
+              overviewStats.inadGeral.pct,
+              overviewStats.inadGeral.venceu,
+            )}
           </p>
+          {overviewStats.inadGeral.venceu <= 0 && (
+            <p className="text-[10px] text-gray-400 dark:text-dark-text-secondary mb-3">
+              Nada venceu há mais de {INADIMPLENCIA_CORTE_DIAS} dias neste
+              recorte: por enquanto é só atraso.
+            </p>
+          )}
           <div className="pt-3 border-t border-gray-100 dark:border-dark-border space-y-1 text-[11px] font-medium">
             <div className="flex justify-between gap-2">
               <span className="text-gray-500 dark:text-dark-text-secondary">
@@ -744,7 +780,7 @@ const EnhancedStoreManagement: React.FC = () => {
                       className={`text-xs font-bold shrink-0 ${statusTextColor}`}
                       title="Inadimplência: do que já venceu, não foi pago"
                     >
-                      {store.inadimplencia.toFixed(1)}%
+                      {formatarInadimplencia(store.inadimplencia, store.dueAmount)}
                     </span>
                   </div>
                   <p className="flex items-center gap-1 mt-0.5 text-[11px] text-gray-400 dark:text-dark-text-secondary truncate">
@@ -811,7 +847,7 @@ const EnhancedStoreManagement: React.FC = () => {
                     className={`inline-flex items-center px-2.5 py-1 rounded-xl text-xs font-bold ${statusTextColor} ${statusBgLight} border ${statusBorderColor} shrink-0`}
                     title="Inadimplência: do que já venceu, não foi pago"
                   >
-                    {store.inadimplencia.toFixed(1)}%
+                    {formatarInadimplencia(store.inadimplencia, store.dueAmount)}
                   </div>
                 </div>
 
@@ -913,7 +949,7 @@ const EnhancedStoreManagement: React.FC = () => {
                         <span
                           className={`text-xs font-bold ${statusTextColor}`}
                         >
-                          {store.inadimplencia.toFixed(0)}%
+                          {formatarInadimplencia(store.inadimplencia, store.dueAmount, 0)}
                         </span>
                       </div>
                       <div className="w-full bg-gray-100 dark:bg-dark-bg rounded-full h-1.5">
@@ -1329,7 +1365,7 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
                 className="text-base sm:text-xl font-extrabold whitespace-nowrap text-blue-950 dark:text-blue-200"
                 title={`${formatCurrency(store.inadNaoPago)} não pago de ${formatCurrency(store.dueAmount)} (atraso > ${INADIMPLENCIA_CORTE_DIAS} dias)`}
               >
-                {store.inadimplencia.toFixed(1)}%
+                {formatarInadimplencia(store.inadimplencia, store.dueAmount)}
               </p>
               <p className="text-[10px] sm:text-xs text-blue-650/70 dark:text-blue-400/70 mt-1 truncate">
                 Do que venceu, não pago

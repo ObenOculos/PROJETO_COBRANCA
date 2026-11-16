@@ -78,14 +78,31 @@ export const inadimplenciaDe = (
   };
 };
 
+/** Recorte de periodo da inadimplencia na tela: janela padrao, historico
+ * todo, ou o filtro de vencimento do usuario (que prevalece). */
+export type RecorteInadimplencia = "janela" | "tudo" | "filtro";
+
+export const janelaDoRecorte = (r: RecorteInadimplencia): number | null =>
+  r === "janela" ? INADIMPLENCIA_JANELA_DIAS : null;
+
 /** Texto do recorte usado, para mostrar junto do numero. */
 export const descricaoRecorteInadimplencia = (
-  janelaDias: number | null,
+  r: RecorteInadimplencia,
   corteDias = INADIMPLENCIA_CORTE_DIAS,
 ): string =>
-  janelaDias == null
+  r === "filtro"
     ? `atraso > ${corteDias} dias · vencimentos do filtro`
-    : `atraso > ${corteDias} dias · vencimentos dos últimos ${Math.round(janelaDias / 30.4)} meses`;
+    : r === "tudo"
+      ? `atraso > ${corteDias} dias · todo o histórico`
+      : `atraso > ${corteDias} dias · vencimentos dos últimos ${Math.round(INADIMPLENCIA_JANELA_DIAS / 30.4)} meses`;
+
+/** Percentual para exibir: "—" quando nada venceu alem do corte no recorte
+ * (ex.: periodo recente, so com atraso de ate 30 dias) -- 0% enganaria. */
+export const formatarInadimplencia = (
+  pct: number,
+  venceu: number,
+  casas = 1,
+): string => (venceu > 0 ? `${pct.toFixed(casas)}%` : "—");
 
 /** Faixas de cor da tela. Ajustar aqui se o gestor quiser outro corte. */
 export const FAIXA_INADIMPLENCIA = { baixa: 10, media: 25 } as const;
