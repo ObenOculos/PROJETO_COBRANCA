@@ -180,6 +180,11 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     const [distributionAmount, setDistributionAmount] = useState<string>("");
     const [paymentMethod, setPaymentMethod] = useState("dinheiro");
     const [withDiscount, setWithDiscount] = useState(false);
+    // Desconto so nas parcelas MARCADAS (a diferenca do pagamento parcial
+    // vira desconto e elas ficam quitadas); as demais seguem em aberto.
+    // "Quitar tudo com desconto" (withDiscount) segue para a divida inteira.
+    const [descontoNasMarcadasEscolhido, setDescontoNasMarcadas] =
+      useState(false);
     // Proxima visita do cobrador externo quando sobra vencido (etapa 3).
     const [rescheduleDate, setRescheduleDate] = useState("");
     const [rescheduleTime, setRescheduleTime] = useState("");
@@ -558,14 +563,47 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     const jurosValor = modoParcelas ? jurosInformado : 0;
     // Principal = o que abate parcelas.
     const principal = modoParcelas ? alocacao.principal : amountToDistribute;
+
+    // Desconto nas parcelas marcadas: pagamento parcial (sem juros informado)
+    // de quem pode dar desconto (item 69: gestor e externo). Ex.: marcou
+    // R$ 230 em 2 parcelas, recebeu R$ 224 -> R$ 6 de desconto na ultima
+    // marcada e as 2 ficam quitadas. Pedido do usuario, 2026-11-16.
+    const podeDescontoNasMarcadas =
+      modoParcelas &&
+      podeDarDescontoNaQuitacao(user?.type) &&
+      alocacao.situacao === "parcial" &&
+      jurosInformado <= 0 &&
+      alocacao.principal > 0;
+    const descontoMarcadas =
+      descontoNasMarcadasEscolhido && podeDescontoNasMarcadas
+        ? round2(alocacao.somaParcelas - alocacao.principal)
+        : 0;
+    /** Itens da alocacao com o desconto de cada parcela marcada (0 sem
+     * desconto). Fonte unica para distribuicao, resumo e conferencia. */
+    const itensPagamento = useMemo(
+      () =>
+        alocacao.itens.map((p) => {
+          const descontoParcela =
+            descontoMarcadas > 0 ? round2(p.saldo - p.aplicado) : 0;
+          return {
+            ...p,
+            desconto: descontoParcela,
+            quita: p.quita || descontoMarcadas > 0,
+          };
+        }),
+      [alocacao, descontoMarcadas],
+    );
+
     const qtdAVencerPagas = modoParcelas
-      ? alocacao.itens.filter((p) => !p.vencida && p.aplicado > 0).length
+      ? itensPagamento.filter(
+          (p) => !p.vencida && (p.aplicado > 0 || p.desconto > 0),
+        ).length
       : 0;
     const quitaTudo =
       modoParcelas &&
       alocacao.situacao !== "vazio" &&
       principal > 0 &&
-      principal >= totalPending - 0.01;
+      principal + descontoMarcadas >= totalPending - 0.01;
 
     // Valor acima: com parcela vencida marcada, pergunta (juros acordados ×
     // erro de digitacao) e nao deixa seguir sem resposta; so com parcelas a
@@ -580,7 +618,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       if (withDiscount) return 0; // quitacao total
       if (acordoAtivo) return vencidoTotal; // pagamento aqui nao abate o acordo
       const aplicadoPor = new Map(
-        alocacao.itens.map((p) => [p.idParcela, p.aplicado]),
+        itensPagamento.map((p) => [p.idParcela, p.aplicado + p.desconto]),
       );
       return round2(
         parcelasAbertas
@@ -590,13 +628,13 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
             0,
           ),
       );
-    }, [withDiscount, acordoAtivo, vencidoTotal, alocacao, parcelasAbertas]);
+    }, [withDiscount, acordoAtivo, vencidoTotal, itensPagamento, parcelasAbertas]);
     const precisaAcompanhamento = vencidoRestante > 0.01;
 
     // Conferencia (etapa 3): o que cada parcela recebe. So no modo parcelas
     // -- nos outros casos a distribuicao e por venda (saleDistribution).
     const abatimentoPorParcela = modoParcelas
-      ? alocacao.itens.filter((p) => p.aplicado > 0)
+      ? itensPagamento.filter((p) => p.aplicado > 0 || p.desconto > 0)
       : null;
 
     // Item 67: multa/juros do Ciclone que ficaram de fora (todos ou parte),
@@ -619,8 +657,11 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     // Observacao obrigatoria quando ha algo a justificar: desconto,
     // juros/multa (regra do item 58) ou multa/juros do Ciclone nao cobrados.
     const observacaoObrigatoria =
-      withDiscount || jurosValor > 0 || encargoNaoCobrado > 0.009;
-    const motivoObservacao = withDiscount
+      withDiscount ||
+      descontoMarcadas > 0 ||
+      jurosValor > 0 ||
+      encargoNaoCobrado > 0.009;
+    const motivoObservacao = withDiscount || descontoMarcadas > 0
       ? "o desconto"
       : encargoNaoCobrado > 0.009
         ? `por que ${formatCurrency(encargoNaoCobrado)} de multa e juros não foram cobrados (combinado com o gestor?)`
@@ -642,18 +683,23 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       // venda. Antes ia pela venda de MENOR saldo, o que podia mandar o
       // dinheiro para parcela a vencer com outra venda em atraso.
       if (modoParcelas) {
+        // Desconto nas marcadas vai por venda junto do pagamento: o
+        // process_payment aplica desconto e pagamento as parcelas abertas da
+        // venda em ordem de vencimento, e a soma por venda = as marcadas dela
+        // (as marcadas sao sempre as mais antigas do cliente).
         const porVenda = new Map<
           number,
-          { sale: SaleGroup; aplicado: number }
+          { sale: SaleGroup; aplicado: number; desconto: number }
         >();
-        alocacao.itens.forEach((p) => {
-          const aplicado = p.aplicado;
-          if (aplicado <= 0) return;
+        itensPagamento.forEach((p) => {
+          if (p.aplicado <= 0 && p.desconto <= 0) return;
           const atual = porVenda.get(p.sale.saleNumber) ?? {
             sale: p.sale,
             aplicado: 0,
+            desconto: 0,
           };
-          atual.aplicado = round2(atual.aplicado + aplicado);
+          atual.aplicado = round2(atual.aplicado + p.aplicado);
+          atual.desconto = round2(atual.desconto + p.desconto);
           porVenda.set(p.sale.saleNumber, atual);
         });
         const saldoDaVenda = (saleNumber: number) =>
@@ -663,14 +709,15 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
               .reduce((s, p) => s + p.saldo, 0),
           );
         return Array.from(porVenda.values())
-          .filter((v) => v.aplicado > 0)
-          .map(({ sale, aplicado }) => ({
+          .filter((v) => v.aplicado > 0 || v.desconto > 0)
+          .map(({ sale, aplicado, desconto: descontoVenda }) => ({
             sale,
             currentReceived: sale.totalReceived || 0,
             appliedAmount: aplicado,
-            appliedDiscount: 0,
+            appliedDiscount: descontoVenda,
             newAmount: (sale.totalReceived || 0) + aplicado,
-            willBeComplete: saldoDaVenda(sale.saleNumber) - aplicado <= 0.01,
+            willBeComplete:
+              saldoDaVenda(sale.saleNumber) - aplicado - descontoVenda <= 0.01,
           }));
       }
 
@@ -715,7 +762,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       withDiscount,
       totalPending,
       modoParcelas,
-      alocacao,
+      itensPagamento,
       parcelasAbertas,
     ]);
 
@@ -891,14 +938,19 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         );
       } else if (modoParcelas) {
         // Mesma alocacao da distribuicao (vencimento mais antigo primeiro).
-        alocacao.itens.forEach((p) => {
-          if (p.aplicado <= 0) return;
+        itensPagamento.forEach((p) => {
+          if (p.aplicado <= 0 && p.desconto <= 0) return;
           partes.push(
-            p.aplicado >= p.saldo - 0.01
+            p.aplicado + p.desconto >= p.saldo - 0.01
               ? `parcela de ${dataBR(p.vencimento)} quitada`
               : `${formatCurrency(p.aplicado)} abatidos da parcela de ${dataBR(p.vencimento)}`,
           );
         });
+        if (descontoMarcadas > 0) {
+          partes.push(
+            `desconto de ${formatCurrency(descontoMarcadas)} nas parcelas pagas`,
+          );
+        }
       }
       if (jurosValor > 0) {
         partes.push(`${formatCurrency(jurosValor)} de juros/multa`);
@@ -1145,7 +1197,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     const dataTexto = (iso: string) => iso.split("-").reverse().join("/");
     const desconto = withDiscount
       ? round2(Math.max(0, totalPending - amountToDistribute))
-      : 0;
+      : descontoMarcadas;
 
     // O "Confirmar" so libera depois de marcar "Conferi os valores", em todo
     // pagamento -- evita clique acidental (decisao do usuario, 2026-11-16).
@@ -1835,8 +1887,25 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                     )}
 
                     {modoParcelas && alocacao.situacao === "parcial" && (
-                      <Aviso tom="info" titulo="Pagamento parcial">
-                        {(() => {
+                      <Aviso
+                        tom={descontoMarcadas > 0 ? "atencao" : "info"}
+                        titulo={
+                          descontoMarcadas > 0
+                            ? "Quita as parcelas marcadas com desconto"
+                            : "Pagamento parcial"
+                        }
+                      >
+                        {descontoMarcadas > 0 ? (
+                          <p>
+                            {itensPagamento.length}{" "}
+                            {itensPagamento.length === 1
+                              ? "parcela fica quitada"
+                              : "parcelas ficam quitadas"}
+                            : {formatCurrency(alocacao.principal)} recebidos +{" "}
+                            {formatCurrency(descontoMarcadas)} de desconto. As
+                            outras parcelas continuam em aberto.
+                          </p>
+                        ) : (() => {
                           const quitadas = alocacao.itens.filter(
                             (p) => p.quita,
                           ).length;
@@ -1857,6 +1926,33 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                           const t = partes.join(" e ") || "nada é quitado";
                           return t.charAt(0).toUpperCase() + t.slice(1) + ".";
                         })()}
+                        {/* Desconto so nas marcadas (gestor/externo, item 69).
+                            Interno/terceirizado/juridico: aviso abaixo diz
+                            a quem pedir. */}
+                        {podeDescontoNasMarcadas && (
+                          <label className="mt-2 flex items-start gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={descontoNasMarcadasEscolhido}
+                              onChange={(e) => {
+                                setDescontoNasMarcadas(e.target.checked);
+                                setErroEtapa(null);
+                              }}
+                              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <span>
+                              Dar{" "}
+                              <strong>
+                                {formatCurrency(
+                                  round2(
+                                    alocacao.somaParcelas - alocacao.principal,
+                                  ),
+                                )}
+                              </strong>{" "}
+                              de desconto e quitar as parcelas marcadas
+                            </span>
+                          </label>
+                        )}
                         {/* Juros informados saem do valor recebido: explica a
                         diferenca e oferece o valor com os juros por cima
                         (confusao vista com o usuario, 2026-11-16). */}
@@ -2118,6 +2214,11 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                                 <span className="block font-medium tabular-nums">
                                   {formatCurrency(p.aplicado)}
                                 </span>
+                                {p.desconto > 0.009 && (
+                                  <span className="block text-xs text-indigo-700 tabular-nums">
+                                    + desconto {formatCurrency(p.desconto)}
+                                  </span>
+                                )}
                                 <span
                                   className={`block text-xs ${
                                     p.quita
