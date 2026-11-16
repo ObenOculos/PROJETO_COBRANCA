@@ -31,7 +31,7 @@ import {
   hasInstallmentBalance,
   round2,
 } from "../../filters/clientStatus";
-import { encargoParcela } from "../../filters/encargos";
+import { encargoParcela, isTituloCiclone } from "../../filters/encargos";
 
 const FORMA_PAGAMENTO_LABEL: Record<string, string> = {
   dinheiro: "Dinheiro",
@@ -314,9 +314,28 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
           vendasDaLista.findIndex((v) => v.saleNumber === saleNumber),
         ) % CORES_VENDA.length
       ];
-    const nomeVenda = (saleNumber: number) =>
-      saleNumber === 0 ? "Renegociada" : `Venda #${saleNumber}`;
-    /** "Venda #X · Parcela N" -- com varias vendas, a venda vira etiqueta colorida. */
+    // Item 68: mesmo nome da Ficha -- "Titulo N" no Ciclone (busca por
+    // titulo + parcela), "Venda N" na SSOtica; "Parcela X de N".
+    const infoVenda = useMemo(() => {
+      const mapa = new Map<number, { ciclone: boolean; total: number }>();
+      (clientSales || []).forEach((sale) =>
+        mapa.set(sale.saleNumber, {
+          ciclone: sale.installments.some((i) => isTituloCiclone(i)),
+          total: Math.max(0, ...sale.installments.map((i) => i.parcela ?? 0)),
+        }),
+      );
+      return mapa;
+    }, [clientSales]);
+    const nomeVenda = (saleNumber: number) => {
+      const ciclone = infoVenda.get(saleNumber)?.ciclone;
+      if (saleNumber === 0) return ciclone ? "Outro título" : "Renegociada";
+      return `${ciclone ? "Título" : "Venda"} ${saleNumber}`;
+    };
+    const parcelaDeN = (saleNumber: number, numero: number) => {
+      const total = saleNumber === 0 ? 0 : (infoVenda.get(saleNumber)?.total ?? 0);
+      return `Parcela ${numero}${total >= numero ? ` de ${total}` : ""}`;
+    };
+    /** "Titulo X · Parcela N de M" -- com varias vendas, a venda vira etiqueta colorida. */
     const rotuloParcela = (saleNumber: number, numero: number | null) =>
       variasVendas ? (
         <span className="flex flex-wrap items-center gap-1.5">
@@ -325,12 +344,12 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
           >
             {nomeVenda(saleNumber)}
           </span>
-          {numero != null && <span>Parcela {numero}</span>}
+          {numero != null && <span>{parcelaDeN(saleNumber, numero)}</span>}
         </span>
       ) : (
         <>
           {nomeVenda(saleNumber)}
-          {numero != null && ` · Parcela ${numero}`}
+          {numero != null && ` · ${parcelaDeN(saleNumber, numero)}`}
         </>
       );
     const qtdMarcadas = Math.min(
@@ -345,21 +364,21 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         .slice(0, qtdMarcadas)
         .reduce((soma, p) => soma + p.encargo, 0),
     );
-    const usarEncargoCiclone = () => {
-      // Valor ainda so com as parcelas (ex.: clicou "Todo o vencido" antes)
-      // ou vazio: soma o encargo ao valor recebido. Sem isso os juros sairiam
-      // de dentro do valor e a ultima parcela nao quitaria.
-      const soParcelas = round2(alocacao.somaParcelas + jurosInformado);
-      if (
-        amountToDistribute <= 0 ||
-        Math.abs(amountToDistribute - soParcelas) <= 0.01
-      ) {
-        setDistributionAmount(
-          valorParaCampo(round2(alocacao.somaParcelas + encargoMarcadas)),
-        );
-      }
+    /** "Recebi com multa e juros": valor = parcelas + encargo e o encargo vai
+     * para o campo de juros (um clique do cobrador -- nada presumido). */
+    const receberComEncargo = () => {
+      setDistributionAmount(
+        valorParaCampo(round2(alocacao.somaParcelas + encargoMarcadas)),
+      );
       setMostrarJuros(true);
-      setJurosTexto(encargoMarcadas.toFixed(2).replace(".", ","));
+      setJurosTexto(valorParaCampo(encargoMarcadas));
+      setErroEtapa(null);
+    };
+    /** "Recebi so o valor das parcelas" (juro perdoado/negociado a parte). */
+    const receberSemEncargo = () => {
+      setDistributionAmount(valorParaCampo(alocacao.somaParcelas));
+      setMostrarJuros(false);
+      setJurosTexto("");
       setErroEtapa(null);
     };
     // Sem nada vencido, a lista a vencer ja aparece aberta.
@@ -450,6 +469,13 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       };
     }, [parcelasAbertas, qtdMarcadas, amountToDistribute, jurosInformado]);
 
+    // Item 67: o valor "a mais" e exatamente a multa + juros do Ciclone das
+    // parcelas marcadas -- o aviso reconhece em vez de perguntar.
+    const aMaisEhEncargo =
+      modoParcelas &&
+      encargoMarcadas > 0.009 &&
+      alocacao.situacao === "acima" &&
+      Math.abs(alocacao.aMais - encargoMarcadas) <= 0.01;
     const jurosValor = modoParcelas ? jurosInformado : 0;
     // Principal = o que abate parcelas.
     const principal = modoParcelas ? alocacao.principal : amountToDistribute;
@@ -1286,7 +1312,58 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                             )}
                         </ul>
                       )}
-                      {qtdMarcadas > 0 && (
+                      {qtdMarcadas > 0 &&
+                        modoParcelas &&
+                        encargoMarcadas > 0.009 &&
+                        jurosInformado <= 0 && (
+                          <div className="mt-2 space-y-2 text-sm">
+                            <div className="text-gray-600 dark:text-dark-text-secondary">
+                              A cobrar hoje{" "}
+                              <strong className="text-gray-900 dark:text-dark-text tabular-nums">
+                                {formatCurrency(
+                                  round2(
+                                    alocacao.somaParcelas + encargoMarcadas,
+                                  ),
+                                )}
+                              </strong>
+                              <span
+                                className="block text-xs text-amber-700 dark:text-amber-400"
+                                title="Multa e juros de atraso calculados pela regra do Ciclone (Prev. Baixa), até hoje"
+                              >
+                                {formatCurrency(alocacao.somaParcelas)} +{" "}
+                                {formatCurrency(encargoMarcadas)} multa/juros
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={receberComEncargo}
+                                className="px-3 py-1.5 text-xs font-medium rounded-full border border-indigo-300 bg-indigo-600 text-white hover:bg-indigo-700"
+                              >
+                                Recebi{" "}
+                                {formatCurrency(
+                                  round2(
+                                    alocacao.somaParcelas + encargoMarcadas,
+                                  ),
+                                )}{" "}
+                                com multa e juros
+                              </button>
+                              <button
+                                type="button"
+                                onClick={receberSemEncargo}
+                                className="px-3 py-1.5 text-xs font-medium rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                              >
+                                Recebi só {formatCurrency(alocacao.somaParcelas)}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      {qtdMarcadas > 0 &&
+                        !(
+                          modoParcelas &&
+                          encargoMarcadas > 0.009 &&
+                          jurosInformado <= 0
+                        ) && (
                         <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm">
                           <span className="text-gray-600 dark:text-dark-text-secondary">
                             A cobrar{" "}
@@ -1372,42 +1449,6 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                         </div>
                       )}
                     </div>
-
-                    {/* Item 67: parcela marcada do Ciclone com multa/juros --
-                    avisa o total de hoje para o cobrador nao receber so o
-                    vencido. */}
-                    {modoParcelas && encargoMarcadas > 0.009 && (
-                      <div className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200">
-                        <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                        <div className="space-y-1">
-                          <div>
-                            <strong>
-                              As parcelas marcadas têm{" "}
-                              {formatCurrency(encargoMarcadas)} de multa e juros
-                              até hoje
-                            </strong>{" "}
-                            (regra do Ciclone). Com eles, o cliente paga{" "}
-                            <strong>
-                              {formatCurrency(
-                                round2(alocacao.somaParcelas + encargoMarcadas),
-                              )}
-                            </strong>
-                            .
-                          </div>
-                          {round2(parseValor(jurosTexto)) !==
-                            encargoMarcadas && (
-                            <button
-                              type="button"
-                              onClick={usarEncargoCiclone}
-                              className="text-xs font-semibold text-amber-900 underline hover:text-amber-700 dark:text-amber-200"
-                            >
-                              Usar multa e juros do Ciclone (
-                              {formatCurrency(encargoMarcadas)})
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    )}
 
                     {/* Juros/multa: so informados pelo cobrador (acordados com o
                     cliente). Fechado por padrao. */}
@@ -1502,14 +1543,28 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                     {avisoAcima && (
                       <Aviso
                         tom="atencao"
-                        titulo={`Valor ${formatCurrency(alocacao.aMais)} acima do esperado`}
+                        titulo={
+                          aMaisEhEncargo
+                            ? `${formatCurrency(alocacao.aMais)} = multa e juros do Ciclone`
+                            : `Valor ${formatCurrency(alocacao.aMais)} acima do esperado`
+                        }
                       >
-                        <p>
-                          As parcelas marcadas somam{" "}
-                          {formatCurrency(alocacao.esperado)} e você digitou{" "}
-                          <strong>{formatCurrency(amountToDistribute)}</strong>.
-                          O que são esses {formatCurrency(alocacao.aMais)}?
-                        </p>
+                        {aMaisEhEncargo ? (
+                          <p>
+                            Você digitou{" "}
+                            <strong>{formatCurrency(amountToDistribute)}</strong>:
+                            parcelas {formatCurrency(alocacao.esperado)} + multa e
+                            juros de atraso até hoje{" "}
+                            {formatCurrency(alocacao.aMais)}.
+                          </p>
+                        ) : (
+                          <p>
+                            As parcelas marcadas somam{" "}
+                            {formatCurrency(alocacao.esperado)} e você digitou{" "}
+                            <strong>{formatCurrency(amountToDistribute)}</strong>.
+                            O que são esses {formatCurrency(alocacao.aMais)}?
+                          </p>
+                        )}
                         <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                           <button
                             type="button"
@@ -1525,10 +1580,14 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                             className="rounded-xl border-2 border-amber-300 bg-white dark:bg-dark-bg px-3 py-2 text-left hover:border-amber-500"
                           >
                             <span className="block font-semibold">
-                              Juros/multa acordados
+                              {aMaisEhEncargo
+                                ? "Confirmar multa e juros"
+                                : "Juros/multa acordados"}
                             </span>
                             <span className="block text-xs">
-                              Combinado com o cliente; não abate parcela.
+                              {aMaisEhEncargo
+                                ? "Regra do Ciclone; não abate parcela."
+                                : "Combinado com o cliente; não abate parcela."}
                             </span>
                           </button>
                           <button
