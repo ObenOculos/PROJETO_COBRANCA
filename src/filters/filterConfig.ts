@@ -8,7 +8,7 @@ export type FilterContext =
   | "collectionsCollector" // Cobranca (cobrador)
   | "assignment" // Atribuicao de cobradores
   | "performance" // Ranking de Performance (agregada + periodo)
-  | "stores"; // Acompanhamento de Lojas (agregada + cobrador)
+  | "stores"; // Desempenho Loja (agregada por loja)
 
 /** Estado unificado dos filtros. Cada contexto usa um subconjunto. */
 export interface FilterValues {
@@ -111,8 +111,9 @@ export const FILTER_FIELDS: Record<FilterContext, FilterFieldFlags> = {
   // Lojas: igual + cobrador (a dimensao da tela e a loja).
   stores: {
     // Status de pagamento fica nas pills (multi-select), nao no dropdown.
-    city: true,
-    collector: true,
+    // Reuniao 16/11 (itens 27/29/30): filtro por loja; sem cidade e sem
+    // cobrador (a dimensao da tela e a loja, nao o cobrador).
+    store: true,
     dueRange: true,
     launchRange: true,
     amount: true,
