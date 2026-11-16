@@ -13,6 +13,7 @@ import {
   PhoneCall,
   Handshake,
   MoreHorizontal,
+  Store,
 } from "lucide-react";
 import {
   ClientGroup,
@@ -40,6 +41,7 @@ import { useAuth } from "../../contexts/AuthContext";
 
 import GeneralPaymentModal from "./GeneralPaymentModal";
 import CorrigirPagamentoModal from "./CorrigirPagamentoModal";
+import AtribuirPagamentoModal from "./AtribuirPagamentoModal";
 import LogContactModal from "./LogContactModal";
 import AcordoModal from "./AcordoModal";
 import AcordoDetailModal from "./AcordoDetailModal";
@@ -276,6 +278,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     acordoAtivoOverdueMap,
   );
   const [menuMaisAberto, setMenuMaisAberto] = useState(false);
+  // Item 66: cliente pagou na loja depois da cobranca -> pedido ao gestor.
+  const [isAtribuirOpen, setIsAtribuirOpen] = useState(false);
   // Loja(s) do cliente (a primeira e a da parcela em aberto mais antiga).
   const lojasCliente = clientStoresForDisplay({ sales: clientSales });
 
@@ -664,6 +668,20 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                 ? "Corrigir pagamento"
                                 : "Pedir correção de pagamento"}
                             </button>
+                            {!souGestor && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMenuMaisAberto(false);
+                                  setIsAtribuirOpen(true);
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left"
+                                title="O cliente pagou na loja ou no banco depois que você cobrou: peça ao gestor para contar no seu desempenho"
+                              >
+                                <Store className="h-4 w-4 text-gray-500" />
+                                Cliente pagou na loja
+                              </button>
+                            )}
                           </div>
                         </>
                       )}
@@ -1365,6 +1383,14 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           nomePorId={nomePorUsuario}
           onClose={() => setIsGeneralEditModalOpen(false)}
           onSuccess={handleGeneralEditSuccess}
+        />
+      )}
+
+      {/* Item 66: cliente pagou na loja depois da cobranca (cobrador) */}
+      {isAtribuirOpen && (
+        <AtribuirPagamentoModal
+          clientGroup={clientGroup}
+          onClose={() => setIsAtribuirOpen(false)}
         />
       )}
 

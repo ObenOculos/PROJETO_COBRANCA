@@ -1076,6 +1076,70 @@ export type Database = {
         };
         Relationships: [];
       };
+      // Migration 20261116000003 (item 66).
+      atribuicoes_pagamento: {
+        Row: {
+          cliente: string | null;
+          created_at: string;
+          data_pagamento: string;
+          decidido_em: string | null;
+          decidido_por_id: string | null;
+          decisao: string | null;
+          documento: string;
+          id: string;
+          id_parcela: number;
+          lote: string;
+          observacao: string;
+          parcela: number | null;
+          resposta: string | null;
+          solicitado_por_id: string;
+          ultimo_contato_em: string;
+          valor: number;
+          valor_aprovado: number | null;
+          venda: number | null;
+        };
+        Insert: {
+          cliente?: string | null;
+          created_at?: string;
+          data_pagamento: string;
+          decidido_em?: string | null;
+          decidido_por_id?: string | null;
+          decisao?: string | null;
+          documento: string;
+          id?: string;
+          id_parcela: number;
+          lote: string;
+          observacao: string;
+          parcela?: number | null;
+          resposta?: string | null;
+          solicitado_por_id: string;
+          ultimo_contato_em: string;
+          valor: number;
+          valor_aprovado?: number | null;
+          venda?: number | null;
+        };
+        Update: {
+          cliente?: string | null;
+          created_at?: string;
+          data_pagamento?: string;
+          decidido_em?: string | null;
+          decidido_por_id?: string | null;
+          decisao?: string | null;
+          documento?: string;
+          id?: string;
+          id_parcela?: number;
+          lote?: string;
+          observacao?: string;
+          parcela?: number | null;
+          resposta?: string | null;
+          solicitado_por_id?: string;
+          ultimo_contato_em?: string;
+          valor?: number;
+          valor_aprovado?: number | null;
+          venda?: number | null;
+        };
+        Relationships: [];
+      };
       pedidos_correcao_pagamento: {
         Row: {
           cliente: string | null;
@@ -2293,6 +2357,31 @@ export type Database = {
           isOneToOne: false;
           isSetofReturn: true;
         };
+      };
+      // Migration 20261116000003 (item 66).
+      parcelas_para_atribuicao: {
+        Args: { p_documento: string };
+        Returns: {
+          id_parcela: number;
+          venda: number | null;
+          parcela: number | null;
+          data_vencimento: string | null;
+          valor: number;
+          data_pagamento: string;
+          loja: string | null;
+          ultimo_contato_em: string | null;
+          pedido_decisao: string | null;
+          pedido_meu: boolean | null;
+          bloqueio: string | null;
+        }[];
+      };
+      pedir_atribuicao_pagamento: {
+        Args: { p_documento: string; p_parcelas: number[]; p_observacao: string };
+        Returns: string;
+      };
+      decidir_atribuicao_pagamento: {
+        Args: { p_lote: string; p_aprovar: boolean; p_resposta?: string };
+        Returns: Json;
       };
       decidir_pedido_correcao: {
         Args: {
