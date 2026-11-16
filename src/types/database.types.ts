@@ -1140,6 +1140,66 @@ export type Database = {
         };
         Relationships: [];
       };
+      pedidos_desconto: {
+        Row: {
+          cliente: string | null;
+          created_at: string;
+          decidido_em: string | null;
+          decidido_por_id: string | null;
+          decisao: string | null;
+          desconto_aprovado: number | null;
+          desconto_pedido: number;
+          documento: string;
+          id: string;
+          motivo: string;
+          parcelas: number[];
+          resposta: string | null;
+          solicitado_por_id: string;
+          tipo: string;
+          valido_ate: string | null;
+          valor_devido: number;
+          valor_pago: number;
+        };
+        Insert: {
+          cliente?: string | null;
+          created_at?: string;
+          decidido_em?: string | null;
+          decidido_por_id?: string | null;
+          decisao?: string | null;
+          desconto_aprovado?: number | null;
+          desconto_pedido: number;
+          documento: string;
+          id?: string;
+          motivo: string;
+          parcelas?: number[];
+          resposta?: string | null;
+          solicitado_por_id: string;
+          tipo: string;
+          valido_ate?: string | null;
+          valor_devido: number;
+          valor_pago: number;
+        };
+        Update: {
+          cliente?: string | null;
+          created_at?: string;
+          decidido_em?: string | null;
+          decidido_por_id?: string | null;
+          decisao?: string | null;
+          desconto_aprovado?: number | null;
+          desconto_pedido?: number;
+          documento?: string;
+          id?: string;
+          motivo?: string;
+          parcelas?: number[];
+          resposta?: string | null;
+          solicitado_por_id?: string;
+          tipo?: string;
+          valido_ate?: string | null;
+          valor_devido?: number;
+          valor_pago?: number;
+        };
+        Relationships: [];
+      };
       pedidos_correcao_pagamento: {
         Row: {
           cliente: string | null;
@@ -1444,6 +1504,7 @@ export type Database = {
           notes: string | null;
           payment_amount: number;
           payment_date: string;
+          pedido_desconto_id: string | null;
           payment_method: string | null;
           registrado_por_id: string | null;
           sale_number: number | null;
@@ -1466,6 +1527,7 @@ export type Database = {
           notes?: string | null;
           payment_amount: number;
           payment_date?: string;
+          pedido_desconto_id?: string | null;
           payment_method?: string | null;
           registrado_por_id?: string | null;
           sale_number?: number | null;
@@ -1488,6 +1550,7 @@ export type Database = {
           notes?: string | null;
           payment_amount?: number;
           payment_date?: string;
+          pedido_desconto_id?: string | null;
           payment_method?: string | null;
           registrado_por_id?: string | null;
           sale_number?: number | null;
@@ -2403,6 +2466,46 @@ export type Database = {
       decidir_atribuicao_pagamento: {
         Args: { p_lote: string; p_aprovar: boolean; p_resposta?: string };
         Returns: Json;
+      };
+      pedir_desconto: {
+        Args: {
+          p_documento: string;
+          p_tipo: string;
+          p_parcelas: number[];
+          p_valor_pago: number;
+          p_motivo: string;
+        };
+        Returns: string;
+      };
+      decidir_pedido_desconto: {
+        Args: {
+          p_id: string;
+          p_aprovar: boolean;
+          p_desconto_aprovado?: number;
+          p_resposta?: string;
+        };
+        Returns: Json;
+      };
+      pedidos_desconto_do_cliente: {
+        Args: { p_documento: string };
+        Returns: {
+          id: string;
+          tipo: string;
+          parcelas: number[];
+          valor_devido: number;
+          valor_pago: number;
+          desconto_pedido: number;
+          motivo: string;
+          solicitado_por_id: string;
+          created_at: string;
+          decisao: string | null;
+          desconto_aprovado: number | null;
+          valido_ate: string | null;
+          resposta: string | null;
+          decidido_por_id: string | null;
+          decidido_em: string | null;
+          desconto_usado: number;
+        }[];
       };
       decidir_pedido_correcao: {
         Args: {

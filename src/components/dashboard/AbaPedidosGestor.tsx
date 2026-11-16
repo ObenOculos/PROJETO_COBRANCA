@@ -1,16 +1,18 @@
 import React, { useState } from "react";
 import PedidosCorrecao from "./PedidosCorrecao";
 import PedidosAtribuicao from "./PedidosAtribuicao";
+import PedidosDesconto from "./PedidosDesconto";
 
 // Aba "Correções" do gestor: pedidos de correção de pagamento (item 62) e
-// pagos na loja depois da cobrança (item 66). Cada um carrega só quando
-// aparece.
+// pagos na loja depois da cobrança (item 66) e pedidos de desconto (item 71).
+// Cada um carrega só quando aparece.
 
-type Visao = "correcoes" | "loja";
+type Visao = "correcoes" | "loja" | "descontos";
 
 const VISOES: { key: Visao; label: string }[] = [
   { key: "correcoes", label: "Correções de pagamento" },
   { key: "loja", label: "Pagos na loja" },
+  { key: "descontos", label: "Descontos" },
 ];
 
 const AbaPedidosGestor: React.FC = () => {
@@ -38,7 +40,13 @@ const AbaPedidosGestor: React.FC = () => {
           </button>
         ))}
       </div>
-      {visao === "correcoes" ? <PedidosCorrecao /> : <PedidosAtribuicao />}
+      {visao === "correcoes" ? (
+        <PedidosCorrecao />
+      ) : visao === "loja" ? (
+        <PedidosAtribuicao />
+      ) : (
+        <PedidosDesconto />
+      )}
     </div>
   );
 };

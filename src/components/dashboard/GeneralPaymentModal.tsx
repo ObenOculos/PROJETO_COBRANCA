@@ -36,6 +36,13 @@ import {
   round2,
 } from "../../filters/clientStatus";
 import { encargoParcela, isTituloCiclone } from "../../filters/encargos";
+import {
+  autorizacaoVigente,
+  listarPedidosDescontoDoCliente,
+  pedirDesconto,
+  PedidoDesconto,
+  TipoPedidoDesconto,
+} from "../../services/pedidosDesconto";
 
 /** A partir deste valor recebido o "Confirmar" pede "Conferi os valores". */
 const VALOR_ALTO_CONFERENCIA = 2000;
@@ -175,6 +182,48 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       : undefined;
     const { user } = useAuth();
     const { isOnline } = useOffline();
+
+    // Item 71, etapa 2: quem nao da desconto direto (interno/terceirizado/
+    // juridico) pede ao gestor; aprovado, o desconto libera ate o valor
+    // autorizado (o process_payment confere de novo).
+    const descontoDireto = podeDarDescontoNaQuitacao(user?.type);
+    const [pedidosDesconto, setPedidosDesconto] = useState<PedidoDesconto[]>(
+      [],
+    );
+    const [versaoPedidos, setVersaoPedidos] = useState(0);
+    useEffect(() => {
+      if (descontoDireto || !clientGroup.document || !isOnline) return;
+      let cancelado = false;
+      listarPedidosDescontoDoCliente(clientGroup.document)
+        .then((p) => {
+          if (!cancelado) setPedidosDesconto(p);
+        })
+        .catch((e) => {
+          // Sem a migration aplicada o modal segue como antes.
+          console.error("Erro ao carregar pedidos de desconto:", e);
+        });
+      return () => {
+        cancelado = true;
+      };
+    }, [descontoDireto, clientGroup.document, isOnline, versaoPedidos]);
+    const autorizacao = descontoDireto
+      ? null
+      : autorizacaoVigente(pedidosDesconto);
+    const pedidoDescontoAberto =
+      pedidosDesconto.find((p) => p.decisao === null) ?? null;
+    const ultimoPedidoDesconto = pedidosDesconto[0] ?? null;
+    /** Teto de desconto de quem registra: sem limite para gestor/externo. */
+    const descontoMaximo = descontoDireto
+      ? Number.POSITIVE_INFINITY
+      : (autorizacao?.disponivel ?? 0);
+    // Formulario do pedido ao gestor (tipo escolhido + motivo).
+    const [pedidoTipo, setPedidoTipo] = useState<TipoPedidoDesconto | null>(
+      null,
+    );
+    const [pedidoMotivo, setPedidoMotivo] = useState("");
+    const [pedidoEnviando, setPedidoEnviando] = useState(false);
+    const [pedidoErro, setPedidoErro] = useState<string | null>(null);
+    const [pedidoEnviado, setPedidoEnviado] = useState(false);
     const { addNotification } = useNotifications();
     const [loading, setLoading] = useState(false);
     const [distributionAmount, setDistributionAmount] = useState<string>("");
@@ -568,12 +617,14 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     // de quem pode dar desconto (item 69: gestor e externo). Ex.: marcou
     // R$ 230 em 2 parcelas, recebeu R$ 224 -> R$ 6 de desconto na ultima
     // marcada e as 2 ficam quitadas. Pedido do usuario, 2026-11-16.
+    // Interno/terceirizado/juridico: so ate o autorizado pelo gestor (item 71).
     const podeDescontoNasMarcadas =
       modoParcelas &&
-      podeDarDescontoNaQuitacao(user?.type) &&
       alocacao.situacao === "parcial" &&
       jurosInformado <= 0 &&
-      alocacao.principal > 0;
+      alocacao.principal > 0 &&
+      round2(alocacao.somaParcelas - alocacao.principal) <=
+        descontoMaximo + 0.009;
     const descontoMarcadas =
       descontoNasMarcadasEscolhido && podeDescontoNasMarcadas
         ? round2(alocacao.somaParcelas - alocacao.principal)
@@ -1207,10 +1258,14 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       if (acordoAtivo || amountToDistribute <= 0) return null;
       if (!withDiscount && amountToDistribute >= totalPending - 0.01) return null;
       if (modoParcelas && jurosInformado > 0) return null;
-      const pode = podeDarDescontoNaQuitacao(user?.type);
       const parcial = alocacao.situacao === "parcial";
       const fecha = alocacao.situacao === "fecha";
-      if (!withDiscount && !(parcial || (fecha && pode))) return null;
+      const descontoTudo = round2(Math.max(0, totalPending - amountToDistribute));
+      // Gestor/externo: sem teto. Demais: ate o autorizado (item 71).
+      const cabe = (v: number) => v <= descontoMaximo + 0.009;
+      if (!withDiscount && !(parcial || (fecha && cabe(descontoTudo)))) {
+        return null;
+      }
 
       const pct = (v: number, base: number) =>
         base > 0 ? `${((v / base) * 100).toFixed(1).replace(".", ",")}%` : "";
@@ -1223,7 +1278,6 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
           ? ` ${nOutras === 1 ? "A outra parcela continua" : `As outras ${nOutras} continuam`} em aberto.`
           : "";
       const diferenca = round2(alocacao.somaParcelas - alocacao.principal);
-      const descontoTudo = round2(Math.max(0, totalPending - amountToDistribute));
 
       let detalheBase = "Só as parcelas marcadas, sem desconto.";
       if (parcial) {
@@ -1272,7 +1326,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
           chave: "marcadas",
           titulo: `Desconto de ${formatCurrency(diferenca)} (${pct(diferenca, alocacao.somaParcelas)})`,
           detalhe: `Quita ${n === 1 ? "a parcela marcada" : `as ${n} parcelas marcadas`}.${outrasTexto}`,
-          bloqueada: !pode,
+          bloqueada: !cabe(diferenca),
         });
       }
       opcoes.push({
@@ -1283,10 +1337,15 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
             ? `, inclusive ${nAVencer} que ainda não ${nAVencer === 1 ? "venceu" : "venceram"}`
             : ""
         }.`,
-        bloqueada: !pode,
+        bloqueada: !cabe(descontoTudo),
       });
 
       return {
+        // Para o pedido ao gestor: o que cada opcao de desconto pediria.
+        pedido: {
+          parcelas: parcial ? diferenca : null,
+          tudo: descontoTudo,
+        },
         pergunta: parcial
           ? `O cliente pagou ${formatCurrency(diferenca)} a menos que as parcelas marcadas (${formatCurrency(alocacao.somaParcelas)}). O que fazer com a diferença?`
           : "Dar desconto no restante da dívida?",
@@ -1298,6 +1357,33 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
             : ("devendo" as const),
       };
     })();
+
+    /** Pedido de desconto ao gestor (item 71): o banco confere o devido das
+     * parcelas marcadas (ou do cliente inteiro) e grava o retrato. */
+    const enviarPedidoDesconto = async () => {
+      if (!pedidoTipo || !clientGroup.document) return;
+      setPedidoEnviando(true);
+      setPedidoErro(null);
+      try {
+        await pedirDesconto({
+          documento: clientGroup.document,
+          tipo: pedidoTipo,
+          parcelas: alocacao.itens.map((p) => p.idParcela),
+          valorPago: amountToDistribute,
+          motivo: pedidoMotivo,
+        });
+        setPedidoEnviado(true);
+        setPedidoTipo(null);
+        setPedidoMotivo("");
+        setVersaoPedidos((v) => v + 1);
+      } catch (e) {
+        setPedidoErro(
+          e instanceof Error ? e.message : "Falha ao enviar o pedido.",
+        );
+      } finally {
+        setPedidoEnviando(false);
+      }
+    };
 
     // O "Confirmar" so libera depois de marcar "Conferi os valores", em todo
     // pagamento -- evita clique acidental (decisao do usuario, 2026-11-16).
@@ -2115,11 +2201,126 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                             </span>
                           </label>
                         ))}
-                        {!podeDarDescontoNaQuitacao(user?.type) && (
-                          <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
-                            Só o gestor pode dar desconto: peça para ele
-                            registrar este pagamento pela ficha, em seu nome.
-                          </p>
+                        {!descontoDireto && (
+                          <div className="space-y-2 border-t border-gray-100 dark:border-dark-border pt-2 text-xs">
+                            {/* Situacao do ultimo pedido deste cobrador */}
+                            {pedidoDescontoAberto ? (
+                              <p className="text-amber-800 dark:text-amber-300">
+                                Pedido de desconto de{" "}
+                                {formatCurrency(pedidoDescontoAberto.desconto_pedido)}{" "}
+                                em análise pelo gestor. Quando ele aprovar, abra o
+                                Receber pagamento de novo.
+                              </p>
+                            ) : autorizacao ? (
+                              <p className="text-emerald-800 dark:text-emerald-300">
+                                Gestor autorizou até{" "}
+                                <strong>{formatCurrency(autorizacao.disponivel)}</strong>{" "}
+                                de desconto, válido até{" "}
+                                {dataTexto(autorizacao.valido_ate ?? "")}.
+                                {autorizacao.resposta
+                                  ? ` "${autorizacao.resposta}"`
+                                  : ""}
+                              </p>
+                            ) : ultimoPedidoDesconto?.decisao === "recusado" ? (
+                              <p className="text-red-700 dark:text-red-300">
+                                Gestor recusou o último pedido de desconto: "
+                                {ultimoPedidoDesconto.resposta}"
+                              </p>
+                            ) : null}
+
+                            {pedidoEnviado ? (
+                              <p className="font-medium text-emerald-800 dark:text-emerald-300">
+                                Pedido enviado ao gestor. Ele decide na aba
+                                Correções.
+                              </p>
+                            ) : (
+                              !pedidoDescontoAberto &&
+                              (() => {
+                                const opcoesPedido: {
+                                  tipo: TipoPedidoDesconto;
+                                  valor: number;
+                                  rotulo: string;
+                                }[] = [];
+                                const v = escolhaDiferenca.pedido;
+                                if (v.parcelas != null && v.parcelas > descontoMaximo + 0.009) {
+                                  opcoesPedido.push({
+                                    tipo: "parcelas",
+                                    valor: v.parcelas,
+                                    rotulo: `Pedir ${formatCurrency(v.parcelas)} nas parcelas marcadas`,
+                                  });
+                                }
+                                if (v.tudo > descontoMaximo + 0.009) {
+                                  opcoesPedido.push({
+                                    tipo: "tudo",
+                                    valor: v.tudo,
+                                    rotulo: `Pedir ${formatCurrency(v.tudo)} para quitar tudo`,
+                                  });
+                                }
+                                if (opcoesPedido.length === 0) return null;
+                                return (
+                                  <div className="space-y-2">
+                                    <p className="text-gray-600 dark:text-dark-text-secondary">
+                                      Desconto precisa do gestor. Peça aqui; ele
+                                      aprova ou recusa na aba Correções.
+                                    </p>
+                                    <div className="flex flex-wrap gap-2">
+                                      {opcoesPedido.map((o) => (
+                                        <button
+                                          key={o.tipo}
+                                          type="button"
+                                          disabled={!isOnline}
+                                          onClick={() => {
+                                            setPedidoTipo(o.tipo);
+                                            setPedidoErro(null);
+                                          }}
+                                          className={`rounded-full border px-3 py-1 font-semibold ${
+                                            pedidoTipo === o.tipo
+                                              ? "border-indigo-500 bg-indigo-600 text-white"
+                                              : "border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-50 dark:bg-dark-bg"
+                                          } disabled:opacity-50`}
+                                        >
+                                          {o.rotulo}
+                                        </button>
+                                      ))}
+                                    </div>
+                                    {pedidoTipo &&
+                                      opcoesPedido.some((o) => o.tipo === pedidoTipo) && (
+                                        <div className="space-y-1.5">
+                                          <textarea
+                                            value={pedidoMotivo}
+                                            onChange={(e) =>
+                                              setPedidoMotivo(e.target.value)
+                                            }
+                                            rows={2}
+                                            placeholder="Por que o desconto? (ex.: cliente só tem R$ 224 hoje e quita as duas atrasadas)"
+                                            className="w-full rounded-lg border border-gray-300 dark:border-dark-border px-2 py-1.5 text-xs dark:bg-dark-bg dark:text-dark-text"
+                                          />
+                                          {pedidoErro && (
+                                            <p className="text-red-700 dark:text-red-300">
+                                              {pedidoErro}
+                                            </p>
+                                          )}
+                                          <button
+                                            type="button"
+                                            disabled={
+                                              pedidoEnviando ||
+                                              !pedidoMotivo.trim() ||
+                                              !isOnline
+                                            }
+                                            onClick={() => void enviarPedidoDesconto()}
+                                            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                                          >
+                                            {pedidoEnviando
+                                              ? "Enviando..."
+                                              : "Enviar pedido ao gestor"}
+                                          </button>
+                                        </div>
+                                      )}
+                                  </div>
+                                );
+                              })()
+                            )}
+                          </div>
                         )}
                       </fieldset>
                     )}
