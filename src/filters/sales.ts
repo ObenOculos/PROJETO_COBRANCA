@@ -80,6 +80,21 @@ export const resolveSaleKey = (
 ): number => c.numero_titulo ?? c.venda_n ?? 0;
 
 /**
+ * Titulo da parcela como o ERP mostra, para o cobrador achar no Ciclone/
+ * SSOtica (item 68): o numero do titulo; sem numero, o titulo de texto do
+ * Ciclone que o sync guarda em `descricao` ("Ciclone: PEDIDO7176/6"). A
+ * descricao da SSOtica ("Venda Crediario") e tipo, nao titulo. null = sem.
+ */
+export const tituloDaParcela = (
+  c: Pick<Collection, "numero_titulo" | "venda_n" | "descricao">,
+): string | null => {
+  const numero = c.numero_titulo ?? c.venda_n;
+  if (numero) return String(numero);
+  const desc = (c.descricao || "").trim();
+  return desc.startsWith("Ciclone:") ? desc.slice(8).trim() || null : null;
+};
+
+/**
  * Conta vendas distintas agrupando por CLIENTE (documento || cliente):
  * - cada par (cliente, chave-da-venda) conta 1 (chave = numero_titulo, com
  *   fallback para venda_n — ver resolveSaleKey);

@@ -14,6 +14,8 @@ import {
   Handshake,
   MoreHorizontal,
   Store,
+  Copy,
+  Check,
 } from "lucide-react";
 import {
   ClientGroup,
@@ -34,7 +36,12 @@ import {
   round2,
 } from "../../filters/clientStatus";
 import { parseAndNormalizeDate } from "../../filters/dates";
-import { encargoCliente, encargoParcela } from "../../filters/encargos";
+import {
+  encargoCliente,
+  encargoParcela,
+  isTituloCiclone,
+} from "../../filters/encargos";
+import { tituloDaParcela } from "../../filters/sales";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useClientBirthDate } from "../../hooks/useClientBirthDate";
 import { razaoSocialDistinta } from "../../utils/clienteNome";
@@ -287,6 +294,14 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
         )
       : null;
   const [menuMaisAberto, setMenuMaisAberto] = useState(false);
+  // Numero do titulo/venda copiado (para buscar no Ciclone/SSOtica).
+  const [numeroCopiado, setNumeroCopiado] = useState<number | null>(null);
+  const copiarNumero = (numero: number) => {
+    void navigator.clipboard?.writeText(String(numero)).then(() => {
+      setNumeroCopiado(numero);
+      window.setTimeout(() => setNumeroCopiado(null), 1500);
+    });
+  };
   // Item 66: cliente pagou na loja depois da cobranca -> pedido ao gestor.
   const [isAtribuirOpen, setIsAtribuirOpen] = useState(false);
   // Loja(s) do cliente (a primeira e a da parcela em aberto mais antiga).
@@ -1149,6 +1164,30 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                       ? undefined
                       : resumoPorVenda.get(sale.saleNumber);
                     const vendaAtrasada = !!resumo && resumo.vencido > 0.01;
+                    // Item 68: o nome que o sistema de origem usa -- no
+                    // Ciclone e "Titulo" (busca por titulo + parcela), na
+                    // SSOtica "Venda". Sem numero, no Ciclone, sao titulos de
+                    // texto (PEDIDO.../ACORDO...): cada parcela mostra o dela.
+                    const vendaCiclone = sale.installments.some((i) =>
+                      isTituloCiclone(i),
+                    );
+                    const rotuloVenda =
+                      sale.saleNumber === 0
+                        ? vendaCiclone
+                          ? "Outros títulos do Ciclone"
+                          : "Venda Renegociada"
+                        : `${vendaCiclone ? "Título" : "Venda"} ${sale.saleNumber}`;
+                    // "Parcela X de N": N = maior parcela da venda.
+                    const totalParcelasVenda =
+                      sale.saleNumber === 0
+                        ? 0
+                        : Math.max(
+                            0,
+                            ...sale.installments.map((i) => i.parcela ?? 0),
+                          );
+                    const temSelos =
+                      !!resumo &&
+                      (resumo.vencido > 0.01 || resumo.aVencer > 0.01);
 
                     return (
                       <div
@@ -1178,16 +1217,36 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <h4 className="text-sm font-medium text-gray-900">
-                                    {sale.saleNumber === 0
-                                      ? "Venda Renegociada"
-                                      : `Venda #${sale.saleNumber}`}
+                                    {rotuloVenda}
                                   </h4>
+                                  {sale.saleNumber !== 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        copiarNumero(sale.saleNumber);
+                                      }}
+                                      className="p-0.5 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+                                      title={`Copiar o número para buscar no ${vendaCiclone ? "Ciclone" : "sistema da loja"}`}
+                                      aria-label="Copiar número"
+                                    >
+                                      {numeroCopiado === sale.saleNumber ? (
+                                        <Check className="h-3.5 w-3.5 text-green-600" />
+                                      ) : (
+                                        <Copy className="h-3.5 w-3.5" />
+                                      )}
+                                    </button>
+                                  )}
                                   {saleSeloFora ? (
                                     <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs border bg-gray-200 text-gray-600 border-gray-300">
                                       {saleSeloFora}
                                     </span>
                                   ) : (
-                                    <StatusBadge status={saleBalance.status} />
+                                    // Em aberto, os selos Em atraso / A
+                                    // vencer ja dizem a situacao.
+                                    !temSelos && (
+                                      <StatusBadge status={saleBalance.status} />
+                                    )
                                   )}
                                 </div>
                                 {resumo &&
@@ -1327,7 +1386,12 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                               title={`ID da parcela: ${installment.id_parcela}`}
                                             >
                                               {installment.parcela != null
-                                                ? `Parcela ${installment.parcela}`
+                                                ? `Parcela ${installment.parcela}${
+                                                    totalParcelasVenda >=
+                                                    installment.parcela
+                                                      ? ` de ${totalParcelasVenda}`
+                                                      : ""
+                                                  }`
                                                 : `#${installment.id_parcela}`}
                                             </span>
                                             {isForaDaCobranca(
@@ -1358,6 +1422,23 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                               </span>
                                             )}
                                           </div>
+                                          {/* Titulo do ERP so quando nao e o
+                                              do cabecalho (titulos de texto
+                                              do Ciclone). */}
+                                          {(() => {
+                                            const titulo =
+                                              tituloDaParcela(installment);
+                                            return titulo &&
+                                              titulo !==
+                                                String(sale.saleNumber) ? (
+                                              <div
+                                                className="text-[10px] leading-tight text-gray-400 truncate select-all"
+                                                title="Título no sistema de origem"
+                                              >
+                                                {titulo}
+                                              </div>
+                                            ) : null;
+                                          })()}
                                           <div className="text-xs text-gray-600 truncate">
                                             {formatDate(
                                               installment.data_vencimento,
