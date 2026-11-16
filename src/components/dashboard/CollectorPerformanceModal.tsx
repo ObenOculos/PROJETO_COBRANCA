@@ -5,7 +5,6 @@ import {
   Filter,
   BarChart3,
   AlertCircle,
-  TrendingUp,
   History,
   Info,
   Users,
@@ -21,10 +20,6 @@ import { Modal } from "../Modal";
 import TabTransition from "../common/TabTransition";
 import { supabase } from "../../lib/supabase";
 import { fetchAllRows } from "../../utils/fetchAllRows";
-import {
-  REMARCACOES_REINCIDENTE,
-  ReincidenteCliente,
-} from "../../config/visitStatus";
 import { countsTowardVisitsGoal } from "../../config/collectionAttempts";
 import { isWalletCollectorType } from "../../config/profiles";
 import Pagination from "../common/Pagination";
@@ -33,8 +28,6 @@ interface CollectorPerformanceModalProps {
   isOpen: boolean;
   onClose: () => void;
   collector: any;
-  selectedMonths: number[];
-  selectedYears: number[];
 }
 
 type ViewMode = "list" | "chart";
@@ -61,8 +54,6 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
   isOpen,
   onClose,
   collector,
-  selectedMonths,
-  selectedYears,
 }) => {
   const { monthlyGoals, salePayments, scheduledVisits, collections } =
     useCollection();
@@ -75,8 +66,8 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
   const visitsLabel = isWalletGoal ? "Contatos" : "Visitas";
 
   const [activeTab, setActiveTab] = useState<
-    "summary" | "history" | "pending" | "carteira"
-  >("summary");
+    "history" | "pending" | "carteira"
+  >("history");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [historyPage, setHistoryPage] = useState(1);
@@ -210,27 +201,13 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
     }
   };
 
-  // Period filter consistent with dashboard
-  const isDateInSelectedMonths = (date: Date | null): boolean => {
-    if (!date) return false;
-    const dateMonth = date.getMonth();
-    const dateYear = date.getFullYear();
-    const monthMatches =
-      selectedMonths.length === 0 || selectedMonths.includes(dateMonth);
-    const yearMatches =
-      selectedYears.length === 0 || selectedYears.includes(dateYear);
-    return monthMatches && yearMatches;
-  };
-
   const pendingClients = useMemo(() => {
     if (!collector) return [];
     const filtered = collections.filter((c) => {
+      // Carteira inteira do cobrador, sem filtro de periodo: no Resumo por
+      // Cobrador o modal mostra sempre o total dele (reuniao 16/11, itens 4/32).
       if (c.user_id !== collector.collectorId || !c.documento) return false;
-      const dateVenc = parseDateSafely(c.data_vencimento);
-      const dateLanc = parseDateSafely(c.data_lancamento);
-      const inPeriod =
-        isDateInSelectedMonths(dateVenc) || isDateInSelectedMonths(dateLanc);
-      return inPeriod && c.valor_original - c.valor_recebido > 0.01;
+      return c.valor_original - c.valor_recebido > 0.01;
     });
 
     const clientMap = new Map();
@@ -248,7 +225,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
     return Array.from(clientMap.values()).sort(
       (a, b) => b.valorPendente - a.valorPendente,
     );
-  }, [collector, collections, selectedMonths, selectedYears]);
+  }, [collector, collections]);
 
   const performanceHistory = useMemo(() => {
     if (!collector) return [];
@@ -337,29 +314,6 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
     if (!selectedYear) return performanceHistory;
     return performanceHistory.filter((h) => h.year === selectedYear);
   }, [performanceHistory, selectedYear]);
-
-  const summaryStats = useMemo(() => {
-    if (filteredHistory.length === 0) return null;
-    const avgVisitsPerformance =
-      filteredHistory.reduce((sum, h) => sum + h.visitsPerformance, 0) /
-      filteredHistory.length;
-    const avgPaymentsPerformance =
-      filteredHistory.reduce((sum, h) => sum + h.paymentsPerformance, 0) /
-      filteredHistory.length;
-    const totalMonths = filteredHistory.length;
-    const achievedMonths = filteredHistory.filter(
-      (h) => h.overallPerformance >= 100,
-    ).length;
-
-    return {
-      avgVisitsPerformance,
-      avgPaymentsPerformance,
-      achievementRate:
-        totalMonths > 0 ? (achievedMonths / totalMonths) * 100 : 0,
-      totalMonths,
-      achievedMonths,
-    };
-  }, [filteredHistory]);
 
   const getPerformanceColor = (percentage: number) => {
     if (percentage >= 100)
@@ -541,7 +495,6 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
   if (!collector) return null;
 
   const tabs = [
-    { id: "summary", name: "Resumo", icon: TrendingUp },
     { id: "history", name: "Histórico", icon: History },
     { id: "pending", name: "Pendências", icon: AlertCircle },
     { id: "carteira", name: "Carteira", icon: Users },
@@ -585,174 +538,6 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
         {/* Tab Content — scrollable */}
         <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-6 py-5">
           <TabTransition activeKey={activeTab}>
-            {activeTab === "summary" && (
-              <div className="space-y-6">
-                {/* Score Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="p-5 border border-green-100 dark:border-green-900/30 rounded-2xl bg-green-50/50 dark:bg-green-900/10">
-                    <label className="block text-[10px] font-bold text-green-700 dark:text-green-400 tracking-wide mb-1">
-                      Total Recebido
-                    </label>
-                    <p className="text-3xl font-bold text-green-600 dark:text-green-400">
-                      {formatCurrency(collector.receivedAmount)}
-                    </p>
-                  </div>
-                  <div className="p-5 border border-amber-100 dark:border-amber-900/30 rounded-2xl bg-amber-50/50 dark:bg-amber-900/10">
-                    <label className="block text-[10px] font-bold text-amber-700 dark:text-amber-400 tracking-wide mb-1">
-                      Total a Receber
-                    </label>
-                    <p className="text-3xl font-bold text-amber-600 dark:text-amber-400">
-                      {formatCurrency(collector.pendingAmount)}
-                    </p>
-                  </div>
-                </div>
-
-                {summaryStats && (
-                  <div className="space-y-4">
-                    <h4 className="text-[10px] font-bold text-gray-400 tracking-[0.15em] border-b border-gray-100 dark:border-dark-border pb-2">
-                      Estatísticas do Período
-                    </h4>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      <div className="bg-white dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl p-3 text-center shadow-sm">
-                        <p className="text-[10px] font-bold text-gray-400 mb-1">
-                          {visitsLabel}
-                        </p>
-                        <p className="text-lg font-bold text-blue-600">
-                          {summaryStats.avgVisitsPerformance.toFixed(1)}%
-                        </p>
-                      </div>
-                      <div className="bg-white dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl p-3 text-center shadow-sm">
-                        <p className="text-[10px] font-bold text-gray-400 mb-1">
-                          Pagos
-                        </p>
-                        <p className="text-lg font-bold text-green-600">
-                          {summaryStats.avgPaymentsPerformance.toFixed(1)}%
-                        </p>
-                      </div>
-                      <div className="bg-white dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl p-3 text-center shadow-sm">
-                        <p className="text-[10px] font-bold text-gray-400 mb-1">
-                          Sucesso
-                        </p>
-                        <p className="text-lg font-bold text-purple-600">
-                          {summaryStats.achievementRate.toFixed(1)}%
-                        </p>
-                      </div>
-                      <div className="bg-white dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl p-3 text-center shadow-sm">
-                        <p className="text-[10px] font-bold text-gray-400 mb-1">
-                          Metas
-                        </p>
-                        <p className="text-lg font-bold text-gray-700 dark:text-dark-text">
-                          {summaryStats.achievedMonths}/
-                          {summaryStats.totalMonths}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Remarcação — os números vêm prontos do cálculo do ranking
-                    (collector), não recalculados aqui, para card e modal nunca
-                    divergirem sob o mesmo filtro de período. */}
-                <div className="space-y-4">
-                  <h4 className="text-[10px] font-bold text-gray-400 tracking-[0.15em] border-b border-gray-100 dark:border-dark-border pb-2">
-                    Remarcação de Visitas
-                  </h4>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    <div className="bg-white dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl p-3 text-center shadow-sm">
-                      <p className="text-[10px] font-bold text-gray-400 mb-1">
-                        Taxa
-                      </p>
-                      <p
-                        className={`text-lg font-bold ${
-                          collector.remarcacaoRate >= 30
-                            ? "text-red-600 dark:text-red-400"
-                            : collector.remarcacaoRate >= 15
-                              ? "text-amber-600 dark:text-amber-400"
-                              : "text-gray-700 dark:text-dark-text"
-                        }`}
-                      >
-                        {collector.remarcacaoRate.toFixed(1)}%
-                      </p>
-                    </div>
-                    <div className="bg-white dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl p-3 text-center shadow-sm">
-                      <p className="text-[10px] font-bold text-gray-400 mb-1">
-                        Remarcadas
-                      </p>
-                      <p className="text-lg font-bold text-gray-700 dark:text-dark-text">
-                        {collector.visitsReagendadas}
-                        <span className="text-xs font-medium text-gray-400">
-                          {" "}
-                          / {collector.visitsComDesfecho}
-                        </span>
-                      </p>
-                    </div>
-                    <div className="bg-white dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl p-3 text-center shadow-sm">
-                      <p className="text-[10px] font-bold text-gray-400 mb-1">
-                        Reincidentes
-                      </p>
-                      <p
-                        className={`text-lg font-bold ${
-                          collector.reincidentes.length > 0
-                            ? "text-amber-600 dark:text-amber-400"
-                            : "text-gray-700 dark:text-dark-text"
-                        }`}
-                      >
-                        {collector.reincidentes.length}
-                      </p>
-                    </div>
-                  </div>
-
-                  <p className="text-[10px] text-gray-400 dark:text-dark-text-secondary leading-relaxed">
-                    Taxa = visitas remarcadas sobre as que chegaram a um
-                    desfecho no período (realizadas, não encontradas e
-                    remarcadas). Agendadas e canceladas ficam de fora.
-                  </p>
-
-                  {collector.reincidentes.length > 0 ? (
-                    <div className="border border-amber-200/60 dark:border-amber-900/30 rounded-2xl overflow-hidden">
-                      <div className="px-4 py-2.5 bg-amber-50/60 dark:bg-amber-950/20 border-b border-amber-200/60 dark:border-amber-900/30">
-                        <p className="text-[11px] font-bold text-amber-800 dark:text-amber-400">
-                          Clientes remarcados {REMARCACOES_REINCIDENTE}x ou mais
-                        </p>
-                        <p className="text-[10px] text-amber-700/80 dark:text-amber-500/80 mt-0.5">
-                          Costuma indicar endereço errado, cliente que evita o
-                          cobrador ou rota mal montada.
-                        </p>
-                      </div>
-                      <ul className="divide-y divide-amber-100/60 dark:divide-amber-900/20">
-                        {collector.reincidentes.map(
-                          (cliente: ReincidenteCliente) => (
-                            <li
-                              key={cliente.document}
-                              className="flex items-center justify-between gap-3 px-4 py-2.5 bg-white dark:bg-dark-bg"
-                            >
-                              <span className="min-w-0">
-                                <span className="block text-xs font-semibold text-gray-700 dark:text-dark-text truncate">
-                                  {cliente.name}
-                                </span>
-                                <span className="block text-[10px] text-gray-400 tabular-nums">
-                                  {cliente.document}
-                                </span>
-                              </span>
-                              <span className="shrink-0 text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/30 rounded-lg px-2 py-1 tabular-nums">
-                                {cliente.count}x
-                              </span>
-                            </li>
-                          ),
-                        )}
-                      </ul>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-gray-400 dark:text-dark-text-secondary italic">
-                      Nenhum cliente remarcado {REMARCACOES_REINCIDENTE}x ou
-                      mais no período.
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-
             {activeTab === "history" && (
               <div className="space-y-6 pb-4">
                 {/* Controls */}

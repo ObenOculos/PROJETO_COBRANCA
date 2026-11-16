@@ -14,6 +14,7 @@ import {
   Gauge,
   PhoneCall,
   UserX,
+  History,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
@@ -33,6 +34,7 @@ import { hasInstallmentBalance } from "../../filters/clientStatus";
 import { toYYYYMMDD } from "../../filters/dates";
 import { formatCurrency, calculateOverdueDays } from "../../utils/formatters";
 import ContactScheduler from "./ContactScheduler";
+import CollectorPerformanceModal from "./CollectorPerformanceModal";
 import SaidasSemAcaoModal from "./SaidasSemAcao";
 import { useSaidasSemAcao } from "../../hooks/useSaidasSemAcao";
 import { valorRecebidoTotal } from "../../filters/sales";
@@ -217,6 +219,11 @@ const CollectorsSummary: React.FC = () => {
   // precisar logar como o cobrador -- ver ContactScheduler.
   const [scheduleContactCollectorId, setScheduleContactCollectorId] =
     useState<string | null>(null);
+  // Modal do cobrador (Historico, Pendencias, Carteira) -- veio da antiga
+  // tela Desempenho, que saiu do menu (reuniao 16/11, item 4).
+  const [detalheCobradorId, setDetalheCobradorId] = useState<string | null>(
+    null,
+  );
   // Tabela e melhor pra comparar/rankear muitos cobradores (a lista ja vem
   // ordenada por vencidaValor); Cards fica melhor pra olhar 1-2 em detalhe —
   // por isso o padrao (sem preferencia salva) e Tabela.
@@ -656,6 +663,57 @@ const CollectorsSummary: React.FC = () => {
     };
   }, [currentUser, managerCollectorLinks, monthlyGoals, salePayments, today]);
 
+  // Meta do MES ATUAL de cada cobrador, mesma base da meta da equipe acima
+  // (salePayments do mes, valorRecebidoTotal). Mes atual e nao o periodo do
+  // filtro: meta e mensal (mesma razao do teamGoal).
+  const metaPorCobrador = useMemo(() => {
+    const mesAtual = today.slice(0, 7);
+    const recebidoMes = new Map<string, number>();
+    salePayments.forEach((p) => {
+      if (!p.collectorId || !p.paymentDate.startsWith(mesAtual)) return;
+      recebidoMes.set(
+        p.collectorId,
+        (recebidoMes.get(p.collectorId) ?? 0) + valorRecebidoTotal(p),
+      );
+    });
+    const mapa = new Map<
+      string,
+      { meta: number; recebido: number; pct: number }
+    >();
+    rows.forEach((row) => {
+      const meta = Number(
+        metaDoMes(monthlyGoals, row.id, mesAtual)?.payments_goal || 0,
+      );
+      if (meta <= 0) return;
+      const recebido = recebidoMes.get(row.id) ?? 0;
+      mapa.set(row.id, { meta, recebido, pct: (recebido / meta) * 100 });
+    });
+    return mapa;
+  }, [rows, monthlyGoals, salePayments, today]);
+
+  const nomeMesAtual = new Date(
+    Number(today.slice(0, 4)),
+    Number(today.slice(5, 7)) - 1,
+    1,
+  ).toLocaleDateString("pt-BR", { month: "short" });
+
+  const linhaMeta = (id: string) => {
+    const m = metaPorCobrador.get(id);
+    if (!m) return [];
+    return [
+      {
+        label: `Meta de ${nomeMesAtual}`,
+        value: `${m.pct.toFixed(0)}% de ${formatCurrency(m.meta, false)}`,
+        tone: m.pct >= 100 ? ("green" as const) : undefined,
+        hint: `${formatCurrency(m.recebido, false)} recebidos no mês atual`,
+      },
+    ];
+  };
+
+  const detalheCobrador = detalheCobradorId
+    ? users.find((u) => u.id === detalheCobradorId)
+    : undefined;
+
   const collectorFilterLabel =
     excludedCollectorIds.size === 0
       ? "Todos os cobradores"
@@ -1021,16 +1079,27 @@ const CollectorsSummary: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                {isWalletCollectorType(row.type) && (
+                <div className="flex-shrink-0 flex items-center gap-3">
                   <button
                     type="button"
-                    onClick={() => setScheduleContactCollectorId(row.id)}
-                    className="flex-shrink-0 inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-700"
+                    onClick={() => setDetalheCobradorId(row.id)}
+                    title="Histórico mês a mês, pendências e carteira"
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-700"
                   >
-                    <CalendarClock className="h-3.5 w-3.5" />
-                    Agendar em massa
+                    <History className="h-3.5 w-3.5" />
+                    Histórico
                   </button>
-                )}
+                  {isWalletCollectorType(row.type) && (
+                    <button
+                      type="button"
+                      onClick={() => setScheduleContactCollectorId(row.id)}
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-700"
+                    >
+                      <CalendarClock className="h-3.5 w-3.5" />
+                      Agendar em massa
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1081,6 +1150,7 @@ const CollectorsSummary: React.FC = () => {
                       label: "Ainda vence no período",
                       value: formatCurrency(row.previstaValor, false),
                     },
+                    ...linhaMeta(row.id),
                   ]}
                 />
                 <SummaryCard
@@ -1276,9 +1346,14 @@ const CollectorsSummary: React.FC = () => {
                     {index + 1}
                   </td>
                   <td className="px-3 py-3 whitespace-nowrap">
-                    <div className="font-medium text-gray-900 dark:text-dark-text">
+                    <button
+                      type="button"
+                      onClick={() => setDetalheCobradorId(row.id)}
+                      title="Histórico mês a mês, pendências e carteira"
+                      className="font-medium text-gray-900 dark:text-dark-text hover:text-blue-600 dark:hover:text-blue-400 hover:underline text-left"
+                    >
                       {row.name}
-                    </div>
+                    </button>
                     <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
                       {USER_TYPE_LABELS[row.type]}
                     </div>
@@ -1326,6 +1401,15 @@ const CollectorsSummary: React.FC = () => {
                     <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
                       {formatCurrency(row.previstaValor, false)} ainda vence
                     </div>
+                    {linhaMeta(row.id).map((m) => (
+                      <div
+                        key={m.label}
+                        title={m.hint}
+                        className={`text-[10px] font-semibold ${m.tone === "green" ? "text-green-600 dark:text-green-400" : "text-indigo-600 dark:text-indigo-400"}`}
+                      >
+                        {m.label}: {m.value}
+                      </div>
+                    ))}
                   </td>
                   <td className="px-3 py-3 text-right whitespace-nowrap border-l border-gray-100 dark:border-dark-border/40">
                     <div className="font-semibold text-blue-600 dark:text-blue-400">
@@ -1400,6 +1484,18 @@ const CollectorsSummary: React.FC = () => {
           users={users}
           onClose={() => setSaidasCobradorId(null)}
           onDevolvido={recarregarSaidas}
+        />
+      )}
+
+      {detalheCobrador && (
+        <CollectorPerformanceModal
+          isOpen
+          onClose={() => setDetalheCobradorId(null)}
+          collector={{
+            collectorId: detalheCobrador.id,
+            collectorName: detalheCobrador.name,
+            collectorType: detalheCobrador.type,
+          }}
         />
       )}
 

@@ -9,7 +9,6 @@ import {
 } from "lucide-react";
 import FilterBar from "../common/FilterBar";
 import { CollectionTable } from "./CollectionTable";
-import EnhancedPerformanceChart from "./EnhancedPerformanceChart";
 import UserManagement from "./UserManagement";
 import EnhancedStoreManagement from "./EnhancedStoreManagement";
 import DatabaseUpload from "../admin/DatabaseUpload";
@@ -36,7 +35,6 @@ import { Notification } from "../../contexts/NotificationContext";
 // BANCO_DADOS exatamente, entao o resultado e identico ao escopo "all", so
 // que em duas buscas menores em vez de uma varredura da tabela inteira).
 const TABS_NEEDING_FULL_SCOPE = new Set([
-  "performance",
   "stores",
   "clients",
   "collectors-summary",
@@ -70,7 +68,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
 
   const [internalActiveTab, setInternalActiveTab] = useState<
     | "collections"
-    | "performance"
     | "collectors-summary"
     | "users"
     | "stores"
@@ -398,9 +395,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
             )}
           </div>
         );
-
-      case "performance":
-        return <EnhancedPerformanceChart />;
 
       case "collectors-summary":
         return (

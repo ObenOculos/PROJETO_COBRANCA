@@ -6,7 +6,6 @@ import {
   Store,
   CircleCheckBig,
   CalendarClock,
-  ChartSpline,
   ClipboardList,
   User,
   CloudUpload,
@@ -69,12 +68,6 @@ export const navigationItems: NavItemConfig[] = [
     managerIcon: PhoneCall,
     collectorIcon: PhoneCall,
     roles: ["internal_collector", "third_party_collector", "legal_collector"],
-  },
-  {
-    id: "performance",
-    managerName: "Desempenho",
-    managerIcon: ChartSpline,
-    roles: ["manager"],
   },
   {
     id: "collectors-summary",

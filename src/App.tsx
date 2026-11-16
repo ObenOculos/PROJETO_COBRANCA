@@ -30,6 +30,8 @@ const AppContent: React.FC = () => {
   // Estado para gerenciar aba ativa do manager
   const [managerActiveTab, setManagerActiveTab] = useState(() => {
     const savedTab = localStorage.getItem("managerActiveTab");
+    // "performance" (Desempenho) saiu do menu em 16/11: cai no Resumo.
+    if (savedTab === "performance") return "collectors-summary";
     return savedTab && savedTab !== "overview" ? savedTab : "collections";
   });
 
