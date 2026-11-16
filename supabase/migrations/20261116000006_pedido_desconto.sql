@@ -306,7 +306,8 @@ AS $function$
          d.decisao, d.desconto_aprovado, d.valido_ate, d.resposta,
          d.decidido_por_id, d.decidido_em,
          COALESCE((
-           SELECT round(sum(sp.discount_amount), 2)
+           -- discount_amount e real (float): converte antes de somar.
+           SELECT round(sum(sp.discount_amount::numeric), 2)
            FROM public.sale_payments sp
            WHERE sp.pedido_desconto_id = d.id
          ), 0) AS desconto_usado
@@ -388,7 +389,8 @@ BEGIN
           AND d.decisao = 'aprovado'
           AND d.valido_ate >= v_hoje
           AND d.desconto_aprovado - COALESCE((
-                SELECT sum(sp.discount_amount)
+                -- discount_amount e real (float): converte antes de somar.
+                SELECT round(sum(sp.discount_amount::numeric), 2)
                 FROM public.sale_payments sp
                 WHERE sp.pedido_desconto_id = d.id
               ), 0) >= round(p_discount_amount, 2) - 0.009
