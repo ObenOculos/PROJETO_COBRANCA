@@ -34,7 +34,7 @@ export interface NavItemConfig {
 export const navigationItems: NavItemConfig[] = [
   {
     id: "collections",
-    managerName: "Cobranças",
+    managerName: "Caixa",
     collectorName: "Minha Carteira",
     managerIcon: HandCoins,
     collectorIcon: HandCoins,
@@ -90,7 +90,7 @@ export const navigationItems: NavItemConfig[] = [
   },
   {
     id: "stores",
-    managerName: "Lojas",
+    managerName: "Desempenho Loja",
     managerIcon: Store,
     roles: ["manager"],
   },

@@ -440,7 +440,7 @@ const EnhancedStoreManagement: React.FC = () => {
             </div>
             <div className="min-w-0">
               <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight leading-none truncate">
-                Acompanhamento de Lojas
+                Desempenho Loja
               </h2>
               <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary mt-1 tracking-wide truncate">
                 Performance e status de {overviewStats.totalStores} lojas

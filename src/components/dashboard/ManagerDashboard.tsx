@@ -308,7 +308,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
               <div className="flex items-center justify-between w-full sm:w-auto">
                 <h2 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-dark-text flex items-center">
                   <FileText className="h-5 w-5 lg:h-6 lg:w-6 mr-2 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-                  Cobranças
+                  Caixa
                 </h2>
                 {collectionsView !== "cash-report" && (
                   <button
