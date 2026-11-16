@@ -1211,6 +1211,25 @@ export const ClientAssignment = React.memo(
 
       const assignmentRate = total > 0 ? (assigned / total) * 100 : 0;
 
+      // Card "Valores" (reuniao 16/11, item 17): vencido, a vencer e pago no
+      // mesmo card, com a MESMA regra das linhas da lista
+      // (collectionsBalanceSplit, com acordo ativo valem as parcelas dele).
+      let vencido = 0;
+      let aVencer = 0;
+      let pago = 0;
+      baseClients.forEach((c) => {
+        const saldo = collectionsBalanceSplit(
+          c.documento || "",
+          c.collections,
+          acordoAtivoOverdueMap,
+        );
+        vencido += saldo.vencido;
+        aVencer += saldo.aVencer;
+        c.collections.forEach((t) => {
+          pago += t.valor_recebido || 0;
+        });
+      });
+
       return {
         total,
         totalSales,
@@ -1220,6 +1239,9 @@ export const ClientAssignment = React.memo(
         prevMonth,
         pendingValue,
         assignmentRate,
+        vencido,
+        aVencer,
+        pago,
       };
     }, [
       hasActiveFilters,
@@ -1227,6 +1249,7 @@ export const ClientAssignment = React.memo(
       overviewStats,
       filteredClients,
       clientsData,
+      acordoAtivoOverdueMap,
     ]);
 
     // Rótulos explícitos dos períodos comparados no card "Novos Clientes".
@@ -1492,7 +1515,8 @@ export const ClientAssignment = React.memo(
             </div>
           </div>
 
-          {/* Card: Valor em Aberto */}
+          {/* Card: Valores -- em aberto (vencido + a vencer) e pago juntos,
+              mesma regra das linhas da lista (reuniao 16/11, item 17). */}
           <div className="shrink-0 snap-start min-w-[44%] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-3">
               <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl">
@@ -1501,11 +1525,37 @@ export const ClientAssignment = React.memo(
             </div>
             <div>
               <p className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">
-                Valor em Aberto
+                Em aberto
               </p>
               <p className="text-lg sm:text-2xl font-bold text-indigo-600 dark:text-indigo-450 tracking-tight truncate">
-                {formatCurrency(mainStats.pendingValue)}
+                {formatCurrency(mainStats.vencido + mainStats.aVencer)}
               </p>
+              <div className="mt-2 pt-2 border-t border-gray-100 dark:border-dark-border/40 space-y-0.5 text-[10px] sm:text-[11px] font-medium">
+                <div className="flex justify-between gap-2">
+                  <span className="text-gray-500 dark:text-dark-text-secondary">
+                    Vencido
+                  </span>
+                  <span className="font-semibold text-red-600 dark:text-red-400 truncate">
+                    {formatCurrency(mainStats.vencido)}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-gray-500 dark:text-dark-text-secondary">
+                    A vencer
+                  </span>
+                  <span className="font-semibold text-gray-700 dark:text-dark-text truncate">
+                    {formatCurrency(mainStats.aVencer)}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-gray-500 dark:text-dark-text-secondary">
+                    Pago
+                  </span>
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400 truncate">
+                    {formatCurrency(mainStats.pago)}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
