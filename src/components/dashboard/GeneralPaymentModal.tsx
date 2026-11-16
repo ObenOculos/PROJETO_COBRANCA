@@ -23,7 +23,10 @@ import { useNotifications } from "../../contexts/NotificationContext";
 import { calculateOverdueDays, formatCurrency } from "../../utils/formatters";
 import { supabase } from "../../lib/supabase";
 import { addDaysLocalStr, todayLocalStr } from "../../config/visitStatus";
-import { isWalletCollectorType } from "../../config/profiles";
+import {
+  isWalletCollectorType,
+  podeDarDescontoNaQuitacao,
+} from "../../config/profiles";
 import { ATTEMPT_RESULT_LABELS } from "../../config/collectionAttempts";
 import { isForaDaCobranca } from "../../types/status";
 import {
@@ -1752,7 +1755,19 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
 
                     {/* Quitacao com desconto: so quando o valor deixa algo a
                     descontar (com o valor cheio a opcao confundia). */}
-                    {(withDiscount ||
+                    {/* Item 69: sem desconto para interno/terceirizado/
+                    juridico -- diz a quem pedir. */}
+                    {!podeDarDescontoNaQuitacao(user?.type) &&
+                      amountToDistribute > 0 &&
+                      amountToDistribute < totalPending - 0.01 && (
+                        <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
+                          Cliente pediu desconto para quitar? Só o gestor pode
+                          dar: peça para ele registrar este pagamento pela
+                          ficha, em seu nome.
+                        </p>
+                      )}
+                    {podeDarDescontoNaQuitacao(user?.type) &&
+                      (withDiscount ||
                       amountToDistribute < totalPending - 0.01) && (
                       <label
                         className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
@@ -1781,7 +1796,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                             {withDiscount &&
                             amountToDistribute > 0 &&
                             desconto > 0
-                              ? `Desconto de ${formatCurrency(desconto)} (${((desconto / totalPending) * 100).toFixed(1)}% do saldo de ${formatCurrency(totalPending)}). O gestor é avisado.`
+                              ? `Desconto de ${formatCurrency(desconto)} (${((desconto / totalPending) * 100).toFixed(1)}% do saldo de ${formatCurrency(totalPending)}). Fica registrado no pagamento e aparece para o gestor.`
                               : `O que faltar para ${formatCurrency(totalPending)} vira desconto e todas as parcelas são quitadas.`}
                           </span>
                         </span>

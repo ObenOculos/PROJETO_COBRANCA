@@ -47,6 +47,14 @@ export const isWalletCollectorType = (
 ): boolean =>
   !!type && WALLET_COLLECTOR_TYPES.includes(type as Exclude<UserType, "manager">);
 
+/** "Quitar tudo com desconto" (item 69, decisao do usuario 2026-11-16): so o
+ * gestor e o cobrador externo, que negocia na rua. Interno/terceirizado/
+ * juridico pedem ao gestor, que registra pela ficha em nome deles. O banco
+ * repete a regra em process_payment (migration 20261116000005). */
+export const podeDarDescontoNaQuitacao = (
+  type: UserType | null | undefined,
+): boolean => type === "manager" || type === "collector";
+
 /**
  * The confirmed situacao set when a client is assigned to a specific user of
  * a given profile (i.e. user_id is set to a real collector).
