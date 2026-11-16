@@ -292,7 +292,14 @@ const BulkAssignmentModal: React.FC<Props> = ({
       onComplete?.();
     } catch (err) {
       addLog(
-        `Erro: ${err instanceof Error ? err.message : "Erro desconhecido"}`,
+        // Erro do Supabase (PostgrestError) e objeto comum, nao Error: sem
+        // ler `message` a causa real (ex.: tempo limite, regra do banco)
+        // virava "Erro desconhecido" e so ficava no console.
+        `Erro: ${
+          err instanceof Error
+            ? err.message
+            : ((err as { message?: string })?.message ?? "Erro desconhecido")
+        }`,
         "info",
       );
       setDone(true);
