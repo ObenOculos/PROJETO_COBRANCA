@@ -645,7 +645,10 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
               {/* So o que pede atencao: valor vencido (com o atraso) e acordo
                   ativo. Em dia / a vencer nao aparece (pedido do usuario). */}
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                {saldoCliente.vencido > 0.01 && (
+                {/* Com multa/juros o aviso "Cobrar hoje" ja traz o vencido e
+                    os dias: o selo some para nao repetir. */}
+                {saldoCliente.vencido > 0.01 &&
+                  !(encargoFicha && encargoFicha.encargo > 0.009) && (
                   <span className="px-2 py-0.5 rounded-md bg-red-50 text-red-700">
                     Vencido{" "}
                     <strong>{formatCurrency(saldoCliente.vencido)}</strong>
@@ -798,7 +801,10 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                       saldoCliente.vencido + encargoFicha.encargo,
                     )}
                   </strong>{" "}
-                  — vencido {formatCurrency(saldoCliente.vencido)} + multa{" "}
+                  — vencido {formatCurrency(saldoCliente.vencido)}
+                  {atrasoCliente > 0 &&
+                    ` há ${atrasoCliente} dia${atrasoCliente !== 1 ? "s" : ""}`}{" "}
+                  + multa{" "}
                   {formatCurrency(encargoFicha.multa)} + juros{" "}
                   {formatCurrency(encargoFicha.juros)}
                 </div>
