@@ -476,6 +476,13 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       encargoMarcadas > 0.009 &&
       alocacao.situacao === "acima" &&
       Math.abs(alocacao.aMais - encargoMarcadas) <= 0.01;
+    // ...ou parte dela (multa e juros com desconto, autorizado pelo gestor).
+    const aMaisEhParteDoEncargo =
+      modoParcelas &&
+      encargoMarcadas > 0.009 &&
+      alocacao.situacao === "acima" &&
+      jurosInformado <= 0 &&
+      alocacao.aMais < encargoMarcadas - 0.01;
     const jurosValor = modoParcelas ? jurosInformado : 0;
     // Principal = o que abate parcelas.
     const principal = modoParcelas ? alocacao.principal : amountToDistribute;
@@ -520,12 +527,32 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       ? alocacao.itens.filter((p) => p.aplicado > 0)
       : null;
 
-    // Observacao obrigatoria quando ha algo a justificar: desconto ou
-    // juros/multa (regra do item 58).
-    const observacaoObrigatoria = withDiscount || jurosValor > 0;
+    // Item 67: multa/juros do Ciclone que ficaram de fora (todos ou parte),
+    // com as parcelas marcadas quitadas pelo valor. So com acordo do gestor:
+    // o cobrador justifica na observacao (pedido do usuario, 2026-11-16).
+    const encargoNaoCobrado =
+      modoParcelas &&
+      encargoMarcadas > 0.009 &&
+      alocacao.situacao === "fecha"
+        ? Math.max(0, round2(encargoMarcadas - jurosInformado))
+        : 0;
+    const prefixoNaoCobrado = `Multa e juros do Ciclone não cobrados (${formatCurrency(
+      encargoNaoCobrado,
+    )}). Motivo:`;
+    /** O que o cobrador escreveu alem do texto preenchido pelo sistema. */
+    const motivoNaoCobrado = observations.trim().startsWith(prefixoNaoCobrado)
+      ? observations.trim().slice(prefixoNaoCobrado.length).trim()
+      : observations.trim();
+
+    // Observacao obrigatoria quando ha algo a justificar: desconto,
+    // juros/multa (regra do item 58) ou multa/juros do Ciclone nao cobrados.
+    const observacaoObrigatoria =
+      withDiscount || jurosValor > 0 || encargoNaoCobrado > 0.009;
     const motivoObservacao = withDiscount
       ? "o desconto"
-      : "os juros/multa acordados";
+      : encargoNaoCobrado > 0.009
+        ? `por que ${formatCurrency(encargoNaoCobrado)} de multa e juros não foram cobrados (combinado com o gestor?)`
+        : "os juros/multa acordados";
 
     // Distribuicao por venda, calculada no render (useMemo): antes ficava num
     // estado atualizado por useEffect, e um Enter logo depois de digitar o
@@ -696,6 +723,9 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       if (observacaoObrigatoria && !observations.trim()) {
         return `Explique ${motivoObservacao} na observação.`;
       }
+      if (encargoNaoCobrado > 0.009 && !motivoNaoCobrado) {
+        return `Escreva na observação por que ${formatCurrency(encargoNaoCobrado)} de multa e juros não foram cobrados.`;
+      }
       return null;
     };
 
@@ -716,7 +746,23 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     const avancar = () => {
       const erro = etapa === 1 ? erroDoValor() : erroDoPagamento();
       setErroEtapa(erro);
-      if (!erro) setEtapa((e) => (e === 1 ? 2 : 3));
+      if (erro) return;
+      // Item 67: indo para "Pagamento", deixa a observacao pronta quando ha
+      // multa/juros do Ciclone -- so se o cobrador ainda nao escreveu nada.
+      if (etapa === 1 && !observations.trim()) {
+        if (encargoNaoCobrado > 0.009) {
+          setObservations(`${prefixoNaoCobrado} `);
+        } else if (
+          modoParcelas &&
+          encargoMarcadas > 0.009 &&
+          Math.abs(jurosInformado - encargoMarcadas) <= 0.01
+        ) {
+          setObservations(
+            `Multa e juros do Ciclone até hoje (${formatCurrency(encargoMarcadas)}).`,
+          );
+        }
+      }
+      setEtapa((e) => (e === 1 ? 2 : 3));
     };
 
     const voltar = () => {
@@ -1507,6 +1553,24 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                         </button>
                       ))}
 
+                    {/* Item 67: multa/juros do Ciclone sem cobrar (todos ou
+                    parte) -- avisa ja aqui que vai pedir o motivo. */}
+                    {encargoNaoCobrado > 0.009 && (
+                      <Aviso
+                        tom="atencao"
+                        titulo={`${formatCurrency(encargoNaoCobrado)} de multa e juros não cobrados`}
+                      >
+                        <p>
+                          {jurosInformado > 0
+                            ? `Multa e juros do Ciclone até hoje: ${formatCurrency(encargoMarcadas)}; recebidos ${formatCurrency(jurosInformado)}.`
+                            : `O cliente não está pagando a multa e os juros do Ciclone (${formatCurrency(encargoMarcadas)}).`}{" "}
+                          Isso só vale com autorização do gestor. Na próxima
+                          etapa, escreva o motivo na observação (ex.: "gestor
+                          autorizou pagar sem juros").
+                        </p>
+                      </Aviso>
+                    )}
+
                     {/* Conferencia do valor com as parcelas marcadas: um aviso
                     por situacao, no mesmo formato (Aviso). */}
                     {modoParcelas &&
@@ -1546,10 +1610,25 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                         titulo={
                           aMaisEhEncargo
                             ? `${formatCurrency(alocacao.aMais)} = multa e juros do Ciclone`
-                            : `Valor ${formatCurrency(alocacao.aMais)} acima do esperado`
+                            : aMaisEhParteDoEncargo
+                              ? `${formatCurrency(alocacao.aMais)} de ${formatCurrency(encargoMarcadas)} de multa e juros`
+                              : `Valor ${formatCurrency(alocacao.aMais)} acima do esperado`
                         }
                       >
-                        {aMaisEhEncargo ? (
+                        {aMaisEhParteDoEncargo ? (
+                          <p>
+                            A multa e os juros do Ciclone até hoje são{" "}
+                            {formatCurrency(encargoMarcadas)} e você recebeu{" "}
+                            <strong>{formatCurrency(alocacao.aMais)}</strong>.
+                            Os{" "}
+                            {formatCurrency(
+                              round2(encargoMarcadas - alocacao.aMais),
+                            )}{" "}
+                            que faltam só podem ficar de fora com autorização
+                            do gestor — você vai explicar o motivo na próxima
+                            etapa.
+                          </p>
+                        ) : aMaisEhEncargo ? (
                           <p>
                             Você digitou{" "}
                             <strong>{formatCurrency(amountToDistribute)}</strong>:
@@ -1582,12 +1661,16 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                             <span className="block font-semibold">
                               {aMaisEhEncargo
                                 ? "Confirmar multa e juros"
-                                : "Juros/multa acordados"}
+                                : aMaisEhParteDoEncargo
+                                  ? "Multa e juros com desconto"
+                                  : "Juros/multa acordados"}
                             </span>
                             <span className="block text-xs">
                               {aMaisEhEncargo
                                 ? "Regra do Ciclone; não abate parcela."
-                                : "Combinado com o cliente; não abate parcela."}
+                                : aMaisEhParteDoEncargo
+                                  ? "Autorizado pelo gestor; não abate parcela."
+                                  : "Combinado com o cliente; não abate parcela."}
                             </span>
                           </button>
                           <button
@@ -1815,7 +1898,11 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                       }}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm dark:bg-dark-bg dark:text-dark-text"
                       rows={3}
-                      placeholder="Ex.: comprovante enviado pelo WhatsApp"
+                      placeholder={
+                        encargoNaoCobrado > 0.009
+                          ? "Ex.: gestor autorizou pagar sem juros"
+                          : "Ex.: comprovante enviado pelo WhatsApp"
+                      }
                     />
                   </div>
                 </div>
