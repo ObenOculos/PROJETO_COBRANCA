@@ -5,7 +5,6 @@ import {
   UserStar,
   Store,
   CircleCheckBig,
-  CalendarClock,
   ClipboardList,
   User,
   CloudUpload,
@@ -71,7 +70,7 @@ export const navigationItems: NavItemConfig[] = [
   },
   {
     id: "collectors-summary",
-    managerName: "Resumo",
+    managerName: "Cobradores",
     managerIcon: ClipboardList,
     roles: ["manager"],
   },
@@ -91,12 +90,6 @@ export const navigationItems: NavItemConfig[] = [
     id: "clients",
     managerName: "Clientes",
     managerIcon: UserStar,
-    roles: ["manager"],
-  },
-  {
-    id: "visit-tracking",
-    managerName: "Acompanhamento",
-    managerIcon: CalendarClock,
     roles: ["manager"],
   },
   {

@@ -32,6 +32,15 @@ const AppContent: React.FC = () => {
     const savedTab = localStorage.getItem("managerActiveTab");
     // "performance" (Desempenho) saiu do menu em 16/11: cai no Resumo.
     if (savedTab === "performance") return "collectors-summary";
+    // "visit-tracking" (Acompanhamento) virou aba da pagina Cobradores (16/11).
+    if (savedTab === "visit-tracking") {
+      try {
+        localStorage.setItem("managerSummaryView", "acompanhamento");
+      } catch {
+        // sem storage: abre no Resumo
+      }
+      return "collectors-summary";
+    }
     return savedTab && savedTab !== "overview" ? savedTab : "collections";
   });
 

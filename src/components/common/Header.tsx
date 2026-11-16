@@ -194,7 +194,7 @@ const Header: React.FC<HeaderProps> = ({
                     <span className={`font-medium`}>{tab.name}</span>
                   )}
                   {(showDesktopText || isMobile) &&
-                    tab.id === "visit-tracking" &&
+                    tab.id === "collectors-summary" &&
                     pendingCancellations > 0 && (
                       <span
                         className={`ml-auto h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium`}

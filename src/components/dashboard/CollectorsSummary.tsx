@@ -35,6 +35,7 @@ import { toYYYYMMDD } from "../../filters/dates";
 import { formatCurrency, calculateOverdueDays } from "../../utils/formatters";
 import ContactScheduler from "./ContactScheduler";
 import CollectorPerformanceModal from "./CollectorPerformanceModal";
+import VisitScheduler from "./VisitScheduler";
 import SaidasSemAcaoModal from "./SaidasSemAcao";
 import { useSaidasSemAcao } from "../../hooks/useSaidasSemAcao";
 import { valorRecebidoTotal } from "../../filters/sales";
@@ -224,6 +225,13 @@ const CollectorsSummary: React.FC = () => {
   const [detalheCobradorId, setDetalheCobradorId] = useState<string | null>(
     null,
   );
+  // Cobrador externo agenda VISITA presencial (VisitScheduler, o mesmo do
+  // "Nova Visita" do Acompanhamento); carteira agenda CONTATO
+  // (ContactScheduler). Cada tipo so ve o botao do seu canal -- abrir o
+  // VisitScheduler para interno criaria visita presencial por engano.
+  const [scheduleVisitCollectorId, setScheduleVisitCollectorId] = useState<
+    string | null
+  >(null);
   // Tabela e melhor pra comparar/rankear muitos cobradores (a lista ja vem
   // ordenada por vencidaValor); Cards fica melhor pra olhar 1-2 em detalhe —
   // por isso o padrao (sem preferencia salva) e Tabela.
@@ -1093,10 +1101,22 @@ const CollectorsSummary: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setScheduleContactCollectorId(row.id)}
+                      title="Agendar ligação/WhatsApp para vários clientes"
                       className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-700"
                     >
                       <CalendarClock className="h-3.5 w-3.5" />
-                      Agendar em massa
+                      Agendar contatos
+                    </button>
+                  )}
+                  {row.type === "collector" && (
+                    <button
+                      type="button"
+                      onClick={() => setScheduleVisitCollectorId(row.id)}
+                      title="Agendar visitas presenciais"
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-700"
+                    >
+                      <CalendarClock className="h-3.5 w-3.5" />
+                      Agendar visitas
                     </button>
                   )}
                 </div>
@@ -1361,10 +1381,22 @@ const CollectorsSummary: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setScheduleContactCollectorId(row.id)}
+                        title="Agendar ligação/WhatsApp para vários clientes"
                         className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-700"
                       >
                         <CalendarClock className="h-3 w-3" />
-                        Agendar em massa
+                        Agendar contatos
+                      </button>
+                    )}
+                    {row.type === "collector" && (
+                      <button
+                        type="button"
+                        onClick={() => setScheduleVisitCollectorId(row.id)}
+                        title="Agendar visitas presenciais"
+                        className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-700"
+                      >
+                        <CalendarClock className="h-3 w-3" />
+                        Agendar visitas
                       </button>
                     )}
                     {qtdSaidas(row.id) > 0 && (
@@ -1497,6 +1529,23 @@ const CollectorsSummary: React.FC = () => {
             collectorType: detalheCobrador.type,
           }}
         />
+      )}
+
+      {scheduleVisitCollectorId && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+          onClick={() => setScheduleVisitCollectorId(null)}
+        >
+          <div
+            className="rounded-2xl max-w-4xl w-full max-h-[95vh] overflow-y-auto minimal-scrollbar pr-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <VisitScheduler
+              collectorId={scheduleVisitCollectorId}
+              onClose={() => setScheduleVisitCollectorId(null)}
+            />
+          </div>
+        </div>
       )}
 
       {scheduleContactCollectorId && (
