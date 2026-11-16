@@ -6,6 +6,7 @@ import { useCollection } from "../../contexts/CollectionContext";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 import { isAjusteOuEstorno } from "../../filters/sales";
 import { round2 } from "../../filters/clientStatus";
+import { supabase } from "../../lib/supabase";
 import {
   listarPedidosCorrecao,
   PedidoCorrecao,
@@ -129,6 +130,77 @@ const CorrigirPagamentoModal: React.FC<Props> = ({
       );
   }, [salePayments, clientGroup.document, gestor, usuarioId]);
 
+  // Parcelas que cada lancamento quitou/abateu, para o cobrador achar o
+  // pagamento certo sem adivinhar pelo valor (o estorno e por lancamento,
+  // nao por parcela). Vem de recebimentos_historico (origem 'app'); pagamento
+  // antigo (antes de 06/10/2026) ou fora do alcance da RLS fica sem a linha.
+  const idsPagamentos = useMemo(
+    () => pagamentos.map((p) => p.id).sort().join(","),
+    [pagamentos],
+  );
+  const [parcelasPorPagamento, setParcelasPorPagamento] = useState<
+    Map<string, string>
+  >(new Map());
+  useEffect(() => {
+    if (!idsPagamentos) return;
+    let cancelado = false;
+    // id_parcela -> "parcela 3 da venda 1248"
+    const rotuloParcela = new Map<number, { venda: number; parcela: number | null }>();
+    clientGroup.sales.forEach((s) =>
+      s.installments.forEach((i) =>
+        rotuloParcela.set(i.id_parcela, {
+          venda: s.saleNumber,
+          parcela: i.parcela ?? null,
+        }),
+      ),
+    );
+    void (async () => {
+      const { data, error } = await supabase
+        .from("recebimentos_historico")
+        .select("sale_payment_id, id_parcela, recebido_antes, recebido_depois")
+        .in("sale_payment_id", idsPagamentos.split(","))
+        .eq("origem", "app")
+        .order("id", { ascending: true });
+      if (cancelado) return;
+      if (error) {
+        console.error("Erro ao buscar parcelas dos pagamentos:", error);
+        return;
+      }
+      // pagamento -> venda -> parcelas
+      const porPag = new Map<string, Map<number, number[]>>();
+      (data ?? []).forEach((r) => {
+        if (!r.sale_payment_id) return;
+        const aplicado =
+          (Number(r.recebido_depois) || 0) - (Number(r.recebido_antes) || 0);
+        if (aplicado <= 0.009) return;
+        const info = rotuloParcela.get(r.id_parcela);
+        if (!info || info.parcela == null) return;
+        const vendas = porPag.get(r.sale_payment_id) ?? new Map();
+        const lista = vendas.get(info.venda) ?? [];
+        if (!lista.includes(info.parcela)) lista.push(info.parcela);
+        vendas.set(info.venda, lista);
+        porPag.set(r.sale_payment_id, vendas);
+      });
+      const textos = new Map<string, string>();
+      porPag.forEach((vendas, pagId) => {
+        const partes: string[] = [];
+        vendas.forEach((parcelas, venda) => {
+          const nums = [...parcelas].sort((a, b) => a - b);
+          const lista =
+            nums.length === 1
+              ? `parcela ${nums[0]}`
+              : `parcelas ${nums.slice(0, -1).join(", ")} e ${nums[nums.length - 1]}`;
+          partes.push(venda ? `${lista} da venda ${venda}` : lista);
+        });
+        textos.set(pagId, partes.join("; "));
+      });
+      setParcelasPorPagamento(textos);
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [idsPagamentos, clientGroup.sales]);
+
   const atual = pagamentos.find((p) => p.id === escolhido) ?? null;
   const pedidoDoAtual = atual
     ? pedidoAbertoPorPagamento.get(atual.id)
@@ -240,7 +312,21 @@ const CorrigirPagamentoModal: React.FC<Props> = ({
                 na ficha do cliente.
               </p>
             )}
-            <div className="flex justify-end">
+            <div className="flex flex-wrap justify-end gap-2">
+              {/* Estorno e por lancamento: quem lancou duas parcelas em
+                  pagamentos separados corrige o segundo em sequencia, com o
+                  mesmo motivo ja preenchido. */}
+              <button
+                onClick={() => {
+                  setResultado(null);
+                  setEscolhido(null);
+                  setValorTexto("");
+                  setErro(null);
+                }}
+                className="rounded-lg border border-gray-300 dark:border-dark-border px-4 py-2 text-sm font-semibold text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-bg"
+              >
+                {gestor ? "Corrigir outro pagamento" : "Pedir correção de outro pagamento"}
+              </button>
               <button
                 onClick={onClose}
                 className="rounded-lg bg-gray-900 dark:bg-white px-4 py-2 text-sm font-semibold text-white dark:text-gray-900"
@@ -306,8 +392,15 @@ const CorrigirPagamentoModal: React.FC<Props> = ({
                           <div className="text-sm font-medium text-gray-900 dark:text-dark-text">
                             {formatDate(p.paymentDate)} ·{" "}
                             {p.paymentMethod || "Pagamento"}
-                            {p.saleNumber ? ` · venda #${p.saleNumber}` : ""}
+                            {p.saleNumber && !parcelasPorPagamento.get(p.id)
+                              ? ` · venda #${p.saleNumber}`
+                              : ""}
                           </div>
+                          {parcelasPorPagamento.get(p.id) && (
+                            <div className="text-xs text-gray-700 dark:text-dark-text">
+                              Quitou/abateu: {parcelasPorPagamento.get(p.id)}
+                            </div>
+                          )}
                           <div className="text-[11px] text-gray-500 dark:text-dark-text-secondary truncate">
                             {p.collectorName || "—"}
                             {p.notes ? ` · ${p.notes}` : ""}

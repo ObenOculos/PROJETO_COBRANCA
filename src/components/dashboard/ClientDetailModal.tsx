@@ -560,7 +560,9 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
 
     // Forçar uma nova renderização local
     setRefreshKey((prev) => prev + 1);
-    setIsGeneralEditModalOpen(false);
+    // A janela de correcao fica aberta mostrando o resultado (o que foi
+    // desfeito em quais parcelas) e oferece "Corrigir outro pagamento"; ela
+    // fecha pelo botao Fechar.
   };
 
   const toggleSaleExpansion = (saleNumber: number) => {
