@@ -32,6 +32,15 @@ const AppContent: React.FC = () => {
     const savedTab = localStorage.getItem("managerActiveTab");
     // "performance" (Desempenho) saiu do menu em 16/11: cai no Resumo.
     if (savedTab === "performance") return "collectors-summary";
+    // "carteira-distribuicao" virou a aba Automatica da Atribuicao (16/11).
+    if (savedTab === "carteira-distribuicao") {
+      try {
+        localStorage.setItem("managerAtribuicaoView", "automatica");
+      } catch {
+        // sem storage: abre na Manual
+      }
+      return "clients";
+    }
     // "visit-tracking" (Acompanhamento) virou aba da pagina Cobradores (16/11).
     if (savedTab === "visit-tracking") {
       try {

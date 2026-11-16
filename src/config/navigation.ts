@@ -2,7 +2,6 @@ import {
   HandCoins,
   MapPin,
   Calendar,
-  UserStar,
   Store,
   CircleCheckBig,
   ClipboardList,
@@ -75,8 +74,10 @@ export const navigationItems: NavItemConfig[] = [
     roles: ["manager"],
   },
   {
-    id: "carteira-distribuicao",
-    managerName: "Distribuição",
+    // Atribuicao: abas Manual (ClientAssignment) e Automatica/Alcance
+    // (CarteiraDistribuicao) -- reuniao 16/11, itens 5/6.
+    id: "clients",
+    managerName: "Atribuição",
     managerIcon: Shuffle,
     roles: ["manager"],
   },
@@ -84,12 +85,6 @@ export const navigationItems: NavItemConfig[] = [
     id: "stores",
     managerName: "Desempenho Loja",
     managerIcon: Store,
-    roles: ["manager"],
-  },
-  {
-    id: "clients",
-    managerName: "Clientes",
-    managerIcon: UserStar,
     roles: ["manager"],
   },
   {

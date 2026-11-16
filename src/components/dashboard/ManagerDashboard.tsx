@@ -7,6 +7,8 @@ import {
   Filter,
   Scale,
   Search,
+  Shuffle,
+  UserStar,
 } from "lucide-react";
 import FilterBar from "../common/FilterBar";
 import { CollectionTable } from "./CollectionTable";
@@ -78,7 +80,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     | "authorization"
     | "database-upload"
     | "acordo-config"
-    | "carteira-distribuicao"
   >(() => {
     const savedTab = localStorage.getItem("managerActiveTab");
     return (savedTab as any) || "collections";
@@ -135,6 +136,26 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     nonce: number;
   } | null>(null);
 
+  // Abas da pagina Atribuicao (reuniao 16/11, itens 5/6).
+  type AtribuicaoView = "manual" | "automatica";
+  const [atribuicaoView, setAtribuicaoView] = useState<AtribuicaoView>(() => {
+    try {
+      return localStorage.getItem("managerAtribuicaoView") === "automatica"
+        ? "automatica"
+        : "manual";
+    } catch {
+      return "manual";
+    }
+  });
+  const changeAtribuicaoView = (v: AtribuicaoView) => {
+    setAtribuicaoView(v);
+    try {
+      localStorage.setItem("managerAtribuicaoView", v);
+    } catch {
+      // sem storage: so nao lembra a aba
+    }
+  };
+
   const handleNotificationClick = (notification: Notification) => {
     // A aba ja foi trocada pelo App; aqui so os filtros da tela de destino.
     const destino = notification.destino;
@@ -149,6 +170,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
       }
       if (destino.atribuicao) {
         setAssignmentPreset({ status: destino.atribuicao, nonce: Date.now() });
+        changeAtribuicaoView("manual");
       }
       return;
     }
@@ -232,14 +254,19 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
 
   // O Relatorio do Caixa vive dentro da aba de cobrancas, mas soma recebimentos
   // do dia — inclui clientes que quitaram tudo. Entra na mesma regra.
+  // A aba Automatica da Atribuicao (CarteiraDistribuicao) tem consulta
+  // propria e nao usa os titulos: nao dispara a carga completa.
+  const tabNeedsFullScope =
+    TABS_NEEDING_FULL_SCOPE.has(activeTab) &&
+    !(activeTab === "clients" && atribuicaoView === "automatica");
   const needsFullScope =
-    TABS_NEEDING_FULL_SCOPE.has(activeTab) ||
+    tabNeedsFullScope ||
     (activeTab === "collections" &&
       (collectionsView === "cash-report" || filterWantsSettledClients));
 
   // Motivo da promoção, pra quem clicou num filtro ou abriu uma aba entender
   // por que a tela parou pra carregar tudo em vez de só trocar de conteúdo.
-  const fullScopeReason = TABS_NEEDING_FULL_SCOPE.has(activeTab)
+  const fullScopeReason = tabNeedsFullScope
     ? "para calcular os números completos desta tela"
     : collectionsView === "cash-report"
       ? "para montar o Relatório de Caixa"
@@ -466,17 +493,58 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
       case "stores":
         return <EnhancedStoreManagement />;
 
-      case "clients":
+      case "clients": {
+        const abasAtribuicao: {
+          id: AtribuicaoView;
+          icon: React.ElementType;
+          label: string;
+          short: string;
+        }[] = [
+          { id: "manual", icon: UserStar, label: "Manual", short: "Manual" },
+          {
+            id: "automatica",
+            icon: Shuffle,
+            label: "Automática / Alcance",
+            short: "Automática",
+          },
+        ];
         return (
-          <ClientAssignment
-            key={assignmentPreset?.nonce}
-            initialAssignmentFilter={assignmentPreset?.status}
-            onViewClient={(clientIdentifier) => {
-              setFilters({ search: clientIdentifier });
-              setActiveTab("collections");
-            }}
-          />
+          <div className="space-y-4">
+            <div className="flex bg-gray-100 dark:bg-dark-bg rounded-md p-0.5 w-full sm:w-fit">
+              {abasAtribuicao.map((aba) => {
+                const Icon = aba.icon;
+                return (
+                  <button
+                    key={aba.id}
+                    onClick={() => changeAtribuicaoView(aba.id)}
+                    className={`flex-1 sm:flex-none inline-flex items-center justify-center px-3 lg:px-4 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap touch-manipulation ${
+                      atribuicaoView === aba.id
+                        ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
+                        : "text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
+                    }`}
+                  >
+                    <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 lg:mr-2" />
+                    <span className="hidden sm:inline">{aba.label}</span>
+                    <span className="sm:hidden">{aba.short}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {atribuicaoView === "manual" ? (
+              <ClientAssignment
+                key={assignmentPreset?.nonce}
+                initialAssignmentFilter={assignmentPreset?.status}
+                onViewClient={(clientIdentifier) => {
+                  setFilters({ search: clientIdentifier });
+                  setActiveTab("collections");
+                }}
+              />
+            ) : (
+              <CarteiraDistribuicao />
+            )}
+          </div>
         );
+      }
 
       case "authorization":
         return <AbaPedidosGestor />;
@@ -484,12 +552,12 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
       case "users":
         return (
           <UserManagement
-            onOpenDistribuicao={() => setActiveTab("carteira-distribuicao")}
+            onOpenDistribuicao={() => {
+              changeAtribuicaoView("automatica");
+              setActiveTab("clients");
+            }}
           />
         );
-
-      case "carteira-distribuicao":
-        return <CarteiraDistribuicao />;
 
       default:
         return null;
