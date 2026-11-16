@@ -1727,6 +1727,36 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                           const t = partes.join(" e ") || "nada é quitado";
                           return t.charAt(0).toUpperCase() + t.slice(1) + ".";
                         })()}
+                        {/* Juros informados saem do valor recebido: explica a
+                        diferenca e oferece o valor com os juros por cima
+                        (confusao vista com o usuario, 2026-11-16). */}
+                        {jurosInformado > 0 && (
+                          <div className="mt-1 space-y-1.5">
+                            <p>
+                              Os {formatCurrency(jurosInformado)} de juros/multa
+                              saem dos {formatCurrency(amountToDistribute)}{" "}
+                              recebidos: só {formatCurrency(alocacao.principal)}{" "}
+                              vão para as parcelas (faltam{" "}
+                              {formatCurrency(
+                                round2(alocacao.somaParcelas - alocacao.principal),
+                              )}
+                              ).
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDistributionAmount(
+                                  valorParaCampo(alocacao.esperado),
+                                );
+                                setErroEtapa(null);
+                              }}
+                              className="rounded-full border border-sky-300 bg-white px-3 py-1 text-xs font-semibold text-sky-800 hover:bg-sky-100 dark:bg-dark-bg dark:text-sky-200"
+                            >
+                              O cliente pagou {formatCurrency(alocacao.esperado)}{" "}
+                              (parcelas + juros)
+                            </button>
+                          </div>
+                        )}
                       </Aviso>
                     )}
 
