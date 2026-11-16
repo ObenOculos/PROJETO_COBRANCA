@@ -1380,11 +1380,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
           `✅ ${successCount} visita${successCount !== 1 ? "s" : ""} agendada${successCount !== 1 ? "s" : ""} com sucesso!`,
           "success",
         );
-
-        // Refresh dos dados para atualizar outras abas
-        if (isOnline) {
-          await refreshData();
-        }
+        // Sem refreshData: scheduleVisit ja poe a visita nova no estado local
+        // e agendar so grava em scheduled_visits (o unico trigger dela so
+        // mexe em updated_at). Recarregar tudo baixava a carteira inteira
+        // de novo (~59 MB para o gestor, item 65). Ver o reagendamento.
       }
       if (errorCount > 0) {
         triggerNotification(
@@ -1489,11 +1488,10 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
           "success",
         );
       }
-
-      // Refresh dos dados para atualizar outras abas
-      if (isOnline) {
-        await refreshData();
-      }
+      // Sem refreshData: updateVisitStatus ja atualiza a visita no estado
+      // local e, quando o desfecho libera o cliente da carteira, tambem a
+      // carteira (user_id/situacao) -- ver CollectionContext. Nada mais muda.
+      // Recarregar tudo custava a carteira inteira de novo (item 65).
     } catch (error) {
       console.error("Erro ao atualizar status da visita:", error);
       alert("Erro ao atualizar status da visita");
