@@ -253,7 +253,6 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         numero: number | null;
         /** Multa + juros do Ciclone ate a data do pagamento (item 67); 0 se nao ha. */
         encargo: number;
-        temEncargoHoje: boolean;
       }[] = [];
       (clientSales || []).forEach((sale) =>
         sale.installments?.forEach((inst) => {
@@ -281,8 +280,6 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
             numero: inst.parcela ?? null,
             // Ate o dia em que o cliente pagou (nao ate hoje).
             encargo: encargoParcela(inst, dataPagamento)?.encargo ?? 0,
-            // Hoje: decide se a data do pagamento aparece ja na etapa 1.
-            temEncargoHoje: (encargoParcela(inst)?.encargo ?? 0) > 0.009,
           });
         }),
       );
@@ -695,6 +692,9 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
 
     /** Erro da etapa 1 (valor), ou null. */
     const erroDoValor = (): string | null => {
+      if (!dataPagamentoValida) {
+        return `Escolha uma data entre ${dataMinima.split("-").reverse().join("/")} e hoje.`;
+      }
       if (modoParcelas && qtdMarcadas === 0) {
         return "Marque a(s) parcela(s) que o cliente está pagando.";
       }
@@ -727,11 +727,8 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       return null;
     };
 
-    /** Erro da etapa 2 (forma, data, observação), ou null. */
+    /** Erro da etapa 2 (forma e observação), ou null. A data e da etapa 1. */
     const erroDoPagamento = (): string | null => {
-      if (!dataPagamentoValida) {
-        return `Escolha uma data entre ${dataMinima.split("-").reverse().join("/")} e hoje.`;
-      }
       if (observacaoObrigatoria && !observations.trim()) {
         return `Explique ${motivoObservacao} na observação.`;
       }
@@ -1370,55 +1367,6 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                             )}
                         </ul>
                       )}
-                      {/* Item 67: multa/juros dependem do dia em que o cliente
-                      pagou -- a data vem antes dos atalhos (a mesma da
-                      etapa 2). Externo registra sempre hoje. */}
-                      {qtdMarcadas > 0 &&
-                        modoParcelas &&
-                        podeEscolherData &&
-                        parcelasAbertas
-                          .slice(0, qtdMarcadas)
-                          .some((p) => p.temEncargoHoje) && (
-                          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-                            <span className="text-gray-600 dark:text-dark-text-secondary">
-                              Quando pagou?
-                            </span>
-                            {(
-                              [
-                                ["Hoje", hoje],
-                                ["Ontem", addDaysLocalStr(hoje, -1)],
-                              ] as const
-                            ).map(([rotulo, valor]) => (
-                              <button
-                                key={rotulo}
-                                type="button"
-                                onClick={() => {
-                                  setDataPagamento(valor);
-                                  setErroEtapa(null);
-                                }}
-                                className={`px-2.5 py-1 rounded-lg border text-xs font-medium ${
-                                  dataPagamento === valor
-                                    ? "border-indigo-500 bg-indigo-50 text-indigo-800"
-                                    : "border-gray-200 text-gray-700 hover:border-gray-300"
-                                }`}
-                              >
-                                {rotulo}
-                              </button>
-                            ))}
-                            <input
-                              type="date"
-                              value={dataPagamento}
-                              min={dataMinima}
-                              max={hoje}
-                              onChange={(e) => {
-                                setDataPagamento(e.target.value);
-                                setErroEtapa(null);
-                              }}
-                              className="px-2 py-1 border border-gray-300 dark:border-dark-border rounded-lg text-xs dark:bg-dark-bg dark:text-dark-text"
-                              aria-label="Outra data do pagamento"
-                            />
-                          </div>
-                        )}
                       {qtdMarcadas > 0 &&
                         modoParcelas &&
                         encargoMarcadas > 0.009 &&
@@ -1504,6 +1452,57 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                   )}
 
                   <div className="space-y-5 min-w-0">
+                    {/* Data do pagamento: um lugar so, antes do valor -- a multa e os
+                    juros do Ciclone sao calculados ate ela. So quem pode lancar
+                    baixa depois (externo e sempre hoje). */}
+                    {podeEscolherData && (
+                      <fieldset>
+                        <legend className="text-sm font-semibold text-gray-900 dark:text-dark-text mb-2">
+                          Quando pagou?
+                        </legend>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {(
+                            [
+                              ["Hoje", hoje],
+                              ["Ontem", addDaysLocalStr(hoje, -1)],
+                            ] as const
+                          ).map(([rotulo, valor]) => (
+                            <button
+                              key={rotulo}
+                              type="button"
+                              onClick={() => {
+                                setDataPagamento(valor);
+                                setErroEtapa(null);
+                              }}
+                              className={`px-3 py-2 rounded-xl border-2 text-sm font-medium ${
+                                dataPagamento === valor
+                                  ? "border-indigo-500 bg-indigo-50 text-indigo-800"
+                                  : "border-gray-200 text-gray-700 hover:border-gray-300"
+                              }`}
+                            >
+                              {rotulo}
+                            </button>
+                          ))}
+                          <input
+                            id="payment-date"
+                            name="paymentDate"
+                            type="date"
+                            value={dataPagamento}
+                            min={dataMinima}
+                            max={hoje}
+                            onChange={(e) => {
+                              setDataPagamento(e.target.value);
+                              setErroEtapa(null);
+                            }}
+                            className="px-3 py-2 border border-gray-300 dark:border-dark-border rounded-xl text-sm dark:bg-dark-bg dark:text-dark-text"
+                            aria-label="Outra data"
+                          />
+                        </div>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Até {DIAS_RETROATIVOS} dias atrás.
+                        </p>
+                      </fieldset>
+                    )}
                     <div>
                       <label
                         htmlFor="distribution-amount"
@@ -1932,55 +1931,6 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                       </div>
                     </fieldset>
 
-                    {/* Data: so quem pode lancar baixa depois (externo e hoje) */}
-                    {podeEscolherData && (
-                      <fieldset>
-                        <legend className="text-sm font-semibold text-gray-900 dark:text-dark-text mb-2">
-                          Quando pagou?
-                        </legend>
-                        <div className="flex flex-wrap items-center gap-2">
-                          {(
-                            [
-                              ["Hoje", hoje],
-                              ["Ontem", addDaysLocalStr(hoje, -1)],
-                            ] as const
-                          ).map(([rotulo, valor]) => (
-                            <button
-                              key={rotulo}
-                              type="button"
-                              onClick={() => {
-                                setDataPagamento(valor);
-                                setErroEtapa(null);
-                              }}
-                              className={`px-3 py-2 rounded-xl border-2 text-sm font-medium ${
-                                dataPagamento === valor
-                                  ? "border-indigo-500 bg-indigo-50 text-indigo-800"
-                                  : "border-gray-200 text-gray-700 hover:border-gray-300"
-                              }`}
-                            >
-                              {rotulo}
-                            </button>
-                          ))}
-                          <input
-                            id="payment-date"
-                            name="paymentDate"
-                            type="date"
-                            value={dataPagamento}
-                            min={dataMinima}
-                            max={hoje}
-                            onChange={(e) => {
-                              setDataPagamento(e.target.value);
-                              setErroEtapa(null);
-                            }}
-                            className="px-3 py-2 border border-gray-300 dark:border-dark-border rounded-xl text-sm dark:bg-dark-bg dark:text-dark-text"
-                            aria-label="Outra data"
-                          />
-                        </div>
-                        <p className="mt-1 text-xs text-gray-500">
-                          Até {DIAS_RETROATIVOS} dias atrás.
-                        </p>
-                      </fieldset>
-                    )}
                   </div>
                   <div>
                     <label
