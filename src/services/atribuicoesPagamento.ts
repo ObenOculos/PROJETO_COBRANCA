@@ -98,3 +98,50 @@ export const decidirAtribuicaoPagamento = async (p: {
   if (error) throw new Error(mensagem(error, "Falha ao registrar a decisão."));
   return data as { decisao: string; parcelas: number; valor?: number };
 };
+
+// ---------------------------------------------------------------------------
+// Gestor (etapa 2, migration 20261116000004)
+// ---------------------------------------------------------------------------
+
+/** Parcela paga pelo ERP x cobrador que conversou com o cliente nos 30 dias
+ * ate o pagamento. Com `pedido_lote` null = elegivel sem pedido. */
+export interface LinhaPainelAtribuicao {
+  id_parcela: number;
+  documento: string;
+  cliente: string | null;
+  venda: number | null;
+  parcela: number | null;
+  valor: number;
+  data_pagamento: string;
+  loja: string | null;
+  cobrador_id: string;
+  contatos: number;
+  ultimo_contato_em: string;
+  ultimo_resultado: string;
+  pedido_lote: string | null;
+  pedido_decisao: "aberto" | "aprovado" | null;
+  pedido_cobrador_id: string | null;
+}
+
+export const carregarPainelAtribuicao = async (): Promise<
+  LinhaPainelAtribuicao[]
+> => {
+  const { data, error } = await supabase.rpc("atribuicoes_painel_gestor");
+  if (error) throw new Error(mensagem(error, "Falha ao carregar o painel."));
+  return (data ?? []) as LinhaPainelAtribuicao[];
+};
+
+/** Pedidos em aberto + decididos desde `desde` (ISO). So gestor ve todos. */
+export const listarAtribuicoesGestor = async (
+  desde: string,
+): Promise<AtribuicaoPagamento[]> =>
+  fetchAllRows<AtribuicaoPagamento>((from, to) =>
+    supabase
+      .from("atribuicoes_pagamento")
+      .select("*")
+      .or(`decisao.is.null,decidido_em.gte.${desde}`)
+      .order("created_at", { ascending: false })
+      .order("id")
+      .range(from, to)
+      .returns<AtribuicaoPagamento[]>(),
+  );

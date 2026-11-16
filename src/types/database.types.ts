@@ -2358,6 +2358,27 @@ export type Database = {
           isSetofReturn: true;
         };
       };
+      // Migration 20261116000004 (item 66, etapa 2).
+      atribuicoes_painel_gestor: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          id_parcela: number;
+          documento: string;
+          cliente: string | null;
+          venda: number | null;
+          parcela: number | null;
+          valor: number;
+          data_pagamento: string;
+          loja: string | null;
+          cobrador_id: string;
+          contatos: number;
+          ultimo_contato_em: string;
+          ultimo_resultado: string;
+          pedido_lote: string | null;
+          pedido_decisao: string | null;
+          pedido_cobrador_id: string | null;
+        }[];
+      };
       // Migration 20261116000003 (item 66).
       parcelas_para_atribuicao: {
         Args: { p_documento: string };

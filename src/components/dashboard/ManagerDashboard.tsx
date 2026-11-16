@@ -18,7 +18,7 @@ import VisitTracking from "./VisitTracking";
 import CollectorsSummary from "./CollectorsSummary";
 import ConferenciaRecebimentos from "./ConferenciaRecebimentos";
 import DailyCashReport from "./DailyCashReport";
-import PedidosCorrecao from "./PedidosCorrecao";
+import AbaPedidosGestor from "./AbaPedidosGestor";
 import AcordoConfiguracaoPadrao from "./AcordoConfiguracaoPadrao";
 import CarteiraDistribuicao from "./CarteiraDistribuicao";
 import TabTransition from "../common/TabTransition";
@@ -457,7 +457,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
         return <VisitTracking />;
 
       case "authorization":
-        return <PedidosCorrecao />;
+        return <AbaPedidosGestor />;
 
       case "users":
         return (
