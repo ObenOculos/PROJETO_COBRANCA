@@ -50,7 +50,7 @@ import {
 } from "../../utils/formatters";
 import { FilterOptions, ClientGroup, User, ScheduledVisit } from "../../types";
 import { Notification } from "../../contexts/NotificationContext";
-import { resolveSaleKey } from "../../filters/sales";
+import { resolveSaleKey, valorRecebidoTotal } from "../../filters/sales";
 import {
   hasOpenBalance,
   hasInstallmentBalance,
@@ -1182,7 +1182,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
           (p) =>
             p.collectorId === user?.id && p.paymentDate.startsWith(mesAtual),
         )
-        .reduce((sum, p) => sum + p.paymentAmount, 0) + acordoPagamentosMes;
+        .reduce((sum, p) => sum + valorRecebidoTotal(p), 0) + acordoPagamentosMes;
     // Item 34: o volume da carteira e o que JA VENCEU. O a vencer aparece a
     // parte, como informacao (o cliente continua na carteira).
     const totalPending = walletFilteredGroups.reduce(
@@ -2783,7 +2783,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
     const metrics = {
       daily: {
         visits: todayVisits.length,
-        payments: dailyPayments.reduce((sum, p) => sum + p.paymentAmount, 0),
+        payments: dailyPayments.reduce((sum, p) => sum + valorRecebidoTotal(p), 0),
       },
       weekly: {
         visits: visits.filter((v) => {
@@ -2797,7 +2797,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
             const paymentDate = toDate(p.paymentDate);
             return paymentDate && paymentDate >= startOfWeek;
           })
-          .reduce((sum, p) => sum + p.paymentAmount, 0),
+          .reduce((sum, p) => sum + valorRecebidoTotal(p), 0),
       },
       monthly: {
         visits: visits.filter((v) => {
@@ -2811,7 +2811,7 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
             const paymentDate = toDate(p.paymentDate);
             return paymentDate && paymentDate >= startOfMonth;
           })
-          .reduce((sum, p) => sum + p.paymentAmount, 0),
+          .reduce((sum, p) => sum + valorRecebidoTotal(p), 0),
       },
     };
 

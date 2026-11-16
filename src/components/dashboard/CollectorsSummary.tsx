@@ -35,6 +35,7 @@ import { formatCurrency, calculateOverdueDays } from "../../utils/formatters";
 import ContactScheduler from "./ContactScheduler";
 import SaidasSemAcaoModal from "./SaidasSemAcao";
 import { useSaidasSemAcao } from "../../hooks/useSaidasSemAcao";
+import { valorRecebidoTotal } from "../../filters/sales";
 
 interface CollectorRow {
   id: string;
@@ -430,7 +431,7 @@ const CollectorsSummary: React.FC = () => {
           .filter(
             (p) => p.collectorId === collector.id && inPeriod(p.paymentDate),
           )
-          .reduce((sum, p) => sum + p.paymentAmount, 0);
+          .reduce((sum, p) => sum + valorRecebidoTotal(p), 0);
 
         const myVisits = scheduledVisits.filter(
           (v) => v.collectorId === collector.id,
@@ -641,7 +642,7 @@ const CollectorsSummary: React.FC = () => {
           teamCollectorIds.has(p.collectorId) &&
           p.paymentDate.startsWith(mesAtual),
       )
-      .reduce((sum, p) => sum + p.paymentAmount, 0);
+      .reduce((sum, p) => sum + valorRecebidoTotal(p), 0);
 
     if (targetValue <= 0) return null;
 

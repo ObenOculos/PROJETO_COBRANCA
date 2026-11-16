@@ -13,6 +13,7 @@ import { formatCurrency } from "../../utils/formatters";
 import { todayLocalStr, addDaysLocalStr } from "../../config/visitStatus";
 import { useAtendimentosPeriodo } from "../../hooks/useAtendimentosPeriodo";
 import SummaryCard from "../common/SummaryCard";
+import { valorRecebidoTotal } from "../../filters/sales";
 
 /**
  * "Meu desempenho" do cobrador de carteira: mesmo formato de card do Resumo
@@ -68,6 +69,7 @@ interface Props {
     collectorId?: string | null;
     paymentDate: string;
     paymentAmount: number;
+    jurosAmount?: number;
   }[];
   /** Meta de recebimento do mes (0 = sem meta). */
   metaMes: number;
@@ -183,7 +185,7 @@ const MeuDesempenho: React.FC<Props> = ({
         const d = (p.paymentDate || "").slice(0, 10);
         return p.collectorId === userId && d >= de && d <= ate;
       })
-      .reduce((s, p) => s + p.paymentAmount, 0) +
+      .reduce((s, p) => s + valorRecebidoTotal(p), 0) +
     acordoPagos
       .filter((p) => p.data >= de && p.data <= ate)
       .reduce((s, p) => s + p.valor, 0);

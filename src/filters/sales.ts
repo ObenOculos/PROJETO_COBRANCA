@@ -30,6 +30,51 @@ export const isAjusteOuEstorno = (p: {
   !!p.estornoDe ||
   /^(ajuste|estorno)/i.test(p.paymentMethod ?? "");
 
+/**
+ * Quanto o cobrador recebeu de fato neste registro: principal (o que abate
+ * parcela) + juros/multa cobrados junto (sale_payments.juros_amount, migration
+ * 20261109000008 — nao abatem parcela, mas entram no caixa e no desempenho).
+ * Estorno chega com juros negativos proporcionais (ver jurosDosEstornos).
+ * Fonte unica: todo total de "recebido" (caixa, desempenho, resumo) usa isto.
+ */
+export const valorRecebidoTotal = (p: {
+  paymentAmount: number;
+  jurosAmount?: number | null;
+}): number => (Number(p.paymentAmount) || 0) + (Number(p.jurosAmount) || 0);
+
+/**
+ * estornar_pagamento / registrar_ajuste_recebimento gravam o estorno com
+ * juros_amount 0 (o CHECK nao aceita negativo), entao os juros do original
+ * continuariam somando depois do estorno. Aqui o estorno recebe, so na
+ * leitura, juros negativos na proporcao do valor estornado — estorno total
+ * zera os juros do original. Nao altera nada gravado.
+ */
+export const jurosDosEstornos = <
+  T extends {
+    id: string;
+    paymentAmount: number;
+    jurosAmount?: number | null;
+    estornoDe?: string | null;
+  },
+>(
+  payments: T[],
+): T[] => {
+  const porId = new Map(payments.map((p) => [p.id, p]));
+  return payments.map((p) => {
+    if (!p.estornoDe) return p;
+    const original = porId.get(p.estornoDe);
+    const jurosOriginal = Number(original?.jurosAmount) || 0;
+    const valorOriginal = Number(original?.paymentAmount) || 0;
+    if (!original || jurosOriginal <= 0 || valorOriginal <= 0) return p;
+    const fracao = Math.min(
+      1,
+      Math.abs(Number(p.paymentAmount) || 0) / valorOriginal,
+    );
+    const juros = -Math.round(jurosOriginal * fracao * 100) / 100;
+    return { ...p, jurosAmount: juros };
+  });
+};
+
 export const resolveSaleKey = (
   c: Pick<Collection, "numero_titulo" | "venda_n">,
 ): number => c.numero_titulo ?? c.venda_n ?? 0;

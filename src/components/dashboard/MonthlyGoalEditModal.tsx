@@ -12,6 +12,7 @@ import { supabase } from "../../lib/supabase";
 import { useCollection } from "../../contexts/CollectionContext";
 import { Modal } from "../Modal";
 import { isWalletCollectorType } from "../../config/profiles";
+import { valorRecebidoTotal } from "../../filters/sales";
 
 interface MonthlyGoalEditModalProps {
   isOpen: boolean;
@@ -156,7 +157,7 @@ const MonthlyGoalEditModal: React.FC<MonthlyGoalEditModalProps> = ({
         if (!d) return;
         const key = monthYearKey(d.getFullYear(), d.getMonth());
         if (key in sumsByKey) {
-          sumsByKey[key] += Number(p.paymentAmount || 0);
+          sumsByKey[key] += valorRecebidoTotal(p);
         }
       });
 

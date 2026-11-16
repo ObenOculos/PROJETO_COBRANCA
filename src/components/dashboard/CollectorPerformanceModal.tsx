@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { formatCurrency } from "../../utils/formatters";
 import { useCollection } from "../../contexts/CollectionContext";
-import { resolveSaleKey } from "../../filters/sales";
+import { resolveSaleKey, valorRecebidoTotal } from "../../filters/sales";
 import { Modal } from "../Modal";
 import TabTransition from "../common/TabTransition";
 import { supabase } from "../../lib/supabase";
@@ -287,7 +287,7 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
             paymentDate.getUTCFullYear() === goalYear
           );
         })
-        .reduce((sum, p) => sum + p.paymentAmount, 0);
+        .reduce((sum, p) => sum + valorRecebidoTotal(p), 0);
 
       const visitsPerformance =
         goal.visits_goal > 0 ? (visitsInMonth / goal.visits_goal) * 100 : 0;

@@ -69,7 +69,7 @@ import {
   hasOpenBalance,
   normalizePaymentStatus,
 } from "../filters/clientStatus";
-import { resolveSaleKey } from "../filters/sales";
+import { jurosDosEstornos, resolveSaleKey } from "../filters/sales";
 import { documentoCombina } from "../filters/documento";
 import { toYYYYMMDD } from "../filters/dates";
 import {
@@ -3754,16 +3754,21 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             createdAt: payment.created_at,
             distribution_details: payment.distribution_details || [], // Corrected casing
             discountAmount: payment.discount_amount, // Added this line
+            jurosAmount: Number(payment.juros_amount) || 0,
             clientName: payment.client_name,
             estornoDe: payment.estorno_de,
             motivo: payment.motivo,
           }) as unknown as SalePayment,
       );
 
-      setSalePayments(convertedPayments);
+      // Estorno grava juros 0: na leitura ele passa a desfazer os juros do
+      // original na proporcao estornada (filters/sales jurosDosEstornos).
+      const paymentsComJuros = jurosDosEstornos(convertedPayments);
+
+      setSalePayments(paymentsComJuros);
 
       // Cache the data
-      dataCache.set(cacheKey, convertedPayments);
+      dataCache.set(cacheKey, paymentsComJuros);
 
       console.log(
         `✅ ${convertedPayments.length} pagamentos carregados da tabela sale_payments`,

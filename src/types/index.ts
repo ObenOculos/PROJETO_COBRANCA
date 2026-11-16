@@ -747,6 +747,9 @@ export interface SalePayment {
   createdAt: string;
   distribution_details: PaymentDistribution[];
   discountAmount?: number;
+  /** Juros/multa cobrados junto (nao abatem parcela). Total recebido =
+   * valorRecebidoTotal (filters/sales). Em estorno, negativo proporcional. */
+  jurosAmount?: number;
   isAgreement?: boolean;
   storeName?: string;
   updatedAt?: string;

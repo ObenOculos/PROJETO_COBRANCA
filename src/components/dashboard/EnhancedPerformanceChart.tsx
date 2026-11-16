@@ -15,7 +15,7 @@ import { useCollection } from "../../contexts/CollectionContext";
 import { supabase } from "../../lib/supabase";
 import { formatCurrency } from "../../utils/formatters";
 import { getClientPaymentStatus } from "../../filters/clientStatus";
-import { resolveSaleKey } from "../../filters/sales";
+import { resolveSaleKey, valorRecebidoTotal } from "../../filters/sales";
 import {
   visitEffectiveDate,
   isVisitOverdue,
@@ -888,7 +888,7 @@ const EnhancedPerformanceChart: React.FC = () => {
       if (!isDateInSelectedMonths(parseDateSafely(p.paymentDate))) return;
       receivedByCollector.set(
         p.collectorId,
-        (receivedByCollector.get(p.collectorId) ?? 0) + p.paymentAmount,
+        (receivedByCollector.get(p.collectorId) ?? 0) + valorRecebidoTotal(p),
       );
     });
 

@@ -28,7 +28,7 @@ import * as XLSX from "xlsx";
 import { Collection, isCollectorType } from "../../types";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 import { useCollection } from "../../contexts/CollectionContext";
-import { resolveSaleKey } from "../../filters/sales";
+import { resolveSaleKey, valorRecebidoTotal } from "../../filters/sales";
 import { useAuth } from "../../contexts/AuthContext";
 import ClientDetailModal from "./ClientDetailModal";
 import { ClientGroup } from "../../types";
@@ -43,6 +43,8 @@ interface DailyReportData {
   totalTransactions: number;
   /** Soma dos descontos dados NOS pagamentos do período. */
   totalPaymentDiscount: number;
+  /** Juros/multa cobrados junto (ja incluidos em totalReceived). */
+  totalPaymentJuros: number;
   /** Situação atual das dívidas envolvidas, cada cliente/venda contado uma vez. */
   debtTotals: {
     totalDebt: number;
@@ -68,6 +70,8 @@ interface DailyReportData {
     totalPendingValue: number;
     /** Desconto dado neste pagamento. */
     paymentDiscount: number;
+    /** Juros/multa deste pagamento (ja incluidos em totalReceivedValue). */
+    paymentJuros: number;
     /** Chave cliente/venda da dívida (para não somar a mesma dívida 2x). */
     debtKey: string;
     totalDebt: number;
@@ -360,7 +364,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       }
 
       // Filtro de valor
-      const paymentAmount = payment.paymentAmount;
+      const paymentAmount = valorRecebidoTotal(payment);
       if (minAmount && paymentAmount < parseFloat(minAmount)) return false;
       if (maxAmount && paymentAmount > parseFloat(maxAmount)) return false;
 
@@ -415,7 +419,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       }
 
       const saleData = salesMap.get(saleKey)!;
-      saleData.totalReceived += payment.paymentAmount;
+      saleData.totalReceived += valorRecebidoTotal(payment);
     });
 
     // Agrupar por cobrador
@@ -477,6 +481,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
         totalPaidOnDebt: number;
         totalPendingValue: number;
         paymentDiscount: number;
+        paymentJuros: number;
         debtKey: string;
         totalDebt: number;
         remainingDebt: number;
@@ -551,7 +556,8 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
           saleNumber: payment.saleNumber?.toString() || "",
           store: anyClientRecord?.nome_da_loja || "",
           totalOriginalValue: specificInstallment?.valor_original || 0,
-          totalReceivedValue: payment.paymentAmount,
+          // Recebido = parcela + juros (o que o cobrador entregou).
+          totalReceivedValue: valorRecebidoTotal(payment),
           totalPaidOnDebt: totalAlreadyPaidValue,
           totalPendingValue: Math.max(
             0,
@@ -559,6 +565,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
               (specificInstallment?.valor_recebido || 0),
           ),
           paymentDiscount: Number(payment.discountAmount) || 0,
+          paymentJuros: Number(payment.jurosAmount) || 0,
           debtKey: `${payment.clientDocument}|${
             payment.saleNumber && payment.saleNumber !== 0
               ? payment.saleNumber
@@ -610,7 +617,8 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       ...sale,
       totalPendingValue: Math.max(
         0,
-        sale.totalOriginalValue - sale.totalReceivedValue,
+        // Juros nao abatem parcela: o pendente usa so o principal.
+        sale.totalOriginalValue - (sale.totalReceivedValue - sale.paymentJuros),
       ),
     }));
 
@@ -637,6 +645,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
         (sum, p) => sum + p.paymentDiscount,
         0,
       ),
+      totalPaymentJuros: payments.reduce((sum, p) => sum + p.paymentJuros, 0),
       debtTotals,
       totalTransactions: salesMap.size, // Conta vendas únicas em vez de parcelas
       collectorSummary,
@@ -704,6 +713,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       [""],
       ["MÉTRICAS GERAIS"],
       ["Total Arrecadado", reportData.totalReceived],
+      ["Juros (incluídos no total)", reportData.totalPaymentJuros],
       [
         "Total de Descontos",
         reportData.totalPaymentDiscount,
@@ -765,6 +775,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
         "Cobrador",
         "Forma Pagamento",
         "Valor Recebido",
+        "Juros (incluídos)",
         "Total Pago (Histórico)",
         "Desconto",
         "Total da Dívida",
@@ -781,6 +792,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       p.collector,
       p.paymentMethod,
       p.totalReceivedValue,
+      p.paymentJuros,
       p.totalPaidOnDebt,
       p.paymentDiscount,
       p.totalDebt,
@@ -802,6 +814,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       { wch: 20 }, // Cobrador
       { wch: 15 }, // Forma
       { wch: 18 }, // Recebido Hoje
+      { wch: 14 }, // Juros
       { wch: 18 }, // Total Pago Histórico
       { wch: 12 }, // Desconto
       { wch: 15 }, // Total Dívida
@@ -1204,6 +1217,11 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
             <p className="text-5xl font-black mt-1 tracking-tight">
               {formatCurrency(reportData.totalReceived)}
             </p>
+            {reportData.totalPaymentJuros > 0 && (
+              <p className="text-emerald-100 text-xs font-bold mt-1">
+                inclui {formatCurrency(reportData.totalPaymentJuros)} de juros
+              </p>
+            )}
             {reportData.totalTransactions > 0 && (
               <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full backdrop-blur-sm border border-white/10">
                 <Activity className="h-3.5 w-3.5 text-emerald-200" />
@@ -1474,6 +1492,11 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                           <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">
                             {formatCurrency(payment.totalReceivedValue)}
                           </p>
+                          {payment.paymentJuros > 0 && (
+                            <p className="text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary whitespace-nowrap">
+                              {formatCurrency(payment.paymentJuros)} de juros
+                            </p>
+                          )}
                         </td>
                         <td className="px-4 py-4 text-right hidden xl:table-cell">
                           <p className="text-xs font-bold text-gray-500 dark:text-dark-text-secondary">
@@ -1586,6 +1609,7 @@ const generateReportContent = (
     "=".repeat(60),
     "",
     `Total Recebido: ${formatCurrency(data.totalReceived)}`,
+    `Juros (incluídos no total): ${formatCurrency(data.totalPaymentJuros)}`,
     `Total de Descontos: ${formatCurrency(data.totalPaymentDiscount)}`,
     `Total de Vendas: ${data.totalTransactions}`,
     `Cobradores Ativos: ${data.collectorSummary.length}`,
@@ -1614,7 +1638,7 @@ const generateReportContent = (
         `Data do Pagamento: ${formatDate(payment.receivedDate)}`,
         `${payment.saleNumber ? `Venda: #${payment.saleNumber}` : "Venda sem número"} | Loja: ${payment.store}`,
         `Forma de Pagamento: ${payment.paymentMethod}`,
-        `Valor Recebido: ${formatCurrency(payment.totalReceivedValue)} | Desconto: ${formatCurrency(payment.paymentDiscount)}`,
+        `Valor Recebido: ${formatCurrency(payment.totalReceivedValue)}${payment.paymentJuros > 0 ? ` (juros ${formatCurrency(payment.paymentJuros)})` : ""} | Desconto: ${formatCurrency(payment.paymentDiscount)}`,
         `Total da Dívida: ${formatCurrency(payment.totalDebt)} | Pendente Atual: ${payment.remainingDebt > 0 ? formatCurrency(payment.remainingDebt) : "Quitado"}`,
         `Cobrador: ${payment.collector}`,
         "",
@@ -1859,6 +1883,7 @@ const generatePrintableReport = (
           <div class="summary-item">
             <div class="label">Total Recebido</div>
             <div class="value">${formatCurrency(data.totalReceived)}</div>
+            ${data.totalPaymentJuros > 0 ? `<div class="label">inclui ${formatCurrency(data.totalPaymentJuros)} de juros</div>` : ""}
           </div>
           <div class="summary-item">
             <div class="label">Total Descontos</div>
@@ -1928,7 +1953,7 @@ const generatePrintableReport = (
             <td>${p.saleNumber ? `#${p.saleNumber}` : "Sem número"}</td>
             <td>${p.store}</td>
             <td>${p.paymentMethod}</td>
-            <td style="font-weight: bold; text-align: right;">${formatCurrency(p.totalReceivedValue)}</td>
+            <td style="font-weight: bold; text-align: right;">${formatCurrency(p.totalReceivedValue)}${p.paymentJuros > 0 ? `<div class="small-text" style="font-weight: normal;">juros ${formatCurrency(p.paymentJuros)}</div>` : ""}</td>
             <td style="text-align: right;">${formatCurrency(p.totalPaidOnDebt)}</td>
             <td style="text-align: right; color: #e67e22;">${p.paymentDiscount > 0 ? formatCurrency(p.paymentDiscount) : "-"}</td>
             <td style="text-align: right;">${formatCurrency(p.totalDebt)}</td>
@@ -1961,6 +1986,10 @@ const generatePrintableReport = (
             <div class="total-row">
               <span class="label">Total Recebido${isRangeMode ? " no Período" : " no Dia"}:</span>
               <span class="value">${formatCurrency(data.totalReceived)}</span>
+            </div>
+            <div class="total-row">
+              <span class="label">Juros (incluídos no total):</span>
+              <span class="value">${formatCurrency(data.totalPaymentJuros)}</span>
             </div>
             <div class="total-row">
               <span class="label">Total Descontos:</span>

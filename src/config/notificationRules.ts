@@ -10,7 +10,7 @@ import {
   UserType,
 } from "../types";
 import { isVisitOpen, isVisitOverdue, todayLocalStr } from "./visitStatus";
-import { isAjusteOuEstorno } from "../filters/sales";
+import { isAjusteOuEstorno, valorRecebidoTotal } from "../filters/sales";
 
 // ---------------------------------------------------------------------------
 // Regras das notificacoes automaticas
@@ -175,7 +175,7 @@ export const gerarNotificacoes = (params: {
       !isAjusteOuEstorno(p),
   );
   if (recebidosHoje.length > 0) {
-    const total = recebidosHoje.reduce((s, p) => s + p.paymentAmount, 0);
+    const total = recebidosHoje.reduce((s, p) => s + valorRecebidoTotal(p), 0);
     lista.push({
       id: id("recebidos-hoje", `${recebidosHoje.length}-${total.toFixed(2)}`),
       type: "payment",
