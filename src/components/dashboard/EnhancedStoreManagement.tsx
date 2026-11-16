@@ -404,7 +404,7 @@ const EnhancedStoreManagement: React.FC = () => {
       "Valor Atrasado (R$)",
       "Títulos Atrasados",
       "Total de Clientes",
-      "Base Inadimplência (R$)",
+      "Esperado - Inadimplência (R$)",
       "Não Pago (R$)",
       "Ticket Médio (R$)",
     ];
@@ -647,7 +647,7 @@ const EnhancedStoreManagement: React.FC = () => {
           </div>
           <p
             className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide"
-            title="Do que venceu no período, quanto não foi pago. Parcela com até 30 dias de atraso conta como atraso, não como inadimplência."
+            title="Do que era esperado no período, quanto não foi pago. Parcela com até 30 dias de atraso conta como atraso, não como inadimplência."
           >
             {descricaoRecorteInadimplencia(recorteInad)}
           </p>
@@ -666,12 +666,32 @@ const EnhancedStoreManagement: React.FC = () => {
             </p>
           )}
           <div className="pt-3 border-t border-gray-100 dark:border-dark-border space-y-1 text-[11px] font-medium">
-            <div className="flex justify-between gap-2">
+            <div
+              className="flex justify-between gap-2"
+              title={`Parcelas que venceram há mais de ${INADIMPLENCIA_CORTE_DIAS} dias no período: o que deveria ter entrado`}
+            >
               <span className="text-gray-500 dark:text-dark-text-secondary">
-                Venceu
+                Esperado
               </span>
               <span className="font-semibold text-gray-700 dark:text-dark-text truncate">
                 {formatCurrency(overviewStats.inadGeral.venceu)}
+              </span>
+            </div>
+            <div
+              className="flex justify-between gap-2"
+              title="Do esperado, o que entrou (descontos concedidos contam como resolvidos)"
+            >
+              <span className="text-gray-500 dark:text-dark-text-secondary">
+                Pago
+              </span>
+              <span className="font-semibold text-green-600 dark:text-green-400 truncate">
+                {formatCurrency(
+                  Math.max(
+                    0,
+                    overviewStats.inadGeral.venceu -
+                      overviewStats.inadGeral.naoPago,
+                  ),
+                )}
               </span>
             </div>
             <div className="flex justify-between gap-2">
@@ -944,7 +964,8 @@ const EnhancedStoreManagement: React.FC = () => {
                       <div className="flex justify-between items-center mb-1">
                         <span className="text-[10px] font-semibold tracking-wide text-gray-400 dark:text-dark-text-secondary truncate">
                           Inadimplência · {formatCurrencyCompact(store.inadNaoPago)}{" "}
-                          de {formatCurrencyCompact(store.dueAmount)}
+                          não pago de {formatCurrencyCompact(store.dueAmount)}{" "}
+                          esperado
                         </span>
                         <span
                           className={`text-xs font-bold ${statusTextColor}`}
@@ -1363,12 +1384,12 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
               </div>
               <p
                 className="text-base sm:text-xl font-extrabold whitespace-nowrap text-blue-950 dark:text-blue-200"
-                title={`${formatCurrency(store.inadNaoPago)} não pago de ${formatCurrency(store.dueAmount)} (atraso > ${INADIMPLENCIA_CORTE_DIAS} dias)`}
+                title={`${formatCurrency(store.inadNaoPago)} não pago de ${formatCurrency(store.dueAmount)} esperado (atraso > ${INADIMPLENCIA_CORTE_DIAS} dias)`}
               >
                 {formatarInadimplencia(store.inadimplencia, store.dueAmount)}
               </p>
               <p className="text-[10px] sm:text-xs text-blue-650/70 dark:text-blue-400/70 mt-1 truncate">
-                Do que venceu, não pago
+                Do esperado, não pago
               </p>
             </div>
 
