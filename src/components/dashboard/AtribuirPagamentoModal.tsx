@@ -152,9 +152,9 @@ const AtribuirPagamentoModal: React.FC<Props> = ({ clientGroup, onClose }) => {
               {enviado.qtd === 1 ? "parcela" : "parcelas"}) enviado ao gestor.
             </div>
             <p className="text-sm text-gray-600 dark:text-dark-text-secondary">
-              Quando o gestor aprovar, o valor conta no seu desempenho, na data
-              do pagamento. Ele não entra no seu caixa, porque o dinheiro foi
-              recebido pela loja.
+              Quando o gestor aprovar, o pagamento fica registrado no seu nome,
+              na data em que foi pago. Ele não entra no seu caixa, porque o
+              dinheiro foi recebido pela loja.
             </p>
             <div className="flex justify-end">
               <button
@@ -170,8 +170,9 @@ const AtribuirPagamentoModal: React.FC<Props> = ({ clientGroup, onClose }) => {
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
               <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
                 Marque o que o cliente pagou na loja ou no banco depois que você
-                cobrou. O gestor confere e, se aprovar, o valor conta no seu
-                desempenho. Não muda a parcela e não entra no seu caixa.
+                cobrou. O gestor confere e, se aprovar, o pagamento fica
+                registrado no seu nome. Não muda a parcela e não entra no seu
+                caixa.
               </p>
 
               {parcelas === null ? (

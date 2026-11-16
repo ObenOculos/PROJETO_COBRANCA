@@ -346,6 +346,18 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         .reduce((soma, p) => soma + p.encargo, 0),
     );
     const usarEncargoCiclone = () => {
+      // Valor ainda so com as parcelas (ex.: clicou "Todo o vencido" antes)
+      // ou vazio: soma o encargo ao valor recebido. Sem isso os juros sairiam
+      // de dentro do valor e a ultima parcela nao quitaria.
+      const soParcelas = round2(alocacao.somaParcelas + jurosInformado);
+      if (
+        amountToDistribute <= 0 ||
+        Math.abs(amountToDistribute - soParcelas) <= 0.01
+      ) {
+        setDistributionAmount(
+          valorParaCampo(round2(alocacao.somaParcelas + encargoMarcadas)),
+        );
+      }
       setMostrarJuros(true);
       setJurosTexto(encargoMarcadas.toFixed(2).replace(".", ","));
       setErroEtapa(null);

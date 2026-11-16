@@ -776,7 +776,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                   setIsAtribuirOpen(true);
                                 }}
                                 className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left"
-                                title="O cliente pagou na loja ou no banco depois que você cobrou: peça ao gestor para contar no seu desempenho"
+                                title="O cliente pagou na loja ou no banco depois que você cobrou: peça ao gestor para registrar o pagamento no seu nome"
                               >
                                 <Store className="h-4 w-4 text-gray-500" />
                                 Cliente pagou na loja

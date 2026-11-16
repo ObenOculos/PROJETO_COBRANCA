@@ -198,8 +198,10 @@ const PedidosAtribuicao: React.FC = () => {
         </h2>
         <p className="mt-1 text-xs text-gray-500 dark:text-dark-text-secondary">
           O cliente pagou na loja ou no banco depois que o cobrador conversou
-          com ele. Aprovado, o valor conta no desempenho e na meta do cobrador,
-          na data do pagamento. Não mexe na parcela e não entra no caixa dele.
+          com ele. Aprovado, o pagamento fica registrado no nome do cobrador,
+          na data em que foi pago. Não mexe na parcela e não entra no caixa
+          dele. Ainda não soma no Desempenho, na meta nem no Resumo por
+          Cobrador (próxima etapa).
         </p>
       </div>
 
