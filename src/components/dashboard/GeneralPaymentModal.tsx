@@ -164,6 +164,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     const {
       scheduleVisit,
       processSalePayment,
+      refreshData,
       getAcordoAtivoDoCliente,
       acordoAtivoOverdueMap,
       scheduledVisits,
@@ -937,22 +938,36 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
 
         // Juros/multa vao junto da primeira venda (um registro so).
         let jurosPendente = jurosValor;
-        for (const item of saleDistribution) {
-          if (item.appliedAmount > 0 || item.appliedDiscount > 0) {
-            await processSalePayment(
-              {
-                saleNumber: item.sale.saleNumber,
-                clientDocument: clientGroup.document || "",
-                paymentAmount: item.appliedAmount,
-                paymentMethod: paymentMethod,
-                notes: observations.trim(),
-                discountAmount: item.appliedDiscount,
-                jurosAmount: jurosPendente,
-                paymentDate: podeEscolherData ? dataPagamento : undefined,
-              },
-              user.id,
+        let gravouAlgum = false;
+        try {
+          for (const item of saleDistribution) {
+            if (item.appliedAmount > 0 || item.appliedDiscount > 0) {
+              await processSalePayment(
+                {
+                  saleNumber: item.sale.saleNumber,
+                  clientDocument: clientGroup.document || "",
+                  paymentAmount: item.appliedAmount,
+                  paymentMethod: paymentMethod,
+                  notes: observations.trim(),
+                  discountAmount: item.appliedDiscount,
+                  jurosAmount: jurosPendente,
+                  paymentDate: podeEscolherData ? dataPagamento : undefined,
+                },
+                user.id,
+                false, // recarrega uma vez so, abaixo
+              );
+              jurosPendente = 0;
+              gravouAlgum = true;
+            }
+          }
+        } finally {
+          // Uma recarga so, mesmo com varias vendas -- e tambem quando uma
+          // venda do meio falha, para a tela mostrar o que ja foi gravado.
+          // Offline nao recarrega (os pagamentos estao na fila).
+          if (gravouAlgum && isOnline) {
+            await refreshData().catch((err) =>
+              console.error("Erro ao recarregar depois do pagamento:", err),
             );
-            jurosPendente = 0;
           }
         }
 

@@ -604,6 +604,9 @@ export interface CollectionContextType {
   processSalePayment: (
     payment: SalePaymentInput,
     collectorId: string,
+    /** false: nao recarrega os dados no fim -- quem grava varias vendas
+     * seguidas recarrega uma vez so depois (padrao: true). */
+    recarregar?: boolean,
   ) => Promise<void>;
   processGeneralPayment: (
     clientDocument: string,

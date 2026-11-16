@@ -522,11 +522,9 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   const vendasVisiveis = vendasPorAba[abaEfetiva];
 
   const handleGeneralPaymentSuccess = async () => {
-    // Pequeno delay para garantir que a operação no banco seja concluída
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    // Forçar refresh dos dados do contexto
-    await refreshCollections();
+    // Sem recarregar aqui: o Receber pagamento ja recarrega os dados uma vez
+    // depois de gravar (a RPC termina antes de ele chamar o onSuccess).
+    // Recarregar de novo baixava a carteira inteira mais uma vez (item 65).
 
     // Disparar evento global para atualizar outros componentes
     window.dispatchEvent(

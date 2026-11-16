@@ -3774,6 +3774,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   const processSalePayment = async (
     payment: SalePaymentInput & { discountAmount?: number },
     collectorId: string,
+    recarregar = true,
   ) => {
     setGlobalLoading(true, "Processando pagamento...");
     try {
@@ -3818,7 +3819,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       }
 
       console.log("✅ RPC process_payment executado com sucesso.");
-      await refreshData();
+      // Pagamento de varias vendas: quem chama recarrega uma vez no fim, em
+      // vez de baixar a carteira inteira a cada venda (item 65).
+      if (recarregar) await refreshData();
     } catch (err) {
       console.error("Erro ao processar pagamento de venda:", err);
       setError(
