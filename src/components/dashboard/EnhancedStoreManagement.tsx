@@ -37,6 +37,9 @@ import {
 import { todayLocalStr } from "../../config/visitStatus";
 import {
   inadimplenciaDe,
+  descricaoRecorteInadimplencia,
+  INADIMPLENCIA_CORTE_DIAS,
+  INADIMPLENCIA_JANELA_DIAS,
   nivelInadimplencia,
   NivelInadimplencia,
 } from "../../filters/inadimplencia";
@@ -90,9 +93,12 @@ interface StoreStats {
   discountAmount: number;
   overdueAmount: number; // saldo em aberto de parcelas já vencidas
   overdueTitles: number; // nº de parcelas vencidas com saldo
-  /** Valor original das parcelas ja vencidas (base da inadimplencia). */
+  /** Base da inadimplencia: valor original das parcelas com atraso acima do
+   * corte, no periodo (filters/inadimplencia). */
   dueAmount: number;
-  /** Do que venceu, quanto nao foi pago (%) -- filters/inadimplencia. */
+  /** Saldo em aberto dessas parcelas. */
+  inadNaoPago: number;
+  /** inadNaoPago / dueAmount (%) -- filters/inadimplencia. */
   inadimplencia: number;
   averageTicket: number;
   clientsCount: number;
@@ -110,6 +116,10 @@ const EnhancedStoreManagement: React.FC = () => {
   // Filtros compartilhados (status, cidade, vencimento, lancamento, valor) que
   // refinam a fonte de dados das lojas.
   const [filters, setFilters] = useState<FilterOptions>({});
+  // Inadimplencia: com filtro de vencimento vale o recorte do usuario; sem
+  // ele, os vencimentos dos ultimos 12 meses (filters/inadimplencia).
+  const janelaInad =
+    filters.dateFrom || filters.dateTo ? null : INADIMPLENCIA_JANELA_DIAS;
   const sourceCollections = useMemo(
     () => getFilteredCollections(filters, "manager"),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -219,7 +229,9 @@ const EnhancedStoreManagement: React.FC = () => {
       const completedSales = salesArray.filter(
         (s) => s.totalValue - s.paidValue - s.discountValue <= 0.01,
       ).length;
-      const inad = inadimplenciaDe(periodCollections);
+      const inad = inadimplenciaDe(periodCollections, {
+        janelaDias: janelaInad,
+      });
 
       // ATRASO: saldo em aberto (valor - recebido - desconto) das PARCELAS cujo
       // vencimento já passou. Calculado por parcela (não por venda) para refletir
@@ -287,6 +299,7 @@ const EnhancedStoreManagement: React.FC = () => {
         overdueAmount,
         overdueTitles,
         dueAmount: inad.venceu,
+        inadNaoPago: inad.naoPago,
         inadimplencia: inad.pct,
         averageTicket:
           salesArray.length > 0 ? totalAmount / salesArray.length : 0,
@@ -295,7 +308,7 @@ const EnhancedStoreManagement: React.FC = () => {
     });
 
     return stats;
-  }, [availableStores, collectors, sourceCollections]);
+  }, [availableStores, collectors, sourceCollections, janelaInad]);
 
   // Ordena as lojas (busca/cobrador/status sao aplicados na fonte via FilterBar).
   const filteredAndSortedStores = useMemo(() => {
@@ -350,7 +363,9 @@ const EnhancedStoreManagement: React.FC = () => {
       0,
     );
     // Inadimplencia geral: soma dos valores (nao media dos % das lojas).
-    const inadGeral = inadimplenciaDe(sourceCollections);
+    const inadGeral = inadimplenciaDe(sourceCollections, {
+      janelaDias: janelaInad,
+    });
 
     return {
       totalStores,
@@ -365,7 +380,7 @@ const EnhancedStoreManagement: React.FC = () => {
       totalOverdue,
       inadGeral,
     };
-  }, [storeStats, sourceCollections]);
+  }, [storeStats, sourceCollections, janelaInad]);
 
   const exportStoreData = () => {
     // Headers with better formatting
@@ -385,7 +400,8 @@ const EnhancedStoreManagement: React.FC = () => {
       "Valor Atrasado (R$)",
       "Títulos Atrasados",
       "Total de Clientes",
-      "Valor que Venceu (R$)",
+      "Base Inadimplência (R$)",
+      "Não Pago (R$)",
       "Ticket Médio (R$)",
     ];
 
@@ -411,6 +427,7 @@ const EnhancedStoreManagement: React.FC = () => {
       s.overdueTitles.toString(),
       s.clientsCount.toString(),
       s.dueAmount.toFixed(2),
+      s.inadNaoPago.toFixed(2),
       s.averageTicket.toFixed(2),
     ]);
 
@@ -601,8 +618,11 @@ const EnhancedStoreManagement: React.FC = () => {
               Inadimplência
             </h3>
           </div>
-          <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">
-            Do que já venceu, não foi pago
+          <p
+            className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide"
+            title="Do que venceu no período, quanto não foi pago. Parcela com até 30 dias de atraso conta como atraso, não como inadimplência."
+          >
+            {descricaoRecorteInadimplencia(janelaInad)}
           </p>
           <p
             className={`text-2xl sm:text-3xl font-extrabold tracking-tight mb-3 ${COR_NIVEL[nivelInadimplencia(overviewStats.inadGeral.pct)].text}`}
@@ -624,6 +644,14 @@ const EnhancedStoreManagement: React.FC = () => {
               </span>
               <span className="font-semibold text-red-600 dark:text-red-400 truncate">
                 {formatCurrency(overviewStats.inadGeral.naoPago)}
+              </span>
+            </div>
+            <div className="flex justify-between gap-2">
+              <span className="text-gray-500 dark:text-dark-text-secondary">
+                Em atraso até {INADIMPLENCIA_CORTE_DIAS} dias
+              </span>
+              <span className="font-semibold text-amber-600 dark:text-amber-400 truncate">
+                {formatCurrency(overviewStats.inadGeral.atrasoRecente)}
               </span>
             </div>
           </div>
@@ -879,8 +907,8 @@ const EnhancedStoreManagement: React.FC = () => {
                     <div className="mt-3">
                       <div className="flex justify-between items-center mb-1">
                         <span className="text-[10px] font-semibold tracking-wide text-gray-400 dark:text-dark-text-secondary truncate">
-                          Inadimplência · {formatCurrencyCompact(store.overdueAmount)}{" "}
-                          de {formatCurrencyCompact(store.dueAmount)} vencidos
+                          Inadimplência · {formatCurrencyCompact(store.inadNaoPago)}{" "}
+                          de {formatCurrencyCompact(store.dueAmount)}
                         </span>
                         <span
                           className={`text-xs font-bold ${statusTextColor}`}
@@ -1299,7 +1327,7 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
               </div>
               <p
                 className="text-base sm:text-xl font-extrabold whitespace-nowrap text-blue-950 dark:text-blue-200"
-                title={`${formatCurrency(store.overdueAmount)} não pago de ${formatCurrency(store.dueAmount)} que venceu`}
+                title={`${formatCurrency(store.inadNaoPago)} não pago de ${formatCurrency(store.dueAmount)} (atraso > ${INADIMPLENCIA_CORTE_DIAS} dias)`}
               >
                 {store.inadimplencia.toFixed(1)}%
               </p>
