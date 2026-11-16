@@ -2024,30 +2024,33 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
         )}
       </td>
       <td className="px-6 py-4 text-right" onClick={() => onOpenDetail(group)}>
-        <div className="flex flex-col">
+        <div className="flex flex-col gap-1">
           {quitado ? (
             <span className="font-bold text-emerald-600 dark:text-emerald-400">
               Quitado
             </span>
           ) : emDia ? (
             <span className="font-bold text-gray-400">{formatCurrency(0)}</span>
+          ) : encargo && encargo.encargo > 0.009 ? (
+            // Item 67: com multa/juros do Ciclone o numero em destaque e o
+            // valor de HOJE (o que se cobra); a linha de baixo mostra de
+            // onde vem. Sem caixa, para nao crescer a linha da fila.
+            <span
+              className="flex flex-col items-end gap-0.5"
+              title={`Vencido ${formatCurrency(saldo.vencido)} + multa ${formatCurrency(encargo.multa)} + juros ${formatCurrency(encargo.juros)} (Ciclone, até hoje). Cobre o total de hoje, não só o vencido.`}
+            >
+              <span className="inline-flex items-center gap-1 font-bold text-red-600 dark:text-red-400">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                {formatCurrency(saldo.vencido + encargo.encargo)}
+              </span>
+              <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 whitespace-nowrap">
+                {formatCurrency(saldo.vencido)} +{" "}
+                {formatCurrency(encargo.encargo)} juros
+              </span>
+            </span>
           ) : (
             <span className="font-bold text-red-600 dark:text-red-400">
               {formatCurrency(saldo.vencido)}
-            </span>
-          )}
-          {encargo && encargo.encargo > 0.009 && (
-            <span
-              className="mt-1 self-end inline-flex flex-col items-end rounded-lg border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
-              title={`Multa ${formatCurrency(encargo.multa)} + juros ${formatCurrency(encargo.juros)} do Ciclone até hoje. Cobre o total de hoje, não só o vencido.`}
-            >
-              <span className="inline-flex items-center gap-1">
-                <AlertTriangle className="h-3 w-3" />+{" "}
-                {formatCurrency(encargo.encargo)} multa e juros
-              </span>
-              <span className="text-[11px]">
-                Hoje: {formatCurrency(saldo.vencido + encargo.encargo)}
-              </span>
             </span>
           )}
           {encargo?.conferirNoErp && (

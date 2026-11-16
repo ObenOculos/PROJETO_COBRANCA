@@ -489,20 +489,24 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     };
   }, [clientSales, saldoPorVenda, resumoPorVenda]);
 
-  // Ao abrir a ficha, as vendas com parcela em atraso ja vem abertas (uma
-  // vez; depois o cobrador abre/fecha a vontade). Aberta numa venda
-  // especifica (vendaInicial), nao mexe.
-  const autoExpandiuAtrasadas = React.useRef(vendaInicial != null);
+  // As vendas com parcela em atraso ja vem abertas. Cada uma abre UMA vez,
+  // quando aparece (as vendas podem chegar depois da primeira renderizacao);
+  // fechada pelo cobrador, nao reabre. Aberta numa venda especifica
+  // (vendaInicial) ou com acordo ativo, nao mexe.
+  const vendasAutoAbertas = React.useRef<Set<number>>(new Set());
   useEffect(() => {
-    if (autoExpandiuAtrasadas.current || clientSales.length === 0) return;
-    autoExpandiuAtrasadas.current = true;
-    if (acordoAtivo) return;
-    const atrasadas = clientSales
-      .filter((sale) => (resumoPorVenda.get(sale.saleNumber)?.vencido ?? 0) > 0.01)
+    if (vendaInicial != null || acordoAtivo) return;
+    const novas = clientSales
+      .filter(
+        (sale) =>
+          (resumoPorVenda.get(sale.saleNumber)?.vencido ?? 0) > 0.01 &&
+          !vendasAutoAbertas.current.has(sale.saleNumber),
+      )
       .map((sale) => sale.saleNumber);
-    if (atrasadas.length > 0)
-      setExpandedSales((atual) => new Set([...atual, ...atrasadas]));
-  }, [clientSales, resumoPorVenda, acordoAtivo]);
+    if (novas.length === 0) return;
+    novas.forEach((n) => vendasAutoAbertas.current.add(n));
+    setExpandedSales((atual) => new Set([...atual, ...novas]));
+  }, [clientSales, resumoPorVenda, acordoAtivo, vendaInicial]);
   const abaEfetiva: AbaVendas =
     abaVendas ?? (vendasPorAba.aberto.length > 0 ? "aberto" : "todos");
   const vendasVisiveis = vendasPorAba[abaEfetiva];
@@ -662,17 +666,6 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                     Em acordo
                   </span>
                 )}
-                {encargoFicha && encargoFicha.encargo > 0.009 && (
-                  <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 font-medium inline-flex items-center gap-1">
-                    <AlertTriangle className="h-3.5 w-3.5" />
-                    Com multa e juros, hoje:{" "}
-                    <strong>
-                      {formatCurrency(
-                        saldoCliente.vencido + encargoFicha.encargo,
-                      )}
-                    </strong>
-                  </span>
-                )}
               </div>
 
               {/* Atender e Receber pagamento sao o dia a dia; Acordo ao lado;
@@ -793,21 +786,21 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
             {/* Item 67: aviso de multa e juros (Ciclone) -- o cobrador nao
                 pode cobrar so o vencido. */}
             {encargoFicha && encargoFicha.encargo > 0.009 && (
-              <div className="mt-2 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+              <div
+                className="mt-2 flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs text-amber-900"
+                title="Este cliente tem multa e juros de atraso: cobre o valor de hoje, não só o vencido. Mesma conta do Ciclone (Prev. Baixa); o valor sobe a cada dia de atraso."
+              >
+                <AlertTriangle className="h-4 w-4 flex-shrink-0" />
                 <div>
-                  <strong>Este cliente tem multa e juros de atraso.</strong>{" "}
-                  Cobre o valor de hoje, não só o vencido: vencido{" "}
-                  {formatCurrency(saldoCliente.vencido)} + multa{" "}
-                  {formatCurrency(encargoFicha.multa)} + juros{" "}
-                  {formatCurrency(encargoFicha.juros)} ={" "}
                   <strong>
+                    Cobrar hoje{" "}
                     {formatCurrency(
                       saldoCliente.vencido + encargoFicha.encargo,
                     )}
-                  </strong>
-                  . Mesma conta do Ciclone (Prev. Baixa); o valor sobe a cada
-                  dia de atraso.
+                  </strong>{" "}
+                  — vencido {formatCurrency(saldoCliente.vencido)} + multa{" "}
+                  {formatCurrency(encargoFicha.multa)} + juros{" "}
+                  {formatCurrency(encargoFicha.juros)}
                 </div>
               </div>
             )}
@@ -1258,12 +1251,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                           <AlertTriangle className="h-3 w-3" />
                                           Em atraso{" "}
                                           {formatCurrency(resumo.vencido)} ·{" "}
-                                          {resumo.qtdAtrasadas} parcela
-                                          {resumo.qtdAtrasadas !== 1 ? "s" : ""}{" "}
-                                          · {resumo.maiorAtraso} dia
+                                          {resumo.maiorAtraso} dia
                                           {resumo.maiorAtraso !== 1 ? "s" : ""}
-                                          {resumo.encargo > 0.009 &&
-                                            ` · + ${formatCurrency(resumo.encargo)} multa/juros`}
                                         </span>
                                       )}
                                       {resumo.aVencer > 0.01 && (
@@ -1271,28 +1260,42 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                           A vencer{" "}
                                           {formatCurrency(resumo.aVencer)}
                                           {resumo.proximoVencimento &&
-                                            ` · próxima ${formatDate(resumo.proximoVencimento)}`}
+                                            ` · próx. ${formatDate(resumo.proximoVencimento)}`}
                                         </span>
                                       )}
                                     </div>
                                   )}
-                                <p className="text-xs text-gray-500">
-                                  {sale.installments.length} parcela
-                                  {sale.installments.length !== 1 ? "s" : ""}
-                                  {lojasCliente.length > 1 &&
-                                    (() => {
-                                      const lojasVenda = [
-                                        ...new Set(
-                                          sale.installments
-                                            .map((i) => i.nome_da_loja)
-                                            .filter(Boolean),
-                                        ),
-                                      ];
-                                      return lojasVenda.length > 0
-                                        ? ` · ${lojasVenda.join(", ")}`
-                                        : "";
-                                    })()}
-                                </p>
+                                {(() => {
+                                  const lojasVenda =
+                                    lojasCliente.length > 1
+                                      ? [
+                                          ...new Set(
+                                            sale.installments
+                                              .map((i) => i.nome_da_loja)
+                                              .filter(Boolean),
+                                          ),
+                                        ]
+                                      : [];
+                                  const partes = [
+                                    ...(temSelos
+                                      ? []
+                                      : [
+                                          `${sale.installments.length} parcela${
+                                            sale.installments.length !== 1
+                                              ? "s"
+                                              : ""
+                                          }`,
+                                        ]),
+                                    ...(lojasVenda.length > 0
+                                      ? [lojasVenda.join(", ")]
+                                      : []),
+                                  ];
+                                  return partes.length > 0 ? (
+                                    <p className="text-xs text-gray-500">
+                                      {partes.join(" · ")}
+                                    </p>
+                                  ) : null;
+                                })()}
                               </div>
                             </div>
 
