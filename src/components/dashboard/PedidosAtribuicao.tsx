@@ -6,12 +6,15 @@ import {
   ChevronDown,
   ChevronRight,
   Store,
+  Hourglass,
+  ListChecks,
   XCircle,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 import { round2 } from "../../filters/clientStatus";
 import { ATTEMPT_RESULT_LABELS } from "../../config/collectionAttempts";
+import SummaryCard from "../common/SummaryCard";
 import {
   AtribuicaoPagamento,
   carregarPainelAtribuicao,
@@ -56,6 +59,10 @@ const PedidosAtribuicao: React.FC = () => {
   const [erroAcao, setErroAcao] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [cobradorAberto, setCobradorAberto] = useState<string | null>(null);
+  // Uma secao por vez (item 38): os cards do topo escolhem qual aparece.
+  const [secao, setSecao] = useState<"analise" | "elegiveis" | "decididos">(
+    "analise",
+  );
 
   const nomePorId = useMemo(
     () => new Map(users.map((u) => [u.id, u.name])),
@@ -191,6 +198,23 @@ const PedidosAtribuicao: React.FC = () => {
     return [...porCobrador.values()];
   };
 
+  // Primeira carga sem pedido em analise: abre direto nos elegiveis.
+  const [secaoEscolhida, setSecaoEscolhida] = useState(false);
+  useEffect(() => {
+    if (pedidos !== null && !secaoEscolhida && abertos.length === 0) {
+      setSecao("elegiveis");
+      setSecaoEscolhida(true);
+    }
+  }, [pedidos, abertos.length, secaoEscolhida]);
+
+  const totalAbertos = abertos.reduce((s, l) => s + l.total, 0);
+  const totalElegiveis = elegiveis.reduce((s, [, g]) => s + g.total, 0);
+  const clientesElegiveis = new Set(
+    elegiveis.flatMap(([, g]) => [...g.clientes]),
+  ).size;
+  const aprovados = decididos.filter((l) => l.itens[0].decisao === "aprovado");
+  const totalAprovado = aprovados.reduce((s, l) => s + l.total, 0);
+
   return (
     <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-4 lg:p-5 space-y-4">
       <div>
@@ -199,11 +223,9 @@ const PedidosAtribuicao: React.FC = () => {
           Pagos na loja depois da cobrança
         </h2>
         <p className="mt-1 text-xs text-gray-500 dark:text-dark-text-secondary">
-          O cliente pagou na loja ou no banco depois que o cobrador conversou
-          com ele. Aprovado, o pagamento fica registrado no nome do cobrador,
-          na data em que foi pago. Não mexe na parcela e não entra no caixa
-          dele. Ainda não soma no Desempenho, na meta nem no Resumo por
-          Cobrador (próxima etapa).
+          Cliente pagou na loja ou no banco depois de conversar com o cobrador.
+          Aprovado, fica registrado no nome dele, na data do pagamento — não
+          mexe na parcela nem no caixa.
         </p>
       </div>
 
@@ -230,242 +252,321 @@ const PedidosAtribuicao: React.FC = () => {
         </div>
       ) : (
         <>
+          {/* Cards: cada um junta os numeros da secao e a abre ao clicar */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {(
+              [
+                {
+                  id: "analise",
+                  icon: Hourglass,
+                  title: "Em análise",
+                  value: String(abertos.length),
+                  valueTone: abertos.length > 0 ? "red" : "neutral",
+                  caption: abertos.length === 1 ? "pedido" : "pedidos",
+                  rows: [
+                    { label: "Valor", value: formatCurrency(totalAbertos) },
+                  ],
+                },
+                {
+                  id: "elegiveis",
+                  icon: Store,
+                  title: "Elegíveis sem pedido",
+                  value: formatCurrency(totalElegiveis),
+                  valueTone: "neutral",
+                  caption: "últimos 30 dias · só consulta",
+                  rows: [
+                    { label: "Clientes", value: String(clientesElegiveis) },
+                    { label: "Cobradores", value: String(elegiveis.length) },
+                  ],
+                },
+                {
+                  id: "decididos",
+                  icon: ListChecks,
+                  title: `Decididos (${DIAS_HISTORICO} dias)`,
+                  value: String(decididos.length),
+                  valueTone: "neutral",
+                  caption: decididos.length === 1 ? "pedido" : "pedidos",
+                  rows: [
+                    {
+                      label: "Aprovados",
+                      value: `${aprovados.length} · ${formatCurrency(totalAprovado)}`,
+                      tone: "green",
+                    },
+                    {
+                      label: "Recusados",
+                      value: String(decididos.length - aprovados.length),
+                    },
+                  ],
+                },
+              ] as const
+            ).map((c) => (
+              <div
+                key={c.id}
+                className={`rounded-xl ${secao === c.id ? "ring-2 ring-teal-500" : ""}`}
+              >
+                <SummaryCard
+                  icon={c.icon}
+                  title={c.title}
+                  value={c.value}
+                  valueTone={c.valueTone}
+                  caption={c.caption}
+                  rows={[...c.rows]}
+                  compact
+                  onClick={() => {
+                    setSecao(c.id);
+                    setSecaoEscolhida(true);
+                  }}
+                  hint="Mostrar esta lista"
+                />
+              </div>
+            ))}
+          </div>
+
           {/* Em analise */}
-          <section className="space-y-2">
-            <h3 className="text-sm font-semibold text-gray-800 dark:text-dark-text">
-              Em análise ({abertos.length})
-            </h3>
-            {abertos.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-gray-200 dark:border-dark-border py-6 text-center text-sm text-gray-500 dark:text-dark-text-secondary">
-                Nenhum pedido esperando decisão.
-              </div>
-            ) : (
-              <div className="rounded-xl border border-gray-200 dark:border-dark-border divide-y divide-gray-100 dark:divide-dark-border/40">
-                {abertos.map((l) => {
-                  const p0 = l.itens[0];
-                  const conversas = conversasDoLote(l);
-                  const outros = conversas.filter(
-                    (c) => c.cobrador_id !== p0.solicitado_por_id,
-                  );
-                  return (
-                    <div key={l.lote} className="px-3 py-3 space-y-2">
-                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                        <div className="min-w-0 space-y-0.5">
-                          <div className="text-sm font-semibold text-gray-900 dark:text-dark-text">
-                            {p0.cliente ?? "(sem nome)"}{" "}
-                            <span className="text-xs font-normal text-gray-400">
-                              {p0.documento}
-                            </span>
-                          </div>
-                          <div className="text-xs text-gray-600 dark:text-dark-text-secondary">
-                            {nome(p0.solicitado_por_id)} pediu em{" "}
-                            {dataHora(p0.created_at)}
-                          </div>
-                          <div className="text-sm text-gray-800 dark:text-dark-text">
-                            <strong>{formatCurrency(l.total)}</strong> pago em{" "}
-                            {formatDate(p0.data_pagamento)} ·{" "}
-                            {l.itens
-                              .map(
-                                (it) =>
-                                  `venda #${it.venda ?? "—"} parc. ${it.parcela ?? "—"} (${formatCurrency(Number(it.valor))})`,
-                              )
-                              .join(", ")}
-                          </div>
-                          <div className="text-sm text-gray-700 dark:text-dark-text italic">
-                            “{p0.observacao}”
-                          </div>
-                        </div>
-                        {aberto !== l.lote && (
-                          <div className="flex gap-2 flex-shrink-0">
-                            <button
-                              onClick={() => abrir(l.lote, "aprovar")}
-                              className="inline-flex items-center gap-1 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700"
-                            >
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                              Aprovar
-                            </button>
-                            <button
-                              onClick={() => abrir(l.lote, "recusar")}
-                              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 dark:border-dark-border px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-bg"
-                            >
-                              <XCircle className="h-3.5 w-3.5" />
-                              Recusar
-                            </button>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Prova da tratativa: quem conversou antes do pagamento */}
-                      <div className="rounded-lg bg-gray-50 dark:bg-dark-bg/40 px-3 py-2 text-xs space-y-0.5">
-                        <div className="font-semibold text-gray-700 dark:text-dark-text">
-                          Conversas nos 30 dias antes do pagamento
-                        </div>
-                        {conversas.length === 0 ? (
-                          <div className="text-gray-500">
-                            Não encontradas agora (a parcela pode ter mudado no
-                            ERP). Ao aprovar, o sistema confere de novo.
-                          </div>
-                        ) : (
-                          conversas.map((c) => (
-                            <div
-                              key={c.cobrador_id}
-                              className="text-gray-600 dark:text-dark-text-secondary"
-                            >
-                              <span className="font-medium text-gray-800 dark:text-dark-text">
-                                {nome(c.cobrador_id)}
+          {secao === "analise" && (
+            <section className="space-y-2">
+              <h3 className="text-sm font-semibold text-gray-800 dark:text-dark-text">
+                Em análise ({abertos.length})
+              </h3>
+              {abertos.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-gray-200 dark:border-dark-border py-6 text-center text-sm text-gray-500 dark:text-dark-text-secondary">
+                  Nenhum pedido esperando decisão.
+                </div>
+              ) : (
+                <div className="rounded-xl border border-gray-200 dark:border-dark-border divide-y divide-gray-100 dark:divide-dark-border/40">
+                  {abertos.map((l) => {
+                    const p0 = l.itens[0];
+                    const conversas = conversasDoLote(l);
+                    const outros = conversas.filter(
+                      (c) => c.cobrador_id !== p0.solicitado_por_id,
+                    );
+                    return (
+                      <div key={l.lote} className="px-3 py-3 space-y-2">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                          <div className="min-w-0 space-y-0.5">
+                            <div className="text-sm font-semibold text-gray-900 dark:text-dark-text">
+                              {p0.cliente ?? "(sem nome)"}{" "}
+                              <span className="text-xs font-normal text-gray-400">
+                                {p0.documento}
                               </span>
-                              : {c.contatos}{" "}
-                              {c.contatos === 1 ? "conversa" : "conversas"} ·
-                              última em {dataHora(c.ultimo_contato_em)} (
-                              {rotuloResultado(c.ultimo_resultado)})
                             </div>
-                          ))
-                        )}
-                        {outros.length > 0 && (
-                          <div className="flex items-center gap-1 pt-1 text-amber-700 dark:text-amber-400 font-medium">
-                            <AlertTriangle className="h-3.5 w-3.5" />
-                            Outro cobrador também conversou com o cliente
-                            antes do pagamento.
+                            <div className="text-xs text-gray-600 dark:text-dark-text-secondary">
+                              {nome(p0.solicitado_por_id)} pediu em{" "}
+                              {dataHora(p0.created_at)}
+                            </div>
+                            <div className="text-sm text-gray-800 dark:text-dark-text">
+                              <strong>{formatCurrency(l.total)}</strong> pago em{" "}
+                              {formatDate(p0.data_pagamento)} ·{" "}
+                              {l.itens
+                                .map(
+                                  (it) =>
+                                    `venda #${it.venda ?? "—"} parc. ${it.parcela ?? "—"} (${formatCurrency(Number(it.valor))})`,
+                                )
+                                .join(", ")}
+                            </div>
+                            <div className="text-sm text-gray-700 dark:text-dark-text italic">
+                              “{p0.observacao}”
+                            </div>
+                          </div>
+                          {aberto !== l.lote && (
+                            <div className="flex gap-2 flex-shrink-0">
+                              <button
+                                onClick={() => abrir(l.lote, "aprovar")}
+                                className="inline-flex items-center gap-1 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700"
+                              >
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                Aprovar
+                              </button>
+                              <button
+                                onClick={() => abrir(l.lote, "recusar")}
+                                className="inline-flex items-center gap-1 rounded-lg border border-gray-200 dark:border-dark-border px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-bg"
+                              >
+                                <XCircle className="h-3.5 w-3.5" />
+                                Recusar
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Prova da tratativa: quem conversou antes do pagamento */}
+                        <div className="rounded-lg bg-gray-50 dark:bg-dark-bg/40 px-3 py-2 text-xs space-y-0.5">
+                          <div className="font-semibold text-gray-700 dark:text-dark-text">
+                            Conversas nos 30 dias antes do pagamento
+                          </div>
+                          {conversas.length === 0 ? (
+                            <div className="text-gray-500">
+                              Não encontradas agora (a parcela pode ter mudado
+                              no ERP). Ao aprovar, o sistema confere de novo.
+                            </div>
+                          ) : (
+                            conversas.map((c) => (
+                              <div
+                                key={c.cobrador_id}
+                                className="text-gray-600 dark:text-dark-text-secondary"
+                              >
+                                <span className="font-medium text-gray-800 dark:text-dark-text">
+                                  {nome(c.cobrador_id)}
+                                </span>
+                                : {c.contatos}{" "}
+                                {c.contatos === 1 ? "conversa" : "conversas"} ·
+                                última em {dataHora(c.ultimo_contato_em)} (
+                                {rotuloResultado(c.ultimo_resultado)})
+                              </div>
+                            ))
+                          )}
+                          {outros.length > 0 && (
+                            <div className="flex items-center gap-1 pt-1 text-amber-700 dark:text-amber-400 font-medium">
+                              <AlertTriangle className="h-3.5 w-3.5" />
+                              Outro cobrador também conversou com o cliente
+                              antes do pagamento.
+                            </div>
+                          )}
+                        </div>
+
+                        {aberto === l.lote && (
+                          <div className="rounded-lg border border-gray-200 dark:border-dark-border p-3 space-y-2">
+                            <label className="block">
+                              <span className="text-[11px] font-semibold text-gray-600 dark:text-dark-text-secondary">
+                                {acao === "aprovar"
+                                  ? "Resposta ao cobrador (opcional)"
+                                  : "Motivo da recusa (obrigatório)"}
+                              </span>
+                              <input
+                                type="text"
+                                value={resposta}
+                                onChange={(e) => setResposta(e.target.value)}
+                                className="mt-0.5 w-full rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg px-2.5 py-1.5 text-sm text-gray-900 dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-teal-500"
+                              />
+                            </label>
+                            {acao === "aprovar" && (
+                              <div className="text-[11px] text-gray-500 dark:text-dark-text-secondary">
+                                Credita {formatCurrency(l.total)} a{" "}
+                                {nome(p0.solicitado_por_id)} em{" "}
+                                {formatDate(p0.data_pagamento)}. O valor vale o
+                                que estiver baixado no ERP na hora da aprovação.
+                              </div>
+                            )}
+                            {erroAcao && (
+                              <div className="text-xs text-red-600 dark:text-red-400">
+                                {erroAcao}
+                              </div>
+                            )}
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() => setAberto(null)}
+                                className="rounded-lg border border-gray-200 dark:border-dark-border px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-dark-text"
+                              >
+                                Cancelar
+                              </button>
+                              <button
+                                onClick={() => void decidir(l)}
+                                disabled={salvando}
+                                className={`rounded-lg px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40 ${
+                                  acao === "aprovar"
+                                    ? "bg-teal-600 hover:bg-teal-700"
+                                    : "bg-red-600 hover:bg-red-700"
+                                }`}
+                              >
+                                {salvando
+                                  ? "Gravando…"
+                                  : acao === "aprovar"
+                                    ? "Confirmar aprovação"
+                                    : "Confirmar recusa"}
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>
-
-                      {aberto === l.lote && (
-                        <div className="rounded-lg border border-gray-200 dark:border-dark-border p-3 space-y-2">
-                          <label className="block">
-                            <span className="text-[11px] font-semibold text-gray-600 dark:text-dark-text-secondary">
-                              {acao === "aprovar"
-                                ? "Resposta ao cobrador (opcional)"
-                                : "Motivo da recusa (obrigatório)"}
-                            </span>
-                            <input
-                              type="text"
-                              value={resposta}
-                              onChange={(e) => setResposta(e.target.value)}
-                              className="mt-0.5 w-full rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg px-2.5 py-1.5 text-sm text-gray-900 dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-teal-500"
-                            />
-                          </label>
-                          {acao === "aprovar" && (
-                            <div className="text-[11px] text-gray-500 dark:text-dark-text-secondary">
-                              Credita {formatCurrency(l.total)} a{" "}
-                              {nome(p0.solicitado_por_id)} em{" "}
-                              {formatDate(p0.data_pagamento)}. O valor vale o
-                              que estiver baixado no ERP na hora da aprovação.
-                            </div>
-                          )}
-                          {erroAcao && (
-                            <div className="text-xs text-red-600 dark:text-red-400">
-                              {erroAcao}
-                            </div>
-                          )}
-                          <div className="flex justify-end gap-2">
-                            <button
-                              onClick={() => setAberto(null)}
-                              className="rounded-lg border border-gray-200 dark:border-dark-border px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-dark-text"
-                            >
-                              Cancelar
-                            </button>
-                            <button
-                              onClick={() => void decidir(l)}
-                              disabled={salvando}
-                              className={`rounded-lg px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40 ${
-                                acao === "aprovar"
-                                  ? "bg-teal-600 hover:bg-teal-700"
-                                  : "bg-red-600 hover:bg-red-700"
-                              }`}
-                            >
-                              {salvando
-                                ? "Gravando…"
-                                : acao === "aprovar"
-                                  ? "Confirmar aprovação"
-                                  : "Confirmar recusa"}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          )}
 
           {/* Elegiveis sem pedido (so consulta) */}
-          <section className="space-y-2">
-            <h3 className="text-sm font-semibold text-gray-800 dark:text-dark-text">
-              Elegíveis sem pedido — últimos 30 dias
-            </h3>
-            <p className="text-[11px] text-gray-500 dark:text-dark-text-secondary">
-              Baixas da loja ou do banco com conversa de um cobrador antes do
-              pagamento, que ninguém pediu. Só o cobrador pode pedir; use para
-              conferir ou lembrar o cobrador.
-            </p>
-            {elegiveis.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-gray-200 dark:border-dark-border py-6 text-center text-sm text-gray-500 dark:text-dark-text-secondary">
-                Nenhum pagamento elegível sem pedido.
-              </div>
-            ) : (
-              <div className="rounded-xl border border-gray-200 dark:border-dark-border divide-y divide-gray-100 dark:divide-dark-border/40">
-                {elegiveis.map(([cobradorId, g]) => {
-                  const expandido = cobradorAberto === cobradorId;
-                  return (
-                    <div key={cobradorId}>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setCobradorAberto(expandido ? null : cobradorId)
-                        }
-                        className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-dark-bg/40"
-                      >
-                        <span className="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-dark-text">
-                          {expandido ? (
-                            <ChevronDown className="h-4 w-4 text-gray-400" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4 text-gray-400" />
-                          )}
-                          {nome(cobradorId)}
-                        </span>
-                        <span className="text-xs text-gray-600 dark:text-dark-text-secondary whitespace-nowrap">
-                          {g.clientes.size}{" "}
-                          {g.clientes.size === 1 ? "cliente" : "clientes"} ·{" "}
-                          {g.linhas.length}{" "}
-                          {g.linhas.length === 1 ? "parcela" : "parcelas"} ·{" "}
-                          <strong className="text-gray-900 dark:text-dark-text">
-                            {formatCurrency(g.total)}
-                          </strong>
-                        </span>
-                      </button>
-                      {expandido && (
-                        <ul className="px-3 pb-2 space-y-1">
-                          {g.linhas.map((l) => (
-                            <li
-                              key={`${l.id_parcela}-${l.cobrador_id}`}
-                              className="text-[11px] text-gray-600 dark:text-dark-text-secondary"
-                            >
-                              <span className="font-medium text-gray-800 dark:text-dark-text">
-                                {l.cliente ?? l.documento}
-                              </span>{" "}
-                              · pago em {formatDate(l.data_pagamento)} ·
-                              venda #{l.venda ?? "—"} parc. {l.parcela ?? "—"} ·{" "}
-                              {formatCurrency(Number(l.valor))} · última
-                              conversa {dataHora(l.ultimo_contato_em)} (
-                              {rotuloResultado(l.ultimo_resultado)})
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
+          {secao === "elegiveis" && (
+            <section className="space-y-2">
+              <h3 className="text-sm font-semibold text-gray-800 dark:text-dark-text">
+                Elegíveis sem pedido — últimos 30 dias
+              </h3>
+              <p className="text-[11px] text-gray-500 dark:text-dark-text-secondary">
+                Baixas da loja ou do banco com conversa de um cobrador antes do
+                pagamento, que ninguém pediu. Só o cobrador pode pedir; use para
+                conferir ou lembrar o cobrador.
+              </p>
+              {elegiveis.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-gray-200 dark:border-dark-border py-6 text-center text-sm text-gray-500 dark:text-dark-text-secondary">
+                  Nenhum pagamento elegível sem pedido.
+                </div>
+              ) : (
+                <div className="rounded-xl border border-gray-200 dark:border-dark-border divide-y divide-gray-100 dark:divide-dark-border/40">
+                  {elegiveis.map(([cobradorId, g]) => {
+                    const expandido = cobradorAberto === cobradorId;
+                    return (
+                      <div key={cobradorId}>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCobradorAberto(expandido ? null : cobradorId)
+                          }
+                          className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-dark-bg/40"
+                        >
+                          <span className="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-dark-text">
+                            {expandido ? (
+                              <ChevronDown className="h-4 w-4 text-gray-400" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 text-gray-400" />
+                            )}
+                            {nome(cobradorId)}
+                          </span>
+                          <span className="text-xs text-gray-600 dark:text-dark-text-secondary whitespace-nowrap">
+                            {g.clientes.size}{" "}
+                            {g.clientes.size === 1 ? "cliente" : "clientes"} ·{" "}
+                            {g.linhas.length}{" "}
+                            {g.linhas.length === 1 ? "parcela" : "parcelas"} ·{" "}
+                            <strong className="text-gray-900 dark:text-dark-text">
+                              {formatCurrency(g.total)}
+                            </strong>
+                          </span>
+                        </button>
+                        {expandido && (
+                          <ul className="px-3 pb-2 space-y-1">
+                            {g.linhas.map((l) => (
+                              <li
+                                key={`${l.id_parcela}-${l.cobrador_id}`}
+                                className="text-[11px] text-gray-600 dark:text-dark-text-secondary"
+                              >
+                                <span className="font-medium text-gray-800 dark:text-dark-text">
+                                  {l.cliente ?? l.documento}
+                                </span>{" "}
+                                · pago em {formatDate(l.data_pagamento)} · venda
+                                #{l.venda ?? "—"} parc. {l.parcela ?? "—"} ·{" "}
+                                {formatCurrency(Number(l.valor))} · última
+                                conversa {dataHora(l.ultimo_contato_em)} (
+                                {rotuloResultado(l.ultimo_resultado)})
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          )}
 
-          {decididos.length > 0 && (
+          {secao === "decididos" && (
             <section className="space-y-2">
               <h3 className="text-sm font-semibold text-gray-800 dark:text-dark-text">
                 Decididos nos últimos {DIAS_HISTORICO} dias
               </h3>
+              {decididos.length === 0 && (
+                <div className="rounded-xl border border-dashed border-gray-200 dark:border-dark-border py-6 text-center text-sm text-gray-500 dark:text-dark-text-secondary">
+                  Nenhum pedido decidido nos últimos {DIAS_HISTORICO} dias.
+                </div>
+              )}
               <ul className="rounded-xl border border-gray-200 dark:border-dark-border divide-y divide-gray-100 dark:divide-dark-border/40">
                 {decididos.map((l) => {
                   const p0 = l.itens[0];
@@ -490,9 +591,8 @@ const PedidosAtribuicao: React.FC = () => {
                         {aprovado ? "Aprovado" : "Recusado"}
                       </span>{" "}
                       · {p0.cliente ?? p0.documento} ·{" "}
-                      {nome(p0.solicitado_por_id)} ·{" "}
-                      {formatCurrency(l.total)} pago em{" "}
-                      {formatDate(p0.data_pagamento)} · decidido por{" "}
+                      {nome(p0.solicitado_por_id)} · {formatCurrency(l.total)}{" "}
+                      pago em {formatDate(p0.data_pagamento)} · decidido por{" "}
                       {(p0.decidido_por_id &&
                         nomePorId.get(p0.decidido_por_id)) ||
                         "gestor"}{" "}
