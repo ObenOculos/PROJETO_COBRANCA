@@ -5,6 +5,7 @@ import {
   Hourglass,
   MessageCircle,
   RotateCcw,
+  ShieldCheck,
   XCircle,
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
@@ -84,6 +85,8 @@ interface Props {
   lojaNaLinha?: boolean;
   /** Valor que o cobrador ainda pode pedir como pago na loja. */
   podePedir?: number;
+  /** Exceção do gestor: atribuir pago na loja direto (null = sem baixa). */
+  onAtribuirExcecao?: (() => void) | null;
   onMarcar: (
     acao: "conferido" | "reaberto",
     observacao: string,
@@ -267,6 +270,7 @@ const ConferenciaDetalhe: React.FC<Props> = ({
   conversas = [],
   lojaNaLinha = true,
   podePedir = 0,
+  onAtribuirExcecao = null,
   onMarcar,
 }) => {
   // Por parcela: quem conversou antes do pagamento e o pedido "pago na loja".
@@ -729,6 +733,17 @@ const ConferenciaDetalhe: React.FC<Props> = ({
             ? "Linhas esmaecidas são deste cliente, mas de outra carteira ou de outro cobrador: não entram nesta linha da conferência."
             : ""}
         </span>
+        <div className="flex flex-wrap items-center gap-2">
+        {onAtribuirExcecao && (
+          <button
+            onClick={onAtribuirExcecao}
+            title="Exceção: o cobrador conversou com o cliente, mas a conversa não ficou registrada como efetiva. Atribui o pago na loja direto, com motivo."
+            className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 dark:border-teal-800 px-3 py-1.5 text-xs font-medium text-teal-700 hover:bg-teal-50 dark:text-teal-300 dark:hover:bg-teal-900/20"
+          >
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Atribuir pago na loja (exceção)
+          </button>
+        )}
         {onAbrirFicha ? (
           <button
             onClick={onAbrirFicha}
@@ -742,6 +757,7 @@ const ConferenciaDetalhe: React.FC<Props> = ({
             Ficha indisponível (cliente não carregado)
           </span>
         )}
+        </div>
       </div>
     </div>
   );

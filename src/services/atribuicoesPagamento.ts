@@ -34,8 +34,11 @@ export interface AtribuicaoPagamento {
   valor: number;
   data_pagamento: string;
   observacao: string;
-  ultimo_contato_em: string;
+  /** Vazio só na exceção do gestor (sem conversa efetiva registrada). */
+  ultimo_contato_em: string | null;
   solicitado_por_id: string;
+  /** Atribuído pelo gestor sem pedido (migration 20261117000004). */
+  excecao?: boolean;
   created_at: string;
   decisao: "aprovado" | "recusado" | null;
   valor_aprovado: number | null;
@@ -185,3 +188,38 @@ export const carregarConversasConferencia = async (
       .range(from, to)
       .returns<ConversaConferencia[]>(),
   );
+
+// ---------------------------------------------------------------------------
+// Exceção do gestor (2026-11-17, migration 20261117000004)
+// ---------------------------------------------------------------------------
+
+/** Parcelas pagas pelo ERP (30 dias) que o gestor pode atribuir ao cobrador
+ * como exceção. `ultimo_contato_em` = conversa efetiva do cobrador, se houver. */
+export const listarParcelasExcecao = async (
+  documento: string,
+  cobradorId: string,
+): Promise<ParcelaAtribuivel[]> => {
+  const { data, error } = await supabase.rpc("parcelas_para_excecao", {
+    p_documento: documento,
+    p_cobrador_id: cobradorId,
+  });
+  if (error) throw new Error(mensagem(error, "Falha ao carregar as parcelas."));
+  return (data ?? []) as ParcelaAtribuivel[];
+};
+
+/** Gestor atribui direto ao cobrador (já aprovado, marcado como exceção). */
+export const atribuirPagamentoExcecao = async (p: {
+  documento: string;
+  parcelas: number[];
+  cobradorId: string;
+  motivo: string;
+}): Promise<{ lote: string; parcelas: number; valor: number }> => {
+  const { data, error } = await supabase.rpc("atribuir_pagamento_excecao", {
+    p_documento: p.documento,
+    p_parcelas: p.parcelas,
+    p_cobrador_id: p.cobradorId,
+    p_motivo: p.motivo.trim(),
+  });
+  if (error) throw new Error(mensagem(error, "Falha ao atribuir."));
+  return data as { lote: string; parcelas: number; valor: number };
+};

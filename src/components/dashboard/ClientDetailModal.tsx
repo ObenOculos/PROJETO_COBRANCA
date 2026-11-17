@@ -50,6 +50,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import GeneralPaymentModal from "./GeneralPaymentModal";
 import CorrigirPagamentoModal from "./CorrigirPagamentoModal";
 import AtribuirPagamentoModal from "./AtribuirPagamentoModal";
+import AtribuirExcecaoModal from "./AtribuirExcecaoModal";
 import LogContactModal from "./LogContactModal";
 import AcordoModal from "./AcordoModal";
 import AcordoDetailModal from "./AcordoDetailModal";
@@ -308,6 +309,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   };
   // Item 66: cliente pagou na loja depois da cobranca -> pedido ao gestor.
   const [isAtribuirOpen, setIsAtribuirOpen] = useState(false);
+  // Exceção do gestor (17/11): atribui direto ao cobrador, com motivo.
+  const [isExcecaoOpen, setIsExcecaoOpen] = useState(false);
   // Loja(s) do cliente (a primeira e a da parcela em aberto mais antiga).
   const lojasCliente = clientStoresForDisplay({ sales: clientSales });
 
@@ -774,6 +777,20 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                 ? "Corrigir pagamento"
                                 : "Pedir correção de pagamento"}
                             </button>
+                            {souGestor && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMenuMaisAberto(false);
+                                  setIsExcecaoOpen(true);
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left"
+                                title="Exceção: o cobrador conversou com o cliente, mas a conversa não ficou registrada como efetiva. Atribui o pago na loja direto, com motivo."
+                              >
+                                <Store className="h-4 w-4 text-gray-500" />
+                                Atribuir pago na loja (exceção)
+                              </button>
+                            )}
                             {!souGestor && (
                               <button
                                 type="button"
@@ -1662,6 +1679,23 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           nomePorId={nomePorUsuario}
           onClose={() => setIsGeneralEditModalOpen(false)}
           onSuccess={handleGeneralEditSuccess}
+        />
+      )}
+
+      {/* Exceção do gestor: pago na loja atribuído direto (17/11). Sugere o
+          dono da carteira das parcelas pagas. */}
+      {isExcecaoOpen && (
+        <AtribuirExcecaoModal
+          documento={clientGroup.document}
+          cliente={clientGroup.client}
+          cobradorPadrao={
+            cobradorDaCarteira?.id ??
+            clientSales
+              .flatMap((s) => s.installments)
+              .find((i) => i.user_id && (i.valor_recebido ?? 0) > 0)?.user_id ??
+            null
+          }
+          onClose={() => setIsExcecaoOpen(false)}
         />
       )}
 

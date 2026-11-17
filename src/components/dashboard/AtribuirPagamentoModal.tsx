@@ -331,6 +331,7 @@ const AtribuirPagamentoModal: React.FC<Props> = ({ clientGroup, onClose }) => {
                           }`}
                         >
                           {l.decisao ? ROTULO_DECISAO[l.decisao] : "Em análise"}
+                          {l.excecao && " (atribuído pelo gestor)"}
                         </span>{" "}
                         · pago em {formatDate(l.data_pagamento)} ·{" "}
                         {formatCurrency(round2(l.soma))} ({l.qtd}{" "}

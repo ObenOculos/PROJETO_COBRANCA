@@ -460,6 +460,14 @@ const PedidosAtribuicao: React.FC = () => {
                         )}
                         {aprovado ? "Aprovado" : "Recusado"}
                       </span>{" "}
+                      {p0.excecao && (
+                        <span
+                          className="rounded bg-amber-50 px-1 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
+                          title={`Atribuído pelo gestor sem pedido: ${p0.observacao}`}
+                        >
+                          exceção do gestor
+                        </span>
+                      )}{" "}
                       · {p0.cliente ?? p0.documento} ·{" "}
                       {nome(p0.solicitado_por_id)} · {formatCurrency(l.total)}{" "}
                       pago em {formatDate(p0.data_pagamento)} · decidido por{" "}

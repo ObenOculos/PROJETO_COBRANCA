@@ -26,6 +26,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { ClientGroup } from "../../types";
 import ClientDetailModal from "./ClientDetailModal";
 import ConferenciaDetalhe from "./ConferenciaDetalhe";
+import AtribuirExcecaoModal from "./AtribuirExcecaoModal";
 import { supabase } from "../../lib/supabase";
 import { fetchAllRows } from "../../utils/fetchAllRows";
 import {
@@ -295,6 +296,12 @@ const ConferenciaRecebimentos: React.FC = () => {
   // Linha com o detalhe aberto (chave da linha) e Ficha aberta.
   const [aberta, setAberta] = useState<string | null>(null);
   const [ficha, setFicha] = useState<ClientGroup | null>(null);
+  // Exceção do gestor (pago na loja atribuído direto), aberta pelo detalhe.
+  const [excecao, setExcecao] = useState<{
+    documento: string;
+    cliente: string;
+    cobradorId: string | null;
+  } | null>(null);
   const [mes, setMes] = useState(() => todayLocalStr().slice(0, 7));
   const [linhas, setLinhas] = useState<LinhaRpc[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -1340,6 +1347,17 @@ const ConferenciaRecebimentos: React.FC = () => {
                                   visao === "todos" ? c.lojaAprovado > 0 : true
                                 }
                                 onMarcar={(acao, obs) => marcar(c, acao, obs)}
+                                onAtribuirExcecao={
+                                  c.baseValor > 0
+                                    ? () =>
+                                        setExcecao({
+                                          documento: c.documento,
+                                          cliente: c.cliente,
+                                          cobradorId:
+                                            c.carteiraId ?? c.cobradorId,
+                                        })
+                                    : null
+                                }
                               />
                             </td>
                           </tr>
@@ -1384,6 +1402,17 @@ const ConferenciaRecebimentos: React.FC = () => {
             </div>
           )}
         </>
+      )}
+
+      {excecao && (
+        <AtribuirExcecaoModal
+          documento={excecao.documento}
+          cliente={excecao.cliente}
+          cobradorPadrao={excecao.cobradorId}
+          onClose={() => setExcecao(null)}
+          // Recarrega conversas/pedidos (o aprovado soma ao app da linha).
+          onAtribuido={() => setVersaoMarcacoes((v) => v + 1)}
+        />
       )}
 
       {ficha && (

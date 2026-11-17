@@ -2512,6 +2512,32 @@ export type Database = {
         Args: { p_documento: string; p_parcelas: number[]; p_observacao: string };
         Returns: string;
       };
+      // Migration 20261117000004 (exceção do gestor).
+      parcelas_para_excecao: {
+        Args: { p_documento: string; p_cobrador_id: string };
+        Returns: {
+          id_parcela: number;
+          venda: number | null;
+          parcela: number | null;
+          data_vencimento: string | null;
+          valor: number;
+          data_pagamento: string;
+          loja: string | null;
+          ultimo_contato_em: string | null;
+          pedido_decisao: string | null;
+          pedido_meu: boolean | null;
+          bloqueio: string | null;
+        }[];
+      };
+      atribuir_pagamento_excecao: {
+        Args: {
+          p_documento: string;
+          p_parcelas: number[];
+          p_cobrador_id: string;
+          p_motivo: string;
+        };
+        Returns: Json;
+      };
       decidir_atribuicao_pagamento: {
         Args: { p_lote: string; p_aprovar: boolean; p_resposta?: string };
         Returns: Json;
