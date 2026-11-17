@@ -11,17 +11,13 @@ import {
   DollarSign,
   FileText,
   Printer,
-  Filter,
   RefreshCw,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   FileSpreadsheet,
-  TrendingUp,
   User,
-  Award,
-  Activity,
-  Receipt,
+  Wallet,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import * as XLSX from "xlsx";
@@ -31,6 +27,7 @@ import { useCollection } from "../../contexts/CollectionContext";
 import { resolveSaleKey, valorRecebidoTotal } from "../../filters/sales";
 import { useAuth } from "../../contexts/AuthContext";
 import ClientDetailModal from "./ClientDetailModal";
+import SummaryCard from "../common/SummaryCard";
 import { ClientGroup } from "../../types";
 
 interface DailyCashReportProps {
@@ -40,7 +37,8 @@ interface DailyCashReportProps {
 interface DailyReportData {
   date: string;
   totalReceived: number;
-  totalTransactions: number;
+  /** Quantidade de pagamentos (cada registro de pagamento conta 1). */
+  totalPayments: number;
   /** Soma dos descontos dados NOS pagamentos do período. */
   totalPaymentDiscount: number;
   /** Juros/multa cobrados junto (ja incluidos em totalReceived). */
@@ -55,7 +53,10 @@ interface DailyReportData {
     collectorId: string;
     collectorName: string;
     receivedAmount: number;
+    /** Quantidade de pagamentos do cobrador. */
     transactionCount: number;
+    jurosAmount: number;
+    discountAmount: number;
     clients: string[];
     saleNumbers: string[];
   }[];
@@ -77,6 +78,7 @@ interface DailyReportData {
     totalDebt: number;
     remainingDebt: number;
     receivedDate: string;
+    collectorId: string;
     collector: string;
     paymentMethod: string;
     installments: {
@@ -165,8 +167,10 @@ const getQuickDateRanges = () => {
   };
 };
 
-// Linhas por página na tabela "Transações Detalhadas".
+// Linhas por página na lista de pagamentos.
 const DETAILS_PER_PAGE = 50;
+
+type QuickRangeKey = keyof ReturnType<typeof getQuickDateRanges>;
 
 const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   const { users, salePayments, refreshData, getClientGroups } = useCollection();
@@ -176,33 +180,31 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     useState<ClientGroup | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(getCurrentDateBR());
   const [endDate, setEndDate] = useState<string>(getCurrentDateBR());
-  const [showDetails, setShowDetails] = useState(false);
-  // Paginação da tabela "Transações Detalhadas": intervalos grandes podem gerar
-  // milhares de linhas; renderizar tudo de uma vez trava o navegador.
+  // Paginação da lista de pagamentos: intervalos grandes podem gerar milhares
+  // de linhas; renderizar tudo de uma vez trava o navegador.
   const [detailsPage, setDetailsPage] = useState(1);
   const [dateRangeMode, setDateRangeMode] = useState<"single" | "range">(
     "single",
   );
+  // "Escolher datas" aberto (datas livres em vez de um atalho).
+  const [customDates, setCustomDates] = useState(false);
   const [selectedCollector, setSelectedCollector] = useState<string>("all");
   const [selectedStore, setSelectedStore] = useState<string>("all");
-  const [minAmount, setMinAmount] = useState<string>("");
-  const [maxAmount, setMaxAmount] = useState<string>("");
+  // Cobrador clicado nos cards: filtra só a lista de pagamentos.
+  const [focusCollector, setFocusCollector] = useState<string | null>(null);
   const [showUpdateNotification, setShowUpdateNotification] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
   const [showExportOptions, setShowExportOptions] = useState(false);
   const exportDropdownRef = useRef<HTMLDivElement>(null);
 
   // Versões diferidas dos filtros que alimentam o cálculo pesado (reportData).
-  // Os inputs continuam usando o estado bruto (respondem na hora); o recálculo
-  // roda numa renderização de baixa prioridade, o que permite pintar o overlay
-  // de carregamento ANTES de travar a thread com o processamento do período.
+  // Os controles continuam usando o estado bruto (respondem na hora); o
+  // recálculo roda numa renderização de baixa prioridade, o que permite pintar
+  // o aviso de carregamento ANTES de ocupar a thread com o período.
   const dfSelectedDate = useDeferredValue(selectedDate);
   const dfEndDate = useDeferredValue(endDate);
   const dfDateRangeMode = useDeferredValue(dateRangeMode);
   const dfSelectedCollector = useDeferredValue(selectedCollector);
   const dfSelectedStore = useDeferredValue(selectedStore);
-  const dfMinAmount = useDeferredValue(minAmount);
-  const dfMaxAmount = useDeferredValue(maxAmount);
 
   // Enquanto o valor bruto e o diferido divergem, há um recálculo pendente.
   const isCalculating =
@@ -210,9 +212,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     endDate !== dfEndDate ||
     dateRangeMode !== dfDateRangeMode ||
     selectedCollector !== dfSelectedCollector ||
-    selectedStore !== dfSelectedStore ||
-    minAmount !== dfMinAmount ||
-    maxAmount !== dfMaxAmount;
+    selectedStore !== dfSelectedStore;
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -228,21 +228,8 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Contador de filtros ativos
-  const activeFiltersCount = useMemo(() => {
-    let count = 0;
-    if (selectedCollector !== "all") count++;
-    if (selectedStore !== "all") count++;
-    if (minAmount) count++;
-    if (maxAmount) count++;
-    if (dateRangeMode === "range") count++;
-    return count;
-  }, [selectedCollector, selectedStore, minAmount, maxAmount, dateRangeMode]);
-
   // Aviso "Atualizado" quando chegam dados novos. O recálculo já acontece
-  // sozinho (reportData depende de salePayments/collections); antes isto
-  // também forçava um recálculo extra com a tela de "Processando" por cima a
-  // cada atualização em tempo real.
+  // sozinho (reportData depende de salePayments/collections).
   const isFirstDataRef = useRef(true);
   useEffect(() => {
     if (isFirstDataRef.current) {
@@ -259,33 +246,32 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     return () => clearTimeout(timer);
   }, [salePayments, collections]);
 
-  // Quick date range selection
-  const applyQuickDateRange = (
-    rangeKey: keyof ReturnType<typeof getQuickDateRanges>,
-  ) => {
-    const ranges = getQuickDateRanges();
-    const range = ranges[rangeKey];
+  const quickRanges = getQuickDateRanges();
 
-    if (range.single) {
-      setDateRangeMode("single");
-      setSelectedDate(range.start);
-    } else {
-      setDateRangeMode("range");
-      setSelectedDate(range.start);
-      setEndDate(range.end);
-    }
+  const applyQuickDateRange = (rangeKey: QuickRangeKey) => {
+    const range = quickRanges[rangeKey];
+    setCustomDates(false);
+    setDateRangeMode(range.single ? "single" : "range");
+    setSelectedDate(range.start);
+    setEndDate(range.end);
   };
 
-  // Auto-apply "Mês Passado" when switching to range mode
-  React.useEffect(() => {
-    if (dateRangeMode === "range") {
-      // Check if current dates are still default (today)
-      const today = getCurrentDateBR();
-      if (selectedDate === today && endDate === today) {
-        applyQuickDateRange("mesPassado");
-      }
-    }
-  }, [dateRangeMode]);
+  // Atalho que corresponde às datas escolhidas (chip azul).
+  const activeQuickRange = customDates
+    ? null
+    : ((Object.keys(quickRanges) as QuickRangeKey[]).find(
+        (key) =>
+          quickRanges[key].start === selectedDate &&
+          (dateRangeMode === "single"
+            ? quickRanges[key].single
+            : quickRanges[key].end === endDate),
+      ) ?? null);
+
+  const openCustomDates = () => {
+    setCustomDates(true);
+    setDateRangeMode("range");
+    if (endDate < selectedDate) setEndDate(selectedDate);
+  };
 
   // Get unique stores and collectors for filter options
   const availableStores = useMemo(() => {
@@ -311,10 +297,9 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   };
 
   // Parcelas agrupadas por documento do cliente. Antes, cada pagamento
-  // varria a carteira inteira 3–4 vezes (find/filter em `collections`): num
-  // período de um mês isso dava dezenas de milhões de comparações e era o que
-  // segurava a tela de "Processando consulta". A ordem dentro de cada grupo é
-  // a mesma de `collections`, então o "primeiro que bate" continua o mesmo.
+  // varria a carteira inteira 3–4 vezes (find/filter em `collections`). A
+  // ordem dentro de cada grupo é a mesma de `collections`, então o "primeiro
+  // que bate" continua o mesmo.
   const collectionsByDoc = useMemo(() => {
     const map = new Map<string, Collection[]>();
     for (const c of collections) {
@@ -327,16 +312,12 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   }, [collections]);
 
   const reportData = useMemo((): DailyReportData => {
-    // Usar dados da tabela sale_payments em vez de collections
-
     // Lê os filtros diferidos (o cálculo pesado roda em baixa prioridade).
     const selectedDate = dfSelectedDate;
     const endDate = dfEndDate;
     const dateRangeMode = dfDateRangeMode;
     const selectedCollector = dfSelectedCollector;
     const selectedStore = dfSelectedStore;
-    const minAmount = dfMinAmount;
-    const maxAmount = dfMaxAmount;
 
     const NO_ROWS: Collection[] = [];
     const rowsOf = (doc: string | undefined) =>
@@ -350,7 +331,6 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     };
 
     const filteredPayments = salePayments.filter((payment) => {
-      // Filtro de data
       const paymentDate = payment.paymentDate;
       if (!paymentDate) return false;
 
@@ -358,20 +338,17 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
         dateRangeMode === "single"
           ? paymentDate === selectedDate
           : paymentDate >= selectedDate && paymentDate <= endDate;
-
       if (!isInDateRange) return false;
 
-      // Filtro de cobrador
       if (
         selectedCollector !== "all" &&
         payment.collectorId !== selectedCollector
       )
         return false;
 
-      // Filtro de loja (buscar loja das collections para compatibilidade)
+      // Loja vem da parcela (sale_payments não guarda a loja).
       if (selectedStore !== "all") {
         const relatedCollection = relatedOf(payment);
-
         if (
           !relatedCollection ||
           relatedCollection.nome_da_loja !== selectedStore
@@ -380,56 +357,10 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
         }
       }
 
-      // Filtro de valor
-      const paymentAmount = valorRecebidoTotal(payment);
-      if (minAmount && paymentAmount < parseFloat(minAmount)) return false;
-      if (maxAmount && paymentAmount > parseFloat(maxAmount)) return false;
-
       return true;
     });
 
-    // Agrupar por pagamento individual (cada pagamento é uma transação única)
-    const salesMap = new Map<
-      string,
-      {
-        saleKey: string;
-        collectorId: string;
-        client: string;
-        totalReceived: number;
-        originalValue: number;
-        store: string;
-        saleNumber: string;
-      }
-    >();
-
-    filteredPayments.forEach((payment) => {
-      const saleKey = `${payment.saleNumber}-${payment.clientDocument}-${payment.collectorId}-${payment.id}`;
-
-      // Buscar dados da collection para obter valores originais e loja
-      // Tentar match específico primeiro, se falhar (ex: venda 0), buscar qualquer registro do cliente
-      const relatedCollection = relatedOf(payment);
-
-      if (!salesMap.has(saleKey)) {
-        salesMap.set(saleKey, {
-          saleKey,
-          collectorId: payment.collectorId || "unknown",
-          client:
-            payment.clientName ||
-            relatedCollection?.cliente ||
-            payment.clientDocument ||
-            "Cliente não informado",
-          totalReceived: 0,
-          originalValue: relatedCollection?.valor_original || 0,
-          store: relatedCollection?.nome_da_loja || "",
-          saleNumber: payment.saleNumber?.toString() || "",
-        });
-      }
-
-      const saleData = salesMap.get(saleKey)!;
-      saleData.totalReceived += valorRecebidoTotal(payment);
-    });
-
-    // Agrupar por cobrador
+    // Agrupar por cobrador (cada pagamento conta uma vez).
     const collectorMap = new Map<
       string,
       {
@@ -437,39 +368,45 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
         collectorName: string;
         receivedAmount: number;
         transactionCount: number;
+        jurosAmount: number;
+        discountAmount: number;
         clients: Set<string>;
         saleNumbers: Set<string>;
       }
     >();
 
-    Array.from(salesMap.values()).forEach((sale) => {
-      const collectorId = sale.collectorId;
-      const collector = users.find((u) => u.id === collectorId);
-      const collectorName = collector?.name || "Não atribuído";
-
+    filteredPayments.forEach((payment) => {
+      const collectorId = payment.collectorId || "unknown";
       if (!collectorMap.has(collectorId)) {
         collectorMap.set(collectorId, {
           collectorId,
-          collectorName,
+          collectorName:
+            users.find((u) => u.id === collectorId)?.name || "Não atribuído",
           receivedAmount: 0,
           transactionCount: 0,
+          jurosAmount: 0,
+          discountAmount: 0,
           clients: new Set(),
           saleNumbers: new Set(),
         });
       }
-
+      const relatedCollection = relatedOf(payment);
       const collectorData = collectorMap.get(collectorId)!;
-      collectorData.receivedAmount += sale.totalReceived;
-      collectorData.transactionCount += 1; // Conta uma transação por venda
-      collectorData.clients.add(sale.client);
-      if (sale.saleNumber) {
-        collectorData.saleNumbers.add(sale.saleNumber);
-      }
+      collectorData.receivedAmount += valorRecebidoTotal(payment);
+      collectorData.transactionCount += 1;
+      collectorData.jurosAmount += Number(payment.jurosAmount) || 0;
+      collectorData.discountAmount += Number(payment.discountAmount) || 0;
+      collectorData.clients.add(
+        payment.clientName ||
+          relatedCollection?.cliente ||
+          payment.clientDocument ||
+          "Cliente não informado",
+      );
+      const saleNumber = payment.saleNumber?.toString() || "";
+      if (saleNumber) collectorData.saleNumbers.add(saleNumber);
     });
 
-    // Converter para array, já do maior recebido para o menor (a tela e as
-    // exportações usam essa ordem; antes cada uma ordenava o array memorizado
-    // no próprio render).
+    // Do maior recebido para o menor (tela e exportações usam essa ordem).
     const collectorSummary = Array.from(collectorMap.values())
       .map((c) => ({
         ...c,
@@ -478,39 +415,14 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       }))
       .sort((a, b) => b.receivedAmount - a.receivedAmount);
 
-    // Mapear pagamentos para detalhes usando sale_payments
+    // Uma linha por pagamento.
     const salesPaymentMap = new Map<
       string,
-      {
-        saleKey: string;
-        client: string;
-        clientDocument: string;
-        saleNumber: string;
-        store: string;
-        totalOriginalValue: number;
-        totalReceivedValue: number;
-        totalPaidOnDebt: number;
-        totalPendingValue: number;
-        paymentDiscount: number;
-        paymentJuros: number;
-        debtKey: string;
-        totalDebt: number;
-        remainingDebt: number;
-        receivedDate: string;
-        collector: string;
-        paymentMethod: string;
-        installments: {
-          collectionId: string;
-          originalValue: number;
-          receivedValue: number;
-          pendingValue: number;
-        }[];
-      }
+      DailyReportData["payments"][number]
     >();
 
     filteredPayments.forEach((payment) => {
       const saleKey = `${payment.id}`;
-
       const clientRows = rowsOf(payment.clientDocument);
 
       // 1. Tentar encontrar a parcela específica que foi paga
@@ -521,11 +433,10 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
             payment.distribution_details?.[0]?.installmentId?.toString(),
       );
 
-      // 2. Se não achou a específica (ex: venda 0 ou ajuste manual), buscar qualquer registro do cliente para pegar Nome/Loja
+      // 2. Se não achou a específica (ex: venda 0 ou ajuste manual), qualquer registro do cliente para pegar Nome/Loja
       const anyClientRecord = clientRows[0];
 
-      // 3. CALCULAR DÍVIDA TOTAL DO CLIENTE (para esta venda específica ou geral se venda 0)
-      // Buscamos todas as parcelas desse cliente para ter o quadro completo
+      // 3. Dívida do cliente (desta venda, ou geral se venda 0)
       const clientInstallments =
         payment.saleNumber && payment.saleNumber !== 0
           ? clientRows.filter((c) => resolveSaleKey(c) === payment.saleNumber)
@@ -544,7 +455,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
         0,
       );
 
-      // O pendente da dívida é o total original menos tudo que já foi recebido E descontos aplicados
+      // Pendente = original menos tudo que já foi recebido E descontos aplicados
       const currentRemainingDebt = Math.max(
         0,
         totalDebtValue - (totalAlreadyPaidValue + totalDiscountValue),
@@ -566,11 +477,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
           // Recebido = parcela + juros (o que o cobrador entregou).
           totalReceivedValue: valorRecebidoTotal(payment),
           totalPaidOnDebt: totalAlreadyPaidValue,
-          totalPendingValue: Math.max(
-            0,
-            (specificInstallment?.valor_original || 0) -
-              (specificInstallment?.valor_recebido || 0),
-          ),
+          totalPendingValue: 0,
           paymentDiscount: Number(payment.discountAmount) || 0,
           paymentJuros: Number(payment.jurosAmount) || 0,
           debtKey: `${payment.clientDocument}|${
@@ -581,6 +488,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
           totalDebt: totalDebtValue,
           remainingDebt: currentRemainingDebt,
           receivedDate: payment.paymentDate || selectedDate,
+          collectorId: payment.collectorId || "unknown",
           collector:
             payment.collectorName ||
             users.find((u) => u.id === payment.collectorId)?.name ||
@@ -591,12 +499,13 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       }
 
       const saleData = salesPaymentMap.get(saleKey)!;
-      // Para sale_payments, cada registro representa um pagamento completo
       if (
         payment.distribution_details &&
         Array.isArray(payment.distribution_details)
       ) {
-        payment.distribution_details.forEach((detail: any) => {
+        payment.distribution_details.forEach((d) => {
+          // Registros antigos trazem também o valor original da parcela.
+          const detail = d as typeof d & { originalAmount?: number };
           saleData.installments.push({
             collectionId: detail.installmentId || payment.id,
             originalValue: detail.originalAmount || 0,
@@ -609,7 +518,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
           saleData.totalOriginalValue += detail.originalAmount || 0;
         });
       } else {
-        // Fallback se não houver detalhes de distribuição
+        // Sem detalhes de distribuição
         saleData.installments.push({
           collectionId: payment.id,
           originalValue: 0,
@@ -619,7 +528,6 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       }
     });
 
-    // Converter para array e calcular valor pendente total
     const payments = Array.from(salesPaymentMap.values()).map((sale) => ({
       ...sale,
       totalPendingValue: Math.max(
@@ -630,8 +538,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     }));
 
     // Dívida (total, pago, pendente) é a situação ATUAL do cliente/venda e se
-    // repete em cada pagamento dele: somar linha a linha contava em dobro quem
-    // pagou mais de uma vez no período. Aqui cada cliente/venda entra uma vez.
+    // repete em cada pagamento dele: cada cliente/venda entra uma vez.
     const seenDebt = new Set<string>();
     const debtTotals = { totalDebt: 0, totalPaidOnDebt: 0, remainingDebt: 0 };
     payments.forEach((p) => {
@@ -654,7 +561,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       ),
       totalPaymentJuros: payments.reduce((sum, p) => sum + p.paymentJuros, 0),
       debtTotals,
-      totalTransactions: salesMap.size, // Conta vendas únicas em vez de parcelas
+      totalPayments: payments.length,
       collectorSummary,
       payments,
     };
@@ -666,30 +573,46 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     dfDateRangeMode,
     dfSelectedCollector,
     dfSelectedStore,
-    dfMinAmount,
-    dfMaxAmount,
     users,
   ]);
 
+  // Lista de pagamentos (com o cobrador clicado, se houver).
+  const listedPayments = useMemo(
+    () =>
+      focusCollector
+        ? reportData.payments.filter((p) => p.collectorId === focusCollector)
+        : reportData.payments,
+    [reportData.payments, focusCollector],
+  );
+
   const detailsTotalPages = Math.max(
     1,
-    Math.ceil(reportData.payments.length / DETAILS_PER_PAGE),
+    Math.ceil(listedPayments.length / DETAILS_PER_PAGE),
   );
 
   const paginatedPayments = useMemo(
     () =>
-      reportData.payments.slice(
+      listedPayments.slice(
         (detailsPage - 1) * DETAILS_PER_PAGE,
         detailsPage * DETAILS_PER_PAGE,
       ),
-    [reportData.payments, detailsPage],
+    [listedPayments, detailsPage],
   );
 
-  // Qualquer mudança de filtro gera um novo array de payments: volta à 1ª página
-  // para não ficar preso numa página inexistente após reduzir os resultados.
+  // Novo cálculo: some o foco num cobrador que não está mais no resultado.
+  useEffect(() => {
+    setFocusCollector((current) =>
+      current &&
+      reportData.collectorSummary.some((c) => c.collectorId === current)
+        ? current
+        : null,
+    );
+  }, [reportData.collectorSummary]);
+
+  // Qualquer mudança na lista volta à 1ª página.
   useEffect(() => {
     setDetailsPage(1);
-  }, [reportData.payments]);
+  }, [listedPayments]);
 
   const handleExportReport = () => {
     const reportContent = generateReportContent(
@@ -711,43 +634,41 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   };
 
   const handleExportExcel = () => {
-    // 1. Preparar Aba de Resumo
+    // 1. Aba de Resumo
     const summaryHeader = [
       ["RELATÓRIO DE CAIXA - FOCCO BRASIL"],
       [`Período: ${reportData.date}`],
       [`Data de Extração: ${new Date().toLocaleString("pt-BR")}`],
       [""],
-      ["MÉTRICAS GERAIS"],
-      ["Total Arrecadado", reportData.totalReceived],
-      ["Juros (incluídos no total)", reportData.totalPaymentJuros],
-      ["Total de Descontos", reportData.totalPaymentDiscount],
-      ["Quantidade de Vendas", reportData.totalTransactions],
-      ["Cobradores Ativos", reportData.collectorSummary.length],
-      [
-        "Ticket Médio",
-        reportData.totalTransactions > 0
-          ? reportData.totalReceived / reportData.totalTransactions
-          : 0,
-      ],
+      ["RESUMO"],
+      ["Recebido no período", reportData.totalReceived],
+      ["Juros (incluídos no recebido)", reportData.totalPaymentJuros],
+      ["Descontos dados", reportData.totalPaymentDiscount],
+      ["Pagamentos", reportData.totalPayments],
+      ["Cobradores", reportData.collectorSummary.length],
       [""],
-      ["DESEMPENHO POR COBRADOR"],
+      ["POR COBRADOR"],
       [
         "Cobrador",
-        "Valor Recebido",
-        "Qtd Vendas",
-        "% Participação",
-        "Ticket Médio",
+        "Recebido",
+        "% do total",
+        "Pagamentos",
+        "Clientes",
+        "Juros",
+        "Descontos",
       ],
     ];
 
     const collectorRows = reportData.collectorSummary.map((c) => [
       c.collectorName,
       c.receivedAmount,
-      c.transactionCount,
       reportData.totalReceived > 0
         ? c.receivedAmount / reportData.totalReceived
         : 0,
-      c.transactionCount > 0 ? c.receivedAmount / c.transactionCount : 0,
+      c.transactionCount,
+      c.clients.length,
+      c.jurosAmount,
+      c.discountAmount,
     ]);
 
     const summaryWS = XLSX.utils.aoa_to_sheet([
@@ -755,18 +676,19 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       ...collectorRows,
     ]);
 
-    // Configurar larguras das colunas do Resumo
     summaryWS["!cols"] = [
       { wch: 30 }, // Cobrador
-      { wch: 15 }, // Valor
-      { wch: 12 }, // Vendas
-      { wch: 15 }, // %
-      { wch: 15 }, // Ticket
+      { wch: 15 }, // Recebido
+      { wch: 12 }, // %
+      { wch: 12 }, // Pagamentos
+      { wch: 10 }, // Clientes
+      { wch: 12 }, // Juros
+      { wch: 12 }, // Descontos
     ];
 
-    // 2. Preparar Aba de Transações Detalhadas
+    // 2. Aba de Pagamentos
     const detailsHeader = [
-      ["LISTAGEM DETALHADA DE RECEBIMENTOS"],
+      ["PAGAMENTOS"],
       [""],
       [
         "Cliente",
@@ -806,7 +728,6 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       ...detailRows,
     ]);
 
-    // Configurar larguras das colunas de Detalhes
     detailsWS["!cols"] = [
       { wch: 35 }, // Cliente
       { wch: 18 }, // CPF
@@ -814,7 +735,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       { wch: 15 }, // Loja
       { wch: 20 }, // Cobrador
       { wch: 15 }, // Forma
-      { wch: 18 }, // Recebido Hoje
+      { wch: 18 }, // Recebido
       { wch: 14 }, // Juros
       { wch: 18 }, // Total Pago Histórico
       { wch: 12 }, // Desconto
@@ -823,10 +744,9 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       { wch: 15 }, // Data
     ];
 
-    // Criar o Workbook e Salvar
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, summaryWS, "Resumo Executivo");
-    XLSX.utils.book_append_sheet(wb, detailsWS, "Transações");
+    XLSX.utils.book_append_sheet(wb, summaryWS, "Resumo");
+    XLSX.utils.book_append_sheet(wb, detailsWS, "Pagamentos");
 
     const filenameDate =
       dateRangeMode === "single"
@@ -840,7 +760,6 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     const printContent = generatePrintableReport(
       reportData,
       dateRangeMode === "range",
-      showDetails,
     );
     const printWindow = window.open("", "_blank");
     if (printWindow) {
@@ -850,21 +769,34 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     }
   };
 
-  const handleClearFilters = () => {
-    setDateRangeMode("single");
-    setSelectedDate(getCurrentDateBR());
-    setEndDate(getCurrentDateBR());
-    setSelectedCollector("all");
-    setSelectedStore("all");
-    setMinAmount("");
-    setMaxAmount("");
-  };
+  const chipClass = (active: boolean) =>
+    `px-3 py-1.5 rounded-full text-xs font-medium transition-colors touch-manipulation ${
+      active
+        ? "bg-blue-600 text-white"
+        : "bg-gray-100 dark:bg-dark-bg text-gray-600 dark:text-dark-text-secondary hover:bg-gray-200 dark:hover:bg-dark-border"
+    }`;
+  const selectClass = (active: boolean) =>
+    `px-3 py-1.5 rounded-full text-xs font-medium border-0 focus:outline-none focus:ring-2 focus:ring-blue-500 touch-manipulation ${
+      active
+        ? "bg-blue-600 text-white"
+        : "bg-gray-100 dark:bg-dark-bg text-gray-600 dark:text-dark-text-secondary"
+    }`;
+  const dateInputClass =
+    "px-2 py-1 rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-xs text-gray-700 dark:text-dark-text";
+
+  const periodoLabel =
+    dateRangeMode === "single"
+      ? formatDate(selectedDate)
+      : `${formatDate(selectedDate)} até ${formatDate(endDate)}`;
+  const focusName = focusCollector
+    ? reportData.collectorSummary.find((c) => c.collectorId === focusCollector)
+        ?.collectorName
+    : null;
 
   return (
     <div className="space-y-4">
-      {/* Overlay de carregamento fullscreen (via portal no body): cobre toda a
-          aplicação e bloqueia interações enquanto a consulta de um período longo
-          é processada, evitando a sensação de travamento. */}
+      {/* Aviso de carregamento (via portal no body): cobre a aplicação e
+          bloqueia interações enquanto um período longo é processado. */}
       {isCalculating &&
         createPortal(
           <div
@@ -880,7 +812,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
             role="status"
             aria-live="polite"
           >
-            <div className="flex flex-col items-center gap-3 rounded-2xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg-secondary px-8 py-6 shadow-2xl">
+            <div className="flex flex-col items-center gap-3 rounded-2xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg-secondary px-8 py-6 shadow-xl">
               <RefreshCw className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400" />
               <p className="text-sm font-semibold text-gray-700 dark:text-dark-text">
                 Processando consulta…
@@ -893,65 +825,52 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
           document.body,
         )}
 
-      {/* Header Simplificado */}
-      <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-4">
-        <div className="flex items-center justify-between">
+      {/* Cabeçalho + período + filtros, sempre à vista */}
+      <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-4 lg:p-5 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-dark-text">
+            <h2 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-dark-text flex items-center">
+              <DollarSign className="h-5 w-5 lg:h-6 lg:w-6 mr-2 text-blue-600 dark:text-blue-400 flex-shrink-0" />
               Relatório do Caixa
             </h2>
-            <p className="text-sm text-gray-600 dark:text-dark-text-secondary mt-1">
-              {dateRangeMode === "single"
-                ? formatDate(selectedDate)
-                : `${formatDate(selectedDate)} até ${formatDate(endDate)}`}
+            <p className="text-xs text-gray-500 dark:text-dark-text-secondary mt-0.5 flex items-center gap-2">
+              {periodoLabel}
+              {showUpdateNotification && (
+                <span className="text-green-600 dark:text-green-400">
+                  · Atualizado
+                </span>
+              )}
             </p>
           </div>
 
-          {/* Ações Principais */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <button
               onClick={() => refreshData()}
-              className="p-2 text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 hover:dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg rounded-2xl transition-colors"
+              className="p-2 text-gray-500 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg rounded-lg transition-colors"
               title="Atualizar"
             >
-              <RefreshCw className="h-5 w-5" />
+              <RefreshCw className="h-4 w-4" />
             </button>
-
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="p-2 text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 hover:dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg rounded-2xl transition-colors relative"
-            >
-              <Filter className="h-5 w-5" />
-              {activeFiltersCount > 0 && (
-                <span className="absolute -top-1 -right-1 h-5 w-5 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center font-medium">
-                  {activeFiltersCount}
-                </span>
-              )}
-            </button>
-
             <button
               onClick={handlePrintReport}
-              className="p-2 text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 hover:dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg rounded-2xl transition-colors"
+              className="p-2 text-gray-500 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg rounded-lg transition-colors"
               title="Imprimir"
             >
-              <Printer className="h-5 w-5" />
+              <Printer className="h-4 w-4" />
             </button>
-
-            {/* Dropdown de Exportação */}
             <div className="relative" ref={exportDropdownRef}>
               <button
                 onClick={() => setShowExportOptions(!showExportOptions)}
-                className="flex items-center gap-1 p-2 text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 hover:dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg rounded-2xl transition-colors"
+                className="flex items-center gap-1 p-2 text-gray-500 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg rounded-lg transition-colors"
                 title="Exportar"
               >
-                <Download className="h-5 w-5" />
+                <Download className="h-4 w-4" />
                 <ChevronDown
                   className={`h-3 w-3 transition-transform duration-200 ${showExportOptions ? "rotate-180" : ""}`}
                 />
               </button>
-
               {showExportOptions && (
-                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-xl border border-gray-100 dark:border-dark-border py-2 z-50 animate-in fade-in zoom-in duration-200">
+                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-dark-bg-secondary rounded-xl shadow-lg border border-gray-200 dark:border-dark-border py-1 z-50">
                   <button
                     onClick={handleExportReport}
                     className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-bg-tertiary transition-colors"
@@ -972,576 +891,313 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
           </div>
         </div>
 
-        {showUpdateNotification && (
-          <div className="mt-2 flex items-center gap-2 text-xs text-green-600">
-            <RefreshCw className="h-3 w-3 animate-spin" />
-            <span>Atualizado</span>
+        <div className="flex flex-wrap items-center gap-2">
+          {(Object.keys(quickRanges) as QuickRangeKey[]).map((key) => (
+            <button
+              key={key}
+              onClick={() => applyQuickDateRange(key)}
+              className={chipClass(activeQuickRange === key)}
+            >
+              {quickRanges[key].label}
+            </button>
+          ))}
+          <button
+            onClick={openCustomDates}
+            className={chipClass(customDates || !activeQuickRange)}
+          >
+            Escolher datas
+          </button>
+
+          <select
+            aria-label="Cobrador"
+            value={selectedCollector}
+            onChange={(e) => setSelectedCollector(e.target.value)}
+            className={selectClass(selectedCollector !== "all")}
+          >
+            <option value="all">Todos os cobradores</option>
+            {availableCollectors.map((collector) => (
+              <option key={collector.id} value={collector.id}>
+                {collector.name}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="Loja"
+            value={selectedStore}
+            onChange={(e) => setSelectedStore(e.target.value)}
+            className={selectClass(selectedStore !== "all")}
+          >
+            <option value="all">Todas as lojas</option>
+            {availableStores.map((store) => (
+              <option key={store} value={store}>
+                {store}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {(customDates || !activeQuickRange) && (
+          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-dark-text-secondary">
+            <Calendar className="h-3.5 w-3.5" />
+            <label htmlFor="cash-date-start">De</label>
+            <input
+              type="date"
+              id="cash-date-start"
+              value={selectedDate}
+              onChange={(e) => {
+                setSelectedDate(e.target.value);
+                if (endDate < e.target.value) setEndDate(e.target.value);
+              }}
+              className={dateInputClass}
+            />
+            <label htmlFor="cash-date-end">até</label>
+            <input
+              type="date"
+              id="cash-date-end"
+              value={dateRangeMode === "single" ? selectedDate : endDate}
+              min={selectedDate}
+              onChange={(e) => {
+                setDateRangeMode("range");
+                setEndDate(e.target.value);
+              }}
+              className={dateInputClass}
+            />
           </div>
         )}
       </div>
 
-      {/* Filtros Colapsáveis */}
-      {showFilters && (
-        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-4 animate-in slide-in-from-top-2 duration-200">
-          <div className="space-y-4">
-            {/* Date Range Mode Toggle */}
-            <div>
-              <span className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-2">
-                Período
-              </span>
-              <div className="flex bg-gray-100 dark:bg-dark-bg rounded-2xl p-1 w-full sm:w-auto">
-                <button
-                  onClick={() => setDateRangeMode("single")}
-                  className={`flex-1 sm:flex-none px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                    dateRangeMode === "single"
-                      ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
-                      : "text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
-                  }`}
-                >
-                  Data Única
-                </button>
-                <button
-                  onClick={() => setDateRangeMode("range")}
-                  className={`flex-1 sm:flex-none px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                    dateRangeMode === "range"
-                      ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
-                      : "text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
-                  }`}
-                >
-                  Período
-                </button>
-              </div>
-            </div>
-
-            {/* Quick Date Range Buttons */}
-            <div>
-              <span className="block text-xs font-black text-gray-400 dark:text-dark-text-secondary tracking-wider mb-2">
-                Ações Rápidas
-              </span>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(getQuickDateRanges()).map(([key, range]) => (
-                  <button
-                    key={key}
+      {reportData.totalPayments === 0 ? (
+        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border px-6 py-12 text-center text-sm text-gray-500 dark:text-dark-text-secondary">
+          Nenhum recebimento em {periodoLabel} com os filtros escolhidos.
+        </div>
+      ) : (
+        <>
+          {/* Total + por cobrador no mesmo bloco (cards aglomerados) */}
+          <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-4 space-y-2">
+            {reportData.collectorSummary.length > 1 && (
+              <p className="text-[11px] text-gray-400 dark:text-dark-text-secondary">
+                Clique num cobrador para ver só os pagamentos dele na lista.
+              </p>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+              <SummaryCard
+                icon={Wallet}
+                title="Recebido no período"
+                value={formatCurrency(reportData.totalReceived)}
+                valueTone="green"
+                caption={`${reportData.collectorSummary.length} ${
+                  reportData.collectorSummary.length === 1
+                    ? "cobrador"
+                    : "cobradores"
+                }`}
+                rows={[
+                  {
+                    label: "Pagamentos",
+                    value: String(reportData.totalPayments),
+                  },
+                  {
+                    label: "Juros incluídos",
+                    value: formatCurrency(reportData.totalPaymentJuros),
+                  },
+                  {
+                    label: "Descontos dados",
+                    value: formatCurrency(reportData.totalPaymentDiscount),
+                    tone:
+                      reportData.totalPaymentDiscount > 0 ? "amber" : undefined,
+                  },
+                ]}
+              />
+              {reportData.collectorSummary.map((collector, index) => {
+                const percentage =
+                  reportData.totalReceived > 0
+                    ? (collector.receivedAmount / reportData.totalReceived) *
+                      100
+                    : 0;
+                return (
+                  <SummaryCard
+                    key={collector.collectorId}
+                    icon={User}
+                    title={`${index + 1}º ${collector.collectorName}`}
+                    value={formatCurrency(collector.receivedAmount)}
+                    caption={`${percentage.toFixed(1)}% do total`}
+                    selecionado={focusCollector === collector.collectorId}
                     onClick={() =>
-                      applyQuickDateRange(
-                        key as keyof ReturnType<typeof getQuickDateRanges>,
+                      setFocusCollector((current) =>
+                        current === collector.collectorId
+                          ? null
+                          : collector.collectorId,
                       )
                     }
-                    className="px-4 py-2 text-xs font-bold bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text-secondary rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 border border-gray-100 dark:border-dark-border transition-all duration-200 whitespace-nowrap active:scale-95 shadow-sm"
-                  >
-                    {range.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Date Selection */}
-              <div>
-                <label
-                  htmlFor="cash-date-start"
-                  className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-2"
-                >
-                  {dateRangeMode === "single" ? "Data" : "Data Inicial"}
-                </label>
-                <div className="flex items-center">
-                  <Calendar className="h-4 w-4 text-gray-500 dark:text-dark-text-secondary mr-2" />
-                  <input
-                    type="date"
-                    id="cash-date-start"
-                    name="cashDateStart"
-                    value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-dark-bg text-gray-900 dark:text-dark-text"
+                    hint="Mostrar só os pagamentos deste cobrador na lista"
+                    rows={[
+                      {
+                        label: "Pagamentos",
+                        value: String(collector.transactionCount),
+                      },
+                      {
+                        label: "Clientes",
+                        value: String(collector.clients.length),
+                      },
+                      {
+                        label: "Juros",
+                        value: formatCurrency(collector.jurosAmount),
+                      },
+                      {
+                        label: "Descontos",
+                        value: formatCurrency(collector.discountAmount),
+                        tone:
+                          collector.discountAmount > 0 ? "amber" : undefined,
+                      },
+                    ]}
                   />
-                </div>
-              </div>
-
-              {/* End Date (only in range mode) */}
-              {dateRangeMode === "range" && (
-                <div>
-                  <label
-                    htmlFor="cash-date-end"
-                    className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-2"
-                  >
-                    Data Final
-                  </label>
-                  <div className="flex items-center">
-                    <Calendar className="h-4 w-4 text-gray-500 dark:text-dark-text-secondary mr-2" />
-                    <input
-                      type="date"
-                      id="cash-date-end"
-                      name="cashDateEnd"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      min={selectedDate}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-dark-bg text-gray-900 dark:text-dark-text"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Collector Filter */}
-              <div>
-                <label
-                  htmlFor="cash-collector"
-                  className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-2"
-                >
-                  Cobrador
-                </label>
-                <select
-                  id="cash-collector"
-                  name="cashCollector"
-                  value={selectedCollector}
-                  onChange={(e) => setSelectedCollector(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-dark-bg text-gray-900 dark:text-dark-text"
-                >
-                  <option value="all">Todos os Cobradores</option>
-                  {availableCollectors.map((collector) => (
-                    <option key={collector.id} value={collector.id}>
-                      {collector.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Store Filter */}
-              <div>
-                <label
-                  htmlFor="cash-store"
-                  className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-2"
-                >
-                  Loja
-                </label>
-                <select
-                  id="cash-store"
-                  name="cashStore"
-                  value={selectedStore}
-                  onChange={(e) => setSelectedStore(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-dark-bg text-gray-900 dark:text-dark-text"
-                >
-                  <option value="all">Todas as Lojas</option>
-                  {availableStores.map((store) => (
-                    <option key={store} value={store}>
-                      {store}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Amount Range */}
-              <div>
-                <label
-                  htmlFor="cash-min-amount"
-                  className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-2"
-                >
-                  Valor Mínimo
-                </label>
-                <div className="flex items-center">
-                  <DollarSign className="h-4 w-4 text-gray-500 dark:text-dark-text-secondary mr-2" />
-                  <input
-                    type="number"
-                    id="cash-min-amount"
-                    name="cashMinAmount"
-                    step="0.01"
-                    min="0"
-                    value={minAmount}
-                    onChange={(e) => setMinAmount(e.target.value)}
-                    placeholder="0,00"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-dark-bg text-gray-900 dark:text-dark-text"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="cash-max-amount"
-                  className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-2"
-                >
-                  Valor Máximo
-                </label>
-                <div className="flex items-center">
-                  <DollarSign className="h-4 w-4 text-gray-500 dark:text-dark-text-secondary mr-2" />
-                  <input
-                    type="number"
-                    id="cash-max-amount"
-                    name="cashMaxAmount"
-                    step="0.01"
-                    min="0"
-                    value={maxAmount}
-                    onChange={(e) => setMaxAmount(e.target.value)}
-                    placeholder="∞"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-dark-bg text-gray-900 dark:text-dark-text"
-                  />
-                </div>
-              </div>
-
-              {/* Clear Filters Button */}
-              <div className="flex flex-col gap-2">
-                <button
-                  onClick={handleClearFilters}
-                  className="w-full flex items-center justify-center px-4 py-2 bg-gray-600 text-white rounded-2xl hover:bg-gray-700 transition-colors text-sm font-medium"
-                >
-                  Limpar Filtros
-                </button>
-                <button
-                  onClick={() => setShowFilters(false)}
-                  className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors text-sm font-medium"
-                >
-                  Fechar
-                </button>
-              </div>
+                );
+              })}
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Card Principal - Dashboard Style */}
-      <div className="bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-700 text-white rounded-[2rem] shadow-xl p-8 relative overflow-hidden group">
-        {/* Padrão decorativo de fundo */}
-        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-white/10 rounded-full blur-3xl transition-transform duration-1000 group-hover:scale-110" />
-        <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 bg-teal-400/20 rounded-full blur-2xl" />
-
-        <div className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-8">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-white/20 rounded-lg">
-                <TrendingUp className="h-4 w-4 text-emerald-100" />
-              </div>
-              <p className="text-emerald-100 text-sm font-black tracking-wide">
-                Arrecadação Total
-              </p>
-            </div>
-            <p className="text-5xl font-black mt-1 tracking-tight">
-              {formatCurrency(reportData.totalReceived)}
-            </p>
-            {reportData.totalPaymentJuros > 0 && (
-              <p className="text-emerald-100 text-xs font-bold mt-1">
-                inclui {formatCurrency(reportData.totalPaymentJuros)} de juros
-              </p>
-            )}
-            {reportData.totalTransactions > 0 && (
-              <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full border border-white/10">
-                <Activity className="h-3.5 w-3.5 text-emerald-200" />
-                <p className="text-emerald-100 text-xs font-bold">
-                  Ticket médio:{" "}
-                  <span className="text-white">
-                    {formatCurrency(
-                      reportData.totalReceived / reportData.totalTransactions,
-                    )}
+          {/* Pagamentos */}
+          <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-gray-100 dark:border-dark-border">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-dark-text">
+                Pagamentos ({listedPayments.length})
+                {focusName && (
+                  <span className="font-normal text-gray-500 dark:text-dark-text-secondary">
+                    {" "}
+                    · {focusName}
                   </span>
-                </p>
-              </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white/15 rounded-2xl p-4 border border-white/10 shadow-inner">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-1.5 bg-emerald-400/30 rounded-lg">
-                  <Receipt className="h-4 w-4 text-white" />
-                </div>
-                <p className="text-emerald-50) text-[10px] font-black tracking-wide">
-                  Vendas
-                </p>
-              </div>
-              <p className="text-2xl font-black">
-                {reportData.totalTransactions}
-              </p>
-            </div>
-
-            <div className="bg-white/15 rounded-2xl p-4 border border-white/10 shadow-inner">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-1.5 bg-teal-400/30 rounded-lg">
-                  <User className="h-4 w-4 text-white" />
-                </div>
-                <p className="text-emerald-50) text-[10px] font-black tracking-wide">
-                  Cobradores
-                </p>
-              </div>
-              <p className="text-2xl font-black">
-                {reportData.collectorSummary.length}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Seção de Cobradores - Design melhorado */}
-      {reportData.collectorSummary.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text">
-              Desempenho por Cobrador
-            </h3>
-            <button
-              onClick={() => setShowDetails(!showDetails)}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-            >
-              {showDetails ? "Ocultar detalhes" : "Ver detalhes"}
-            </button>
-          </div>
-
-          {/* Cards de Cobradores */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {reportData.collectorSummary.map((collector, index) => {
-              const percentage =
-                reportData.totalReceived > 0
-                  ? (collector.receivedAmount / reportData.totalReceived) * 100
-                  : 0;
-
-              return (
-                <div
-                  key={collector.collectorId}
-                  className="bg-white dark:bg-dark-bg-secondary rounded-[1.5rem] border border-gray-100 dark:border-dark-border p-5 hover:shadow-xl dark:hover:shadow-black/25 transition-all duration-300 group animate-in fade-in slide-in-from-bottom-2"
+                )}
+              </h3>
+              {focusName && (
+                <button
+                  onClick={() => setFocusCollector(null)}
+                  className="text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400"
                 >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`h-12 w-12 rounded-full flex items-center justify-center font-black text-lg shadow-sm border-2 ${
-                          index === 0
-                            ? "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/30 text-amber-700 dark:text-amber-400"
-                            : "bg-blue-50 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/30 text-blue-700 dark:text-blue-400"
-                        }`}
-                      >
-                        {collector.collectorName.charAt(0)}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <h4 className="font-bold text-gray-900 dark:text-dark-text leading-tight">
-                            {collector.collectorName}
-                          </h4>
-                          {index === 0 && (
-                            <Award className="h-4 w-4 text-amber-500 fill-amber-500" />
-                          )}
-                        </div>
-                        <p className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-wider">
-                          {collector.transactionCount} Transações
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xl font-black text-gray-900 dark:text-dark-text">
-                        {formatCurrency(collector.receivedAmount)}
-                      </p>
-                      <p className="text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary">
-                        {percentage.toFixed(1)}% do total
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Barra de Progresso */}
-                  <div className="space-y-1.5">
-                    <div className="h-1.5 w-full bg-gray-50 dark:bg-dark-bg rounded-full overflow-hidden">
-                      <div
-                        className={`h-full transition-all duration-1000 ease-out ${
-                          index === 0 ? "bg-amber-500" : "bg-blue-500"
-                        }`}
-                        style={{ width: `${percentage}%` }}
-                      />
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary tracking-tighter">
-                      <span>
-                        Ticket:{" "}
-                        {formatCurrency(
-                          collector.transactionCount > 0
-                            ? collector.receivedAmount /
-                                collector.transactionCount
-                            : 0,
-                        )}
-                      </span>
-                      <span>{collector.clients.length} Clientes</span>
-                    </div>
-                  </div>
-
-                  {collector.saleNumbers.length > 0 && showDetails && (
-                    <div className="mt-4 pt-4 border-t border-dashed border-gray-100 dark:border-dark-border">
-                      <p className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-wider mb-2 flex items-center gap-1">
-                        <Receipt className="h-3 w-3" /> Vendas Realizadas
-                      </p>
-                      <div className="flex flex-wrap gap-1">
-                        {collector.saleNumbers.slice(0, 5).map((num) => (
-                          <span
-                            key={num}
-                            className="px-2 py-0.5 bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text-secondary rounded text-[10px] font-bold border border-gray-100 dark:border-dark-border"
-                          >
-                            #{num}
-                          </span>
-                        ))}
-                        {collector.saleNumbers.length > 5 && (
-                          <span className="text-[10px] font-bold text-gray-400 self-center ml-1">
-                            +{collector.saleNumbers.length - 5}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Transações Detalhadas - Melhor organização */}
-      {showDetails && reportData.payments.length > 0 && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text">
-            Transações Detalhadas
-          </h3>
-
-          <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-150 dark:border-dark-border overflow-hidden">
+                  Mostrar todos
+                </button>
+              )}
+            </div>
             <div className="overflow-x-auto">
-              {/* Tabela Responsiva Otimizada */}
-              <table className="w-full table-auto border-collapse">
-                <thead className="bg-gray-50/50 dark:bg-dark-bg/40 border-b border-gray-100 dark:border-dark-border">
-                  <tr>
-                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-wide min-w-[200px]">
-                      Cliente / Venda
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider bg-gray-50 dark:bg-dark-bg/50">
+                    <th className="px-4 py-2 text-left">Cliente / Venda</th>
+                    <th className="px-4 py-2 text-left whitespace-nowrap">
+                      Data
                     </th>
-                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-wide whitespace-nowrap">
-                      Data Pgto.
+                    <th className="px-4 py-2 text-left hidden lg:table-cell">
+                      Cobrador
                     </th>
-                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-wide hidden 2xl:table-cell">
+                    <th className="px-4 py-2 text-left hidden 2xl:table-cell">
                       Loja
                     </th>
-                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-wide hidden xl:table-cell">
+                    <th className="px-4 py-2 text-left hidden xl:table-cell">
                       Forma
                     </th>
-                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-wide">
-                      Recebido
-                    </th>
-                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-wide hidden xl:table-cell">
-                      Pago (Acum.)
-                    </th>
-                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-wide hidden md:table-cell">
+                    <th className="px-4 py-2 text-right">Recebido</th>
+                    <th className="px-4 py-2 text-right hidden md:table-cell">
                       Desconto
                     </th>
-                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-wide hidden lg:table-cell">
-                      Total Dívida
+                    <th className="px-4 py-2 text-right hidden xl:table-cell">
+                      Dívida
                     </th>
-                    <th className="px-4 py-4 text-right text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-wide">
-                      Pendente
-                    </th>
+                    <th className="px-4 py-2 text-right">Pendente</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
-                  {paginatedPayments.map((payment, index) => {
-                    const method = payment.paymentMethod?.toLowerCase() || "";
-                    const methodColor = method.includes("pix")
-                      ? "bg-indigo-50 text-indigo-700 border-indigo-100"
-                      : method.includes("dinheiro")
-                        ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-                        : method.includes("cart")
-                          ? "bg-blue-50 text-blue-700 border-blue-100"
-                          : method.includes("boleto")
-                            ? "bg-amber-50 text-amber-700 border-amber-100"
-                            : "bg-gray-50 text-gray-700 border-gray-100";
-
-                    return (
-                      <tr
-                        key={`${payment.saleKey}-${index}`}
-                        className="hover:bg-blue-50/30 dark:hover:bg-dark-bg/60 transition-colors group"
-                      >
-                        <td className="px-4 py-4">
-                          <div className="flex flex-col">
-                            <button
-                              onClick={() =>
-                                handleOpenClientModal(payment.clientDocument)
-                              }
-                              className="text-sm font-bold text-gray-900 dark:text-dark-text leading-none mb-1 text-left hover:text-blue-600 dark:hover:text-blue-400 transition-colors bg-transparent"
-                            >
-                              {payment.client}
-                            </button>
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded tracking-tighter">
-                                {payment.saleNumber
-                                  ? `Venda #${payment.saleNumber}`
-                                  : "Sem número"}
-                              </span>
-                              <span className="text-[10px] font-medium text-gray-400 dark:text-dark-text-secondary font-mono hidden sm:inline">
-                                {payment.clientDocument}
-                              </span>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-4">
-                          <p className="text-xs font-semibold text-gray-700 dark:text-dark-text tabular-nums whitespace-nowrap">
-                            {formatDate(payment.receivedDate)}
-                          </p>
-                        </td>
-                        <td className="px-4 py-4 hidden 2xl:table-cell">
-                          <p className="text-xs font-semibold text-gray-500 dark:text-dark-text-secondary truncate max-w-[120px]">
-                            {payment.store}
-                          </p>
-                        </td>
-                        <td className="px-4 py-4 hidden xl:table-cell">
-                          <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-black border tracking-tighter ${methodColor}`}
-                          >
-                            {payment.paymentMethod?.split(" ")[0]}
+                  {paginatedPayments.map((payment) => (
+                    <tr
+                      key={payment.saleKey}
+                      className="hover:bg-gray-50 dark:hover:bg-dark-bg/40 transition-colors"
+                    >
+                      <td className="px-4 py-2.5">
+                        <button
+                          onClick={() =>
+                            handleOpenClientModal(payment.clientDocument)
+                          }
+                          className="font-semibold text-gray-900 dark:text-dark-text text-left hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                        >
+                          {payment.client}
+                        </button>
+                        <div className="text-[11px] text-gray-400 dark:text-dark-text-secondary">
+                          {payment.saleNumber
+                            ? `Venda #${payment.saleNumber}`
+                            : "Sem número"}
+                          <span className="hidden sm:inline">
+                            {" "}
+                            · {payment.clientDocument}
                           </span>
-                        </td>
-                        <td className="px-4 py-4 text-right">
-                          <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">
-                            {formatCurrency(payment.totalReceivedValue)}
-                          </p>
-                          {payment.paymentJuros > 0 && (
-                            <p className="text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary whitespace-nowrap">
-                              {formatCurrency(payment.paymentJuros)} de juros
-                            </p>
-                          )}
-                        </td>
-                        <td className="px-4 py-4 text-right hidden xl:table-cell">
-                          <p className="text-xs font-bold text-gray-500 dark:text-dark-text-secondary">
-                            {formatCurrency(payment.totalPaidOnDebt)}
-                          </p>
-                        </td>
-                        <td className="px-4 py-4 text-right hidden md:table-cell">
-                          <p
-                            className={`text-xs font-bold ${payment.paymentDiscount > 0 ? "text-orange-600" : "text-gray-350 dark:text-gray-650"}`}
-                          >
-                            {payment.paymentDiscount > 0
-                              ? formatCurrency(payment.paymentDiscount)
-                              : "-"}
-                          </p>
-                        </td>
-                        <td className="px-4 py-4 text-right hidden lg:table-cell">
-                          <p className="text-xs font-bold text-gray-400 dark:text-dark-text-secondary">
-                            {formatCurrency(payment.totalDebt)}
-                          </p>
-                        </td>
-                        <td className="px-4 py-4 text-right">
-                          <p
-                            className={`text-sm font-black ${payment.remainingDebt > 0 ? "text-red-650 dark:text-red-400" : "text-gray-400 dark:text-dark-text-secondary"}`}
-                          >
-                            {payment.remainingDebt > 0
-                              ? formatCurrency(payment.remainingDebt)
-                              : "Quitado"}
-                          </p>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5 text-xs text-gray-600 dark:text-dark-text-secondary tabular-nums whitespace-nowrap">
+                        {formatDate(payment.receivedDate)}
+                      </td>
+                      <td className="px-4 py-2.5 text-xs text-gray-600 dark:text-dark-text-secondary hidden lg:table-cell">
+                        {payment.collector}
+                      </td>
+                      <td className="px-4 py-2.5 text-xs text-gray-500 dark:text-dark-text-secondary hidden 2xl:table-cell">
+                        <span className="block truncate max-w-[140px]">
+                          {payment.store}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-xs text-gray-600 dark:text-dark-text-secondary hidden xl:table-cell">
+                        {payment.paymentMethod}
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <div className="font-semibold text-green-600 dark:text-green-400 whitespace-nowrap">
+                          {formatCurrency(payment.totalReceivedValue)}
+                        </div>
+                        {payment.paymentJuros > 0 && (
+                          <div className="text-[11px] text-gray-400 dark:text-dark-text-secondary whitespace-nowrap">
+                            {formatCurrency(payment.paymentJuros)} de juros
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-xs hidden md:table-cell">
+                        {payment.paymentDiscount > 0 ? (
+                          <span className="font-semibold text-amber-600 dark:text-amber-400">
+                            {formatCurrency(payment.paymentDiscount)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-300 dark:text-dark-text-secondary">
+                            -
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-xs text-gray-500 dark:text-dark-text-secondary hidden xl:table-cell whitespace-nowrap">
+                        {formatCurrency(payment.totalDebt)}
+                      </td>
+                      <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                        {payment.remainingDebt > 0 ? (
+                          <span className="font-semibold text-red-600 dark:text-red-400">
+                            {formatCurrency(payment.remainingDebt)}
+                          </span>
+                        ) : (
+                          <span className="text-xs font-semibold text-gray-400 dark:text-dark-text-secondary">
+                            Quitado
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
 
             {detailsTotalPages > 1 && (
               <div className="flex items-center justify-between gap-4 px-4 py-3 border-t border-gray-100 dark:border-dark-border">
-                <span className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
+                <span className="text-xs text-gray-500 dark:text-dark-text-secondary">
                   Mostrando {(detailsPage - 1) * DETAILS_PER_PAGE + 1}–
                   {Math.min(
                     detailsPage * DETAILS_PER_PAGE,
-                    reportData.payments.length,
+                    listedPayments.length,
                   )}{" "}
-                  de {reportData.payments.length}
+                  de {listedPayments.length}
                 </span>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setDetailsPage((p) => Math.max(1, p - 1))}
                     disabled={detailsPage === 1}
-                    className="flex items-center px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 dark:text-dark-text-secondary border border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg-tertiary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="flex items-center px-3 py-1.5 rounded-lg text-sm text-gray-600 dark:text-dark-text-secondary border border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg-tertiary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </button>
@@ -1553,7 +1209,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                       setDetailsPage((p) => Math.min(detailsTotalPages, p + 1))
                     }
                     disabled={detailsPage === detailsTotalPages}
-                    className="flex items-center px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 dark:text-dark-text-secondary border border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg-tertiary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="flex items-center px-3 py-1.5 rounded-lg text-sm text-gray-600 dark:text-dark-text-secondary border border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg-tertiary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
                     <ChevronRight className="h-4 w-4" />
                   </button>
@@ -1561,24 +1217,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
               </div>
             )}
           </div>
-        </div>
-      )}
-
-      {/* Empty State */}
-      {reportData.totalTransactions === 0 && (
-        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-12 text-center">
-          <FileText className="h-12 w-12 text-gray-400 dark:text-dark-text-secondary mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 dark:text-dark-text mb-2">
-            Nenhum recebimento encontrado
-          </h3>
-          <p className="text-gray-600 dark:text-dark-text-secondary">
-            Não há recebimentos registrados para{" "}
-            {dateRangeMode === "single"
-              ? formatDate(selectedDate)
-              : `${formatDate(selectedDate)} até ${formatDate(endDate)}`}{" "}
-            com os filtros selecionados.
-          </p>
-        </div>
+        </>
       )}
 
       {/* Modal de Detalhes do Cliente */}
@@ -1605,8 +1244,8 @@ const generateReportContent = (
     `Total Recebido: ${formatCurrency(data.totalReceived)}`,
     `Juros (incluídos no total): ${formatCurrency(data.totalPaymentJuros)}`,
     `Total de Descontos: ${formatCurrency(data.totalPaymentDiscount)}`,
-    `Total de Vendas: ${data.totalTransactions}`,
-    `Cobradores Ativos: ${data.collectorSummary.length}`,
+    `Pagamentos: ${data.totalPayments}`,
+    `Cobradores: ${data.collectorSummary.length}`,
     "",
     "RESUMO POR COBRADOR:",
     "-".repeat(60),
@@ -1616,15 +1255,16 @@ const generateReportContent = (
     lines.push(
       `${collector.collectorName}:`,
       `  Valor Recebido: ${formatCurrency(collector.receivedAmount)}`,
-      `  Vendas: ${collector.transactionCount}`,
+      `  Pagamentos: ${collector.transactionCount}`,
       `  Clientes: ${collector.clients.length}`,
+      `  Juros: ${formatCurrency(collector.jurosAmount)} | Descontos: ${formatCurrency(collector.discountAmount)}`,
       `  Números das Vendas: ${collector.saleNumbers.length > 0 ? `#${collector.saleNumbers.join(", #")}` : "Nenhuma venda com número"}`,
       "",
     );
   });
 
   if (data.payments.length > 0) {
-    lines.push("TRANSAÇÕES DETALHADAS:", "-".repeat(60));
+    lines.push("PAGAMENTOS:", "-".repeat(60));
 
     data.payments.forEach((payment) => {
       lines.push(
@@ -1647,7 +1287,6 @@ const generateReportContent = (
 const generatePrintableReport = (
   data: DailyReportData,
   isRangeMode: boolean = false,
-  showDetails: boolean = false,
 ): string => {
   return `
     <!DOCTYPE html>
@@ -1880,15 +1519,15 @@ const generatePrintableReport = (
             ${data.totalPaymentJuros > 0 ? `<div class="label">inclui ${formatCurrency(data.totalPaymentJuros)} de juros</div>` : ""}
           </div>
           <div class="summary-item">
-            <div class="label">Total Descontos</div>
+            <div class="label">Descontos dados</div>
             <div class="value">${formatCurrency(data.totalPaymentDiscount)}</div>
           </div>
           <div class="summary-item">
-            <div class="label">Total de Vendas</div>
-            <div class="value">${data.totalTransactions}</div>
+            <div class="label">Pagamentos</div>
+            <div class="value">${data.totalPayments}</div>
           </div>
           <div class="summary-item">
-            <div class="label">Cobradores Ativos</div>
+            <div class="label">Cobradores</div>
             <div class="value">${data.collectorSummary.length}</div>
           </div>
         </div>
@@ -1899,8 +1538,10 @@ const generatePrintableReport = (
         <tr>
           <th>Cobrador</th>
           <th>Valor Recebido</th>
-          <th>Vendas</th>
+          <th>Pagamentos</th>
           <th>Clientes</th>
+          <th>Juros</th>
+          <th>Descontos</th>
           <th>Números das Vendas</th>
         </tr>
         ${data.collectorSummary
@@ -1911,6 +1552,8 @@ const generatePrintableReport = (
             <td style="font-weight: bold; text-align: right;">${formatCurrency(c.receivedAmount)}</td>
             <td>${c.transactionCount}</td>
             <td>${c.clients.length}</td>
+            <td style="text-align: right;">${formatCurrency(c.jurosAmount)}</td>
+            <td style="text-align: right;">${formatCurrency(c.discountAmount)}</td>
             <td class="small-text">${c.saleNumbers.length > 0 ? `#${c.saleNumbers.join(", #")}` : "-"}</td>
           </tr>
         `,
@@ -1919,9 +1562,9 @@ const generatePrintableReport = (
       </table>
 
       ${
-        showDetails && data.payments.length > 0
+        data.payments.length > 0
           ? `
-      <h3 class="section-title">Transações Detalhadas</h3>
+      <h3 class="section-title">Pagamentos</h3>
       <table>
         <tr>
           <th>Data Pgto.</th>
@@ -1964,8 +1607,8 @@ const generatePrintableReport = (
         <div class="totals-grid">
           <div class="totals-column">
             <div class="total-row">
-              <span class="label">Total de Vendas:</span>
-              <span class="value">${data.totalTransactions}</span>
+              <span class="label">Pagamentos:</span>
+              <span class="value">${data.totalPayments}</span>
             </div>
             <div class="total-row">
               <span class="label">Dívida Total dos Clientes:</span>
@@ -1986,7 +1629,7 @@ const generatePrintableReport = (
               <span class="value">${formatCurrency(data.totalPaymentJuros)}</span>
             </div>
             <div class="total-row">
-              <span class="label">Total Descontos:</span>
+              <span class="label">Descontos dados:</span>
               <span class="value">${formatCurrency(data.totalPaymentDiscount)}</span>
             </div>
             <div class="total-row">
@@ -1997,42 +1640,6 @@ const generatePrintableReport = (
         </div>
         <div class="total-row grand-total">
           <span class="label">ARRECADAÇÃO LÍQUIDA:</span>
-          <span class="value">${formatCurrency(data.totalReceived)}</span>
-        </div>
-      </div>
-      `
-          : ""
-      }
-      
-      ${
-        !showDetails && data.payments.length > 0
-          ? `
-      <div class="total-section">
-        <h3 style="margin-top: 0;">Totais Gerais</h3>
-        <div class="totals-grid">
-          <div class="totals-column">
-            <div class="total-row">
-              <span class="label">Total de Vendas:</span>
-              <span class="value">${data.totalTransactions}</span>
-            </div>
-            <div class="total-row">
-              <span class="label">Dívida Total dos Clientes:</span>
-              <span class="value">${formatCurrency(data.debtTotals.totalDebt)}</span>
-            </div>
-          </div>
-          <div class="totals-column">
-            <div class="total-row">
-              <span class="label">Total Recebido:</span>
-              <span class="value">${formatCurrency(data.totalReceived)}</span>
-            </div>
-            <div class="total-row">
-              <span class="label">Pendente Atual dos Clientes:</span>
-              <span class="value">${formatCurrency(data.debtTotals.remainingDebt)}</span>
-            </div>
-          </div>
-        </div>
-        <div class="total-row grand-total">
-          <span class="label">RESULTADO FINAL:</span>
           <span class="value">${formatCurrency(data.totalReceived)}</span>
         </div>
       </div>
