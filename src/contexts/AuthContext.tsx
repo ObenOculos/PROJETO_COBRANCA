@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { AuthContextType, User, UserType } from "../types";
 import { supabase } from "../lib/supabase";
 import { useLoading } from "./LoadingContext";
@@ -11,6 +18,14 @@ import {
 } from "../utils/cache";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Sem clique/tecla/rolagem/toque por este tempo em NENHUMA aba, desloga este
+// navegador (usuário pediu 3 h em 17/11; antes 1 h).
+const INACTIVITY_TIMEOUT = 3 * 60 * 60 * 1000; // 3 horas
+/** Ultimo uso do app neste navegador (todas as abas). */
+const CHAVE_ULTIMO_USO = "sistema_ultimo_uso";
+/** Id de Supabase Auth da conta desta aba (sessionStorage). */
+const CHAVE_AUTH_ID = "sistema_auth_id";
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -51,20 +66,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [showInactivityModal, setShowInactivityModal] = useState(false);
   const [showInactiveAccountModal, setShowInactiveAccountModal] =
     useState(false);
+  // Outra conta entrou neste navegador (outra aba): esta aba foi desconectada.
+  const [contaTrocada, setContaTrocada] = useState<string | null>(null);
+  // Login com outra conta ja conectada neste navegador: pede confirmacao.
+  const [confirmarTroca, setConfirmarTroca] = useState<{
+    conectado: string;
+    login: string;
+    password: string;
+  } | null>(null);
   const { withLoading } = useLoading();
+
+  // Sessao do Supabase Auth e UMA por navegador (localStorage, todas as abas);
+  // o perfil mostrado e por aba (sessionStorage). Se outra conta entra em
+  // outra aba, esta aba passaria a consultar e gravar com a conta nova
+  // mostrando a antiga (bug relatado em 17/11). Cada aba guarda o id de Auth
+  // da propria conta e se desconecta quando a sessao do navegador muda.
+  const authIdRef = useRef<string | null>(null);
+  const userRef = useRef<User | null>(null);
+  userRef.current = user;
 
   const clearError = () => {
     setError(null);
   };
 
-  // Configurações de inatividade
-  // Sem clique/tecla/rolagem/toque por este tempo, desloga (usuário pediu 3 h
-  // em 17/11; antes 1 h).
-  const INACTIVITY_TIMEOUT = 3 * 60 * 60 * 1000; // 3 horas
-  let inactivityTimer: ReturnType<typeof setTimeout>;
-
   const clearLocalSession = () => {
     sessionStorage.removeItem("sistema_user");
+    sessionStorage.removeItem(CHAVE_AUTH_ID);
+    authIdRef.current = null;
     dataCache.clear();
     statsCache.clear();
     userCache.clear();
@@ -72,20 +100,41 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     quickCache.clear();
   };
 
-  const resetInactivityTimer = () => {
-    if (inactivityTimer) {
-      clearTimeout(inactivityTimer);
-    }
-
-    if (user) {
-      inactivityTimer = setTimeout(() => {
-        clearLocalSession();
-        void supabase.auth.signOut();
-        setUser(null);
-        setShowInactivityModal(true);
-      }, INACTIVITY_TIMEOUT);
-    }
+  const guardarSessao = (userObj: User, authId: string) => {
+    sessionStorage.setItem("sistema_user", JSON.stringify(userObj));
+    sessionStorage.setItem(CHAVE_AUTH_ID, authId);
+    authIdRef.current = authId;
+    setUser(userObj);
   };
+
+  /** Desconecta SO esta aba (a sessao do navegador e da outra conta). */
+  const desconectarAba = (nomeOutraConta: string) => {
+    clearLocalSession();
+    setUser(null);
+    setContaTrocada(nomeOutraConta);
+  };
+
+  /** Nome da conta de uma sessao de Auth (para os avisos). */
+  const nomeDaConta = async (authUserId: string): Promise<string> => {
+    const { data } = await supabase
+      .from("users")
+      .select("name")
+      .eq("auth_user_id", authUserId)
+      .maybeSingle();
+    return data?.name || "outra conta";
+  };
+
+  /** Confere se a sessao do navegador ainda e a desta aba. */
+  const conferirConta = useCallback(async () => {
+    if (!userRef.current || !authIdRef.current) return;
+    const { data } = await supabase.auth.getSession();
+    const idSessao = data.session?.user.id ?? null;
+    if (!idSessao) return; // saiu: o SIGNED_OUT ja trata
+    if (idSessao !== authIdRef.current) {
+      desconectarAba(await nomeDaConta(idSessao));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     // Restaura a sessão ao abrir o app. supabase.auth.getSession() lê a
@@ -104,10 +153,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         // Espelho local (gravado no login) evita depender de rede para
         // restaurar o perfil — é só exibição, a sessão de verdade é a do
-        // Supabase Auth.
+        // Supabase Auth. So vale se for da MESMA conta da sessao (outra
+        // conta pode ter entrado em outra aba).
         const savedUser = sessionStorage.getItem("sistema_user");
-        if (savedUser) {
+        const savedAuthId = sessionStorage.getItem(CHAVE_AUTH_ID);
+        if (savedUser && savedAuthId === data.session.user.id) {
           try {
+            authIdRef.current = savedAuthId;
             setUser(JSON.parse(savedUser));
             return;
           } catch {
@@ -124,15 +176,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           .single();
 
         if (profileError || !row) {
-          await supabase.auth.signOut();
+          await supabase.auth.signOut({ scope: "local" });
           clearLocalSession();
           setUser(null);
           return;
         }
 
-        const userObj = buildUser(row);
-        sessionStorage.setItem("sistema_user", JSON.stringify(userObj));
-        setUser(userObj);
+        guardarSessao(buildUser(row), data.session.user.id);
       } catch {
         clearLocalSession();
         setUser(null);
@@ -143,46 +193,100 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     checkSession();
 
-    // Desloga em qualquer aba se a sessão expirar/for revogada em outra.
+    // Sessao do navegador mudou em outra aba: saiu (SIGNED_OUT) ou outra
+    // conta entrou (SIGNED_IN com outro id).
     const { data: subscription } = supabase.auth.onAuthStateChange(
-      (event) => {
+      (event, session) => {
         if (event === "SIGNED_OUT") {
           clearLocalSession();
           setUser(null);
+          return;
+        }
+        const idSessao = session?.user.id;
+        if (
+          idSessao &&
+          userRef.current &&
+          authIdRef.current &&
+          idSessao !== authIdRef.current
+        ) {
+          // Fora do callback do Auth (nao chamar o Supabase dentro dele).
+          setTimeout(() => {
+            void nomeDaConta(idSessao).then(desconectarAba);
+          }, 0);
         }
       },
     );
 
-    return () => subscription.subscription.unsubscribe();
+    // Reforco: ao voltar para a aba, confere a conta (caso o aviso entre
+    // abas nao tenha chegado).
+    const aoVoltar = () => {
+      if (document.visibilityState === "visible") void conferirConta();
+    };
+    document.addEventListener("visibilitychange", aoVoltar);
+    window.addEventListener("focus", aoVoltar);
+
+    return () => {
+      subscription.subscription.unsubscribe();
+      document.removeEventListener("visibilitychange", aoVoltar);
+      window.removeEventListener("focus", aoVoltar);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Configurar listeners de atividade quando o usuário estiver logado
+  // Inatividade COMPARTILHADA entre as abas: o ultimo uso fica no
+  // localStorage. Antes cada aba contava sozinha e uma aba esquecida
+  // desconectava o navegador inteiro com o usuario ativo em outra.
   useEffect(() => {
-    if (user) {
-      const events = ["mousedown", "keypress", "scroll", "touchstart", "click"];
+    if (!user) return;
+    let ultimaGravacao = 0;
+    const registrarUso = () => {
+      const agora = Date.now();
+      // Grava no maximo a cada 30 s (evento de rolagem dispara muito).
+      if (agora - ultimaGravacao < 30_000) return;
+      ultimaGravacao = agora;
+      try {
+        localStorage.setItem(CHAVE_ULTIMO_USO, String(agora));
+      } catch {
+        // sem storage: conta so esta aba (ultimaGravacao)
+      }
+    };
+    const ultimoUso = (): number => {
+      try {
+        return Math.max(
+          ultimaGravacao,
+          Number(localStorage.getItem(CHAVE_ULTIMO_USO)) || 0,
+        );
+      } catch {
+        return ultimaGravacao;
+      }
+    };
+    const events = ["mousedown", "keypress", "scroll", "touchstart", "click"];
+    events.forEach((e) => document.addEventListener(e, registrarUso));
+    // Entrar (ou abrir a aba) conta como uso.
+    ultimaGravacao = 0;
+    registrarUso();
 
-      const handleActivity = () => {
-        resetInactivityTimer();
-      };
+    const timer = window.setInterval(() => {
+      if (Date.now() - ultimoUso() < INACTIVITY_TIMEOUT) return;
+      window.clearInterval(timer);
+      clearLocalSession();
+      // So este navegador: o celular do cobrador continua conectado.
+      void supabase.auth.signOut({ scope: "local" });
+      setUser(null);
+      setShowInactivityModal(true);
+    }, 60_000);
 
-      events.forEach((event) => {
-        document.addEventListener(event, handleActivity);
-      });
-
-      resetInactivityTimer();
-
-      return () => {
-        events.forEach((event) => {
-          document.removeEventListener(event, handleActivity);
-        });
-        if (inactivityTimer) {
-          clearTimeout(inactivityTimer);
-        }
-      };
-    }
+    return () => {
+      events.forEach((e) => document.removeEventListener(e, registrarUso));
+      window.clearInterval(timer);
+    };
   }, [user]);
 
-  const login = async (login: string, password: string): Promise<boolean> => {
+  const login = async (
+    login: string,
+    password: string,
+    trocarConta = false,
+  ): Promise<boolean> => {
     try {
       clearError();
 
@@ -230,11 +334,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           return false;
         }
 
-        const { error: signInError } = await supabase.auth.signInWithPassword(
-          { email: authEmail, password },
-        );
+        // Outra conta ja conectada neste navegador (outra aba): entrar troca
+        // a conta de TODAS as abas. Pergunta antes (como o WhatsApp Web).
+        if (!trocarConta) {
+          const { data: atual } = await supabase.auth.getSession();
+          const sessao = atual.session;
+          if (
+            sessao &&
+            (sessao.user.email ?? "").toLowerCase() !==
+              String(authEmail).toLowerCase()
+          ) {
+            setConfirmarTroca({
+              conectado: await nomeDaConta(sessao.user.id),
+              login,
+              password,
+            });
+            return false;
+          }
+        }
 
-        if (signInError) {
+        const { data: entrou, error: signInError } =
+          await supabase.auth.signInWithPassword({ email: authEmail, password });
+
+        if (signInError || !entrou.user) {
           setError("Login ou senha incorretos. Verifique suas credenciais.");
           return false;
         }
@@ -248,7 +370,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           .single();
 
         if (profileError || !row) {
-          await supabase.auth.signOut();
+          await supabase.auth.signOut({ scope: "local" });
           setError("Erro ao carregar o perfil do usuário.");
           return false;
         }
@@ -257,14 +379,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // DEPOIS de validar a senha, pra não revelar o status a quem não
         // tem a senha.
         if (row.active === false) {
-          await supabase.auth.signOut();
+          await supabase.auth.signOut({ scope: "local" });
           setShowInactiveAccountModal(true);
           return false;
         }
 
-        const userObj = buildUser(row);
-        sessionStorage.setItem("sistema_user", JSON.stringify(userObj));
-        setUser(userObj);
+        setContaTrocada(null);
+        guardarSessao(buildUser(row), entrou.user.id);
         return true;
       };
 
@@ -279,13 +400,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       await withLoading(
         (async () => {
-          await supabase.auth.signOut();
+          // So este navegador (antes encerrava a sessão da pessoa em todos
+          // os aparelhos -- padrão "global" do Supabase).
+          await supabase.auth.signOut({ scope: "local" });
           clearLocalSession();
           setUser(null);
-
-          if (inactivityTimer) {
-            clearTimeout(inactivityTimer);
-          }
         })(),
         "Saindo...",
       );
@@ -346,6 +465,65 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 Entendi
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Login com outra conta já conectada neste navegador */}
+      {confirmarTroca && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl p-6 max-w-md w-full shadow-xl">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-dark-text mb-2">
+              Outra conta está conectada
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-dark-text-secondary mb-6">
+              <strong>{confirmarTroca.conectado}</strong> está conectado neste
+              navegador (em outra aba). Entrar como{" "}
+              <strong>{confirmarTroca.login}</strong> desconecta{" "}
+              {confirmarTroca.conectado} em todas as abas deste navegador. Os
+              outros aparelhos não são afetados.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmarTroca(null)}
+                className="flex-1 px-4 py-2.5 border border-gray-200 dark:border-dark-border text-sm font-semibold rounded-xl text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-bg"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  const t = confirmarTroca;
+                  setConfirmarTroca(null);
+                  void login(t.login, t.password, true);
+                }}
+                className="flex-1 px-4 py-2.5 bg-gray-900 dark:bg-blue-600 text-white text-sm font-semibold rounded-xl hover:opacity-90"
+              >
+                Entrar mesmo assim
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Esta aba foi desconectada: outra conta entrou neste navegador */}
+      {contaTrocada && !user && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl p-6 max-w-md w-full shadow-xl text-center">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-dark-text mb-2">
+              Esta aba foi desconectada
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-dark-text-secondary mb-6">
+              <strong>{contaTrocada}</strong> entrou neste navegador em outra
+              aba. Só uma conta fica conectada por vez no mesmo navegador. Para
+              usar duas contas ao mesmo tempo, use uma janela anônima ou outro
+              navegador.
+            </p>
+            <button
+              onClick={() => setContaTrocada(null)}
+              className="w-full px-4 py-2.5 bg-gray-900 dark:bg-blue-600 text-white text-sm font-semibold rounded-xl hover:opacity-90"
+            >
+              Entendi
+            </button>
           </div>
         </div>
       )}
