@@ -42,17 +42,11 @@ import {
   PedidoDesconto,
   TipoPedidoDesconto,
 } from "../../services/pedidosDesconto";
+import { FORMA_PAGAMENTO_LABEL } from "../../config/formasPagamento";
 
 /** A partir deste valor recebido o "Confirmar" pede "Conferi os valores". */
 const VALOR_ALTO_CONFERENCIA = 2000;
 
-const FORMA_PAGAMENTO_LABEL: Record<string, string> = {
-  dinheiro: "Dinheiro",
-  pix: "PIX",
-  cartao_credito: "Cartão de crédito",
-  cartao_debito: "Cartão de débito",
-  boleto: "Boleto",
-};
 
 /**
  * Valor digitado -> numero. Aceita "1.234,56", "1234,56" e "1234.56";

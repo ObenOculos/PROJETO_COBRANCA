@@ -13,8 +13,6 @@ import {
   Printer,
   RefreshCw,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   FileSpreadsheet,
   User,
   Wallet,
@@ -28,6 +26,11 @@ import { resolveSaleKey, valorRecebidoTotal } from "../../filters/sales";
 import { useAuth } from "../../contexts/AuthContext";
 import ClientDetailModal from "./ClientDetailModal";
 import SummaryCard from "../common/SummaryCard";
+import Pagination from "../common/Pagination";
+import {
+  formaPagamentoGrupo,
+  formaPagamentoRotulo,
+} from "../../config/formasPagamento";
 import { ClientGroup } from "../../types";
 
 interface DailyCashReportProps {
@@ -43,6 +46,8 @@ interface DailyReportData {
   totalPaymentDiscount: number;
   /** Juros/multa cobrados junto (ja incluidos em totalReceived). */
   totalPaymentJuros: number;
+  /** Recebido por forma de pagamento (maior valor primeiro). */
+  byMethod: { grupo: string; rotulo: string; valor: number; qtd: number }[];
   /** Situação atual das dívidas envolvidas, cada cliente/venda contado uma vez. */
   debtTotals: {
     totalDebt: number;
@@ -167,8 +172,8 @@ const getQuickDateRanges = () => {
   };
 };
 
-// Linhas por página na lista de pagamentos.
-const DETAILS_PER_PAGE = 50;
+// Linhas por página na lista de pagamentos (padrão 10).
+const PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
 type QuickRangeKey = keyof ReturnType<typeof getQuickDateRanges>;
 
@@ -183,6 +188,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   // Paginação da lista de pagamentos: intervalos grandes podem gerar milhares
   // de linhas; renderizar tudo de uma vez trava o navegador.
   const [detailsPage, setDetailsPage] = useState(1);
+  const [perPage, setPerPage] = useState(PER_PAGE_OPTIONS[0]);
   const [dateRangeMode, setDateRangeMode] = useState<"single" | "range">(
     "single",
   );
@@ -192,6 +198,8 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   const [selectedStore, setSelectedStore] = useState<string>("all");
   // Cobrador clicado nos cards: filtra só a lista de pagamentos.
   const [focusCollector, setFocusCollector] = useState<string | null>(null);
+  // Forma de pagamento clicada no card do total: filtra só a lista.
+  const [focusForma, setFocusForma] = useState<string | null>(null);
   const [showUpdateNotification, setShowUpdateNotification] = useState(false);
   const [showExportOptions, setShowExportOptions] = useState(false);
   const exportDropdownRef = useRef<HTMLDivElement>(null);
@@ -549,6 +557,26 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       debtTotals.remainingDebt += p.remainingDebt;
     });
 
+    const methodMap = new Map<
+      string,
+      { grupo: string; rotulo: string; valor: number; qtd: number }
+    >();
+    payments.forEach((p) => {
+      const grupo = formaPagamentoGrupo(p.paymentMethod);
+      const m = methodMap.get(grupo) ?? {
+        grupo,
+        rotulo: formaPagamentoRotulo(grupo),
+        valor: 0,
+        qtd: 0,
+      };
+      m.valor += p.totalReceivedValue;
+      m.qtd += 1;
+      methodMap.set(grupo, m);
+    });
+    const byMethod = Array.from(methodMap.values()).sort(
+      (a, b) => b.valor - a.valor,
+    );
+
     return {
       date:
         dateRangeMode === "single"
@@ -562,6 +590,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       totalPaymentJuros: payments.reduce((sum, p) => sum + p.paymentJuros, 0),
       debtTotals,
       totalPayments: payments.length,
+      byMethod,
       collectorSummary,
       payments,
     };
@@ -579,24 +608,18 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   // Lista de pagamentos (com o cobrador clicado, se houver).
   const listedPayments = useMemo(
     () =>
-      focusCollector
-        ? reportData.payments.filter((p) => p.collectorId === focusCollector)
-        : reportData.payments,
-    [reportData.payments, focusCollector],
-  );
-
-  const detailsTotalPages = Math.max(
-    1,
-    Math.ceil(listedPayments.length / DETAILS_PER_PAGE),
+      reportData.payments.filter(
+        (p) =>
+          (!focusCollector || p.collectorId === focusCollector) &&
+          (!focusForma || formaPagamentoGrupo(p.paymentMethod) === focusForma),
+      ),
+    [reportData.payments, focusCollector, focusForma],
   );
 
   const paginatedPayments = useMemo(
     () =>
-      listedPayments.slice(
-        (detailsPage - 1) * DETAILS_PER_PAGE,
-        detailsPage * DETAILS_PER_PAGE,
-      ),
-    [listedPayments, detailsPage],
+      listedPayments.slice((detailsPage - 1) * perPage, detailsPage * perPage),
+    [listedPayments, detailsPage, perPage],
   );
 
   // Novo cálculo: some o foco num cobrador que não está mais no resultado.
@@ -608,11 +631,18 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
         : null,
     );
   }, [reportData.collectorSummary]);
+  useEffect(() => {
+    setFocusForma((current) =>
+      current && reportData.byMethod.some((m) => m.grupo === current)
+        ? current
+        : null,
+    );
+  }, [reportData.byMethod]);
 
   // Qualquer mudança na lista volta à 1ª página.
   useEffect(() => {
     setDetailsPage(1);
-  }, [listedPayments]);
+  }, [listedPayments, perPage]);
 
   const handleExportReport = () => {
     const reportContent = generateReportContent(
@@ -646,6 +676,10 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       ["Descontos dados", reportData.totalPaymentDiscount],
       ["Pagamentos", reportData.totalPayments],
       ["Cobradores", reportData.collectorSummary.length],
+      [""],
+      ["POR FORMA DE PAGAMENTO"],
+      ["Forma", "Recebido", "Pagamentos"],
+      ...reportData.byMethod.map((m) => [m.rotulo, m.valor, m.qtd]),
       [""],
       ["POR COBRADOR"],
       [
@@ -713,7 +747,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       p.saleNumber ? `#${p.saleNumber}` : "-",
       p.store,
       p.collector,
-      p.paymentMethod,
+      formaPagamentoRotulo(p.paymentMethod),
       p.totalReceivedValue,
       p.paymentJuros,
       p.totalPaidOnDebt,
@@ -792,6 +826,10 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     ? reportData.collectorSummary.find((c) => c.collectorId === focusCollector)
         ?.collectorName
     : null;
+  const focusLabels = [
+    focusName,
+    focusForma ? formaPagamentoRotulo(focusForma) : null,
+  ].filter((x): x is string => !!x);
 
   return (
     <div className="space-y-4">
@@ -972,41 +1010,113 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
         </div>
       ) : (
         <>
-          {/* Total + por cobrador no mesmo bloco (cards aglomerados) */}
-          <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-4 space-y-2">
-            {reportData.collectorSummary.length > 1 && (
-              <p className="text-[11px] text-gray-400 dark:text-dark-text-secondary">
-                Clique num cobrador para ver só os pagamentos dele na lista.
-              </p>
-            )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
-              <SummaryCard
-                icon={Wallet}
-                title="Recebido no período"
-                value={formatCurrency(reportData.totalReceived)}
-                valueTone="green"
-                caption={`${reportData.collectorSummary.length} ${
-                  reportData.collectorSummary.length === 1
+          {/* Total do período, com a divisão por forma de pagamento */}
+          <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-4">
+            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-4 md:gap-6">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary">
+                  <Wallet className="h-4 w-4 flex-shrink-0" />
+                  Recebido no período
+                </div>
+                <div className="mt-1 text-3xl lg:text-4xl font-bold text-green-600 dark:text-green-400 truncate">
+                  {formatCurrency(reportData.totalReceived)}
+                </div>
+                <div className="text-xs text-gray-500 dark:text-dark-text-secondary">
+                  {reportData.totalPayments}{" "}
+                  {reportData.totalPayments === 1 ? "pagamento" : "pagamentos"}{" "}
+                  · {reportData.collectorSummary.length}{" "}
+                  {reportData.collectorSummary.length === 1
                     ? "cobrador"
-                    : "cobradores"
-                }`}
-                rows={[
-                  {
-                    label: "Pagamentos",
-                    value: String(reportData.totalPayments),
-                  },
-                  {
-                    label: "Juros incluídos",
-                    value: formatCurrency(reportData.totalPaymentJuros),
-                  },
-                  {
-                    label: "Descontos dados",
-                    value: formatCurrency(reportData.totalPaymentDiscount),
-                    tone:
-                      reportData.totalPaymentDiscount > 0 ? "amber" : undefined,
-                  },
-                ]}
-              />
+                    : "cobradores"}
+                </div>
+                <div className="mt-3 pt-2 border-t border-gray-100 dark:border-dark-border/40 space-y-1 text-xs">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-gray-500 dark:text-dark-text-secondary">
+                      Juros incluídos
+                    </span>
+                    <span className="font-semibold text-gray-700 dark:text-dark-text">
+                      {formatCurrency(reportData.totalPaymentJuros)}
+                    </span>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-gray-500 dark:text-dark-text-secondary">
+                      Descontos dados
+                    </span>
+                    <span
+                      className={`font-semibold ${reportData.totalPaymentDiscount > 0 ? "text-amber-600 dark:text-amber-400" : "text-gray-700 dark:text-dark-text"}`}
+                    >
+                      {formatCurrency(reportData.totalPaymentDiscount)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="min-w-0 md:border-l md:border-gray-100 md:dark:border-dark-border/40 md:pl-6">
+                <div className="text-xs font-semibold text-gray-500 dark:text-dark-text-secondary mb-2">
+                  Por forma de pagamento
+                </div>
+                <div className="space-y-1">
+                  {reportData.byMethod.map((m) => {
+                    const share =
+                      reportData.totalReceived > 0
+                        ? Math.max(
+                            0,
+                            (m.valor / reportData.totalReceived) * 100,
+                          )
+                        : 0;
+                    const ativo = focusForma === m.grupo;
+                    return (
+                      <button
+                        key={m.grupo}
+                        type="button"
+                        onClick={() =>
+                          setFocusForma((current) =>
+                            current === m.grupo ? null : m.grupo,
+                          )
+                        }
+                        title="Mostrar só os pagamentos desta forma na lista"
+                        className={`w-full text-left rounded-lg px-2 py-1.5 transition-colors ${ativo ? "bg-blue-50 dark:bg-blue-900/20 ring-1 ring-blue-300 dark:ring-blue-800" : "hover:bg-gray-50 dark:hover:bg-dark-bg/40"}`}
+                      >
+                        <div className="flex items-baseline justify-between gap-2 text-sm">
+                          <span className="text-gray-700 dark:text-dark-text truncate">
+                            {m.rotulo}
+                            <span className="ml-1.5 text-[11px] text-gray-400 dark:text-dark-text-secondary">
+                              {m.qtd}
+                            </span>
+                          </span>
+                          <span
+                            className={`font-semibold whitespace-nowrap ${m.valor < 0 ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-dark-text"}`}
+                          >
+                            {formatCurrency(m.valor)}
+                          </span>
+                        </div>
+                        <div className="mt-1 h-1 rounded-full bg-gray-100 dark:bg-dark-bg overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-green-500/70"
+                            style={{ width: `${Math.min(100, share)}%` }}
+                          />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Por cobrador */}
+          <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-4 space-y-2">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-dark-text">
+                Por cobrador
+              </h3>
+              {reportData.collectorSummary.length > 1 && (
+                <span className="text-[11px] text-gray-400 dark:text-dark-text-secondary">
+                  Clique num cobrador para ver só os pagamentos dele na lista
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
               {reportData.collectorSummary.map((collector, index) => {
                 const percentage =
                   reportData.totalReceived > 0
@@ -1060,16 +1170,19 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
             <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-gray-100 dark:border-dark-border">
               <h3 className="text-sm font-semibold text-gray-700 dark:text-dark-text">
                 Pagamentos ({listedPayments.length})
-                {focusName && (
+                {focusLabels.length > 0 && (
                   <span className="font-normal text-gray-500 dark:text-dark-text-secondary">
                     {" "}
-                    · {focusName}
+                    · {focusLabels.join(" · ")}
                   </span>
                 )}
               </h3>
-              {focusName && (
+              {focusLabels.length > 0 && (
                 <button
-                  onClick={() => setFocusCollector(null)}
+                  onClick={() => {
+                    setFocusCollector(null);
+                    setFocusForma(null);
+                  }}
                   className="text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400"
                 >
                   Mostrar todos
@@ -1140,7 +1253,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                         </span>
                       </td>
                       <td className="px-4 py-2.5 text-xs text-gray-600 dark:text-dark-text-secondary hidden xl:table-cell">
-                        {payment.paymentMethod}
+                        {formaPagamentoRotulo(payment.paymentMethod)}
                       </td>
                       <td className="px-4 py-2.5 text-right">
                         <div className="font-semibold text-green-600 dark:text-green-400 whitespace-nowrap">
@@ -1183,39 +1296,15 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
               </table>
             </div>
 
-            {detailsTotalPages > 1 && (
-              <div className="flex items-center justify-between gap-4 px-4 py-3 border-t border-gray-100 dark:border-dark-border">
-                <span className="text-xs text-gray-500 dark:text-dark-text-secondary">
-                  Mostrando {(detailsPage - 1) * DETAILS_PER_PAGE + 1}–
-                  {Math.min(
-                    detailsPage * DETAILS_PER_PAGE,
-                    listedPayments.length,
-                  )}{" "}
-                  de {listedPayments.length}
-                </span>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setDetailsPage((p) => Math.max(1, p - 1))}
-                    disabled={detailsPage === 1}
-                    className="flex items-center px-3 py-1.5 rounded-lg text-sm text-gray-600 dark:text-dark-text-secondary border border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg-tertiary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  <span className="px-3 text-sm font-semibold text-gray-700 dark:text-dark-text tabular-nums">
-                    {detailsPage} / {detailsTotalPages}
-                  </span>
-                  <button
-                    onClick={() =>
-                      setDetailsPage((p) => Math.min(detailsTotalPages, p + 1))
-                    }
-                    disabled={detailsPage === detailsTotalPages}
-                    className="flex items-center px-3 py-1.5 rounded-lg text-sm text-gray-600 dark:text-dark-text-secondary border border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg-tertiary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            )}
+            <Pagination
+              page={detailsPage}
+              total={listedPayments.length}
+              perPage={perPage}
+              onChange={setDetailsPage}
+              perPageOptions={PER_PAGE_OPTIONS}
+              onPerPageChange={setPerPage}
+              className="px-4 py-3 border-t border-gray-100 dark:border-dark-border"
+            />
           </div>
         </>
       )}
@@ -1247,6 +1336,12 @@ const generateReportContent = (
     `Pagamentos: ${data.totalPayments}`,
     `Cobradores: ${data.collectorSummary.length}`,
     "",
+    "POR FORMA DE PAGAMENTO:",
+    "-".repeat(60),
+    ...data.byMethod.map(
+      (m) => `  ${m.rotulo}: ${formatCurrency(m.valor)} (${m.qtd})`,
+    ),
+    "",
     "RESUMO POR COBRADOR:",
     "-".repeat(60),
   ];
@@ -1271,7 +1366,7 @@ const generateReportContent = (
         `Cliente: ${payment.client}`,
         `Data do Pagamento: ${formatDate(payment.receivedDate)}`,
         `${payment.saleNumber ? `Venda: #${payment.saleNumber}` : "Venda sem número"} | Loja: ${payment.store}`,
-        `Forma de Pagamento: ${payment.paymentMethod}`,
+        `Forma de Pagamento: ${formaPagamentoRotulo(payment.paymentMethod)}`,
         `Valor Recebido: ${formatCurrency(payment.totalReceivedValue)}${payment.paymentJuros > 0 ? ` (juros ${formatCurrency(payment.paymentJuros)})` : ""} | Desconto: ${formatCurrency(payment.paymentDiscount)}`,
         `Total da Dívida: ${formatCurrency(payment.totalDebt)} | Pendente Atual: ${payment.remainingDebt > 0 ? formatCurrency(payment.remainingDebt) : "Quitado"}`,
         `Cobrador: ${payment.collector}`,
@@ -1533,6 +1628,26 @@ const generatePrintableReport = (
         </div>
       </div>
 
+      <h3 class="section-title">Por Forma de Pagamento</h3>
+      <table>
+        <tr>
+          <th>Forma</th>
+          <th>Recebido</th>
+          <th>Pagamentos</th>
+        </tr>
+        ${data.byMethod
+          .map(
+            (m) => `
+          <tr>
+            <td>${m.rotulo}</td>
+            <td style="font-weight: bold; text-align: right;">${formatCurrency(m.valor)}</td>
+            <td>${m.qtd}</td>
+          </tr>
+        `,
+          )
+          .join("")}
+      </table>
+
       <h3 class="section-title">Resumo por Cobrador</h3>
       <table>
         <tr>
@@ -1589,7 +1704,7 @@ const generatePrintableReport = (
             <td>${p.clientDocument}</td>
             <td>${p.saleNumber ? `#${p.saleNumber}` : "Sem número"}</td>
             <td>${p.store}</td>
-            <td>${p.paymentMethod}</td>
+            <td>${formaPagamentoRotulo(p.paymentMethod)}</td>
             <td style="font-weight: bold; text-align: right;">${formatCurrency(p.totalReceivedValue)}${p.paymentJuros > 0 ? `<div class="small-text" style="font-weight: normal;">juros ${formatCurrency(p.paymentJuros)}</div>` : ""}</td>
             <td style="text-align: right;">${formatCurrency(p.totalPaidOnDebt)}</td>
             <td style="text-align: right; color: #e67e22;">${p.paymentDiscount > 0 ? formatCurrency(p.paymentDiscount) : "-"}</td>

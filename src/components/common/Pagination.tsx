@@ -1,19 +1,55 @@
 import React from "react";
 
 // Paginacao compacta (← 1 … 4 5 6 … 20 →). Some quando cabe em uma pagina.
+// Com `perPageOptions` + `onPerPageChange`, mostra tambem "Por pagina"
+// (e so some quando cabe na menor opcao).
 const Pagination: React.FC<{
   page: number;
   total: number;
   perPage: number;
   onChange: (p: number) => void;
-}> = ({ page, total, perPage, onChange }) => {
+  perPageOptions?: number[];
+  onPerPageChange?: (n: number) => void;
+  className?: string;
+}> = ({
+  page,
+  total,
+  perPage,
+  onChange,
+  perPageOptions,
+  onPerPageChange,
+  className = "mt-4 pt-3 border-t border-gray-100 dark:border-dark-border",
+}) => {
   const totalPages = Math.ceil(total / perPage);
-  if (totalPages <= 1) return null;
+  const withPerPage = !!(perPageOptions?.length && onPerPageChange);
+  const minOption = withPerPage ? Math.min(...perPageOptions!) : perPage;
+  if (withPerPage ? total <= minOption : totalPages <= 1) return null;
   return (
-    <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100 dark:border-dark-border">
-      <span className="text-[10px] font-bold text-gray-400 tracking-wide">
-        {(page - 1) * perPage + 1}–{Math.min(page * perPage, total)} de {total}
-      </span>
+    <div
+      className={`flex flex-wrap items-center justify-between gap-2 ${className}`}
+    >
+      <div className="flex items-center gap-3">
+        <span className="text-[10px] font-bold text-gray-400 tracking-wide">
+          {(page - 1) * perPage + 1}–{Math.min(page * perPage, total)} de{" "}
+          {total}
+        </span>
+        {withPerPage && (
+          <label className="flex items-center gap-1 text-[10px] font-bold text-gray-400 tracking-wide">
+            Por página
+            <select
+              value={perPage}
+              onChange={(e) => onPerPageChange!(Number(e.target.value))}
+              className="px-1.5 py-0.5 rounded-md border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-[11px] text-gray-600 dark:text-dark-text"
+            >
+              {perPageOptions!.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
       <div className="flex items-center gap-1">
         <button
           onClick={() => onChange(page - 1)}
@@ -53,7 +89,7 @@ const Pagination: React.FC<{
           )}
         <button
           onClick={() => onChange(page + 1)}
-          disabled={page === totalPages}
+          disabled={page >= totalPages}
           className="px-3 py-1.5 text-[10px] font-bold tracking-wide rounded-lg border border-gray-100 dark:border-dark-border disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-dark-bg transition-all"
         >
           →
