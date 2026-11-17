@@ -384,12 +384,6 @@ const EnhancedStoreManagement: React.FC = () => {
   // Card unico do topo: as partes do vendido, na ordem da barra.
   const compTopo = overviewStats.comp;
   const inadTopo = compTopo.inadimplencia;
-  const periodoTexto =
-    recorteInad === "filtro"
-      ? "no período do filtro"
-      : recorteInad === "tudo"
-        ? "em todo o histórico"
-        : "nos últimos 12 meses";
   const partesTopo: {
     id: string;
     label: string;
@@ -397,7 +391,9 @@ const EnhancedStoreManagement: React.FC = () => {
     barra: string;
     texto: string;
     dica: string;
-    base?: boolean;
+    /** Parte do saldo em aberto: vai dentro do "Em aberto" na legenda,
+     * como no card da loja (Em aberto com o vencido dentro). */
+    emAberto?: boolean;
   }[] = [
     {
       id: "recebido",
@@ -409,53 +405,51 @@ const EnhancedStoreManagement: React.FC = () => {
     },
     {
       id: "desconto",
-      label: "Desconto concedido",
+      label: "Desconto",
       valor: compTopo.desconto,
       barra: "bg-gray-300 dark:bg-gray-600",
       texto: "text-gray-600 dark:text-dark-text-secondary",
       dica: "Abatido nas negociações: não entra e não é dívida",
     },
+    // Em aberto = a vencer + vencido, igual ao card da loja. O "não pago"
+    // da inadimplência fica só na frase do %, como na barra do card da loja
+    // (o "em atraso até 30 dias" separado só atrapalhava -- usuário, 16/11).
     {
       id: "aVencer",
-      label: "A vencer",
+      label: "a vencer",
       valor: compTopo.aVencer,
       barra: "bg-blue-300 dark:bg-blue-700",
       texto: "text-gray-700 dark:text-dark-text",
       dica: "Em aberto, ainda não venceu",
+      emAberto: true,
     },
     {
-      id: "atraso",
-      label: `Atraso até ${INADIMPLENCIA_CORTE_DIAS} dias`,
-      valor: compTopo.atrasoRecente,
-      barra: "bg-amber-400",
-      texto: "text-amber-600 dark:text-amber-400",
-      dica: "Venceu há pouco: é atraso, ainda não inadimplência",
-    },
-    {
-      id: "inad",
-      label:
-        recorteInad === "janela"
-          ? "Inadimplente · últimos 12 meses"
-          : "Inadimplente",
-      valor: compTopo.inadJanela,
+      id: "vencido",
+      label: "vencido",
+      valor: compTopo.vencido,
       barra: "bg-red-500",
       texto: "text-red-600 dark:text-red-400",
-      dica: `Vencido há mais de ${INADIMPLENCIA_CORTE_DIAS} dias ${periodoTexto} e não pago: é daqui que sai o %`,
-      base: true,
+      dica: "Em aberto, com vencimento já passado (qualquer atraso)",
+      emAberto: true,
     },
-    ...(recorteInad === "janela"
-      ? [
-          {
-            id: "inadAntigo",
-            label: "Inadimplente · mais antigo",
-            valor: compTopo.inadAntigo,
-            barra: "bg-red-900 dark:bg-red-300",
-            texto: "text-red-800 dark:text-red-300",
-            dica: "Vencido há mais de 12 meses e não pago: fica fora do % (use \"Tudo\" para incluir)",
-          },
-        ]
-      : []),
   ];
+  const legendaParte = (p: (typeof partesTopo)[number], dentro = false) => (
+    <div
+      key={p.id}
+      className={`flex items-center justify-between gap-2 min-w-0 ${dentro ? "pl-3" : ""}`}
+      title={p.dica}
+    >
+      <span className="flex items-center gap-1.5 min-w-0 text-gray-600 dark:text-dark-text-secondary">
+        <span className={`h-2 w-2 rounded-full shrink-0 ${p.barra}`} />
+        <span className="truncate">{p.label}</span>
+      </span>
+      {/* Sem % por parte: ao lado do % da inadimplencia, a fatia do
+          vendido (outra base) confundia. */}
+      <span className={`font-semibold shrink-0 ${p.texto}`}>
+        {formatCurrency(p.valor)}
+      </span>
+    </div>
+  );
 
   const exportStoreData = () => {
     // Headers with better formatting
@@ -659,30 +653,38 @@ const EnhancedStoreManagement: React.FC = () => {
             )}
           </div>
 
-          {/* O % e de onde ele sai, numa frase */}
+          {/* O % e de onde ele sai -- mesmas palavras do card da loja
+              ("não pago de ... esperado") e a linha do recorte do modal. */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-4">
             <p
               className={`text-3xl font-extrabold tracking-tight ${inadTopo.venceu > 0 ? COR_NIVEL[nivelInadimplencia(inadTopo.pct)].text : "text-gray-400 dark:text-dark-text-secondary"}`}
             >
               {formatarInadimplencia(inadTopo.pct, inadTopo.venceu)}
             </p>
-            <p className="text-xs text-gray-500 dark:text-dark-text-secondary flex-1 min-w-[220px]">
-              {inadTopo.venceu > 0 ? (
-                <>
-                  Do que venceu há mais de {INADIMPLENCIA_CORTE_DIAS} dias{" "}
-                  {periodoTexto} ({formatCurrency(inadTopo.venceu)}),{" "}
-                  <span className="font-semibold text-red-600 dark:text-red-400">
-                    {formatCurrency(inadTopo.naoPago)}
-                  </span>{" "}
-                  não foi pago.
-                </>
-              ) : (
-                <>
-                  Nada venceu há mais de {INADIMPLENCIA_CORTE_DIAS} dias{" "}
-                  {periodoTexto}: por enquanto é só atraso.
-                </>
-              )}
-            </p>
+            <div className="flex-1 min-w-[220px]">
+              <p
+                className="text-sm text-gray-600 dark:text-dark-text-secondary"
+                title="Esperado: o que já deveria ter sido pago (parcelas vencidas há mais de 30 dias). Não pago: o que disso ainda não entrou."
+              >
+                {inadTopo.venceu > 0 ? (
+                  <>
+                    <span className="font-semibold text-red-600 dark:text-red-400">
+                      {formatCurrencyCompact(inadTopo.naoPago)}
+                    </span>{" "}
+                    não pago de {formatCurrencyCompact(inadTopo.venceu)}{" "}
+                    esperado
+                  </>
+                ) : (
+                  <>
+                    Nada venceu há mais de {INADIMPLENCIA_CORTE_DIAS} dias: por
+                    enquanto é só atraso
+                  </>
+                )}
+              </p>
+              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">
+                {descricaoRecorteInadimplencia(recorteInad)}
+              </p>
+            </div>
           </div>
 
           {/* Vendido dividido em partes que somam o total */}
@@ -706,26 +708,27 @@ const EnhancedStoreManagement: React.FC = () => {
               ) : null,
             )}
           </div>
+          {/* Legenda na forma do card da loja: Recebido ao lado de Em
+              aberto, e dentro do Em aberto as partes dele. */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-[11px] font-medium">
-            {partesTopo.map((p) => (
-              <div
-                key={p.id}
-                className={`flex items-center justify-between gap-2 min-w-0 ${p.base ? "rounded-md bg-red-50 dark:bg-red-900/20 -mx-1.5 px-1.5" : ""}`}
-                title={p.dica}
-              >
-                <span className="flex items-center gap-1.5 min-w-0 text-gray-600 dark:text-dark-text-secondary">
-                  <span className={`h-2 w-2 rounded-full shrink-0 ${p.barra}`} />
-                  <span className={`truncate ${p.base ? "font-semibold text-red-700 dark:text-red-300" : ""}`}>
-                    {p.label}
-                  </span>
+            <div className="space-y-1">
+              {partesTopo
+                .filter((p) => !p.emAberto)
+                .map((p) => legendaParte(p))}
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-semibold text-gray-700 dark:text-dark-text">
+                  Em aberto
                 </span>
-                {/* Sem % por parte: ao lado do % da inadimplencia, a fatia
-                    do vendido (outra base) confundia. */}
-                <span className={`font-semibold shrink-0 ${p.texto}`}>
-                  {formatCurrency(p.valor)}
+                <span className="font-bold text-amber-600 dark:text-amber-400">
+                  {formatCurrency(compTopo.emAberto)}
                 </span>
               </div>
-            ))}
+              {partesTopo
+                .filter((p) => p.emAberto)
+                .map((p) => legendaParte(p, true))}
+            </div>
           </div>
         </div>
       </div>
@@ -1268,14 +1271,6 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
                     </span>
                     <span className="font-semibold text-red-600 dark:text-red-400">
                       {formatCurrency(store.inadNaoPago)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <span className="text-gray-500 dark:text-dark-text-secondary">
-                      Em atraso até {INADIMPLENCIA_CORTE_DIAS} dias
-                    </span>
-                    <span className="font-semibold text-amber-600 dark:text-amber-400">
-                      {formatCurrency(store.atrasoRecente)}
                     </span>
                   </div>
                 </div>
