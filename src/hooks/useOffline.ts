@@ -37,6 +37,8 @@ export interface DistributePaymentAction {
     /** Dia do pagamento (YYYY-MM-DD), fixado ao entrar na fila: sincronizar
      * amanha nao pode mudar a data. Itens antigos sem o campo = hoje. */
     paymentDate?: string;
+    /** Boleto pago fora de ordem: so estas parcelas (SalePaymentInput). */
+    parcelas?: number[];
   };
 }
 
@@ -327,6 +329,8 @@ export const useOffline = () => {
       p_sale_number: paymentData.saleNumber ?? undefined,
       p_juros_amount: paymentData.jurosAmount || 0,
       p_payment_date: paymentData.paymentDate ?? undefined,
+      // Ausente no pagamento normal: nao manda o parametro.
+      p_parcelas: paymentData.parcelas ?? undefined,
     });
 
     if (error) {

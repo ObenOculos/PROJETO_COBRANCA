@@ -788,6 +788,9 @@ export interface SalePaymentInput {
   jurosAmount?: number;
   /** Dia em que o cliente pagou (YYYY-MM-DD); ausente = hoje. */
   paymentDate?: string;
+  /** Boleto pago fora de ordem: abate SO estas parcelas (id_parcela).
+   * Ausente = ordem de vencimento (migration 20261117000001). */
+  parcelas?: number[];
 }
 
 // Acordo de renegociacao (parcelamento futuro combinado com o cliente).

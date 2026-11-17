@@ -3818,6 +3818,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             notes: payment.notes,
             collectorId: collectorId,
             paymentDate: payment.paymentDate ?? todayLocalStr(),
+            parcelas: payment.parcelas,
           },
         });
         console.log("✅ Pagamento adicionado à fila offline");
@@ -3836,6 +3837,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         p_sale_number: payment.saleNumber ?? undefined,
         p_juros_amount: payment.jurosAmount || 0,
         p_payment_date: payment.paymentDate ?? undefined,
+        // Boleto pago fora de ordem; ausente = ordem de vencimento.
+        p_parcelas: payment.parcelas ?? undefined,
       });
 
       if (error) {

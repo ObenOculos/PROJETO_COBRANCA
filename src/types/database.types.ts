@@ -2361,6 +2361,7 @@ export type Database = {
           p_juros_amount?: number;
           p_sale_number?: number;
           p_payment_date?: string;
+          p_parcelas?: number[];
         };
         Returns: undefined;
       };

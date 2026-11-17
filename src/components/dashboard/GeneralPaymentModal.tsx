@@ -114,6 +114,9 @@ const Aviso: React.FC<{
   );
 };
 
+/** Segundos de leitura do alerta antes de liberar o boleto fora de ordem. */
+const ESPERA_FORA_DE_ORDEM = 10;
+
 /** Cor de cada venda na lista de parcelas (cliente com mais de uma venda). */
 const CORES_VENDA = [
   {
@@ -256,6 +259,21 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     >(null);
     // Parcelas a vencer ficam fechadas: adiantar e uma acao deliberada.
     const [mostrarAVencer, setMostrarAVencer] = useState(false);
+    // Boleto pago fora de ordem (17/11): o cliente pagou por engano uma
+    // parcela mais nova com outra mais antiga em aberto (ex.: o boleto de
+    // 17/12 com o de 17/11 aberto). "aviso" = alerta com espera antes de
+    // seguir; "ativo" = escolhe UMA parcela e so ela e baixada (p_parcelas do
+    // process_payment, migration 20261117000001). Qualquer perfil pode usar.
+    const [foraDeOrdem, setForaDeOrdem] = useState<"nao" | "aviso" | "ativo">(
+      "nao",
+    );
+    const [foraDeOrdemId, setForaDeOrdemId] = useState<number | null>(null);
+    const [esperaForaDeOrdem, setEsperaForaDeOrdem] = useState(0);
+    useEffect(() => {
+      if (foraDeOrdem !== "aviso" || esperaForaDeOrdem <= 0) return;
+      const t = setTimeout(() => setEsperaForaDeOrdem((n) => n - 1), 1000);
+      return () => clearTimeout(t);
+    }, [foraDeOrdem, esperaForaDeOrdem]);
     // So muda a exibicao: a marcacao segue sempre a ordem de vencimento.
     const [ordenarPor, setOrdenarPor] = useState<"vencimento" | "venda">(
       "vencimento",
@@ -425,17 +443,37 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
           {numero != null && ` · ${parcelaDeN(saleNumber, numero)}`}
         </>
       );
-    const qtdMarcadas = Math.min(
+    // Ordem normal: as N parcelas mais antigas.
+    const qtdMarcadasOrdem = Math.min(
       qtdMarcadasEscolhida ?? qtdVencidas,
       parcelasAbertas.length,
     );
+    const emForaDeOrdem = foraDeOrdem === "ativo";
+    const parcelaForaDeOrdem = emForaDeOrdem
+      ? (parcelasAbertas.find((p) => p.idParcela === foraDeOrdemId) ?? null)
+      : null;
+    // Parcelas mais antigas que a escolhida: continuam em aberto.
+    const anterioresForaDeOrdem = parcelaForaDeOrdem
+      ? parcelasAbertas.slice(0, parcelasAbertas.indexOf(parcelaForaDeOrdem))
+      : [];
+    const marcadasLista = useMemo(
+      () =>
+        emForaDeOrdem
+          ? parcelasAbertas.filter((p) => p.idParcela === foraDeOrdemId)
+          : parcelasAbertas.slice(0, qtdMarcadasOrdem),
+      [emForaDeOrdem, parcelasAbertas, foraDeOrdemId, qtdMarcadasOrdem],
+    );
+    const qtdMarcadas = marcadasLista.length;
+    const sairForaDeOrdem = () => {
+      setForaDeOrdem("nao");
+      setForaDeOrdemId(null);
+      setErroEtapa(null);
+    };
     // Item 67: multa + juros do Ciclone das parcelas marcadas (referencia de
     // hoje). So SUGERE o valor -- o juro continua informado pelo cobrador
     // (item 60: o sistema nunca presume encargo).
     const encargoMarcadas = round2(
-      parcelasAbertas
-        .slice(0, qtdMarcadas)
-        .reduce((soma, p) => soma + p.encargo, 0),
+      marcadasLista.reduce((soma, p) => soma + p.encargo, 0),
     );
     /** Data do pagamento numa linha so ("Pago em"): a multa e os juros do
      * Ciclone sao calculados ate ela. So quem pode lancar baixa depois
@@ -508,7 +546,9 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       setErroEtapa(null);
     };
     // Sem nada vencido, a lista a vencer ja aparece aberta.
-    const aVencerVisivel = mostrarAVencer || qtdVencidas === 0;
+    // No boleto fora de ordem o pago costuma ser a vencer: lista inteira.
+    const aVencerVisivel =
+      mostrarAVencer || qtdVencidas === 0 || emForaDeOrdem;
 
     // Vencido do cliente (mesma regra da carteira: clientBalanceSplit, que
     // com acordo ativo segue o cronograma do acordo).
@@ -564,7 +604,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
      *  - "jurosMaior": juros informado maior que o valor recebido.
      */
     const alocacao = useMemo(() => {
-      const marcadas = parcelasAbertas.slice(0, qtdMarcadas);
+      const marcadas = marcadasLista;
       const somaParcelas = round2(marcadas.reduce((s, p) => s + p.saldo, 0));
       const v = amountToDistribute;
       const disponivel = round2(v - jurosInformado);
@@ -593,7 +633,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         principal: round2(itens.reduce((s, p) => s + p.aplicado, 0)),
         aMais: situacao === "acima" ? round2(disponivel - somaParcelas) : 0,
       };
-    }, [parcelasAbertas, qtdMarcadas, amountToDistribute, jurosInformado]);
+    }, [marcadasLista, amountToDistribute, jurosInformado]);
 
     // Item 67: o valor "a mais" e exatamente a multa + juros do Ciclone das
     // parcelas marcadas -- o aviso reconhece em vez de perguntar.
@@ -620,6 +660,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     // Interno/terceirizado/juridico: so ate o autorizado pelo gestor (item 71).
     const podeDescontoNasMarcadas =
       modoParcelas &&
+      !emForaDeOrdem && // boleto pago: so o valor dele, sem desconto
       alocacao.situacao === "parcial" &&
       jurosInformado <= 0 &&
       alocacao.principal > 0 &&
@@ -856,6 +897,12 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       if (!dataPagamentoValida) {
         return `Escolha uma data entre ${dataMinima.split("-").reverse().join("/")} e hoje.`;
       }
+      if (modoParcelas && emForaDeOrdem && !parcelaForaDeOrdem) {
+        return "Escolha a parcela do boleto que o cliente pagou.";
+      }
+      if (emForaDeOrdem && anterioresForaDeOrdem.length === 0) {
+        return "Essa já é a parcela mais antiga em aberto: volte para a ordem normal.";
+      }
       if (modoParcelas && qtdMarcadas === 0) {
         return "Marque a(s) parcela(s) que o cliente está pagando.";
       }
@@ -1022,7 +1069,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
         podeEscolherData && dataPagamento !== hoje
           ? ` pago em ${dataBR(dataPagamento)}`
           : "";
-      return `Pagamento de ${formatCurrency(amountToDistribute)} (${forma})${quando}${
+      return `${parcelaForaDeOrdem ? "Boleto pago fora de ordem. " : ""}Pagamento de ${formatCurrency(amountToDistribute)} (${forma})${quando}${
         partes.length ? `: ${partes.join("; ")}` : ""
       }. ${situacao}`;
     };
@@ -1059,8 +1106,13 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                   clientDocument: clientGroup.document || "",
                   paymentAmount: item.appliedAmount,
                   paymentMethod: paymentMethod,
-                  notes: observations.trim(),
+                  notes: parcelaForaDeOrdem
+                    ? `Boleto pago fora de ordem (parcela de ${dataTexto(parcelaForaDeOrdem.vencimento.slice(0, 10))}; as anteriores continuam em aberto).${observations.trim() ? " " + observations.trim() : ""}`
+                    : observations.trim(),
                   discountAmount: item.appliedDiscount,
+                  parcelas: parcelaForaDeOrdem
+                    ? [parcelaForaDeOrdem.idParcela]
+                    : undefined,
                   jurosAmount: jurosPendente,
                   paymentDate: podeEscolherData ? dataPagamento : undefined,
                 },
@@ -1593,15 +1645,25 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                               i: number,
                             ) => {
                               if (!p.vencida && !aVencerVisivel) return null;
-                              const marcada = i < qtdMarcadas;
+                              const marcada = emForaDeOrdem
+                                ? p.idParcela === foraDeOrdemId
+                                : i < qtdMarcadasOrdem;
                               return (
                                 <li key={p.idParcela}>
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      setQtdMarcadasEscolhida(
-                                        marcada ? i : i + 1,
-                                      );
+                                      if (emForaDeOrdem) {
+                                        // Uma parcela so, com o valor dela.
+                                        setForaDeOrdemId(p.idParcela);
+                                        setDistributionAmount(
+                                          valorParaCampo(p.saldo),
+                                        );
+                                      } else {
+                                        setQtdMarcadasEscolhida(
+                                          marcada ? i : i + 1,
+                                        );
+                                      }
                                       setErroEtapa(null);
                                     }}
                                     className={`w-full flex items-start gap-3 px-3 py-2.5 text-left text-sm transition-colors ${
@@ -1703,7 +1765,8 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                               );
                             });
                           })()}
-                          {qtdVencidas > 0 &&
+                          {!emForaDeOrdem &&
+                            qtdVencidas > 0 &&
                             parcelasAbertas.length > qtdVencidas && (
                               <li>
                                 <button
@@ -1711,7 +1774,7 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                                   onClick={() => {
                                     if (mostrarAVencer) {
                                       setQtdMarcadasEscolhida(
-                                        Math.min(qtdMarcadas, qtdVencidas),
+                                        Math.min(qtdMarcadasOrdem, qtdVencidas),
                                       );
                                     }
                                     setMostrarAVencer(!mostrarAVencer);
@@ -1729,6 +1792,97 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                               </li>
                             )}
                         </ul>
+                      )}
+                      {parcelasAbertas.length > 1 && foraDeOrdem === "nao" && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setForaDeOrdem("aviso");
+                            setEsperaForaDeOrdem(ESPERA_FORA_DE_ORDEM);
+                            setErroEtapa(null);
+                          }}
+                          className="mt-2 text-xs text-gray-500 dark:text-dark-text-secondary underline hover:text-gray-700"
+                        >
+                          O cliente pagou um boleto fora de ordem?
+                        </button>
+                      )}
+                      {foraDeOrdem === "aviso" && (
+                        <div className="mt-2">
+                          <Aviso tom="erro" titulo="Boleto pago fora de ordem">
+                            <p>
+                              Só para quando o cliente pagou, por engano, um
+                              boleto mais novo com outro mais antigo em aberto
+                              (ex.: pagou o de dezembro com o de novembro
+                              aberto).
+                            </p>
+                            <p className="mt-1">
+                              Só a parcela que você escolher é baixada. As mais
+                              antigas <strong>continuam em aberto e
+                              vencidas</strong> — avise o cliente.
+                            </p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                disabled={esperaForaDeOrdem > 0}
+                                onClick={() => {
+                                  setForaDeOrdem("ativo");
+                                  setForaDeOrdemId(null);
+                                  setDistributionAmount("");
+                                  setErroEtapa(null);
+                                }}
+                                className="px-3 py-1.5 text-xs font-semibold rounded-full bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed tabular-nums"
+                              >
+                                {esperaForaDeOrdem > 0
+                                  ? `Leia o aviso (${esperaForaDeOrdem}s)`
+                                  : "Entendi, escolher a parcela"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={sairForaDeOrdem}
+                                className="px-3 py-1.5 text-xs font-medium rounded-full border border-red-200 bg-white text-red-700 hover:bg-red-50"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          </Aviso>
+                        </div>
+                      )}
+                      {emForaDeOrdem && (
+                        <div className="mt-2">
+                          <Aviso tom="erro" titulo="Boleto pago fora de ordem">
+                            {!parcelaForaDeOrdem ? (
+                              <p>Toque na parcela do boleto que o cliente pagou.</p>
+                            ) : anterioresForaDeOrdem.length === 0 ? (
+                              <p>
+                                Essa já é a parcela mais antiga em aberto: não
+                                precisa da exceção.
+                              </p>
+                            ) : (
+                              <p>
+                                {anterioresForaDeOrdem.length === 1
+                                  ? "1 parcela mais antiga continua"
+                                  : `${anterioresForaDeOrdem.length} parcelas mais antigas continuam`}{" "}
+                                em aberto (
+                                {formatCurrency(
+                                  round2(
+                                    anterioresForaDeOrdem.reduce(
+                                      (s, p) => s + p.saldo,
+                                      0,
+                                    ),
+                                  ),
+                                )}
+                                ). Avise o cliente.
+                              </p>
+                            )}
+                            <button
+                              type="button"
+                              onClick={sairForaDeOrdem}
+                              className="mt-1 text-xs underline"
+                            >
+                              Voltar para a ordem normal
+                            </button>
+                          </Aviso>
+                        </div>
                       )}
                       {qtdMarcadas > 0 &&
                         modoParcelas &&
@@ -2436,6 +2590,16 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
 
             {etapa === 3 && (
               <>
+                {parcelaForaDeOrdem && anterioresForaDeOrdem.length > 0 && (
+                  <Aviso tom="erro" titulo="Boleto pago fora de ordem">
+                    Só a parcela de{" "}
+                    {dataTexto(parcelaForaDeOrdem.vencimento.slice(0, 10))} é
+                    baixada.{" "}
+                    {anterioresForaDeOrdem.length === 1
+                      ? "A parcela mais antiga continua em aberto e vencida."
+                      : `As ${anterioresForaDeOrdem.length} parcelas mais antigas continuam em aberto e vencidas.`}
+                  </Aviso>
+                )}
                 <div className={grade}>
                   <div className="space-y-5">
                     {/* Resumo do que vai ser gravado */}
