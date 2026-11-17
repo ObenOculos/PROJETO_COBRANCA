@@ -16,7 +16,17 @@ const VISOES: { key: Visao; label: string }[] = [
 ];
 
 const AbaPedidosGestor: React.FC = () => {
-  const [visao, setVisao] = useState<Visao>("correcoes");
+  // A Conferência de recebimentos abre direto em "Pagos na loja" (link do
+  // pedido em análise): le e apaga a aba pedida.
+  const [visao, setVisao] = useState<Visao>(() => {
+    try {
+      const pedida = localStorage.getItem("correcoesVisao");
+      localStorage.removeItem("correcoesVisao");
+      return pedida === "loja" || pedida === "descontos" ? pedida : "correcoes";
+    } catch {
+      return "correcoes";
+    }
+  });
   return (
     <div className="space-y-3">
       <div

@@ -147,3 +147,41 @@ export const listarAtribuicoesGestor = async (
       .range(from, to)
       .returns<AtribuicaoPagamento[]>(),
   );
+
+// ---------------------------------------------------------------------------
+// Conferência de recebimentos (2026-11-17, migration 20261117000002)
+// ---------------------------------------------------------------------------
+
+/** Parcela baixada no mês com conversa de cobrador nos 30 dias antes do
+ * pagamento e/ou pedido "pago na loja". Uma linha por parcela x cobrador que
+ * conversou (cobrador_id null = só o pedido). */
+export interface ConversaConferencia {
+  id_parcela: number;
+  documento: string;
+  valor: number | string;
+  data_pagamento: string;
+  cobrador_id: string | null;
+  contatos: number;
+  ultimo_contato_em: string | null;
+  ultimo_resultado: string | null;
+  /** Ainda dá para o cobrador pedir (sem bloqueio, sem pedido, até 30 dias). */
+  pode_pedir: boolean;
+  pedido_lote: string | null;
+  pedido_decisao: "aberto" | "aprovado" | "recusado" | null;
+  pedido_cobrador_id: string | null;
+  valor_aprovado: number | string | null;
+}
+
+export const carregarConversasConferencia = async (
+  inicio: string,
+  fim: string,
+): Promise<ConversaConferencia[]> =>
+  fetchAllRows<ConversaConferencia>((from, to) =>
+    supabase
+      .rpc("conferencia_conversas", { p_inicio: inicio, p_fim: fim })
+      // Ordem unica para a paginacao (CLAUDE.md): parcela + cobrador.
+      .order("id_parcela")
+      .order("cobrador_id")
+      .range(from, to)
+      .returns<ConversaConferencia[]>(),
+  );

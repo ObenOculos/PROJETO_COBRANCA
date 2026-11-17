@@ -2472,6 +2472,25 @@ export type Database = {
           pedido_cobrador_id: string | null;
         }[];
       };
+      // Migration 20261117000002 (Conferência × pagos na loja).
+      conferencia_conversas: {
+        Args: { p_inicio: string; p_fim: string };
+        Returns: {
+          id_parcela: number;
+          documento: string;
+          valor: number;
+          data_pagamento: string;
+          cobrador_id: string | null;
+          contatos: number;
+          ultimo_contato_em: string | null;
+          ultimo_resultado: string | null;
+          pode_pedir: boolean;
+          pedido_lote: string | null;
+          pedido_decisao: string | null;
+          pedido_cobrador_id: string | null;
+          valor_aprovado: number | null;
+        }[];
+      };
       // Migration 20261116000003 (item 66).
       parcelas_para_atribuicao: {
         Args: { p_documento: string };

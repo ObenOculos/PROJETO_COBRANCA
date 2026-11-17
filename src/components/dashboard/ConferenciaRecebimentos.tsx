@@ -7,7 +7,9 @@ import {
   Download,
   FileSpreadsheet,
   FileText,
+  Hourglass,
   Info,
+  MessageCircle,
   Printer,
   Scale,
   Search,
@@ -26,6 +28,11 @@ import ClientDetailModal from "./ClientDetailModal";
 import ConferenciaDetalhe from "./ConferenciaDetalhe";
 import { supabase } from "../../lib/supabase";
 import { fetchAllRows } from "../../utils/fetchAllRows";
+import {
+  carregarConversasConferencia,
+  ConversaConferencia,
+} from "../../services/atribuicoesPagamento";
+import { ATTEMPT_RESULT_LABELS } from "../../config/collectionAttempts";
 import { formatCurrency } from "../../utils/formatters";
 import { todayLocalStr } from "../../config/visitStatus";
 import {
@@ -76,6 +83,29 @@ interface LinhaRpc {
 
 type Visao = "todos" | "carteira";
 
+/** Conversas e pedidos "pago na loja" de um cliente nas baixas do mes
+ * (RPC conferencia_conversas, migration 20261117000002). Antes isso ficava
+ * na lista "Elegiveis sem pedido" de Correções, que repetia esta tela. */
+interface LojaDoc {
+  /** Conversa mais recente de um cobrador antes de uma baixa do mes. */
+  conversa: { cobradorId: string; em: string; resultado: string } | null;
+  cobradores: Set<string>;
+  /** Valor das parcelas que o cobrador ainda pode pedir como pago na loja. */
+  podePedir: number;
+  /** Valor com pedido esperando decisao em Correções. */
+  emAnalise: number;
+  emAnaliseCobrador: string | null;
+  /** Pago na loja aprovado, por quem pediu. */
+  aprovadoPor: Map<string, number>;
+  linhas: ConversaConferencia[];
+}
+
+const soDigitos = (s: string | null | undefined): string =>
+  (s ?? "").replace(/\D/g, "");
+
+const rotuloResultado = (r: string): string =>
+  (ATTEMPT_RESULT_LABELS as Record<string, string>)[r] ?? r;
+
 interface LinhaCliente {
   chave: string;
   cobradorId: string | null;
@@ -88,6 +118,9 @@ interface LinhaCliente {
   appValor: number;
   appLancamentos: number;
   appCedrus: number;
+  /** Pago na loja aprovado somado ao app (aprovado conta como registrado). */
+  lojaAprovado: number;
+  loja: LojaDoc | undefined;
   situacao: ConferenciaSituacao;
   marcacao: ConferenciaEstadoMarcacao;
   ultima: ConferenciaMarcacao | undefined;
@@ -276,6 +309,9 @@ const ConferenciaRecebimentos: React.FC = () => {
   const [situacaoFiltro, setSituacaoFiltro] =
     useState<ConferenciaSituacao | null>(null);
   const [busca, setBusca] = useState("");
+  // So clientes com conversa de cobrador antes da baixa (ex.: o cobrador
+  // tratou e o cliente pagou na loja sem avisar).
+  const [soComConversa, setSoComConversa] = useState(false);
   const [pagina, setPagina] = useState(1);
   const [exportAberto, setExportAberto] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
@@ -356,6 +392,86 @@ const ConferenciaRecebimentos: React.FC = () => {
     };
   }, [mes, versaoMarcacoes]);
 
+  // Conversas e pedidos "pago na loja" das baixas do mes. Sem a migration
+  // 20261117000002 fica vazio e a tela segue como antes.
+  const [conversas, setConversas] = useState<ConversaConferencia[]>([]);
+  useEffect(() => {
+    let cancelado = false;
+    setConversas([]);
+    const { inicio, fim } = limitesDoMes(mes);
+    carregarConversasConferencia(inicio, fim)
+      .then((d) => {
+        if (!cancelado) setConversas(d);
+      })
+      .catch((e) =>
+        console.error("Erro ao carregar conversas da conferência:", e),
+      );
+    return () => {
+      cancelado = true;
+    };
+  }, [mes, versaoMarcacoes]);
+
+  const lojaPorDoc = useMemo(() => {
+    const m = new Map<string, LojaDoc>();
+    // A RPC repete a parcela por cobrador que conversou: valores uma vez so.
+    const vistas = new Set<number>();
+    conversas.forEach((x) => {
+      const doc = soDigitos(x.documento);
+      let g = m.get(doc);
+      if (!g) {
+        g = {
+          conversa: null,
+          cobradores: new Set(),
+          podePedir: 0,
+          emAnalise: 0,
+          emAnaliseCobrador: null,
+          aprovadoPor: new Map(),
+          linhas: [],
+        };
+        m.set(doc, g);
+      }
+      g.linhas.push(x);
+      if (x.cobrador_id && x.ultimo_contato_em) {
+        g.cobradores.add(x.cobrador_id);
+        if (!g.conversa || x.ultimo_contato_em > g.conversa.em)
+          g.conversa = {
+            cobradorId: x.cobrador_id,
+            em: x.ultimo_contato_em,
+            resultado: x.ultimo_resultado ?? "",
+          };
+      }
+      if (vistas.has(x.id_parcela)) return;
+      vistas.add(x.id_parcela);
+      const valor = num(x.valor);
+      if (x.pode_pedir) g.podePedir += valor;
+      if (x.pedido_decisao === "aberto") {
+        g.emAnalise += valor;
+        g.emAnaliseCobrador = x.pedido_cobrador_id;
+      }
+      if (x.pedido_decisao === "aprovado" && x.pedido_cobrador_id)
+        g.aprovadoPor.set(
+          x.pedido_cobrador_id,
+          (g.aprovadoPor.get(x.pedido_cobrador_id) ?? 0) +
+            num(x.valor_aprovado),
+        );
+    });
+    return m;
+  }, [conversas]);
+
+  /** Abre Correções > Pagos na loja (onde o pedido e decidido). */
+  const abrirPedidosLoja = () => {
+    try {
+      localStorage.setItem("correcoesVisao", "loja");
+    } catch {
+      // sem storage: abre na primeira aba
+    }
+    window.dispatchEvent(
+      new CustomEvent("notificationClick", {
+        detail: { destino: { aba: "authorization" } },
+      }),
+    );
+  };
+
   // Historico por documento, em ordem de registro (a ultima vale).
   const marcacoesPorDoc = useMemo(() => {
     const m = new Map<string, ConferenciaMarcacao[]>();
@@ -398,7 +514,7 @@ const ConferenciaRecebimentos: React.FC = () => {
   // Lista volta a 1a pagina quando o recorte muda.
   useEffect(() => {
     setPagina(1);
-  }, [mes, visao, cobradorSel, grupoFiltro, situacaoFiltro, busca]);
+  }, [mes, visao, cobradorSel, grupoFiltro, situacaoFiltro, busca, soComConversa]);
 
   // Menu de exportar fecha ao clicar fora.
   useEffect(() => {
@@ -420,9 +536,39 @@ const ConferenciaRecebimentos: React.FC = () => {
   const grupos = useMemo<GrupoCobrador[]>(() => {
     if (!linhas) return [];
     const porCobrador = new Map<string, GrupoCobrador>();
+    // Visao "Todos": o pago na loja aprovado entra numa linha so do cliente
+    // -- a de quem pediu, se houver; senao a primeira.
+    const alvoLoja = new Map<string, number>();
+    if (visao === "todos")
+      linhas.forEach((l, i) => {
+        const doc = soDigitos(l.documento);
+        const loja = lojaPorDoc.get(doc);
+        if (!loja || loja.aprovadoPor.size === 0) return;
+        const atual = alvoLoja.get(doc);
+        const ehDeQuemPediu = (id: string | null) =>
+          !!id && loja.aprovadoPor.has(id);
+        if (
+          atual === undefined ||
+          (ehDeQuemPediu(l.cobrador_id) &&
+            !ehDeQuemPediu(linhas[atual].cobrador_id))
+        )
+          alvoLoja.set(doc, i);
+      });
     linhas.forEach((l, i) => {
+      const doc = soDigitos(l.documento);
+      const loja = lojaPorDoc.get(doc);
+      const lojaAprovado = !loja
+        ? 0
+        : visao === "todos"
+          ? alvoLoja.get(doc) === i
+            ? [...loja.aprovadoPor.values()].reduce((s, v) => s + v, 0)
+            : 0
+          : l.cobrador_id
+            ? (loja.aprovadoPor.get(l.cobrador_id) ?? 0)
+            : 0;
       const baseValor = num(l.base_valor);
-      const appValor = num(l.app_valor);
+      // Pago na loja aprovado conta como registrado (decisao 17/11).
+      const appValor = num(l.app_valor) + lojaAprovado;
       const id = l.cobrador_id ?? "";
       let g = porCobrador.get(id);
       if (!g) {
@@ -465,6 +611,8 @@ const ConferenciaRecebimentos: React.FC = () => {
         appValor,
         appLancamentos: l.app_lancamentos,
         appCedrus: num(l.app_cedrus),
+        lojaAprovado,
+        loja,
         situacao,
         marcacao,
         ultima,
@@ -477,7 +625,7 @@ const ConferenciaRecebimentos: React.FC = () => {
         if (!a.id !== !b.id) return a.id ? -1 : 1;
         return a.nome.localeCompare(b.nome, "pt-BR");
       });
-  }, [linhas, nomePorId, marcacoesPorDoc, visao]);
+  }, [linhas, nomePorId, marcacoesPorDoc, visao, lojaPorDoc]);
 
   // Cobrador escolhido que sumiu (troca de mes/visao) volta para "Todos".
   const cobradorAtual =
@@ -510,6 +658,8 @@ const ConferenciaRecebimentos: React.FC = () => {
       base: 0,
       app: 0,
       cedrus: 0,
+      loja: 0,
+      comConversa: 0,
       porGrupo: {
         acao: 0,
         juros: 0,
@@ -532,21 +682,29 @@ const ConferenciaRecebimentos: React.FC = () => {
       r.base += c.baseValor;
       r.app += c.appValor;
       r.cedrus += c.appCedrus;
+      r.loja += c.lojaAprovado;
       const grupo = grupoDe(c);
       r.porGrupo[grupo]++;
       // Sub-chips de situacao contam so dentro do grupo escolhido.
-      if (grupoFiltro === "todos" || grupo === grupoFiltro)
+      if (grupoFiltro === "todos" || grupo === grupoFiltro) {
         r.porSituacao[c.situacao]++;
+        if (
+          c.loja?.conversa &&
+          (situacaoFiltro === null || c.situacao === situacaoFiltro)
+        )
+          r.comConversa++;
+      }
     });
     return r;
-  }, [escopo, grupoFiltro]);
+  }, [escopo, grupoFiltro, situacaoFiltro]);
 
   const lista = useMemo(() => {
     return escopo
       .filter(
         (c) =>
           (grupoFiltro === "todos" || grupoDe(c) === grupoFiltro) &&
-          (situacaoFiltro === null || c.situacao === situacaoFiltro),
+          (situacaoFiltro === null || c.situacao === situacaoFiltro) &&
+          (!soComConversa || !!c.loja?.conversa),
       )
       .sort(
         (a, b) =>
@@ -554,7 +712,7 @@ const ConferenciaRecebimentos: React.FC = () => {
           Math.abs(b.appValor - b.baseValor) -
             Math.abs(a.appValor - a.baseValor),
       );
-  }, [escopo, grupoFiltro, situacaoFiltro]);
+  }, [escopo, grupoFiltro, situacaoFiltro, soComConversa]);
 
   const escolherGrupo = (g: GrupoTela | "todos") => {
     setGrupoFiltro(g);
@@ -850,6 +1008,14 @@ const ConferenciaRecebimentos: React.FC = () => {
                   {formatCurrency(resumo.cedrus)} do Cedrus
                 </div>
               )}
+              {resumo.loja > 0 && (
+                <div
+                  className="text-[11px] text-teal-600 dark:text-teal-400"
+                  title="Pagos na loja depois da cobrança, aprovados em Correções: contam como registrados pelo cobrador."
+                >
+                  {formatCurrency(resumo.loja)} pago na loja (aprovado)
+                </div>
+              )}
             </div>
             <div className="rounded-xl border border-gray-100 dark:border-dark-border/40 bg-gray-50/60 dark:bg-dark-bg/30 px-3 sm:px-4 py-2.5">
               <div className="text-[11px] sm:text-xs font-semibold text-gray-500 dark:text-dark-text-secondary">
@@ -963,6 +1129,20 @@ const ConferenciaRecebimentos: React.FC = () => {
                 ))}
               </div>
             )}
+            {(resumo.comConversa > 0 || soComConversa) && (
+              <button
+                onClick={() => setSoComConversa((v) => !v)}
+                title="Só clientes que conversaram com um cobrador nos 30 dias antes do pagamento (ex.: o cobrador tratou e o cliente pagou na loja)."
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                  soComConversa
+                    ? "bg-teal-600 text-white"
+                    : "bg-teal-50 text-teal-700 hover:bg-teal-100 dark:bg-teal-900/20 dark:text-teal-300"
+                }`}
+              >
+                <MessageCircle className="h-3 w-3" />
+                Com conversa de cobrador ({resumo.comConversa})
+              </button>
+            )}
           </div>
 
           {/* Lista de clientes */}
@@ -1013,6 +1193,24 @@ const ConferenciaRecebimentos: React.FC = () => {
                               {c.documento}
                               {outraCarteira && ` · carteira: ${outraCarteira}`}
                             </div>
+                            {c.loja?.conversa && (
+                              <div
+                                className="mt-0.5 flex items-center gap-1 text-[11px] text-teal-700 dark:text-teal-400"
+                                title={`Conversa de cobrador nos 30 dias antes do pagamento${c.loja.cobradores.size > 1 ? " (mais de um cobrador conversou)" : ""}${c.loja.podePedir > 0 ? `. O cobrador ainda pode pedir ${formatCurrency(c.loja.podePedir)} como pago na loja (até 30 dias do pagamento).` : ""}`}
+                              >
+                                <MessageCircle className="h-3 w-3 flex-shrink-0" />
+                                conversou com{" "}
+                                {nomePorId.get(c.loja.conversa.cobradorId) ??
+                                  "cobrador"}{" "}
+                                em{" "}
+                                {new Date(c.loja.conversa.em).toLocaleDateString(
+                                  "pt-BR",
+                                )}{" "}
+                                ({rotuloResultado(c.loja.conversa.resultado)})
+                                {c.loja.cobradores.size > 1 &&
+                                  ` +${c.loja.cobradores.size - 1}`}
+                              </div>
+                            )}
                           </td>
                           {cobradorAtual === null && (
                             <td className="px-3 py-2 whitespace-nowrap text-gray-600 dark:text-dark-text-secondary">
@@ -1034,6 +1232,21 @@ const ConferenciaRecebimentos: React.FC = () => {
                                 <CheckCircle2 className="h-3 w-3" />
                                 Conferido
                               </span>
+                            )}
+                            {c.loja && c.loja.emAnalise > 0 && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  abrirPedidosLoja();
+                                }}
+                                title="O cobrador pediu este pagamento como pago na loja. Decidir em Correções."
+                                className="mt-0.5 flex items-center gap-1 whitespace-nowrap text-[11px] font-medium text-amber-700 hover:underline dark:text-amber-400"
+                              >
+                                <Hourglass className="h-3 w-3" />
+                                Pedido em análise ·{" "}
+                                {formatCurrency(c.loja.emAnalise)}
+                              </button>
                             )}
                             {c.marcacao === "mudou" && (
                               <span
@@ -1057,13 +1270,20 @@ const ConferenciaRecebimentos: React.FC = () => {
                             )}
                           </td>
                           <td className="px-3 py-2 text-right whitespace-nowrap text-gray-700 dark:text-dark-text">
-                            {c.appLancamentos > 0 ? (
+                            {c.appLancamentos > 0 || c.lojaAprovado > 0 ? (
                               <>
                                 {formatCurrency(c.appValor)}
                                 <div className="text-[11px] text-gray-400">
-                                  {c.appLancamentos} lançamento(s)
+                                  {c.appLancamentos > 0 &&
+                                    `${c.appLancamentos} lançamento(s)`}
                                   {c.appCedrus !== 0 && " · Cedrus"}
                                 </div>
+                                {c.lojaAprovado > 0 && (
+                                  <div className="text-[11px] text-teal-600 dark:text-teal-400">
+                                    {formatCurrency(c.lojaAprovado)} pago na
+                                    loja
+                                  </div>
+                                )}
                               </>
                             ) : (
                               "—"
@@ -1093,6 +1313,10 @@ const ConferenciaRecebimentos: React.FC = () => {
                                   marcacoesPorDoc.get(c.documento) ?? []
                                 }
                                 estadoMarcacao={c.marcacao}
+                                conversas={c.loja?.linhas ?? []}
+                                lojaNaLinha={
+                                  visao === "todos" ? c.lojaAprovado > 0 : true
+                                }
                                 onMarcar={(acao, obs) => marcar(c, acao, obs)}
                               />
                             </td>

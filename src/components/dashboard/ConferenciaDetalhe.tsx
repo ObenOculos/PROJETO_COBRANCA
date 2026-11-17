@@ -1,5 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { CheckCircle2, ExternalLink, RotateCcw } from "lucide-react";
+import {
+  CheckCircle2,
+  ExternalLink,
+  Hourglass,
+  MessageCircle,
+  RotateCcw,
+  XCircle,
+} from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 import {
@@ -8,6 +15,8 @@ import {
   ConferenciaMarcacao,
   marcacaoPedeObservacao,
 } from "../../filters/conferenciaRecebimentos";
+import { ConversaConferencia } from "../../services/atribuicoesPagamento";
+import { ATTEMPT_RESULT_LABELS } from "../../config/collectionAttempts";
 
 // Item 61, etapa B: detalhe de um cliente da Conferencia de recebimentos --
 // as parcelas que a base baixou no mes x os lancamentos do app no mes, lado a
@@ -43,6 +52,8 @@ interface AppRow {
   cobradorId: string | null;
   notas: string | null;
   estorno: boolean;
+  /** Pago na loja aprovado (atribuicoes_pagamento), nao um lancamento. */
+  loja?: boolean;
 }
 
 // Mesma janela da RPC ("so data"): fonte unica em filters/conferenciaRecebimentos.
@@ -67,6 +78,10 @@ interface Props {
   appValor: number;
   marcacoes: ConferenciaMarcacao[];
   estadoMarcacao: ConferenciaEstadoMarcacao;
+  /** Conversas/pedidos "pago na loja" das baixas do cliente no mes. */
+  conversas?: ConversaConferencia[];
+  /** O pago na loja aprovado soma nesta linha (visao "Todos": so numa). */
+  lojaNaLinha?: boolean;
   onMarcar: (
     acao: "conferido" | "reaberto",
     observacao: string,
@@ -231,8 +246,32 @@ const ConferenciaDetalhe: React.FC<Props> = ({
   appValor,
   marcacoes,
   estadoMarcacao,
+  conversas = [],
+  lojaNaLinha = true,
   onMarcar,
 }) => {
+  // Por parcela: quem conversou antes do pagamento e o pedido "pago na loja".
+  const porParcela = new Map<number, ConversaConferencia[]>();
+  conversas.forEach((x) => {
+    const l = porParcela.get(x.id_parcela);
+    if (l) l.push(x);
+    else porParcela.set(x.id_parcela, [x]);
+  });
+  // Pago na loja aprovado entra no lado do app, como lancamento do cobrador.
+  const lojaRows: AppRow[] = [...porParcela.values()]
+    .map((l) => l[0])
+    .filter((x) => x.pedido_decisao === "aprovado")
+    .map((x) => ({
+      chave: `l:${x.id_parcela}`,
+      data: x.data_pagamento,
+      valor: Number(x.valor_aprovado ?? x.valor) || 0,
+      origem: "Pago na loja (aprovado)",
+      venda: null,
+      cobradorId: x.pedido_cobrador_id,
+      notas: null,
+      estorno: false,
+      loja: true,
+    }));
   const [base, setBase] = useState<BaseRow[] | null>(null);
   const [app, setApp] = useState<AppRow[] | null>(null);
   // Fora do mes, ate JANELA_DIAS antes/depois: nunca entra na soma.
@@ -345,7 +384,8 @@ const ConferenciaDetalhe: React.FC<Props> = ({
   // O que entra na soma da linha da conferencia.
   const baseConta = (b: BaseRow) =>
     visao === "todos" || b.user_id === cobradorId;
-  const appConta = (a: AppRow) => a.cobradorId === cobradorId;
+  const appConta = (a: AppRow) =>
+    a.loja && visao === "todos" ? lojaNaLinha : a.cobradorId === cobradorId;
 
   if (erro)
     return (
@@ -360,12 +400,17 @@ const ConferenciaDetalhe: React.FC<Props> = ({
       </div>
     );
 
+  const appTela = [...app, ...lojaRows].sort((x, y) =>
+    x.data.localeCompare(y.data),
+  );
   const totalBase = base
     .filter(baseConta)
     .reduce((s, b) => s + Number(b.valor_recebido), 0);
-  const totalApp = app.filter(appConta).reduce((s, a) => s + a.valor, 0);
+  const totalApp = appTela
+    .filter(appConta)
+    .reduce((s, a) => s + a.valor, 0);
   const foraBase = base.filter((b) => !baseConta(b)).length;
-  const foraApp = app.filter((a) => !appConta(a)).length;
+  const foraApp = appTela.filter((a) => !appConta(a)).length;
 
   const cabecalho =
     "text-left text-[10px] uppercase tracking-wide text-gray-400 dark:text-dark-text-secondary";
@@ -423,6 +468,62 @@ const ConferenciaDetalhe: React.FC<Props> = ({
                           {!conta &&
                             ` · carteira de ${nome(b.user_id)} (não somado)`}
                         </div>
+                        {(() => {
+                          const lista = porParcela.get(b.id_parcela);
+                          if (!lista) return null;
+                          const com = lista.filter(
+                            (x) => x.cobrador_id && x.ultimo_contato_em,
+                          );
+                          const ped = lista[0];
+                          return (
+                            <div className="mt-0.5 space-y-0.5 text-[10px]">
+                              {com.map((x) => (
+                                <div
+                                  key={x.cobrador_id ?? ""}
+                                  className="flex items-center gap-1 text-teal-700 dark:text-teal-400"
+                                  title={`${x.contatos} conversa(s) nos 30 dias antes do pagamento`}
+                                >
+                                  <MessageCircle className="h-2.5 w-2.5 flex-shrink-0" />
+                                  {nome(x.cobrador_id)} em{" "}
+                                  {new Date(
+                                    x.ultimo_contato_em as string,
+                                  ).toLocaleDateString("pt-BR")}{" "}
+                                  (
+                                  {(ATTEMPT_RESULT_LABELS as Record<string, string>)[
+                                    x.ultimo_resultado ?? ""
+                                  ] ?? x.ultimo_resultado}
+                                  )
+                                </div>
+                              ))}
+                              {ped.pedido_decisao === "aberto" && (
+                                <div className="flex items-center gap-1 font-medium text-amber-700 dark:text-amber-400">
+                                  <Hourglass className="h-2.5 w-2.5" />
+                                  pedido de {nome(ped.pedido_cobrador_id)} em
+                                  análise (Correções)
+                                </div>
+                              )}
+                              {ped.pedido_decisao === "aprovado" && (
+                                <div className="flex items-center gap-1 font-medium text-teal-700 dark:text-teal-400">
+                                  <CheckCircle2 className="h-2.5 w-2.5" />
+                                  pago na loja aprovado para{" "}
+                                  {nome(ped.pedido_cobrador_id)}
+                                </div>
+                              )}
+                              {ped.pedido_decisao === "recusado" && (
+                                <div className="flex items-center gap-1 text-red-600 dark:text-red-400">
+                                  <XCircle className="h-2.5 w-2.5" />
+                                  pedido de {nome(ped.pedido_cobrador_id)}{" "}
+                                  recusado
+                                </div>
+                              )}
+                              {ped.pode_pedir && (
+                                <div className="text-gray-400 dark:text-dark-text-secondary">
+                                  o cobrador ainda pode pedir como pago na loja
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-3 py-1.5 whitespace-nowrap text-gray-500 dark:text-dark-text-secondary">
                         {b.data_vencimento
@@ -450,7 +551,7 @@ const ConferenciaDetalhe: React.FC<Props> = ({
               {formatCurrency(totalApp)}
             </span>
           </div>
-          {app.length === 0 ? (
+          {appTela.length === 0 ? (
             <div className="px-3 py-3 text-xs text-gray-500 dark:text-dark-text-secondary">
               Nenhum lançamento no app neste mês.
             </div>
@@ -467,7 +568,7 @@ const ConferenciaDetalhe: React.FC<Props> = ({
                 </tr>
               </thead>
               <tbody>
-                {app.map((a) => {
+                {appTela.map((a) => {
                   const conta = appConta(a);
                   return (
                     <tr
@@ -478,7 +579,13 @@ const ConferenciaDetalhe: React.FC<Props> = ({
                         {formatDate(a.data)}
                       </td>
                       <td className="px-3 py-1.5 text-gray-700 dark:text-dark-text">
-                        {a.origem}
+                        <span
+                          className={
+                            a.loja ? "text-teal-700 dark:text-teal-400" : ""
+                          }
+                        >
+                          {a.origem}
+                        </span>
                         {a.venda ? ` · #${a.venda}` : ""}
                         {a.estorno && (
                           <span className="ml-1 rounded bg-red-50 px-1 text-[10px] font-medium text-red-600 dark:bg-red-900/20 dark:text-red-300">

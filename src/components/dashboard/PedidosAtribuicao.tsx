@@ -3,8 +3,6 @@ import { invalidarHistoricoCliente } from "../../utils/cacheHistoricoCliente";
 import {
   AlertTriangle,
   CheckCircle2,
-  ChevronDown,
-  ChevronRight,
   Store,
   Hourglass,
   ListChecks,
@@ -24,9 +22,10 @@ import {
 } from "../../services/atribuicoesPagamento";
 
 // Item 66 etapa 2: gestor decide os pedidos "Cliente pagou na loja" (baixa do
-// ERP creditada ao cobrador que tratou o cliente) e ve os elegiveis que
-// ninguem pediu. So o cobrador pede (decisao do usuario, 2026-11-16) -- aqui
-// os elegiveis sao so consulta. A decisao e da RPC decidir_atribuicao_pagamento
+// ERP creditada ao cobrador que tratou o cliente). So o cobrador pede (decisao
+// do usuario, 2026-11-16). A lista "Elegiveis sem pedido" saiu em 17/11: repetia
+// a Conferência de recebimentos, que agora mostra a conversa do cobrador antes
+// da baixa e o pedido de cada parcela. A decisao e da RPC decidir_atribuicao_pagamento
 // (uma vez por lote; confere de novo a parcela no ERP).
 
 /** Decididos que ainda aparecem na aba (dias). */
@@ -58,11 +57,8 @@ const PedidosAtribuicao: React.FC = () => {
   const [salvando, setSalvando] = useState(false);
   const [erroAcao, setErroAcao] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
-  const [cobradorAberto, setCobradorAberto] = useState<string | null>(null);
   // Uma secao por vez (item 38): os cards do topo escolhem qual aparece.
-  const [secao, setSecao] = useState<"analise" | "elegiveis" | "decididos">(
-    "analise",
-  );
+  const [secao, setSecao] = useState<"analise" | "decididos">("analise");
 
   const nomePorId = useMemo(
     () => new Map(users.map((u) => [u.id, u.name])),
@@ -125,28 +121,6 @@ const PedidosAtribuicao: React.FC = () => {
     return m;
   }, [painel]);
 
-  // Elegiveis sem pedido, por cobrador.
-  const elegiveis = useMemo(() => {
-    const m = new Map<
-      string,
-      { linhas: LinhaPainelAtribuicao[]; total: number; clientes: Set<string> }
-    >();
-    painel
-      .filter((l) => !l.pedido_lote)
-      .forEach((l) => {
-        const g = m.get(l.cobrador_id) ?? {
-          linhas: [],
-          total: 0,
-          clientes: new Set<string>(),
-        };
-        g.linhas.push(l);
-        g.total = round2(g.total + Number(l.valor));
-        g.clientes.add(l.documento);
-        m.set(l.cobrador_id, g);
-      });
-    return [...m.entries()].sort((a, b) => b[1].total - a[1].total);
-  }, [painel]);
-
   const abrir = (lote: string, tipo: "aprovar" | "recusar") => {
     setAberto(lote);
     setAcao(tipo);
@@ -198,20 +172,7 @@ const PedidosAtribuicao: React.FC = () => {
     return [...porCobrador.values()];
   };
 
-  // Primeira carga sem pedido em analise: abre direto nos elegiveis.
-  const [secaoEscolhida, setSecaoEscolhida] = useState(false);
-  useEffect(() => {
-    if (pedidos !== null && !secaoEscolhida && abertos.length === 0) {
-      setSecao("elegiveis");
-      setSecaoEscolhida(true);
-    }
-  }, [pedidos, abertos.length, secaoEscolhida]);
-
   const totalAbertos = abertos.reduce((s, l) => s + l.total, 0);
-  const totalElegiveis = elegiveis.reduce((s, [, g]) => s + g.total, 0);
-  const clientesElegiveis = new Set(
-    elegiveis.flatMap(([, g]) => [...g.clientes]),
-  ).size;
   const aprovados = decididos.filter((l) => l.itens[0].decisao === "aprovado");
   const totalAprovado = aprovados.reduce((s, l) => s + l.total, 0);
 
@@ -253,7 +214,7 @@ const PedidosAtribuicao: React.FC = () => {
       ) : (
         <>
           {/* Cards: cada um junta os numeros da secao e a abre ao clicar */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {(
               [
                 {
@@ -265,18 +226,6 @@ const PedidosAtribuicao: React.FC = () => {
                   caption: abertos.length === 1 ? "pedido" : "pedidos",
                   rows: [
                     { label: "Valor", value: formatCurrency(totalAbertos) },
-                  ],
-                },
-                {
-                  id: "elegiveis",
-                  icon: Store,
-                  title: "Elegíveis sem pedido",
-                  value: formatCurrency(totalElegiveis),
-                  valueTone: "neutral",
-                  caption: "últimos 30 dias · só consulta",
-                  rows: [
-                    { label: "Clientes", value: String(clientesElegiveis) },
-                    { label: "Cobradores", value: String(elegiveis.length) },
                   ],
                 },
                 {
@@ -310,10 +259,7 @@ const PedidosAtribuicao: React.FC = () => {
                 caption={c.caption}
                 rows={[...c.rows]}
                 compact
-                onClick={() => {
-                  setSecao(c.id);
-                  setSecaoEscolhida(true);
-                }}
+                onClick={() => setSecao(c.id)}
                 hint="Mostrar esta lista"
               />
             ))}
@@ -472,79 +418,6 @@ const PedidosAtribuicao: React.FC = () => {
                               </button>
                             </div>
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </section>
-          )}
-
-          {/* Elegiveis sem pedido (so consulta) */}
-          {secao === "elegiveis" && (
-            <section className="space-y-2">
-              <h3 className="text-sm font-semibold text-gray-800 dark:text-dark-text">
-                Elegíveis sem pedido — últimos 30 dias
-              </h3>
-              <p className="text-[11px] text-gray-500 dark:text-dark-text-secondary">
-                Baixas da loja ou do banco com conversa de um cobrador antes do
-                pagamento, que ninguém pediu. Só o cobrador pode pedir; use para
-                conferir ou lembrar o cobrador.
-              </p>
-              {elegiveis.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-gray-200 dark:border-dark-border py-6 text-center text-sm text-gray-500 dark:text-dark-text-secondary">
-                  Nenhum pagamento elegível sem pedido.
-                </div>
-              ) : (
-                <div className="rounded-xl border border-gray-200 dark:border-dark-border divide-y divide-gray-100 dark:divide-dark-border/40">
-                  {elegiveis.map(([cobradorId, g]) => {
-                    const expandido = cobradorAberto === cobradorId;
-                    return (
-                      <div key={cobradorId}>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setCobradorAberto(expandido ? null : cobradorId)
-                          }
-                          className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-dark-bg/40"
-                        >
-                          <span className="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-dark-text">
-                            {expandido ? (
-                              <ChevronDown className="h-4 w-4 text-gray-400" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4 text-gray-400" />
-                            )}
-                            {nome(cobradorId)}
-                          </span>
-                          <span className="text-xs text-gray-600 dark:text-dark-text-secondary whitespace-nowrap">
-                            {g.clientes.size}{" "}
-                            {g.clientes.size === 1 ? "cliente" : "clientes"} ·{" "}
-                            {g.linhas.length}{" "}
-                            {g.linhas.length === 1 ? "parcela" : "parcelas"} ·{" "}
-                            <strong className="text-gray-900 dark:text-dark-text">
-                              {formatCurrency(g.total)}
-                            </strong>
-                          </span>
-                        </button>
-                        {expandido && (
-                          <ul className="px-3 pb-2 space-y-1">
-                            {g.linhas.map((l) => (
-                              <li
-                                key={`${l.id_parcela}-${l.cobrador_id}`}
-                                className="text-[11px] text-gray-600 dark:text-dark-text-secondary"
-                              >
-                                <span className="font-medium text-gray-800 dark:text-dark-text">
-                                  {l.cliente ?? l.documento}
-                                </span>{" "}
-                                · pago em {formatDate(l.data_pagamento)} · venda
-                                #{l.venda ?? "—"} parc. {l.parcela ?? "—"} ·{" "}
-                                {formatCurrency(Number(l.valor))} · última
-                                conversa {dataHora(l.ultimo_contato_em)} (
-                                {rotuloResultado(l.ultimo_resultado)})
-                              </li>
-                            ))}
-                          </ul>
                         )}
                       </div>
                     );
