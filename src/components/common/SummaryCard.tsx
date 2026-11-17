@@ -28,6 +28,8 @@ const SummaryCard: React.FC<{
   onClick?: () => void;
   /** Dica ao passar o mouse no card clicavel. */
   hint?: string;
+  /** Card que esta filtrando a lista agora (borda de destaque). */
+  selecionado?: boolean;
 }> = ({
   icon: Icon,
   title,
@@ -39,6 +41,7 @@ const SummaryCard: React.FC<{
   compact = false,
   onClick,
   hint,
+  selecionado = false,
 }) => {
   const valueClasses: Record<string, string> = {
     neutral: "text-gray-900 dark:text-dark-text",
@@ -67,7 +70,7 @@ const SummaryCard: React.FC<{
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
       title={hint}
-      className={`min-w-0 rounded-xl border border-gray-100 dark:border-dark-border/40 bg-gray-50/60 dark:bg-dark-bg/30 ${compact ? "px-3 py-2" : "px-4 py-3"} ${onClick ? "cursor-pointer transition-colors hover:border-blue-300 hover:bg-blue-50/50 dark:hover:border-blue-800 dark:hover:bg-blue-900/10" : ""}`}
+      className={`min-w-0 rounded-xl border ${selecionado ? "border-blue-400 bg-blue-50/50 dark:border-blue-700 dark:bg-blue-900/10" : "border-gray-100 dark:border-dark-border/40 bg-gray-50/60 dark:bg-dark-bg/30"} ${compact ? "px-3 py-2" : "px-4 py-3"} ${onClick ? "cursor-pointer transition-colors hover:border-blue-300 hover:bg-blue-50/50 dark:hover:border-blue-800 dark:hover:bg-blue-900/10" : ""}`}
     >
       <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary">
         <Icon className="h-4 w-4 flex-shrink-0" />

@@ -300,25 +300,22 @@ const PedidosAtribuicao: React.FC = () => {
                 },
               ] as const
             ).map((c) => (
-              <div
+              <SummaryCard
                 key={c.id}
-                className={`rounded-xl ${secao === c.id ? "ring-2 ring-teal-500" : ""}`}
-              >
-                <SummaryCard
-                  icon={c.icon}
-                  title={c.title}
-                  value={c.value}
-                  valueTone={c.valueTone}
-                  caption={c.caption}
-                  rows={[...c.rows]}
-                  compact
-                  onClick={() => {
-                    setSecao(c.id);
-                    setSecaoEscolhida(true);
-                  }}
-                  hint="Mostrar esta lista"
-                />
-              </div>
+                selecionado={secao === c.id}
+                icon={c.icon}
+                title={c.title}
+                value={c.value}
+                valueTone={c.valueTone}
+                caption={c.caption}
+                rows={[...c.rows]}
+                compact
+                onClick={() => {
+                  setSecao(c.id);
+                  setSecaoEscolhida(true);
+                }}
+                hint="Mostrar esta lista"
+              />
             ))}
           </div>
 

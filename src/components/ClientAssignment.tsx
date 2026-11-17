@@ -8,7 +8,6 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
-  Award,
   HandCoins,
   Briefcase,
   CircleSlash,
@@ -27,6 +26,7 @@ import {
 import { useCollection } from "../contexts/CollectionContext";
 import { Collection, isCollectorType, ClientGroup } from "../types";
 import { createPortal } from "react-dom";
+import SummaryCard from "./common/SummaryCard";
 import ClientDetailModal from "./dashboard/ClientDetailModal";
 import { countVendas, resolveSaleKey } from "../filters/sales";
 import {
@@ -61,24 +61,6 @@ import {
 import * as XLSX from "xlsx";
 import BulkAssignmentModal from "./BulkAssignmentModal";
 import AssignmentReportModal from "./dashboard/AssignmentReportModal";
-
-const MONTHS_PT = [
-  "Jan",
-  "Fev",
-  "Mar",
-  "Abr",
-  "Mai",
-  "Jun",
-  "Jul",
-  "Ago",
-  "Set",
-  "Out",
-  "Nov",
-  "Dez",
-];
-
-const monthLabel = (date: Date) =>
-  `${MONTHS_PT[date.getMonth()]}/${date.getFullYear()}`;
 
 type SortField =
   | "cliente"
@@ -221,7 +203,11 @@ interface SelectionIndicatorProps {
   onClick: (e: React.MouseEvent) => void;
 }
 
-const SelectionIndicator = ({ checked, partial, onClick }: SelectionIndicatorProps) => {
+const SelectionIndicator = ({
+  checked,
+  partial,
+  onClick,
+}: SelectionIndicatorProps) => {
   return (
     <button
       type="button"
@@ -230,8 +216,8 @@ const SelectionIndicator = ({ checked, partial, onClick }: SelectionIndicatorPro
         checked
           ? "bg-blue-600 border border-blue-600 text-white scale-105 shadow-sm shadow-blue-500/25"
           : partial
-          ? "bg-blue-50 border border-blue-400 text-blue-600 dark:bg-blue-900/20 dark:border-blue-500"
-          : "bg-white border border-gray-300 dark:bg-dark-bg dark:border-dark-border text-transparent hover:border-blue-400 dark:hover:border-blue-500 hover:scale-105"
+            ? "bg-blue-50 border border-blue-400 text-blue-600 dark:bg-blue-900/20 dark:border-blue-500"
+            : "bg-white border border-gray-300 dark:bg-dark-bg dark:border-dark-border text-transparent hover:border-blue-400 dark:hover:border-blue-500 hover:scale-105"
       }`}
       aria-checked={checked ? "true" : partial ? "mixed" : "false"}
       role="checkbox"
@@ -324,7 +310,8 @@ export const ClientAssignment = React.memo(
     const clientCreatedAtMap = useMemo(() => {
       const map = new Map<string, Date>();
       clientesRegistry.forEach((cliente, documento) => {
-        if (cliente.created_at) map.set(documento, new Date(cliente.created_at));
+        if (cliente.created_at)
+          map.set(documento, new Date(cliente.created_at));
       });
       return map;
     }, [clientesRegistry]);
@@ -333,36 +320,12 @@ export const ClientAssignment = React.memo(
     const clientBirthDateMap = useMemo(() => {
       const map = new Map<string, string>();
       clientesRegistry.forEach((cliente, documento) => {
-        if (cliente.data_nascimento) map.set(documento, cliente.data_nascimento);
+        if (cliente.data_nascimento)
+          map.set(documento, cliente.data_nascimento);
       });
       return map;
     }, [clientesRegistry]);
 
-    // Conjuntos de documentos criados no mes atual e no mes anterior, derivados
-    // do mapa acima -- usados pelo card "Novos Clientes" (mes atual vs anterior).
-    const newClientDocs = useMemo(() => {
-      const now = new Date();
-      const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-      const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const prevMonthEnd = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        0,
-        23,
-        59,
-        59,
-        999,
-      );
-
-      const current = new Set<string>();
-      const previous = new Set<string>();
-      clientCreatedAtMap.forEach((created, doc) => {
-        if (created >= currentMonthStart) current.add(doc);
-        else if (created >= prevMonthStart && created <= prevMonthEnd)
-          previous.add(doc);
-      });
-      return { current, previous };
-    }, [clientCreatedAtMap]);
     const [showFilters, setShowFilters] = useState(false);
     // Mobile: recolhe controles/pills/painel atrás de um chevron (desktop sempre visível).
     const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
@@ -1077,22 +1040,6 @@ export const ClientAssignment = React.memo(
       const assignedClients = clientsData.filter((c) => c.collectorId).length;
       const unassignedClients = totalClients - assignedClients;
 
-      // Valor em aberto (considera desconto, mesma regra do status do cliente).
-      const totalPendingValue = clientsData.reduce(
-        (sum, client) => sum + getClientPending(client.collections),
-        0,
-      );
-
-      // Novos clientes (Mês Atual vs Mês Anterior) com base na existência prévia
-      // na tabela `clientes` (created_at), não em títulos/data_lancamento.
-      const newClientsMonth = clientsData.filter((client) =>
-        newClientDocs.current.has(client.documento),
-      ).length;
-
-      const prevMonthCount = clientsData.filter((client) =>
-        newClientDocs.previous.has(client.documento),
-      ).length;
-
       const assignmentRate =
         totalClients > 0 ? (assignedClients / totalClients) * 100 : 0;
 
@@ -1100,12 +1047,9 @@ export const ClientAssignment = React.memo(
         totalClients,
         assignedClients,
         unassignedClients,
-        totalPendingValue,
-        newClientsMonth,
-        prevMonthCount,
         assignmentRate,
       };
-    }, [clientsData, newClientDocs]);
+    }, [clientsData]);
 
     // Calculate filtered overview statistics
     const filteredStats = useMemo(() => {
@@ -1115,30 +1059,12 @@ export const ClientAssignment = React.memo(
       ).length;
       const unassignedFiltered = totalFiltered - assignedFiltered;
 
-      const totalPendingFiltered = filteredClients.reduce(
-        (sum, client) => sum + getClientPending(client.collections),
-        0,
-      );
-
-      // Novos clientes filtrados (Mês Atual vs Mês Anterior) — mesma fonte de
-      // verdade (tabela `clientes`/created_at), respeitando o conjunto filtrado.
-      const newClientsFiltered = filteredClients.filter((client) =>
-        newClientDocs.current.has(client.documento),
-      ).length;
-
-      const prevMonthFiltered = filteredClients.filter((client) =>
-        newClientDocs.previous.has(client.documento),
-      ).length;
-
       return {
         totalFiltered,
         assignedFiltered,
         unassignedFiltered,
-        totalPendingFiltered,
-        newClientsFiltered,
-        prevMonthFiltered,
       };
-    }, [filteredClients, newClientDocs]);
+    }, [filteredClients]);
 
     // Debug info para datas (remover em produção)
     useEffect(() => {
@@ -1192,15 +1118,6 @@ export const ClientAssignment = React.memo(
       const assigned = hasActiveFilters
         ? filteredStats.assignedFiltered
         : overviewStats.assignedClients;
-      const newClients = hasActiveFilters
-        ? filteredStats.newClientsFiltered
-        : overviewStats.newClientsMonth;
-      const prevMonth = hasActiveFilters
-        ? filteredStats.prevMonthFiltered
-        : overviewStats.prevMonthCount;
-      const pendingValue = hasActiveFilters
-        ? filteredStats.totalPendingFiltered
-        : overviewStats.totalPendingValue;
 
       // Total de vendas (mesma base de clientes que o total: filtrada ou geral).
       const baseClients = hasActiveFilters ? filteredClients : clientsData;
@@ -1235,9 +1152,6 @@ export const ClientAssignment = React.memo(
         totalSales,
         assigned,
         unassigned: total - assigned,
-        newClients,
-        prevMonth,
-        pendingValue,
         assignmentRate,
         vencido,
         aVencer,
@@ -1252,14 +1166,7 @@ export const ClientAssignment = React.memo(
       acordoAtivoOverdueMap,
     ]);
 
-    // Rótulos explícitos dos períodos comparados no card "Novos Clientes".
-    const now = new Date();
-    const currentMonthLabel = monthLabel(now);
-
     // Clique nos cards aplica/remove (toggle) o filtro correspondente.
-    const currentMonthStartStr = todayLocalStr(new Date(now.getFullYear(), now.getMonth(), 1));
-    const isNewClientsFilterActive =
-      filterCreatedFrom === currentMonthStartStr && !filterCreatedTo;
     const isPendingFilterActive = filterStatus === "without_collector";
     const isAllActive =
       !filterStatus &&
@@ -1270,25 +1177,26 @@ export const ClientAssignment = React.memo(
     const currentVision = useMemo(() => {
       if (isPendingFilterActive) return "pending";
       if (filterStatus === "with_collector") return "assigned";
-      if (isNewClientsFilterActive) return "new";
       return "all";
-    }, [isPendingFilterActive, filterStatus, isNewClientsFilterActive]);
+    }, [isPendingFilterActive, filterStatus]);
 
-    const handleToggleNewClientsFilter = () => {
-      if (isNewClientsFilterActive) {
-        setFilterCreatedFrom("");
-      } else {
-        setFilterCreatedFrom(currentMonthStartStr);
-        setFilterCreatedTo("");
-      }
-      setCurrentPage(1);
-    };
+    // Cards: valor | percentual, com virgula decimal.
+    const pctBr = (n: number) =>
+      `${n.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+    const emAbertoTotal = mainStats.vencido + mainStats.aVencer;
 
     const handleShowAll = () => {
       setFilterStatus("");
       setFilterCreatedFrom("");
       setFilterCreatedTo("");
       setFilterDateFrom("");
+      setCurrentPage(1);
+    };
+
+    const handleToggleAssignedFilter = () => {
+      setFilterStatus(
+        filterStatus === "with_collector" ? "" : "with_collector",
+      );
       setCurrentPage(1);
     };
 
@@ -1405,201 +1313,63 @@ export const ClientAssignment = React.memo(
           </div>
         </div>
 
-        {/* Grid de Cards Executivos — faixa horizontal deslizável no mobile, grid no desktop */}
-        <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 overflow-x-auto sm:overflow-visible snap-x snap-mandatory -mx-1 px-1 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {/* Card: Total de Clientes */}
-          <div
-            role="button"
-            tabIndex={0}
+        {/* Cards (reuniao 16/11): Clientes e Em aberto, cada um juntando as
+            informacoes que se relacionam (modelo do Resumo por Cobrador).
+            O card "Novos Clientes" saiu a pedido do gestor. */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+          <SummaryCard
+            selecionado={isAllActive}
+            icon={Users}
+            title="Clientes"
+            value={mainStats.total.toLocaleString("pt-BR")}
+            caption={`${mainStats.totalSales.toLocaleString("pt-BR")} vendas`}
             onClick={handleShowAll}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                handleShowAll();
-              }
-            }}
-            title="Mostrar todos os clientes (limpar filtros)"
-            className={`shrink-0 snap-start min-w-[44%] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 rounded-2xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-all cursor-pointer ${
-              isAllActive
-                ? "border-blue-500 ring-2 ring-blue-500/10"
-                : "border-gray-100 dark:border-dark-border"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
-                <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-              </div>
-              {mainStats.unassigned > 0 && (
-                <span className="text-[8px] sm:text-[9px] font-semibold text-amber-700 bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.5 rounded-md tracking-wide border border-amber-100 dark:border-amber-900/30 shrink-0">
-                  {mainStats.unassigned} Pend.
-                </span>
-              )}
-            </div>
-            <div>
-              <p className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">
-                Total Clientes
-              </p>
-              <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">
-                {mainStats.total}
-              </p>
-              <p className="text-[10px] sm:text-[11px] font-medium text-gray-400 dark:text-dark-text-secondary mt-0.5 truncate">
-                <span className="text-gray-600 dark:text-dark-text font-semibold">
-                  {mainStats.totalSales}
-                </span>{" "}
-                vendas
-              </p>
-            </div>
-          </div>
-
-          {/* Card: Novos Clientes */}
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={handleToggleNewClientsFilter}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                handleToggleNewClientsFilter();
-              }
-            }}
-            title={`Filtrar clientes criados em ${currentMonthLabel}`}
-            className={`shrink-0 snap-start min-w-[44%] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 rounded-2xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-all cursor-pointer ${
-              isNewClientsFilterActive
-                ? "border-green-500 ring-2 ring-green-500/10"
-                : "border-gray-100 dark:border-dark-border"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-xl">
-                <Zap className="h-4 w-4 text-green-600 dark:text-green-400" />
-              </div>
-              {mainStats.prevMonth > 0 ? (
-                <span
-                  className={`text-[8px] sm:text-[9px] font-semibold px-1.5 py-0.5 rounded-md tracking-wide border shrink-0 ${
-                    mainStats.newClients >= mainStats.prevMonth
-                      ? "text-green-700 bg-green-50 border-green-150 dark:text-green-400 dark:bg-green-900/20 dark:border-green-900/30"
-                      : "text-amber-700 bg-amber-50 border-amber-150 dark:text-amber-400 dark:bg-amber-900/20 dark:border-amber-900/30"
-                  }`}
-                >
-                  {mainStats.newClients >= mainStats.prevMonth ? "▲ +" : "▼ "}
-                  {(
-                    (mainStats.newClients / mainStats.prevMonth - 1) *
-                    100
-                  ).toFixed(0)}
-                  %
-                </span>
-              ) : (
-                <span className="text-[8px] sm:text-[9px] font-semibold text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-900/20 px-1.5 py-0.5 rounded-md tracking-wide border border-green-100 dark:border-green-900/30 shrink-0">
-                  {currentMonthLabel}
-                </span>
-              )}
-            </div>
-            <div>
-              <p className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">
-                Novos Clientes
-              </p>
-              <div className="flex items-baseline gap-1 mt-0.5 flex-wrap">
-                <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">
-                  {mainStats.newClients}
-                </p>
-                <p className="text-[8px] sm:text-[9px] font-semibold text-gray-400 tracking-tight shrink-0">
-                  {currentMonthLabel}
-                </p>
-              </div>
-              <p className="text-[9px] sm:text-[10px] font-medium text-gray-400 dark:text-dark-text-secondary mt-0.5 tracking-tight truncate">
-                Ant:{" "}
-                <span className="text-gray-600 dark:text-dark-text font-semibold">
-                  {mainStats.prevMonth}
-                </span>
-              </p>
-            </div>
-          </div>
-
-          {/* Card: Valores -- em aberto (vencido + a vencer) e pago juntos,
-              mesma regra das linhas da lista (reuniao 16/11, item 17). */}
-          <div className="shrink-0 snap-start min-w-[44%] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-3">
-              <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl">
-                <HandCoins className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-              </div>
-            </div>
-            <div>
-              <p className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">
-                Em aberto
-              </p>
-              <p className="text-lg sm:text-2xl font-bold text-indigo-600 dark:text-indigo-450 tracking-tight truncate">
-                {formatCurrency(mainStats.vencido + mainStats.aVencer)}
-              </p>
-              <div className="mt-2 pt-2 border-t border-gray-100 dark:border-dark-border/40 space-y-0.5 text-[10px] sm:text-[11px] font-medium">
-                <div className="flex justify-between gap-2">
-                  <span className="text-gray-500 dark:text-dark-text-secondary">
-                    Vencido
-                  </span>
-                  <span className="font-semibold text-red-600 dark:text-red-400 truncate">
-                    {formatCurrency(mainStats.vencido)}
-                  </span>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <span className="text-gray-500 dark:text-dark-text-secondary">
-                    A vencer
-                  </span>
-                  <span className="font-semibold text-gray-700 dark:text-dark-text truncate">
-                    {formatCurrency(mainStats.aVencer)}
-                  </span>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <span className="text-gray-500 dark:text-dark-text-secondary">
-                    Pago
-                  </span>
-                  <span className="font-semibold text-emerald-600 dark:text-emerald-400 truncate">
-                    {formatCurrency(mainStats.pago)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Card: Taxa de Atribuição */}
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={handleTogglePendingFilter}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                handleTogglePendingFilter();
-              }
-            }}
-            title="Filtrar clientes pendentes (sem cobrador)"
-            className={`shrink-0 snap-start min-w-[44%] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 rounded-2xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-all cursor-pointer ${
-              isPendingFilterActive
-                ? "border-amber-500 ring-2 ring-amber-500/10"
-                : "border-gray-100 dark:border-dark-border"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-xl">
-                <Award className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-              </div>
-              <span
-                className={`text-[8px] sm:text-[9px] font-semibold px-1.5 py-0.5 rounded-md tracking-wide border shrink-0 ${
-                  mainStats.assignmentRate > 90
-                    ? "text-green-700 bg-green-50 border-green-100 dark:text-green-400 dark:bg-green-900/20 dark:border-green-900/30"
-                    : "text-amber-700 bg-amber-50 border-amber-100 dark:text-amber-400 dark:bg-amber-900/20 dark:border-amber-900/30"
-                }`}
-              >
-                {mainStats.assignmentRate > 90 ? "OK" : "Ajustar"}
-              </span>
-            </div>
-            <div>
-              <p className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">
-                Taxa Atribuição
-              </p>
-              <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">
-                {mainStats.assignmentRate.toFixed(1)}%
-              </p>
-            </div>
-          </div>
+            hint="Mostrar todos os clientes (limpar filtros)"
+            rows={[
+              {
+                label: "Com cobrador",
+                value: `${mainStats.assigned.toLocaleString("pt-BR")} | ${pctBr(mainStats.assignmentRate)}`,
+                tone: mainStats.assignmentRate > 90 ? "green" : undefined,
+                onClick: handleToggleAssignedFilter,
+                hint:
+                  filterStatus === "with_collector"
+                    ? "Tirar o filtro de clientes com cobrador"
+                    : "Filtrar clientes com cobrador",
+              },
+              {
+                label: "Sem cobrador",
+                value: `${mainStats.unassigned.toLocaleString("pt-BR")} | ${pctBr(mainStats.total > 0 ? (mainStats.unassigned / mainStats.total) * 100 : 0)}`,
+                tone: mainStats.unassigned > 0 ? "amber" : undefined,
+                onClick: handleTogglePendingFilter,
+                hint: isPendingFilterActive
+                  ? "Tirar o filtro de clientes sem cobrador"
+                  : "Filtrar clientes sem cobrador",
+              },
+            ]}
+          />
+          <SummaryCard
+            icon={HandCoins}
+            title="Em aberto"
+            value={formatCurrency(emAbertoTotal)}
+            caption="vencido + a vencer"
+            hint="Mesma regra das linhas da lista (com acordo ativo, valem as parcelas do acordo)"
+            rows={[
+              {
+                label: "Vencido",
+                value: `${formatCurrency(mainStats.vencido)} | ${pctBr(emAbertoTotal > 0 ? (mainStats.vencido / emAbertoTotal) * 100 : 0)}`,
+                tone: "red",
+              },
+              {
+                label: "A vencer",
+                value: `${formatCurrency(mainStats.aVencer)} | ${pctBr(emAbertoTotal > 0 ? (mainStats.aVencer / emAbertoTotal) * 100 : 0)}`,
+              },
+              {
+                label: "Pago",
+                value: formatCurrency(mainStats.pago),
+                tone: "green",
+              },
+            ]}
+          />
         </div>
 
         {/* Barra de Filtros Unificada */}
@@ -1668,15 +1438,6 @@ export const ClientAssignment = React.memo(
                       setFilterDateFrom("");
                       setFilterCreatedFrom("");
                       setFilterCreatedTo("");
-                    } else if (val === "new") {
-                      // Mesma regra do card "Novos": createdFrom = inicio do mes e
-                      // createdTo vazio, para que currentVision detecte "new" e o
-                      // select reflita/limpe corretamente.
-                      setFilterCreatedFrom(currentMonthStartStr);
-                      setFilterCreatedTo("");
-                      setFilterStatus("");
-                      setFilterCollector("");
-                      setFilterDateFrom("");
                     }
                   }}
                   className="w-full sm:w-[155px] pl-3 pr-8 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-xs font-semibold text-gray-600 dark:text-dark-text tracking-wide focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer appearance-none"
@@ -1684,7 +1445,6 @@ export const ClientAssignment = React.memo(
                   <option value="all">Visão: Todos</option>
                   <option value="pending">Visão: Pendentes</option>
                   <option value="assigned">Visão: Atribuídos</option>
-                  <option value="new">Visão: Novos</option>
                 </select>
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
                   <Filter className="h-3.5 w-3.5" />
@@ -1975,7 +1735,9 @@ export const ClientAssignment = React.memo(
                           <div className="flex justify-center">
                             <SelectionIndicator
                               checked={selectedClients.has(client.uniqueKey)}
-                              onClick={() => handleSelectClient(client.uniqueKey)}
+                              onClick={() =>
+                                handleSelectClient(client.uniqueKey)
+                              }
                             />
                           </div>
                         </td>
@@ -2165,7 +1927,9 @@ export const ClientAssignment = React.memo(
                                 className="flex items-baseline justify-end gap-1 text-[10px] font-semibold text-blue-600 dark:text-blue-400"
                                 title="Parcelas ainda dentro do prazo: não estão atrasadas"
                               >
-                                <span className="text-[9px] uppercase">A vencer</span>
+                                <span className="text-[9px] uppercase">
+                                  A vencer
+                                </span>
                                 {formatCurrency(saldo.aVencer)}
                               </span>
                             )}
@@ -2250,7 +2014,10 @@ export const ClientAssignment = React.memo(
                 >
                   <div className="p-3 sm:p-4">
                     <div className="flex items-start gap-3">
-                      <div className="flex items-center h-5" onClick={(e) => e.stopPropagation()}>
+                      <div
+                        className="flex items-center h-5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <SelectionIndicator
                           checked={isSelected}
                           onClick={() => handleSelectClient(client.uniqueKey)}
@@ -2290,18 +2057,24 @@ export const ClientAssignment = React.memo(
                             <p
                               className={`text-[11px] font-semibold tracking-tight leading-tight ${saldo.vencido > 0.01 ? "text-red-600 dark:text-red-400" : "text-gray-400"}`}
                             >
-                              <span className="text-[8px] uppercase mr-1">Vencido</span>
+                              <span className="text-[8px] uppercase mr-1">
+                                Vencido
+                              </span>
                               {formatCurrency(saldo.vencido)}
                             </p>
                             {saldo.aVencer > 0.01 && (
                               <p className="text-[9px] font-semibold text-blue-600 dark:text-blue-400 tracking-tight leading-tight mt-0.5">
-                                <span className="text-[8px] uppercase mr-1">A vencer</span>
+                                <span className="text-[8px] uppercase mr-1">
+                                  A vencer
+                                </span>
                                 {formatCurrency(saldo.aVencer)}
                               </p>
                             )}
                             {receivedValue > 0 && (
                               <p className="text-[9px] font-semibold text-emerald-600 dark:text-emerald-400 tracking-tight leading-tight mt-0.5">
-                                <span className="text-[8px] uppercase mr-1">Pago</span>
+                                <span className="text-[8px] uppercase mr-1">
+                                  Pago
+                                </span>
                                 {formatCurrency(receivedValue)}
                               </p>
                             )}
@@ -2491,8 +2264,8 @@ export const ClientAssignment = React.memo(
         {/* Barra de Ação Contextual — Mais compacta em mobile */}
         <div
           className={`fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-40 transition-all duration-300 transform w-[95%] sm:w-auto ${
-            selectedClients.size > 0 
-              ? "translate-y-0 scale-100 opacity-100" 
+            selectedClients.size > 0
+              ? "translate-y-0 scale-100 opacity-100"
               : "translate-y-12 scale-95 opacity-0 pointer-events-none"
           }`}
         >
@@ -2502,7 +2275,9 @@ export const ClientAssignment = React.memo(
                 {selectedClients.size}
               </div>
               <span className="text-[11px] sm:text-sm font-semibold text-white tracking-wide whitespace-nowrap hidden min-[400px]:inline">
-                {selectedClients.size === 1 ? "cliente selecionado" : "clientes selecionados"}
+                {selectedClients.size === 1
+                  ? "cliente selecionado"
+                  : "clientes selecionados"}
               </span>
             </div>
 
