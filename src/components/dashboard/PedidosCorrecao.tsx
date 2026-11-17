@@ -1,6 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { invalidarHistoricoCliente } from "../../utils/cacheHistoricoCliente";
-import { CheckCircle2, RotateCcw, Undo2, XCircle } from "lucide-react";
+import {
+  CheckCircle2,
+  Hourglass,
+  ListChecks,
+  RotateCcw,
+  Undo2,
+  XCircle,
+} from "lucide-react";
+import SummaryCard from "../common/SummaryCard";
 import { useCollection } from "../../contexts/CollectionContext";
 import { supabase } from "../../lib/supabase";
 import { formatCurrency, formatDate } from "../../utils/formatters";
@@ -47,6 +55,8 @@ const PedidosCorrecao: React.FC = () => {
   const [salvando, setSalvando] = useState(false);
   const [erroAcao, setErroAcao] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  // Uma secao por vez: os cards do topo escolhem qual aparece.
+  const [secao, setSecao] = useState<"analise" | "decididos">("analise");
 
   const nomePorId = useMemo(
     () => new Map(users.map((u) => [u.id, u.name])),
@@ -162,6 +172,8 @@ const PedidosCorrecao: React.FC = () => {
 
   const abertos = (pedidos ?? []).filter((p) => !p.decisao);
   const decididos = (pedidos ?? []).filter((p) => p.decisao);
+  const totalAbertos = abertos.reduce((s, p) => s + Number(p.valor), 0);
+  const okDecididos = decididos.filter((p) => p.decisao === "estornado");
 
   const linhaPagamento = (p: PedidoCorrecao) => {
     const pag = pagamentos.get(p.sale_payment_id);
@@ -175,7 +187,7 @@ const PedidosCorrecao: React.FC = () => {
     <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-4 lg:p-5 space-y-4">
       <div>
         <h2 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-dark-text flex items-center">
-          <Undo2 className="h-5 w-5 lg:h-6 lg:w-6 mr-2 text-amber-600 flex-shrink-0" />
+          <Undo2 className="h-5 w-5 lg:h-6 lg:w-6 mr-2 text-teal-600 flex-shrink-0" />
           Pedidos de correção de pagamento
         </h2>
         <p className="mt-1 text-xs text-gray-500 dark:text-dark-text-secondary">
@@ -209,6 +221,46 @@ const PedidosCorrecao: React.FC = () => {
         </div>
       ) : (
         <>
+          {/* Cards: cada um junta os numeros da secao e a abre ao clicar
+              (mesma forma de "Pagos na loja"). */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <SummaryCard
+              selecionado={secao === "analise"}
+              icon={Hourglass}
+              title="Em análise"
+              value={String(abertos.length)}
+              valueTone={abertos.length > 0 ? "red" : "neutral"}
+              caption={abertos.length === 1 ? "pedido" : "pedidos"}
+              rows={[{ label: "Valor", value: formatCurrency(totalAbertos) }]}
+              compact
+              onClick={() => setSecao("analise")}
+              hint="Mostrar esta lista"
+            />
+            <SummaryCard
+              selecionado={secao === "decididos"}
+              icon={ListChecks}
+              title={`Decididos (${DIAS_HISTORICO} dias)`}
+              value={String(decididos.length)}
+              valueTone="neutral"
+              caption={decididos.length === 1 ? "pedido" : "pedidos"}
+              rows={[
+                {
+                  label: "Estornados",
+                  value: `${okDecididos.length} · ${formatCurrency(okDecididos.reduce((s, p) => s + Number(p.valor), 0))}`,
+                  tone: "green",
+                },
+                {
+                  label: "Recusados",
+                  value: String(decididos.length - okDecididos.length),
+                },
+              ]}
+              compact
+              onClick={() => setSecao("decididos")}
+              hint="Mostrar esta lista"
+            />
+          </div>
+
+          {secao === "analise" && (
           <section className="space-y-2">
             <h3 className="text-sm font-semibold text-gray-800 dark:text-dark-text">
               Em análise ({abertos.length})
@@ -222,7 +274,7 @@ const PedidosCorrecao: React.FC = () => {
                 {abertos.map((p) => (
                   <div key={p.id} className="px-3 py-3 space-y-2">
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                      <div className="min-w-0">
+                      <div className="min-w-0 space-y-0.5">
                         <div className="text-sm font-semibold text-gray-900 dark:text-dark-text">
                           {p.cliente ?? "(sem nome)"}{" "}
                           <span className="text-xs font-normal text-gray-400">
@@ -230,26 +282,27 @@ const PedidosCorrecao: React.FC = () => {
                           </span>
                         </div>
                         <div className="text-xs text-gray-600 dark:text-dark-text-secondary">
-                          {nomePorId.get(p.solicitado_por_id) ?? "Cobrador"} ·{" "}
+                          {nomePorId.get(p.solicitado_por_id) ?? "Cobrador"}{" "}
+                          pediu em{" "}
                           {new Date(p.created_at).toLocaleString("pt-BR", {
                             dateStyle: "short",
                             timeStyle: "short",
                           })}
                         </div>
-                        <div className="text-xs text-gray-500 dark:text-dark-text-secondary">
-                          Pagamento: {linhaPagamento(p)}
+                        <div className="text-sm text-gray-800 dark:text-dark-text">
+                          Estorno de{" "}
+                          <strong>{formatCurrency(Number(p.valor))}</strong> ·
+                          pagamento {linhaPagamento(p)}
                         </div>
-                        <div className="mt-1 text-sm text-gray-800 dark:text-dark-text">
-                          Pede estorno de{" "}
-                          <strong>{formatCurrency(Number(p.valor))}</strong>:{" "}
-                          {p.motivo}
+                        <div className="text-sm text-gray-700 dark:text-dark-text italic">
+                          “{p.motivo}”
                         </div>
                       </div>
                       {aberto !== p.id && (
                         <div className="flex gap-2 flex-shrink-0">
                           <button
                             onClick={() => abrir(p, "estornar")}
-                            className="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700"
+                            className="inline-flex items-center gap-1 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700"
                           >
                             <RotateCcw className="h-3.5 w-3.5" />
                             Estornar
@@ -266,7 +319,7 @@ const PedidosCorrecao: React.FC = () => {
                     </div>
 
                     {aberto === p.id && (
-                      <div className="rounded-lg bg-gray-50 dark:bg-dark-bg/40 p-3 space-y-2">
+                      <div className="rounded-lg border border-gray-200 dark:border-dark-border p-3 space-y-2">
                         <div className="flex flex-col sm:flex-row gap-2">
                           {acao === "estornar" && (
                             <label className="sm:w-40">
@@ -278,7 +331,7 @@ const PedidosCorrecao: React.FC = () => {
                                 inputMode="decimal"
                                 value={valorTexto}
                                 onChange={(e) => setValorTexto(e.target.value)}
-                                className="mt-0.5 w-full rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg px-2.5 py-1.5 text-sm text-gray-900 dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                className="mt-0.5 w-full rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg px-2.5 py-1.5 text-sm text-gray-900 dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-teal-500"
                               />
                             </label>
                           )}
@@ -292,7 +345,7 @@ const PedidosCorrecao: React.FC = () => {
                               type="text"
                               value={resposta}
                               onChange={(e) => setResposta(e.target.value)}
-                              className="mt-0.5 w-full rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg px-2.5 py-1.5 text-sm text-gray-900 dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-amber-500"
+                              className="mt-0.5 w-full rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg px-2.5 py-1.5 text-sm text-gray-900 dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-teal-500"
                             />
                           </label>
                         </div>
@@ -313,7 +366,7 @@ const PedidosCorrecao: React.FC = () => {
                             disabled={salvando}
                             className={`rounded-lg px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40 ${
                               acao === "estornar"
-                                ? "bg-amber-600 hover:bg-amber-700"
+                                ? "bg-teal-600 hover:bg-teal-700"
                                 : "bg-red-600 hover:bg-red-700"
                             }`}
                           >
@@ -331,12 +384,18 @@ const PedidosCorrecao: React.FC = () => {
               </div>
             )}
           </section>
+          )}
 
-          {decididos.length > 0 && (
+          {secao === "decididos" && (
             <section className="space-y-2">
               <h3 className="text-sm font-semibold text-gray-800 dark:text-dark-text">
                 Decididos nos últimos {DIAS_HISTORICO} dias
               </h3>
+              {decididos.length === 0 && (
+                <div className="rounded-xl border border-dashed border-gray-200 dark:border-dark-border py-6 text-center text-sm text-gray-500 dark:text-dark-text-secondary">
+                  Nenhum pedido decidido nos últimos {DIAS_HISTORICO} dias.
+                </div>
+              )}
               <ul className="rounded-xl border border-gray-200 dark:border-dark-border divide-y divide-gray-100 dark:divide-dark-border/40">
                 {decididos.map((p) => (
                   <li
