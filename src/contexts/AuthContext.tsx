@@ -478,7 +478,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             </h3>
             <p className="text-sm text-gray-600 dark:text-dark-text-secondary mb-6">
               <strong>{confirmarTroca.conectado}</strong> está conectado neste
-              navegador (em outra aba). Entrar como{" "}
+              navegador (em outra aba). Entrar com o login{" "}
               <strong>{confirmarTroca.login}</strong> desconecta{" "}
               {confirmarTroca.conectado} em todas as abas deste navegador. Os
               outros aparelhos não são afetados.
