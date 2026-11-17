@@ -58,7 +58,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   // Configurações de inatividade
-  const INACTIVITY_TIMEOUT = 60 * 60 * 1000; // 1 hora
+  // Sem clique/tecla/rolagem/toque por este tempo, desloga (usuário pediu 3 h
+  // em 17/11; antes 1 h).
+  const INACTIVITY_TIMEOUT = 3 * 60 * 60 * 1000; // 3 horas
   let inactivityTimer: ReturnType<typeof setTimeout>;
 
   const clearLocalSession = () => {
