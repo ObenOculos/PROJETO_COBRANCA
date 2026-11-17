@@ -360,6 +360,28 @@ export const calculateOverdueDays = (
   }
 };
 
+/**
+ * calculateOverdueDays com cache por data de vencimento. Para telas que somam
+ * a carteira inteira (dezenas de milhares de titulos, poucos milhares de datas
+ * distintas): cada chamada de calculateOverdueDays cria duas Date e roda uma
+ * regex. Crie um por calculo (dentro do useMemo) -- o cache nao sabe que o dia
+ * virou.
+ */
+export const criarCalculoAtraso = (): ((
+  dueDateStr: string | null | undefined,
+) => number) => {
+  const cache = new Map<string, number>();
+  return (dueDateStr) => {
+    if (!dueDateStr) return 0;
+    let dias = cache.get(dueDateStr);
+    if (dias === undefined) {
+      dias = calculateOverdueDays(dueDateStr);
+      cache.set(dueDateStr, dias);
+    }
+    return dias;
+  };
+};
+
 export const parseAndFormatDate = (
   dateStr: string | null | undefined,
 ): string => {

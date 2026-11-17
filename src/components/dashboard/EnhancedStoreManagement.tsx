@@ -2,9 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
 import {
   Store,
-  AlertCircle,
   AlertTriangle,
-  CheckCircle,
   Download,
   BarChart3,
   Building,
@@ -12,7 +10,6 @@ import {
   ChevronUp,
   ChevronRight,
   DollarSign,
-  Award,
   MapPin,
   Users,
   X,
@@ -22,18 +19,15 @@ import { useCollection } from "../../contexts/CollectionContext";
 import {
   formatCurrency,
   formatCurrencyCompact,
-  calculateOverdueDays,
+  criarCalculoAtraso,
 } from "../../utils/formatters";
 import Pagination from "../common/Pagination";
 import FilterBar from "../common/FilterBar";
-import { Collection, FilterOptions, isCollectorType } from "../../types";
+import { ClientGroup, Collection, FilterOptions } from "../../types";
+import ClientDetailModal from "./ClientDetailModal";
 import { countVendas, resolveSaleKey } from "../../filters/sales";
 import { documentoCombina } from "../../filters/documento";
-import {
-  clientKey,
-  getClientPaymentStatus,
-  getClientPending,
-} from "../../filters/clientStatus";
+import { clientKey } from "../../filters/clientStatus";
 import { todayLocalStr } from "../../config/visitStatus";
 import {
   inadimplenciaDe,
@@ -76,17 +70,27 @@ const COR_NIVEL: Record<
   },
 };
 
+interface StoreCollector {
+  id: string;
+  name: string;
+  /** Clientes distintos da loja na carteira deste cobrador. */
+  clients: number;
+}
+
 interface StoreStats {
   storeName: string;
+  /** Cidade com mais titulos. Toda loja atende varias (16/11: as 11). */
   city: string;
-  assignedCollector: string;
-  collectorName: string;
-  isFormalAssignment: boolean;
-  totalCollections: number;
+  citiesCount: number;
+  /** Cobradores com carteira na loja, do que tem mais clientes ao que tem
+   * menos. Antes mostrava so o primeiro ("Operador"), e 10 das 11 lojas tem
+   * mais de um. */
+  collectors: StoreCollector[];
   titlesCount: number; // total de títulos/parcelas do período
   totalSales: number;
   completedSales: number;
   pendingSales: number;
+  /** Clientes distintos com saldo em aberto (antes contava fichas). */
   clientsWithPending: number;
   totalAmount: number;
   receivedAmount: number;
@@ -101,9 +105,20 @@ interface StoreStats {
   inadNaoPago: number;
   /** inadNaoPago / dueAmount (%) -- filters/inadimplencia. */
   inadimplencia: number;
+  /** Saldo vencido ha ate 30 dias: atraso, ainda nao inadimplencia. */
+  atrasoRecente: number;
   averageTicket: number;
   clientsCount: number;
 }
+
+/** "Fulano, Ciclano +2" -- cabe numa linha do card. */
+const nomesCobradores = (lista: StoreCollector[], max = 2): string =>
+  lista.length === 0
+    ? "Sem cobrador"
+    : lista
+        .slice(0, max)
+        .map((c) => c.name)
+        .join(", ") + (lista.length > max ? ` +${lista.length - max}` : "");
 
 const EnhancedStoreManagement: React.FC = () => {
   const {
@@ -134,30 +149,45 @@ const EnhancedStoreManagement: React.FC = () => {
     "storeName" | "inadimplencia" | "totalAmount"
   >("storeName");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
-  const [selectedStoreForModal, setSelectedStoreForModal] =
-    useState<StoreStats | null>(null);
+  // Guarda o NOME da loja aberta: o modal le os numeros de storeStats, que
+  // acompanham filtros e recargas (antes ficava com a foto do clique).
+  const [selectedStoreName, setSelectedStoreName] = useState<string | null>(
+    null,
+  );
 
   const hasActiveFilters = Object.values(filters).some(Boolean);
   // Memo: filtrar inline criava um array novo a cada render da pagina e o
   // modal refazia todos os agrupamentos (milhares de titulos) a cada vez.
   const selectedStoreCollections = useMemo(
     () =>
-      selectedStoreForModal
-        ? sourceCollections.filter(
-            (c) => c.nome_da_loja === selectedStoreForModal.storeName,
-          )
+      selectedStoreName
+        ? sourceCollections.filter((c) => c.nome_da_loja === selectedStoreName)
         : [],
-    [selectedStoreForModal, sourceCollections],
+    [selectedStoreName, sourceCollections],
   );
 
-  const collectors = useMemo(
-    () => users.filter((u) => isCollectorType(u.type)),
+  // Nome de quem tem carteira na loja (qualquer usuario: o dono da carteira
+  // pode ter mudado de perfil).
+  const userNames = useMemo(
+    () => new Map(users.map((u) => [u.id, u.name] as const)),
     [users],
   );
   const availableStores = useMemo(
     () => getAvailableStores(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [collections],
+  );
+
+  // Dias de atraso com cache por data: a pagina soma a carteira inteira em
+  // varias passadas (lojas, inadimplencia de cada uma, geral, modal). Sem o
+  // cache eram ~3 chamadas de calculateOverdueDays por titulo a cada filtro
+  // (~0,9 s com 150 mil titulos; com cache ~0,05 s).
+  // Cache novo a cada recalculo (dados ou recorte mudaram): assim um dia
+  // virado nao fica preso no cache.
+  const atrasoDias = useMemo(
+    () => criarCalculoAtraso(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sourceCollections, janelaInad],
   );
 
   // Calculate store statistics
@@ -189,21 +219,50 @@ const EnhancedStoreManagement: React.FC = () => {
           clientDocument: string;
         }
       >();
+      const cityCounts = new Map<string, number>();
+      const clientsByCollector = new Map<string, Set<string>>();
+      let overdueAmount = 0;
+      let overdueTitles = 0;
 
+      // Uma passada por titulo: vendas, cidades, cobradores e atraso.
       periodCollections.forEach((c) => {
         const key = `${resolveSaleKey(c)}:::${c.documento}`;
-        if (!salesMap.has(key)) {
-          salesMap.set(key, {
+        let s = salesMap.get(key);
+        if (!s) {
+          s = {
             totalValue: 0,
             paidValue: 0,
             discountValue: 0,
             clientDocument: c.documento || "",
-          });
+          };
+          salesMap.set(key, s);
         }
-        const s = salesMap.get(key)!;
-        s.totalValue += Number(c.valor_original || 0);
-        s.paidValue += Number(c.valor_recebido || 0);
-        s.discountValue += Number(c.desconto || 0);
+        const original = Number(c.valor_original || 0);
+        const recebido = Number(c.valor_recebido || 0);
+        const desconto = Number(c.desconto || 0);
+        s.totalValue += original;
+        s.paidValue += recebido;
+        s.discountValue += desconto;
+
+        if (c.cidade)
+          cityCounts.set(c.cidade, (cityCounts.get(c.cidade) || 0) + 1);
+
+        if (c.user_id) {
+          let set = clientsByCollector.get(c.user_id);
+          if (!set) {
+            set = new Set();
+            clientsByCollector.set(c.user_id, set);
+          }
+          set.add(clientKey(c));
+        }
+
+        // ATRASO: saldo em aberto das PARCELAS com vencimento passado
+        // (por parcela, nao por venda, independente do status da origem).
+        const open = original - recebido - desconto;
+        if (open > 0.01 && atrasoDias(c.data_vencimento) > 0) {
+          overdueAmount += open;
+          overdueTitles += 1;
+        }
       });
 
       const salesArray = Array.from(salesMap.values());
@@ -230,72 +289,39 @@ const EnhancedStoreManagement: React.FC = () => {
         totalAmount - pendingAmount - totalDiscount,
       );
 
-      const completedSales = salesArray.filter(
-        (s) => s.totalValue - s.paidValue - s.discountValue <= 0.01,
-      ).length;
+      const openSales = salesArray.filter(
+        (s) => s.totalValue - s.paidValue - s.discountValue > 0.01,
+      );
       const inad = inadimplenciaDe(periodCollections, {
         janelaDias: janelaInad,
+        atrasoDias,
       });
 
-      // ATRASO: saldo em aberto (valor - recebido - desconto) das PARCELAS cujo
-      // vencimento já passou. Calculado por parcela (não por venda) para refletir
-      // o valor efetivamente vencido, independente do status gravado na origem.
-      let overdueAmount = 0;
-      let overdueTitles = 0;
-      periodCollections.forEach((c) => {
-        const open =
-          Number(c.valor_original || 0) -
-          Number(c.valor_recebido || 0) -
-          Number(c.desconto || 0);
-        if (open > 0.01 && calculateOverdueDays(c.data_vencimento) > 0) {
-          overdueAmount += open;
-          overdueTitles += 1;
-        }
-      });
-
-      const allStoreCollections = periodCollections;
-      const cityCounts = new Map<string, number>();
-      allStoreCollections.forEach((c) => {
-        if (c.cidade)
-          cityCounts.set(c.cidade, (cityCounts.get(c.cidade) || 0) + 1);
-      });
       const storeCity =
         Array.from(cityCounts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ||
         "Não informada";
 
-      let assignedCollector = "";
-      const workingCollectors = new Map<string, number>();
-      allStoreCollections.forEach((c) => {
-        if (c.user_id)
-          workingCollectors.set(
-            c.user_id,
-            (workingCollectors.get(c.user_id) || 0) + 1,
-          );
-      });
-      const sortedCollectors = Array.from(workingCollectors.entries()).sort(
-        (a, b) => b[1] - a[1],
-      );
-      if (sortedCollectors.length > 0)
-        assignedCollector = sortedCollectors[0][0];
-
-      const collectorName =
-        collectors.find((c) => c.id === assignedCollector)?.name ||
-        "Não atribuído";
+      const storeCollectors: StoreCollector[] = Array.from(
+        clientsByCollector.entries(),
+      )
+        .map(([id, set]) => ({
+          id,
+          name: userNames.get(id) || "Usuário removido",
+          clients: set.size,
+        }))
+        .sort((a, b) => b.clients - a.clients);
 
       stats.push({
         storeName,
         city: storeCity,
-        assignedCollector,
-        collectorName,
-        isFormalAssignment: false,
-        totalCollections: salesArray.length,
+        citiesCount: cityCounts.size,
+        collectors: storeCollectors,
         titlesCount: periodCollections.length,
         totalSales: salesArray.length,
-        completedSales,
-        pendingSales: salesArray.length - completedSales,
-        clientsWithPending: salesArray.filter(
-          (s) => s.totalValue - s.paidValue - s.discountValue > 0.01,
-        ).length,
+        completedSales: salesArray.length - openSales.length,
+        pendingSales: openSales.length,
+        clientsWithPending: new Set(openSales.map((s) => s.clientDocument))
+          .size,
         totalAmount,
         receivedAmount,
         pendingAmount,
@@ -305,6 +331,7 @@ const EnhancedStoreManagement: React.FC = () => {
         dueAmount: inad.venceu,
         inadNaoPago: inad.naoPago,
         inadimplencia: inad.pct,
+        atrasoRecente: inad.atrasoRecente,
         averageTicket:
           salesArray.length > 0 ? totalAmount / salesArray.length : 0,
         clientsCount: new Set(salesArray.map((s) => s.clientDocument)).size,
@@ -312,7 +339,11 @@ const EnhancedStoreManagement: React.FC = () => {
     });
 
     return stats;
-  }, [availableStores, collectors, sourceCollections, janelaInad]);
+  }, [availableStores, userNames, sourceCollections, janelaInad, atrasoDias]);
+
+  const selectedStoreForModal = selectedStoreName
+    ? (storeStats.find((s) => s.storeName === selectedStoreName) ?? null)
+    : null;
 
   // Ordena as lojas (busca/cobrador/status sao aplicados na fonte via FilterBar).
   const filteredAndSortedStores = useMemo(() => {
@@ -340,14 +371,15 @@ const EnhancedStoreManagement: React.FC = () => {
   // Calculate overview statistics
   const overviewStats = useMemo(() => {
     const totalStores = storeStats.length;
-    const assignedStores = storeStats.filter((s) => s.assignedCollector).length;
+    const assignedStores = storeStats.filter(
+      (s) => s.collectors.length > 0,
+    ).length;
     const unassignedStores = totalStores - assignedStores;
     // Fichas/Vendas: contagem global por cliente (mesma regra de Cobrança e
     // Atribuição). Antes somava o total por loja (s.totalCollections) e
     // duplicava vendas espalhadas em mais de uma loja.
     const totalSales = countVendas(sourceCollections);
     // Títulos/parcelas: total de linhas da fonte (já sem cancelados e filtrado).
-    const totalTitles = sourceCollections.length;
     // Clientes distintos (documento) na fonte filtrada — global, sem duplicar
     // clientes que aparecem em mais de uma loja.
     const totalClients = new Set(
@@ -369,6 +401,7 @@ const EnhancedStoreManagement: React.FC = () => {
     // Inadimplencia geral: soma dos valores (nao media dos % das lojas).
     const inadGeral = inadimplenciaDe(sourceCollections, {
       janelaDias: janelaInad,
+      atrasoDias,
     });
 
     return {
@@ -376,7 +409,6 @@ const EnhancedStoreManagement: React.FC = () => {
       assignedStores,
       unassignedStores,
       totalSales,
-      totalTitles,
       totalClients,
       totalRevenue,
       totalGross,
@@ -384,14 +416,14 @@ const EnhancedStoreManagement: React.FC = () => {
       totalOverdue,
       inadGeral,
     };
-  }, [storeStats, sourceCollections, janelaInad]);
+  }, [storeStats, sourceCollections, janelaInad, atrasoDias]);
 
   const exportStoreData = () => {
     // Headers with better formatting
     const headers = [
       "Loja",
-      "Cobrador",
-      "Status Atribuição",
+      "Cobradores",
+      "Cidades",
       "Total de Títulos",
       "Total de Vendas",
       "Vendas Finalizadas",
@@ -412,12 +444,10 @@ const EnhancedStoreManagement: React.FC = () => {
     // Data rows with proper formatting
     const rows = filteredAndSortedStores.map((s) => [
       s.storeName,
-      s.collectorName,
-      s.isFormalAssignment
-        ? "Formal"
-        : s.assignedCollector
-          ? "Informal"
-          : "Não Atribuído",
+      s.collectors.length
+        ? s.collectors.map((c) => `${c.name} (${c.clients})`).join("; ")
+        : "Sem cobrador",
+      s.citiesCount.toString(),
       s.titlesCount.toString(),
       s.totalSales.toString(),
       s.completedSales.toString(),
@@ -491,21 +521,13 @@ const EnhancedStoreManagement: React.FC = () => {
                 Desempenho Loja
               </h2>
               <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary mt-1 tracking-wide truncate">
-                Performance e status de {overviewStats.totalStores} lojas
-                cadastradas
+                Inadimplência e carteira por loja
               </p>
             </div>
           </div>
 
           {/* Ações Principais */}
           <div className="flex items-center gap-2 shrink-0">
-            {overviewStats.unassignedStores > 0 && (
-              <div className="hidden sm:flex items-center text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 rounded-full font-semibold border border-amber-100 dark:border-amber-900/35">
-                <AlertCircle className="h-3.5 w-3.5 mr-1.5" />
-                {overviewStats.unassignedStores} sem atribuição
-              </div>
-            )}
-
             <button
               onClick={exportStoreData}
               className="flex items-center gap-2 px-3 sm:px-4 py-2 text-gray-700 dark:text-dark-text bg-white dark:bg-dark-bg hover:text-blue-600 hover:dark:text-blue-400 border border-gray-200 dark:border-dark-border rounded-xl transition-all duration-200 text-sm font-medium shadow-sm shrink-0"
@@ -533,21 +555,20 @@ const EnhancedStoreManagement: React.FC = () => {
               </h3>
             </div>
             {overviewStats.unassignedStores > 0 ? (
-              <span className="text-[9px] sm:text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.5 rounded-md tracking-wide border border-amber-150 dark:border-amber-900/30 shrink-0">
-                {overviewStats.unassignedStores} s/ atrib.
+              <span className="text-[9px] sm:text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.5 rounded-md tracking-wide border border-amber-200 dark:border-amber-900/30 shrink-0">
+                {overviewStats.unassignedStores} sem cobrador
               </span>
             ) : (
-              <span className="text-[9px] sm:text-[10px] font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-1.5 py-0.5 rounded-md tracking-wide border border-green-150 dark:border-green-900/30 shrink-0">
+              <span className="text-[9px] sm:text-[10px] font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-1.5 py-0.5 rounded-md tracking-wide border border-green-200 dark:border-green-900/30 shrink-0">
                 OK
               </span>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+          <div className="grid grid-cols-3 gap-x-4 gap-y-3">
             {[
               { label: "Lojas", value: overviewStats.totalStores },
               { label: "Clientes", value: overviewStats.totalClients },
               { label: "Vendas", value: overviewStats.totalSales },
-              { label: "Títulos", value: overviewStats.totalTitles },
             ].map((s) => (
               <div key={s.label} className="min-w-0">
                 <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide truncate">
@@ -583,29 +604,41 @@ const EnhancedStoreManagement: React.FC = () => {
           <p className="text-2xl sm:text-3xl font-extrabold text-green-600 dark:text-green-400 tracking-tight truncate mb-3">
             {formatCurrency(overviewStats.totalRevenue)}
           </p>
-          {/* Apoios: Em aberto · A vencer (o atrasado/nao pago fica no card
-              Inadimplencia, para nao repetir o mesmo numero). */}
-          <div className="grid grid-cols-2 gap-x-4 pt-3 border-t border-gray-100 dark:border-dark-border">
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold text-amber-600/80 dark:text-amber-400/80 tracking-wide truncate">
+          {/* Em aberto e como ele se divide (vencido + a vencer). O
+              vencido aqui e todo atraso, de 1 dia em diante; a
+              inadimplencia ao lado so conta acima de 30 dias. */}
+          <div className="pt-3 border-t border-gray-100 dark:border-dark-border space-y-1 text-[11px] font-medium">
+            <div className="flex justify-between gap-2">
+              <span className="text-gray-500 dark:text-dark-text-secondary">
                 Em aberto
-              </p>
-              <p className="text-sm font-bold text-amber-600 dark:text-amber-400 tracking-tight truncate">
+              </span>
+              <span className="font-bold text-amber-600 dark:text-amber-400 truncate">
                 {formatCurrency(overviewStats.totalPending)}
-              </p>
+              </span>
             </div>
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide truncate">
-                A vencer
-              </p>
-              <p className="text-sm font-bold text-gray-700 dark:text-dark-text tracking-tight truncate">
+            <div
+              className="flex justify-between gap-2 pl-3"
+              title="Saldo das parcelas com vencimento já passado (qualquer atraso)"
+            >
+              <span className="text-gray-400 dark:text-dark-text-secondary">
+                vencido
+              </span>
+              <span className="font-semibold text-red-600 dark:text-red-400 truncate">
+                {formatCurrency(overviewStats.totalOverdue)}
+              </span>
+            </div>
+            <div className="flex justify-between gap-2 pl-3">
+              <span className="text-gray-400 dark:text-dark-text-secondary">
+                a vencer
+              </span>
+              <span className="font-semibold text-gray-700 dark:text-dark-text truncate">
                 {formatCurrency(
                   Math.max(
                     0,
                     overviewStats.totalPending - overviewStats.totalOverdue,
                   ),
                 )}
-              </p>
+              </span>
             </div>
           </div>
         </div>
@@ -679,10 +712,10 @@ const EnhancedStoreManagement: React.FC = () => {
             </div>
             <div
               className="flex justify-between gap-2"
-              title="Do esperado, o que entrou (descontos concedidos contam como resolvidos)"
+              title="Do esperado, o que entrou (descontos concedidos contam como resolvidos). Não é o mesmo que o Recebido ao lado, que soma tudo o que entrou."
             >
               <span className="text-gray-500 dark:text-dark-text-secondary">
-                Pago
+                Pago do esperado
               </span>
               <span className="font-semibold text-green-600 dark:text-green-400 truncate">
                 {formatCurrency(
@@ -767,29 +800,39 @@ const EnhancedStoreManagement: React.FC = () => {
       {/* Lista de Lojas com Cards Aprimorados */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-6 p-1">
         {filteredAndSortedStores.map((store) => {
-          const isUnassigned = !store.assignedCollector;
+          const isUnassigned = store.collectors.length === 0;
 
           const cor =
             COR_NIVEL[
               isUnassigned ? "sem" : nivelInadimplencia(store.inadimplencia)
             ];
-          const statusBgColor = cor.bg;
-          const statusTextColor = cor.text;
-          const statusBgLight = cor.light;
-          const statusBorderColor = cor.border;
+          // Inadimplencia aparece UMA vez no card (a etiqueta); a barra so
+          // mostra os valores de onde ela sai.
+          const inadTexto = formatarInadimplencia(
+            store.inadimplencia,
+            store.dueAmount,
+          );
+          const inadDica = `Inadimplência: ${formatCurrency(store.inadNaoPago)} não pago de ${formatCurrency(store.dueAmount)} esperado (atraso > ${INADIMPLENCIA_CORTE_DIAS} dias)`;
+          const temVencido = store.overdueAmount > 0.01;
+          const cidades =
+            store.citiesCount > 1
+              ? `${store.city} +${store.citiesCount - 1} ${store.citiesCount === 2 ? "cidade" : "cidades"}`
+              : store.city;
+          const cobradores = nomesCobradores(store.collectors);
 
           return (
-            <div
+            <button
+              type="button"
               key={store.storeName}
-              onClick={() => setSelectedStoreForModal(store)}
-              className="group bg-white dark:bg-dark-bg-secondary rounded-2xl border border-gray-100 dark:border-dark-border p-3 sm:p-5 hover:-translate-y-1 hover:shadow-lg hover:shadow-gray-250/20 dark:hover:shadow-black/20 transition-all duration-300 cursor-pointer flex flex-col justify-between"
+              onClick={() => setSelectedStoreName(store.storeName)}
+              className="group text-left w-full bg-white dark:bg-dark-bg-secondary rounded-2xl border border-gray-100 dark:border-dark-border p-3 sm:p-5 hover:-translate-y-1 hover:shadow-lg hover:shadow-gray-200/20 dark:hover:shadow-black/20 transition-all duration-300 cursor-pointer flex flex-col justify-between"
             >
               {/* MOBILE: linha compacta (detalhe completo no modal ao tocar) */}
-              <div className="sm:hidden flex items-center gap-3">
+              <div className="sm:hidden flex items-center gap-3 w-full">
                 <div
-                  className={`p-2 rounded-lg ${statusBgLight} border ${statusBorderColor} shrink-0`}
+                  className={`p-2 rounded-lg ${cor.light} border ${cor.border} shrink-0`}
                 >
-                  <Store className={`h-4 w-4 ${statusTextColor}`} />
+                  <Store className={`h-4 w-4 ${cor.text}`} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
@@ -797,210 +840,125 @@ const EnhancedStoreManagement: React.FC = () => {
                       {store.storeName}
                     </h4>
                     <span
-                      className={`text-xs font-bold shrink-0 ${statusTextColor}`}
-                      title="Inadimplência: do que já venceu, não foi pago"
+                      className={`text-xs font-bold shrink-0 ${cor.text}`}
+                      title={inadDica}
                     >
-                      {formatarInadimplencia(store.inadimplencia, store.dueAmount)}
+                      {inadTexto}
                     </span>
                   </div>
-                  <p className="flex items-center gap-1 mt-0.5 text-[11px] text-gray-400 dark:text-dark-text-secondary truncate">
-                    <MapPin className="h-3 w-3 shrink-0" />
-                    {store.city}
+                  <p
+                    className={`mt-0.5 text-[11px] truncate ${isUnassigned ? "font-semibold text-amber-600 dark:text-amber-400" : "text-gray-400 dark:text-dark-text-secondary"}`}
+                  >
+                    {cobradores}
                   </p>
-                  {!isUnassigned ? (
-                    <>
-                      <p className="mt-1 text-[11px] font-semibold truncate">
-                        <span className="text-green-600 dark:text-green-400">
-                          {formatCurrency(store.receivedAmount)}
-                        </span>
+                  <p className="mt-1 text-[11px] font-semibold truncate">
+                    <span className="text-amber-600 dark:text-amber-400">
+                      {formatCurrency(store.pendingAmount)} em aberto
+                    </span>
+                    {temVencido && (
+                      <>
                         <span className="text-gray-300 dark:text-gray-600 mx-1.5">
                           ·
                         </span>
-                        <span
-                          className={
-                            store.overdueAmount > 0.01
-                              ? "text-red-600 dark:text-red-400"
-                              : "text-gray-400 dark:text-dark-text-secondary"
-                          }
-                        >
-                          {formatCurrency(store.overdueAmount)} atras.
+                        <span className="text-red-600 dark:text-red-400">
+                          {formatCurrency(store.overdueAmount)} vencido
                         </span>
-                      </p>
-                      <p className="mt-0.5 text-[10px] font-medium text-gray-400 dark:text-dark-text-secondary truncate">
-                        {store.titlesCount} títulos · {store.totalSales} vendas
-                        · {store.clientsCount} clientes
-                      </p>
-                    </>
-                  ) : (
-                    <p className="mt-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3 shrink-0" />
-                      Sem cobrador atribuído
-                    </p>
-                  )}
+                      </>
+                    )}
+                  </p>
                 </div>
                 <ChevronRight className="h-4 w-4 text-gray-300 dark:text-gray-600 shrink-0" />
               </div>
 
               {/* DESKTOP: card completo */}
-              <div className="hidden sm:block">
-                {/* Header do Card */}
-                <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="hidden sm:block w-full">
+                {/* Cabeçalho: loja, onde atende e a inadimplência */}
+                <div className="flex items-start justify-between gap-3 mb-3">
                   <div className="flex items-center gap-3 min-w-0">
                     <div
-                      className={`p-2.5 rounded-xl ${statusBgLight} border ${statusBorderColor} transition-colors shrink-0`}
+                      className={`p-2.5 rounded-xl ${cor.light} border ${cor.border} transition-colors shrink-0`}
                     >
-                      <Store className={`h-5 w-5 ${statusTextColor}`} />
+                      <Store className={`h-5 w-5 ${cor.text}`} />
                     </div>
                     <div className="min-w-0">
-                      <h4 className="text-sm sm:text-base font-bold text-gray-900 dark:text-dark-text truncate leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                      <h4 className="text-base font-bold text-gray-900 dark:text-dark-text truncate leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                         {store.storeName}
                       </h4>
-                      <p className="text-xs text-gray-400 dark:text-dark-text-secondary mt-1 flex items-center">
-                        <MapPin className="h-3.5 w-3.5 mr-1 shrink-0 text-gray-400 dark:text-dark-text-secondary" />
-                        {store.city}
+                      <p className="text-xs text-gray-400 dark:text-dark-text-secondary mt-1 flex items-center min-w-0">
+                        <MapPin className="h-3.5 w-3.5 mr-1 shrink-0" />
+                        <span className="truncate">{cidades}</span>
                       </p>
                     </div>
                   </div>
-
-                  {/* Inadimplencia da loja como Pill Tag */}
                   <div
-                    className={`inline-flex items-center px-2.5 py-1 rounded-xl text-xs font-bold ${statusTextColor} ${statusBgLight} border ${statusBorderColor} shrink-0`}
-                    title="Inadimplência: do que já venceu, não foi pago"
+                    className={`inline-flex items-center px-2.5 py-1 rounded-xl text-xs font-bold ${cor.text} ${cor.light} border ${cor.border} shrink-0`}
+                    title={inadDica}
                   >
-                    {formatarInadimplencia(store.inadimplencia, store.dueAmount)}
+                    {inadTexto}
                   </div>
                 </div>
 
-                {/* Info do Cobrador */}
-                <div className="flex items-center justify-between gap-2 mb-4 bg-gray-50/50 dark:bg-dark-bg/25 px-3 py-2 rounded-xl border border-gray-100/50 dark:border-dark-border/40 min-w-0">
-                  <span className="text-xs text-gray-500 dark:text-dark-text-secondary truncate">
-                    Cobrador:{" "}
-                    <span className="font-semibold text-gray-700 dark:text-dark-text">
-                      {store.collectorName}
+                {/* Quem cobra */}
+                <p
+                  className={`flex items-center gap-1.5 text-xs mb-3 min-w-0 ${isUnassigned ? "font-semibold text-amber-600 dark:text-amber-400" : "text-gray-500 dark:text-dark-text-secondary"}`}
+                  title={store.collectors
+                    .map((c) => `${c.name}: ${c.clients} clientes`)
+                    .join("\n")}
+                >
+                  <Users className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{cobradores}</span>
+                </p>
+
+                {/* Carteira: em aberto (e quanto dele venceu) + recebido */}
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <div className="p-2.5 rounded-xl border bg-amber-50/30 dark:bg-amber-950/10 border-amber-100/40 dark:border-amber-900/20 min-w-0">
+                    <span className="text-[9px] font-bold tracking-wider uppercase block mb-0.5 text-amber-700 dark:text-amber-400">
+                      Em aberto
                     </span>
-                  </span>
-                  {store.isFormalAssignment && !isUnassigned && (
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 shrink-0">
-                      Formal
-                    </span>
-                  )}
-                </div>
-
-                {!isUnassigned ? (
-                  <>
-                    {/* Contagens agrupadas em um único elemento */}
-                    <div className="flex items-center justify-around mb-3 py-2 bg-gray-50/60 dark:bg-dark-bg/40 rounded-xl border border-gray-100/50 dark:border-dark-border/30 divide-x divide-gray-100 dark:divide-dark-border/50">
-                      {[
-                        { label: "Títulos", value: store.titlesCount },
-                        { label: "Vendas", value: store.totalSales },
-                        { label: "Clientes", value: store.clientsCount },
-                      ].map((c) => (
-                        <div key={c.label} className="flex-1 text-center px-1">
-                          <span className="text-[8px] font-bold text-gray-400 dark:text-dark-text-secondary tracking-wider uppercase block">
-                            {c.label}
-                          </span>
-                          <div className="text-sm font-extrabold text-gray-900 dark:text-dark-text">
-                            {c.value}
-                          </div>
-                        </div>
-                      ))}
+                    <div className="text-sm font-extrabold truncate text-amber-600 dark:text-amber-400">
+                      {formatCurrency(store.pendingAmount)}
                     </div>
-
-                    {/* Grid de Valores: Recebido · Pendente · Atrasado · Ticket */}
-                    <div className="grid grid-cols-2 gap-2 mb-4">
-                      <div className="p-2.5 bg-green-50/30 dark:bg-green-950/10 rounded-xl border border-green-100/20 dark:border-green-900/10">
-                        <span className="text-[9px] font-bold text-green-700 dark:text-green-400 tracking-wider uppercase block mb-0.5">
-                          Recebido
-                        </span>
-                        <div className="text-xs sm:text-sm font-extrabold text-green-600 dark:text-green-400 truncate">
-                          {formatCurrency(store.receivedAmount)}
-                        </div>
-                      </div>
-                      <div
-                        className={`p-2.5 rounded-xl border ${store.pendingAmount > 0.01 ? "bg-amber-50/30 dark:bg-amber-950/10 border-amber-100/20 dark:border-amber-900/10" : "bg-gray-50/30 dark:bg-dark-bg/30 border-gray-100/20 dark:border-dark-border/10"}`}
-                      >
-                        <span
-                          className={`text-[9px] font-bold tracking-wider uppercase block mb-0.5 ${store.pendingAmount > 0.01 ? "text-amber-700 dark:text-amber-400" : "text-gray-405 dark:text-dark-text-secondary"}`}
-                        >
-                          Em Aberto
-                        </span>
-                        <div
-                          className={`text-xs sm:text-sm font-extrabold truncate ${store.pendingAmount > 0.01 ? "text-amber-600 dark:text-amber-400" : "text-gray-400 dark:text-dark-text-secondary"}`}
-                        >
-                          {formatCurrency(store.pendingAmount)}
-                        </div>
-                      </div>
-                      <div
-                        className={`p-2.5 rounded-xl border ${store.overdueAmount > 0.01 ? "bg-red-50/30 dark:bg-red-950/10 border-red-100/20 dark:border-red-900/10" : "bg-gray-50/30 dark:bg-dark-bg/30 border-gray-100/20 dark:border-dark-border/10"}`}
-                      >
-                        <span
-                          className={`text-[9px] font-bold tracking-wider uppercase mb-0.5 flex items-center gap-1 ${store.overdueAmount > 0.01 ? "text-red-700 dark:text-red-400" : "text-gray-405 dark:text-dark-text-secondary"}`}
-                        >
-                          Atrasado
-                          {store.overdueTitles > 0 && (
-                            <span className="font-normal normal-case tracking-normal">
-                              ({store.overdueTitles})
-                            </span>
-                          )}
-                        </span>
-                        <div
-                          className={`text-xs sm:text-sm font-extrabold truncate ${store.overdueAmount > 0.01 ? "text-red-600 dark:text-red-400" : "text-gray-400 dark:text-dark-text-secondary"}`}
-                        >
-                          {formatCurrency(store.overdueAmount)}
-                        </div>
-                      </div>
-                      <div className="p-2.5 bg-purple-50/30 dark:bg-purple-950/10 rounded-xl border border-purple-100/20 dark:border-purple-900/10">
-                        <span className="text-[9px] font-bold text-purple-700 dark:text-purple-400 tracking-wider uppercase block mb-0.5">
-                          Ticket Médio
-                        </span>
-                        <div className="text-xs sm:text-sm font-extrabold text-purple-600 dark:text-purple-400 truncate">
-                          {formatCurrency(store.averageTicket)}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Barra: inadimplencia (do que venceu, quanto nao foi pago) */}
-                    <div className="mt-3">
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-[10px] font-semibold tracking-wide text-gray-400 dark:text-dark-text-secondary truncate">
-                          Inadimplência · {formatCurrencyCompact(store.inadNaoPago)}{" "}
-                          não pago de {formatCurrencyCompact(store.dueAmount)}{" "}
-                          esperado
-                        </span>
-                        <span
-                          className={`text-xs font-bold ${statusTextColor}`}
-                        >
-                          {formatarInadimplencia(store.inadimplencia, store.dueAmount, 0)}
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-100 dark:bg-dark-bg rounded-full h-1.5">
-                        <div
-                          className={`h-1.5 rounded-full ${statusBgColor} transition-all duration-1000 ease-out`}
-                          style={{
-                            width: `${Math.min(store.inadimplencia, 100)}%`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  /* Unassigned Store State - Compacto e elegante */
-                  <div className="bg-amber-50/50 dark:bg-amber-900/10 rounded-xl p-4 border border-dashed border-amber-200 dark:border-amber-900/30 text-amber-800 dark:text-amber-300">
-                    <div className="flex items-start gap-3">
-                      <AlertCircle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
-                      <div>
-                        <div className="font-bold text-xs tracking-wide mb-0.5 text-amber-800 dark:text-amber-400">
-                          Pendente
-                        </div>
-                        <div className="text-xs text-gray-500 dark:text-dark-text-secondary">
-                          Sem cobrador atribuído à unidade.
-                        </div>
-                      </div>
+                    <div
+                      className={`text-[10px] font-semibold truncate ${temVencido ? "text-red-600 dark:text-red-400" : "text-gray-400 dark:text-dark-text-secondary"}`}
+                      title="Saldo das parcelas com vencimento já passado (qualquer atraso)"
+                    >
+                      {temVencido
+                        ? `${formatCurrency(store.overdueAmount)} vencido (${store.overdueTitles} tít.)`
+                        : "nada vencido"}
                     </div>
                   </div>
-                )}
+                  <div className="p-2.5 bg-green-50/30 dark:bg-green-950/10 rounded-xl border border-green-100/40 dark:border-green-900/20 min-w-0">
+                    <span className="text-[9px] font-bold text-green-700 dark:text-green-400 tracking-wider uppercase block mb-0.5">
+                      Recebido
+                    </span>
+                    <div className="text-sm font-extrabold text-green-600 dark:text-green-400 truncate">
+                      {formatCurrency(store.receivedAmount)}
+                    </div>
+                    <div className="text-[10px] font-medium text-gray-400 dark:text-dark-text-secondary truncate">
+                      {store.clientsCount.toLocaleString("pt-BR")} clientes ·{" "}
+                      {store.totalSales.toLocaleString("pt-BR")} vendas
+                    </div>
+                  </div>
+                </div>
+
+                {/* Barra da inadimplência: de onde sai o % da etiqueta */}
+                <div>
+                  <p className="text-[10px] font-semibold tracking-wide text-gray-400 dark:text-dark-text-secondary truncate mb-1">
+                    {store.dueAmount > 0
+                      ? `${formatCurrencyCompact(store.inadNaoPago)} não pago de ${formatCurrencyCompact(store.dueAmount)} esperado`
+                      : `Nada venceu há mais de ${INADIMPLENCIA_CORTE_DIAS} dias`}
+                  </p>
+                  <div className="w-full bg-gray-100 dark:bg-dark-bg rounded-full h-1.5">
+                    <div
+                      className={`h-1.5 rounded-full ${cor.bg} transition-all duration-1000 ease-out`}
+                      style={{
+                        width: `${Math.min(store.inadimplencia, 100)}%`,
+                      }}
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
@@ -1036,7 +994,10 @@ const EnhancedStoreManagement: React.FC = () => {
         <StoreDetailModal
           store={selectedStoreForModal}
           storeCollections={selectedStoreCollections}
-          onClose={() => setSelectedStoreForModal(null)}
+          recorteTexto={descricaoRecorteInadimplencia(recorteInad)}
+          atrasoDias={atrasoDias}
+          userNames={userNames}
+          onClose={() => setSelectedStoreName(null)}
         />
       )}
     </div>
@@ -1047,228 +1008,185 @@ interface StoreDetailModalProps {
   store: StoreStats;
   /** Collections da loja JÁ filtradas (herdadas da página) — fonte única do modal. */
   storeCollections: Collection[];
+  /** Texto do recorte da inadimplencia (12 meses, tudo ou filtro). */
+  recorteTexto: string;
+  /** Mesmo calculo de atraso (com cache) da pagina. */
+  atrasoDias: (vencimento: string | null | undefined) => number;
+  userNames: Map<string, string>;
   onClose: () => void;
 }
 
+/** Cliente da lista "Quem deve" do modal (so quem tem saldo em aberto). */
+interface StoreDebtor {
+  key: string;
+  name: string;
+  document: string;
+  city: string;
+  /** Cobrador da carteira (o que tem mais titulos em aberto do cliente). */
+  collectorId: string;
+  sales: number;
+  pending: number;
+  overdue: number;
+  /** Maior atraso entre as parcelas vencidas com saldo. */
+  maxDays: number;
+}
+
+const SEM_COBRADOR = "__sem__";
+
+// Modal da loja (16/11): o card ja compara as lojas; o modal responde "quem
+// deve nesta loja e quem cobra". Saude (inadimplencia, no recorte dela) e
+// carteira (hoje) em blocos separados para nao misturar bases de tempo.
 const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
   store,
   storeCollections,
+  recorteTexto,
+  atrasoDias,
+  userNames,
   onClose,
 }) => {
-  // Alterna entre a visão geográfica (cidades) e a visão de clientes/vendas.
-  const [detailView, setDetailView] = useState<"cities" | "clients">("clients");
-  // Clientes expandidos (para revelar as vendas de cada um).
-  const [expandedClients, setExpandedClients] = useState<Set<string>>(
-    new Set(),
-  );
-
-  // Lista de clientes: filtros + paginacao. Renderizar todos de uma vez (lojas
-  // com milhares de clientes) era o que travava a abertura do modal.
+  const { getClientGroups } = useCollection();
   const PAGE_SIZE = 20;
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<
-    "" | "pendente" | "parcial" | "pago"
-  >("");
-  const [cityFilter, setCityFilter] = useState("");
+  const [collectorFilter, setCollectorFilter] = useState("");
   const [onlyOverdue, setOnlyOverdue] = useState(false);
-  const [clientSort, setClientSort] = useState<"pending" | "overdue" | "name">(
-    "pending",
-  );
-  const [clientPage, setClientPage] = useState(1);
-  const [cityPage, setCityPage] = useState(1);
+  const [page, setPage] = useState(1);
+  // Ficha aberta por cima: o modal da loja fica escondido (montado, volta
+  // igual ao fechar) -- um modal por vez.
+  const [ficha, setFicha] = useState<ClientGroup | null>(null);
 
   useEffect(() => {
-    setClientPage(1);
-  }, [search, statusFilter, cityFilter, onlyOverdue, clientSort]);
+    setPage(1);
+  }, [search, collectorFilter, onlyOverdue]);
 
-  const toggleClient = (key: string) =>
-    setExpandedClients((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-
-  const cityBreakdown = useMemo(() => {
-    const breakdown: Record<
-      string,
-      {
-        city: string;
-        clients: Set<string>;
-        sales: Set<string>;
-        totalAmount: number;
-        receivedAmount: number;
-        discountAmount: number;
-      }
-    > = {};
-
-    storeCollections.forEach((c) => {
-      const city = c.cidade || "Não informada";
-      if (!breakdown[city]) {
-        breakdown[city] = {
-          city,
-          clients: new Set(),
-          sales: new Set(),
-          totalAmount: 0,
-          receivedAmount: 0,
-          discountAmount: 0,
-        };
-      }
-
-      if (c.documento) breakdown[city].clients.add(c.documento);
-      breakdown[city].sales.add(`${resolveSaleKey(c)}-${c.documento}`);
-
-      breakdown[city].totalAmount += Number(c.valor_original || 0);
-      breakdown[city].receivedAmount += Number(c.valor_recebido || 0);
-      breakdown[city].discountAmount += Number(c.desconto || 0);
-    });
-
-    return Object.values(breakdown).sort((a, b) =>
-      a.city.localeCompare(b.city),
-    );
-  }, [storeCollections]);
-
-  // Agrupa por CLIENTE e, dentro de cada cliente, por VENDA (venda_n). Mesmas
-  // regras de saldo/atraso usadas nos cards, aplicadas à fonte já filtrada.
-  const clientBreakdown = useMemo(() => {
+  // Uma passada pelos titulos da loja: agrupa por cliente.
+  const { debtors, paidClients } = useMemo(() => {
     const byClient = new Map<
       string,
       {
-        key: string;
         name: string;
         document: string;
         city: string;
-        rows: Collection[];
-        sales: Map<string, Collection[]>;
+        sales: Set<string>;
+        pending: number;
+        overdue: number;
+        maxDays: number;
+        openByCollector: Map<string, number>;
       }
     >();
-
     storeCollections.forEach((c) => {
       const key = clientKey(c);
       if (!key) return;
-      if (!byClient.has(key)) {
-        byClient.set(key, {
-          key,
+      let e = byClient.get(key);
+      if (!e) {
+        e = {
           name: c.cliente || c.documento || "Sem nome",
           document: c.documento || "",
-          city: c.cidade || "Não informada",
-          rows: [],
-          sales: new Map(),
-        });
+          city: c.cidade || "",
+          sales: new Set(),
+          pending: 0,
+          overdue: 0,
+          maxDays: 0,
+          openByCollector: new Map(),
+        };
+        byClient.set(key, e);
       }
-      const entry = byClient.get(key)!;
-      entry.rows.push(c);
-      const rk = resolveSaleKey(c);
-      const saleKey = rk === 0 ? "sem-venda" : String(rk);
-      if (!entry.sales.has(saleKey)) entry.sales.set(saleKey, []);
-      entry.sales.get(saleKey)!.push(c);
+      e.sales.add(String(resolveSaleKey(c)));
+      const open =
+        Number(c.valor_original || 0) -
+        Number(c.valor_recebido || 0) -
+        Number(c.desconto || 0);
+      if (open <= 0.01) return;
+      e.pending += open;
+      const cob = c.user_id || SEM_COBRADOR;
+      e.openByCollector.set(cob, (e.openByCollector.get(cob) || 0) + 1);
+      const dias = atrasoDias(c.data_vencimento);
+      if (dias > 0) {
+        e.overdue += open;
+        if (dias > e.maxDays) e.maxDays = dias;
+      }
     });
 
-    const summarize = (rows: Collection[]) => {
-      const gross = rows.reduce((s, c) => s + Number(c.valor_original || 0), 0);
-      const received = rows.reduce(
-        (s, c) => s + Number(c.valor_recebido || 0),
-        0,
-      );
-      const discount = rows.reduce((s, c) => s + Number(c.desconto || 0), 0);
-      const pending = Math.max(0, gross - received - discount);
-      let overdue = 0;
-      rows.forEach((c) => {
-        const open =
-          Number(c.valor_original || 0) -
-          Number(c.valor_recebido || 0) -
-          Number(c.desconto || 0);
-        if (open > 0.01 && calculateOverdueDays(c.data_vencimento) > 0) {
-          overdue += open;
-        }
+    const list: StoreDebtor[] = [];
+    let paid = 0;
+    byClient.forEach((e, key) => {
+      if (e.pending <= 0.01) {
+        paid += 1;
+        return;
+      }
+      const collectorId =
+        Array.from(e.openByCollector.entries()).sort(
+          (a, b) => b[1] - a[1],
+        )[0]?.[0] ?? SEM_COBRADOR;
+      list.push({
+        key,
+        name: e.name,
+        document: e.document,
+        city: e.city,
+        collectorId,
+        sales: e.sales.size,
+        pending: e.pending,
+        overdue: e.overdue,
+        maxDays: e.maxDays,
       });
-      return { gross, received, pending, overdue, titles: rows.length };
-    };
+    });
+    list.sort((a, b) => b.overdue - a.overdue || b.pending - a.pending);
+    return { debtors: list, paidClients: paid };
+  }, [storeCollections, atrasoDias]);
 
-    return Array.from(byClient.values())
-      .map((entry) => ({
-        key: entry.key,
-        name: entry.name,
-        document: entry.document,
-        city: entry.city,
-        status: getClientPaymentStatus(entry.rows),
-        clientPending: getClientPending(entry.rows),
-        ...summarize(entry.rows),
-        sales: Array.from(entry.sales.entries())
-          .map(([venda, rows]) => ({
-            venda,
-            ...summarize(rows),
-          }))
-          .sort((a, b) => b.gross - a.gross),
+  // Cobradores de quem deve (chips que filtram a lista).
+  const collectorChips = useMemo(() => {
+    const count = new Map<string, number>();
+    debtors.forEach((d) =>
+      count.set(d.collectorId, (count.get(d.collectorId) || 0) + 1),
+    );
+    return Array.from(count.entries())
+      .map(([id, n]) => ({
+        id,
+        name:
+          id === SEM_COBRADOR
+            ? "Sem cobrador"
+            : userNames.get(id) || "Usuário removido",
+        count: n,
       }))
-      .sort((a, b) => b.pending - a.pending || b.gross - a.gross);
-  }, [storeCollections]);
+      .sort((a, b) =>
+        a.id === SEM_COBRADOR ? 1 : b.id === SEM_COBRADOR ? -1 : b.count - a.count,
+      );
+  }, [debtors, userNames]);
 
-  const filteredClients = useMemo(() => {
+  const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    const list = clientBreakdown.filter((c) => {
-      if (statusFilter && c.status !== statusFilter) return false;
-      if (cityFilter && c.city !== cityFilter) return false;
-      if (onlyOverdue && c.overdue <= 0.01) return false;
+    return debtors.filter((d) => {
+      if (collectorFilter && d.collectorId !== collectorFilter) return false;
+      if (onlyOverdue && d.overdue <= 0.01) return false;
       if (!term) return true;
       return (
-        c.name.toLowerCase().includes(term) ||
-        documentoCombina(c.document, term)
+        d.name.toLowerCase().includes(term) ||
+        d.city.toLowerCase().includes(term) ||
+        documentoCombina(d.document, term)
       );
     });
-    if (clientSort === "name") {
-      return [...list].sort((a, b) => a.name.localeCompare(b.name));
-    }
-    if (clientSort === "overdue") {
-      return [...list].sort((a, b) => b.overdue - a.overdue);
-    }
-    return list; // clientBreakdown ja vem por maior em aberto
-  }, [
-    clientBreakdown,
-    search,
-    statusFilter,
-    cityFilter,
-    onlyOverdue,
-    clientSort,
-  ]);
+  }, [debtors, search, collectorFilter, onlyOverdue]);
 
-  const pagedClients = filteredClients.slice(
-    (clientPage - 1) * PAGE_SIZE,
-    clientPage * PAGE_SIZE,
-  );
-  const pagedCities = cityBreakdown.slice(
-    (cityPage - 1) * PAGE_SIZE,
-    cityPage * PAGE_SIZE,
-  );
-  const hasClientFilters =
-    !!search || !!statusFilter || !!cityFilter || onlyOverdue;
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const hasFilters = !!search || !!collectorFilter || onlyOverdue;
 
-  const nivel = nivelInadimplencia(store.inadimplencia);
-  const statusColor = !store.assignedCollector
-    ? "amber"
-    : nivel === "baixa"
-      ? "green"
-      : nivel === "media"
-        ? "blue"
-        : "red";
+  // Ficha pelo documento (mesma base da Cobrancas e da Conferencia;
+  // getClientGroups tem cache no contexto).
+  const abrirFicha = (d: StoreDebtor) => {
+    if (!d.document) return;
+    const grupo = getClientGroups().find(
+      (g) => g.document === d.document,
+    );
+    if (grupo) setFicha(grupo);
+  };
 
-  const statusBgLight =
-    statusColor === "amber"
-      ? "bg-amber-50 dark:bg-amber-900/20"
-      : statusColor === "green"
-        ? "bg-green-50 dark:bg-green-900/20"
-        : statusColor === "blue"
-          ? "bg-blue-50 dark:bg-blue-900/20"
-          : "bg-red-50 dark:bg-red-900/20";
-
-  const statusTextColor =
-    statusColor === "amber"
-      ? "text-amber-600 dark:text-amber-400"
-      : statusColor === "green"
-        ? "text-green-600 dark:text-green-400"
-        : statusColor === "blue"
-          ? "text-blue-600 dark:text-blue-400"
-          : "text-red-600 dark:text-red-400";
+  const cor =
+    COR_NIVEL[
+      store.collectors.length === 0
+        ? "sem"
+        : nivelInadimplencia(store.inadimplencia)
+    ];
+  const aVencer = Math.max(0, store.pendingAmount - store.overdueAmount);
 
   // Boas práticas de modal: trava o scroll do fundo enquanto aberto.
   useEffect(() => {
@@ -1279,576 +1197,312 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
     };
   }, []);
 
-  // Fecha com a tecla ESC.
+  // Fecha com a tecla ESC (nao enquanto a Ficha estiver por cima).
   useEffect(() => {
+    if (ficha) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, ficha]);
 
   return createPortal(
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="store-modal-title"
-      onMouseDown={onClose}
-      className="fixed inset-0 bg-black/50 flex items-center justify-center p-2 sm:p-4 z-50 animate-in fade-in duration-300"
-    >
+    <>
       <div
-        onMouseDown={(e) => e.stopPropagation()}
-        className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 border border-gray-100 dark:border-dark-border relative"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="store-modal-title"
+        onMouseDown={onClose}
+        className={`fixed inset-0 bg-black/50 items-center justify-center p-2 sm:p-4 z-50 animate-in fade-in duration-300 ${ficha ? "hidden" : "flex"}`}
       >
-        {/* Header Elegante */}
-        <div className="p-4 sm:p-6 border-b border-gray-100 dark:border-dark-border flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gray-50 dark:bg-dark-bg">
-          <div className="flex items-center gap-3 sm:gap-4 min-w-0 pr-10 sm:pr-0">
-            <div
-              className={`h-12 w-12 sm:h-14 sm:w-14 rounded-xl ${statusBgLight} flex items-center justify-center shrink-0`}
-            >
-              <Store className={`h-6 w-6 sm:h-7 sm:w-7 ${statusTextColor}`} />
-            </div>
-            <div className="min-w-0">
-              <h3
-                id="store-modal-title"
-                className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight truncate"
-              >
-                {store.storeName}
-              </h3>
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1">
-                <span className="flex items-center text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">
-                  <MapPin className="h-3.5 w-3.5 mr-1 shrink-0 text-gray-400 dark:text-dark-text-secondary" />
-                  {store.city}
-                </span>
-                <span className="text-gray-300 dark:text-gray-600 hidden sm:inline">
-                  •
-                </span>
-                <span className="text-xs font-semibold text-gray-600 dark:text-dark-text-secondary">
-                  Operador:{" "}
-                  <span className="text-blue-600 dark:text-blue-400 font-semibold">
-                    {store.collectorName}
-                  </span>
-                </span>
-              </div>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Fechar"
-            className="absolute top-4 right-4 sm:relative sm:top-0 sm:right-0 h-10 w-10 flex items-center justify-center bg-gray-100 hover:bg-red-50 hover:text-red-500 dark:bg-dark-bg dark:hover:bg-red-950/20 dark:hover:text-red-400 text-gray-500 dark:text-dark-text-secondary rounded-xl transition-all active:scale-95 group"
-          >
-            <X className="h-5 w-5 transition-transform group-hover:rotate-90" />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1 minimal-scrollbar bg-white dark:bg-dark-bg-secondary">
-          {/* Faixa de Contagens */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4">
-            {[
-              { label: "Títulos", value: store.titlesCount },
-              { label: "Vendas / Fichas", value: store.totalSales },
-              { label: "Clientes", value: store.clientsCount },
-              {
-                label: "Fichas Quitadas",
-                value: `${store.completedSales}/${store.totalSales}`,
-              },
-            ].map((c) => (
+        <div
+          onMouseDown={(e) => e.stopPropagation()}
+          className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 border border-gray-100 dark:border-dark-border"
+        >
+          {/* Cabeçalho */}
+          <div className="p-4 sm:p-5 border-b border-gray-100 dark:border-dark-border flex items-center justify-between gap-3 bg-gray-50 dark:bg-dark-bg">
+            <div className="flex items-center gap-3 min-w-0">
               <div
-                key={c.label}
-                className="p-3 sm:p-4 bg-gray-50 dark:bg-dark-bg rounded-2xl border border-gray-100 dark:border-dark-border text-center"
+                className={`h-11 w-11 rounded-xl ${cor.light} flex items-center justify-center shrink-0`}
               >
-                <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary tracking-wider uppercase mb-1 truncate">
-                  {c.label}
-                </p>
-                <p className="text-base sm:text-xl font-extrabold text-gray-900 dark:text-dark-text tracking-tight">
-                  {typeof c.value === "number"
-                    ? c.value.toLocaleString("pt-BR")
-                    : c.value}
+                <Store className={`h-6 w-6 ${cor.text}`} />
+              </div>
+              <div className="min-w-0">
+                <h3
+                  id="store-modal-title"
+                  className="text-lg sm:text-xl font-bold text-gray-900 dark:text-dark-text tracking-tight truncate"
+                >
+                  {store.storeName}
+                </h3>
+                <p className="flex items-center text-xs text-gray-400 dark:text-dark-text-secondary mt-0.5 min-w-0">
+                  <MapPin className="h-3.5 w-3.5 mr-1 shrink-0" />
+                  <span className="truncate">
+                    {store.citiesCount > 1
+                      ? `${store.citiesCount} cidades · mais títulos em ${store.city}`
+                      : store.city}
+                  </span>
                 </p>
               </div>
-            ))}
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Fechar"
+              className="h-10 w-10 flex items-center justify-center bg-gray-100 hover:bg-red-50 hover:text-red-500 dark:bg-dark-bg dark:hover:bg-red-950/20 dark:hover:text-red-400 text-gray-500 dark:text-dark-text-secondary rounded-xl transition-all active:scale-95 shrink-0"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
 
-          {/* Dashboard de Performance no Modal */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
-            <div className="p-3 sm:p-5 bg-gradient-to-br from-blue-50/40 to-blue-50/10 dark:from-blue-950/20 dark:to-blue-950/5 rounded-2xl border border-blue-100/40 dark:border-blue-900/30 flex flex-col justify-between min-w-0">
-              <div className="flex items-center justify-between gap-1 mb-2 sm:mb-4">
-                <div className="p-2 sm:p-2.5 bg-blue-100/80 dark:bg-blue-900/50 rounded-xl text-blue-600 dark:text-blue-400 shrink-0">
-                  <Award className="h-4 w-4 sm:h-5 sm:w-5" />
+          <div className="p-4 sm:p-5 overflow-y-auto flex-1 minimal-scrollbar space-y-4">
+            {/* Saúde (recorte da inadimplência) × Carteira (hoje) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="p-4 rounded-2xl border border-gray-100 dark:border-dark-border">
+                <p className="text-sm font-bold text-gray-900 dark:text-dark-text">
+                  Inadimplência
+                </p>
+                <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">
+                  {recorteTexto}
+                </p>
+                <p
+                  className={`text-3xl font-extrabold tracking-tight my-2 ${store.dueAmount > 0 ? cor.text : "text-gray-400 dark:text-dark-text-secondary"}`}
+                >
+                  {formatarInadimplencia(store.inadimplencia, store.dueAmount)}
+                </p>
+                <div className="pt-2 border-t border-gray-100 dark:border-dark-border space-y-1 text-[11px] font-medium">
+                  <div className="flex justify-between gap-2">
+                    <span className="text-gray-500 dark:text-dark-text-secondary">
+                      Esperado
+                    </span>
+                    <span className="font-semibold text-gray-700 dark:text-dark-text">
+                      {formatCurrency(store.dueAmount)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-gray-500 dark:text-dark-text-secondary">
+                      Não pago
+                    </span>
+                    <span className="font-semibold text-red-600 dark:text-red-400">
+                      {formatCurrency(store.inadNaoPago)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-gray-500 dark:text-dark-text-secondary">
+                      Em atraso até {INADIMPLENCIA_CORTE_DIAS} dias
+                    </span>
+                    <span className="font-semibold text-amber-600 dark:text-amber-400">
+                      {formatCurrency(store.atrasoRecente)}
+                    </span>
+                  </div>
                 </div>
-                <span className="text-[9px] sm:text-[10px] font-bold text-blue-500 dark:text-blue-400 tracking-wider uppercase">
-                  Inadimpl.
-                </span>
               </div>
-              <p
-                className="text-base sm:text-xl font-extrabold whitespace-nowrap text-blue-950 dark:text-blue-200"
-                title={`${formatCurrency(store.inadNaoPago)} não pago de ${formatCurrency(store.dueAmount)} esperado (atraso > ${INADIMPLENCIA_CORTE_DIAS} dias)`}
-              >
-                {formatarInadimplencia(store.inadimplencia, store.dueAmount)}
-              </p>
-              <p className="text-[10px] sm:text-xs text-blue-650/70 dark:text-blue-400/70 mt-1 truncate">
-                Do esperado, não pago
-              </p>
+
+              <div className="p-4 rounded-2xl border border-gray-100 dark:border-dark-border">
+                <p className="text-sm font-bold text-gray-900 dark:text-dark-text">
+                  Carteira hoje
+                </p>
+                <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">
+                  {store.clientsCount.toLocaleString("pt-BR")} clientes ·{" "}
+                  {store.completedSales.toLocaleString("pt-BR")} de{" "}
+                  {store.totalSales.toLocaleString("pt-BR")} vendas quitadas
+                </p>
+                <p className="text-3xl font-extrabold tracking-tight my-2 text-amber-600 dark:text-amber-400">
+                  {formatCurrency(store.pendingAmount)}
+                  <span className="text-xs font-semibold text-gray-400 dark:text-dark-text-secondary ml-1.5">
+                    em aberto
+                  </span>
+                </p>
+                <div className="pt-2 border-t border-gray-100 dark:border-dark-border space-y-1 text-[11px] font-medium">
+                  <div
+                    className="flex justify-between gap-2"
+                    title="Saldo das parcelas com vencimento já passado (qualquer atraso)"
+                  >
+                    <span className="text-gray-500 dark:text-dark-text-secondary">
+                      vencido ({store.overdueTitles.toLocaleString("pt-BR")}{" "}
+                      títulos)
+                    </span>
+                    <span className="font-semibold text-red-600 dark:text-red-400">
+                      {formatCurrency(store.overdueAmount)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-gray-500 dark:text-dark-text-secondary">
+                      a vencer
+                    </span>
+                    <span className="font-semibold text-gray-700 dark:text-dark-text">
+                      {formatCurrency(aVencer)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-gray-500 dark:text-dark-text-secondary">
+                      Recebido
+                    </span>
+                    <span className="font-semibold text-green-600 dark:text-green-400">
+                      {formatCurrency(store.receivedAmount)}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="p-3 sm:p-5 bg-gradient-to-br from-green-50/40 to-green-50/10 dark:from-green-950/20 dark:to-green-950/5 rounded-2xl border border-green-100/40 dark:border-green-900/30 flex flex-col justify-between min-w-0">
-              <div className="flex items-center justify-between gap-1 mb-2 sm:mb-4">
-                <div className="p-2 sm:p-2.5 bg-green-100/80 dark:bg-green-900/50 rounded-xl text-green-600 dark:text-green-400 shrink-0">
-                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-                </div>
-                <span className="text-[9px] sm:text-[10px] font-bold text-green-500 dark:text-green-400 tracking-wider uppercase">
-                  Pago
-                </span>
-              </div>
-              <p
-                className="text-base sm:text-xl font-extrabold whitespace-nowrap text-green-950 dark:text-green-200"
-                title={formatCurrency(store.receivedAmount)}
-              >
-                {formatCurrencyCompact(store.receivedAmount)}
-              </p>
-              <p className="text-[10px] sm:text-xs text-green-650/70 dark:text-green-400/70 mt-1 truncate">
-                Valor Recebido
-              </p>
-            </div>
-
-            <div className="p-3 sm:p-5 bg-gradient-to-br from-amber-50/40 to-amber-50/10 dark:from-amber-950/20 dark:to-amber-950/5 rounded-2xl border border-amber-100/40 dark:border-amber-900/30 flex flex-col justify-between min-w-0">
-              <div className="flex items-center justify-between gap-1 mb-2 sm:mb-4">
-                <div className="p-2 sm:p-2.5 bg-amber-100/80 dark:bg-amber-900/50 rounded-xl text-amber-600 dark:text-amber-400 shrink-0">
-                  <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-                </div>
-                <span className="text-[9px] sm:text-[10px] font-bold text-amber-500 dark:text-amber-400 tracking-wider uppercase">
-                  Aberto
-                </span>
-              </div>
-              <p
-                className="text-base sm:text-xl font-extrabold whitespace-nowrap text-amber-950 dark:text-amber-200"
-                title={formatCurrency(store.pendingAmount)}
-              >
-                {formatCurrencyCompact(store.pendingAmount)}
-              </p>
-              <p className="text-[10px] sm:text-xs text-amber-650/70 dark:text-amber-400/70 mt-1 truncate">
-                Em Aberto
-              </p>
-            </div>
-
-            <div className="p-3 sm:p-5 bg-gradient-to-br from-red-50/40 to-red-50/10 dark:from-red-950/20 dark:to-red-950/5 rounded-2xl border border-red-100/40 dark:border-red-900/30 flex flex-col justify-between min-w-0">
-              <div className="flex items-center justify-between gap-1 mb-2 sm:mb-4">
-                <div className="p-2 sm:p-2.5 bg-red-100/80 dark:bg-red-900/50 rounded-xl text-red-600 dark:text-red-400 shrink-0">
-                  <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5" />
-                </div>
-                <span className="text-[9px] sm:text-[10px] font-bold text-red-500 dark:text-red-400 tracking-wider uppercase">
-                  {store.overdueTitles > 0
-                    ? `${store.overdueTitles} tít.`
-                    : "Atraso"}
-                </span>
-              </div>
-              <p
-                className="text-base sm:text-xl font-extrabold whitespace-nowrap text-red-950 dark:text-red-200"
-                title={formatCurrency(store.overdueAmount)}
-              >
-                {formatCurrencyCompact(store.overdueAmount)}
-              </p>
-              <p className="text-[10px] sm:text-xs text-red-650/70 dark:text-red-400/70 mt-1 truncate">
-                Total Atrasado
-              </p>
-            </div>
-
-            <div className="p-3 sm:p-5 bg-gradient-to-br from-purple-50/40 to-purple-50/10 dark:from-purple-950/20 dark:to-purple-950/5 rounded-2xl border border-purple-100/40 dark:border-purple-900/30 flex flex-col justify-between min-w-0">
-              <div className="flex items-center justify-between gap-1 mb-2 sm:mb-4">
-                <div className="p-2 sm:p-2.5 bg-purple-100/80 dark:bg-purple-900/50 rounded-xl text-purple-600 dark:text-purple-400 shrink-0">
-                  <DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />
-                </div>
-                <span className="text-[9px] sm:text-[10px] font-bold text-purple-500 dark:text-purple-400 tracking-wider uppercase">
-                  Média
-                </span>
-              </div>
-              <p
-                className="text-base sm:text-xl font-extrabold whitespace-nowrap text-purple-950 dark:text-purple-200"
-                title={formatCurrency(store.averageTicket)}
-              >
-                {formatCurrencyCompact(store.averageTicket)}
-              </p>
-              <p className="text-[10px] sm:text-xs text-purple-650/70 dark:text-purple-400/70 mt-1 truncate">
-                Ticket Médio
-              </p>
-            </div>
-          </div>
-
-          {/* Detalhamento — alterna entre Clientes/Vendas e Cidades.
-              Ambas as visões usam a MESMA fonte já filtrada (storeCollections). */}
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1">
-              <h4 className="text-sm font-semibold text-gray-900 dark:text-dark-text flex items-center gap-2 tracking-wide">
-                {detailView === "clients" ? (
-                  <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                ) : (
-                  <BarChart3 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            {/* Quem deve */}
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-baseline justify-between gap-2 px-1">
+                <h4 className="text-sm font-bold text-gray-900 dark:text-dark-text">
+                  Quem deve{" "}
+                  <span className="text-xs font-semibold text-gray-400 dark:text-dark-text-secondary">
+                    {hasFilters
+                      ? `${filtered.length.toLocaleString("pt-BR")} de ${debtors.length.toLocaleString("pt-BR")}`
+                      : debtors.length.toLocaleString("pt-BR")}{" "}
+                    clientes
+                  </span>
+                </h4>
+                {paidClients > 0 && (
+                  <span className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
+                    {paidClients.toLocaleString("pt-BR")} quitados não aparecem
+                  </span>
                 )}
-                {detailView === "clients"
-                  ? "Clientes e Vendas"
-                  : "Distribuição Geográfica"}
-                <span className="text-xs font-semibold text-gray-400 dark:text-dark-text-secondary bg-gray-50 dark:bg-dark-bg px-2.5 py-0.5 rounded-full border border-gray-100 dark:border-dark-border">
-                  {detailView === "clients"
-                    ? hasClientFilters
-                      ? `${filteredClients.length.toLocaleString("pt-BR")} de ${clientBreakdown.length.toLocaleString("pt-BR")}`
-                      : clientBreakdown.length.toLocaleString("pt-BR")
-                    : cityBreakdown.length.toLocaleString("pt-BR")}
-                </span>
-              </h4>
-              {/* Alternador de visão */}
-              <div className="inline-flex self-start sm:self-auto p-0.5 bg-gray-100 dark:bg-dark-bg rounded-xl border border-gray-100 dark:border-dark-border">
-                <button
-                  type="button"
-                  onClick={() => setDetailView("clients")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    detailView === "clients"
-                      ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
-                      : "text-gray-500 dark:text-dark-text-secondary hover:text-gray-700"
-                  }`}
-                >
-                  Clientes
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDetailView("cities")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    detailView === "cities"
-                      ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
-                      : "text-gray-500 dark:text-dark-text-secondary hover:text-gray-700"
-                  }`}
-                >
-                  Cidades
-                </button>
               </div>
-            </div>
 
-            {detailView === "clients" && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
-                <label className="relative lg:col-span-2">
+              {/* Cobradores: quem cobra quantos dos que devem (filtra a lista) */}
+              {collectorChips.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {collectorChips.map((c) => {
+                    const ativo = collectorFilter === c.id;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => setCollectorFilter(ativo ? "" : c.id)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors ${
+                          ativo
+                            ? "bg-blue-600 border-blue-600 text-white"
+                            : c.id === SEM_COBRADOR
+                              ? "border-amber-200 dark:border-amber-900/40 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                              : "border-gray-200 dark:border-dark-border text-gray-600 dark:text-dark-text-secondary hover:bg-gray-50 dark:hover:bg-dark-bg"
+                        }`}
+                      >
+                        {c.name} · {c.count.toLocaleString("pt-BR")}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <label className="relative flex-1">
                   <span className="sr-only">Buscar cliente</span>
                   <Search className="h-4 w-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="search"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Nome ou CPF/CNPJ"
+                    placeholder="Nome, CPF/CNPJ ou cidade"
                     className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </label>
-                <select
-                  aria-label="Situação do cliente"
-                  value={statusFilter}
-                  onChange={(e) =>
-                    setStatusFilter(e.target.value as typeof statusFilter)
-                  }
-                  className="px-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-dark-text"
-                >
-                  <option value="">Todas as situações</option>
-                  <option value="pendente">Pendente</option>
-                  <option value="parcial">Parcial</option>
-                  <option value="pago">Pago</option>
-                </select>
-                <select
-                  aria-label="Cidade"
-                  value={cityFilter}
-                  onChange={(e) => setCityFilter(e.target.value)}
-                  className="px-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-dark-text"
-                >
-                  <option value="">Todas as cidades</option>
-                  {cityBreakdown.map((c) => (
-                    <option key={c.city} value={c.city}>
-                      {c.city}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  aria-label="Ordenar clientes"
-                  value={clientSort}
-                  onChange={(e) =>
-                    setClientSort(e.target.value as typeof clientSort)
-                  }
-                  className="px-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-gray-900 dark:text-dark-text"
-                >
-                  <option value="pending">Maior em aberto</option>
-                  <option value="overdue">Maior atraso</option>
-                  <option value="name">Nome (A–Z)</option>
-                </select>
-                <div className="sm:col-span-2 lg:col-span-5 flex items-center justify-between gap-2">
-                  <label className="inline-flex items-center gap-2 text-xs text-gray-600 dark:text-dark-text-secondary cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={onlyOverdue}
-                      onChange={(e) => setOnlyOverdue(e.target.checked)}
-                      className="rounded border-gray-300"
-                    />
-                    Só clientes com valor em atraso
-                  </label>
-                  {hasClientFilters && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSearch("");
-                        setStatusFilter("");
-                        setCityFilter("");
-                        setOnlyOverdue(false);
-                      }}
-                      className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
-                    >
-                      Limpar filtros
-                    </button>
-                  )}
-                </div>
+                <label className="inline-flex items-center gap-2 text-xs text-gray-600 dark:text-dark-text-secondary cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={onlyOverdue}
+                    onChange={(e) => setOnlyOverdue(e.target.checked)}
+                    className="rounded border-gray-300"
+                  />
+                  Só com valor vencido
+                </label>
               </div>
-            )}
 
-            {detailView === "clients" && (
-              <div className="rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm divide-y divide-gray-50 dark:divide-dark-border overflow-hidden">
-                {filteredClients.length === 0 ? (
+              <div className="rounded-2xl border border-gray-100 dark:border-dark-border divide-y divide-gray-100 dark:divide-dark-border overflow-hidden">
+                {filtered.length === 0 ? (
                   <div className="p-8 text-center text-xs font-medium text-gray-400 dark:text-dark-text-secondary">
-                    Nenhum cliente para os filtros aplicados.
+                    {debtors.length === 0
+                      ? "Ninguém devendo nesta loja."
+                      : "Nenhum cliente para os filtros aplicados."}
                   </div>
                 ) : (
-                  pagedClients.map((client) => {
-                    const isOpen = expandedClients.has(client.key);
-                    const statusMeta =
-                      client.status === "pago"
-                        ? {
-                            label: "Pago",
-                            cls: "text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border-green-150 dark:border-green-900/30",
-                          }
-                        : client.status === "parcial"
-                          ? {
-                              label: "Parcial",
-                              cls: "text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border-blue-150 dark:border-blue-900/30",
-                            }
-                          : {
-                              label: "Pendente",
-                              cls: "text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border-amber-150 dark:border-amber-900/30",
-                            };
+                  paged.map((d) => {
+                    const cobrador =
+                      d.collectorId === SEM_COBRADOR
+                        ? "Sem cobrador"
+                        : userNames.get(d.collectorId) || "Usuário removido";
+                    const temVencido = d.overdue > 0.01;
                     return (
-                      <div key={client.key}>
-                        {/* Linha do cliente (clicável para expandir vendas) */}
-                        <button
-                          type="button"
-                          onClick={() => toggleClient(client.key)}
-                          className="w-full flex items-center gap-3 px-3 sm:px-5 py-3 text-left hover:bg-blue-50/20 dark:hover:bg-blue-900/10 transition-colors"
-                        >
-                          <ChevronRight
-                            className={`h-4 w-4 text-gray-400 shrink-0 transition-transform ${isOpen ? "rotate-90" : ""}`}
-                          />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-dark-text truncate">
-                                {client.name}
+                      <button
+                        key={d.key}
+                        type="button"
+                        disabled={!d.document}
+                        onClick={() => abrirFicha(d)}
+                        title={
+                          d.document
+                            ? "Abrir a Ficha do cliente"
+                            : "Cliente sem CPF/CNPJ: Ficha indisponível"
+                        }
+                        className="w-full flex items-center gap-3 px-3 sm:px-4 py-2.5 text-left hover:bg-blue-50/40 dark:hover:bg-blue-900/10 disabled:hover:bg-transparent disabled:cursor-default transition-colors"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-dark-text truncate">
+                            {d.name}
+                          </p>
+                          <p className="text-[10px] text-gray-400 dark:text-dark-text-secondary truncate">
+                            <span
+                              className={
+                                d.collectorId === SEM_COBRADOR
+                                  ? "text-amber-600 dark:text-amber-400 font-semibold"
+                                  : ""
+                              }
+                            >
+                              {cobrador}
+                            </span>
+                            {d.city && ` · ${d.city}`} · {d.sales}{" "}
+                            {d.sales === 1 ? "venda" : "vendas"}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          {temVencido ? (
+                            <p className="text-xs sm:text-sm font-bold text-red-600 dark:text-red-400">
+                              {formatCurrency(d.overdue)}{" "}
+                              <span className="text-[10px] font-semibold">
+                                vencido há {d.maxDays.toLocaleString("pt-BR")}{" "}
+                                {d.maxDays === 1 ? "dia" : "dias"}
                               </span>
-                              <span
-                                className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md border shrink-0 ${statusMeta.cls}`}
-                              >
-                                {statusMeta.label}
-                              </span>
-                            </div>
-                            <p className="text-[10px] text-gray-400 dark:text-dark-text-secondary truncate">
-                              {client.document || "sem documento"} ·{" "}
-                              {client.sales.length}{" "}
-                              {client.sales.length === 1 ? "venda" : "vendas"} ·{" "}
-                              {client.titles}{" "}
-                              {client.titles === 1 ? "título" : "títulos"}
                             </p>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className="text-xs sm:text-sm font-bold text-gray-900 dark:text-dark-text">
-                              {formatCurrency(client.gross)}
+                          ) : (
+                            <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary">
+                              nada vencido
                             </p>
-                            <p className="text-[10px] font-semibold">
-                              <span className="text-green-600 dark:text-green-400">
-                                {formatCurrency(client.received)}
-                              </span>
-                              {client.overdue > 0.01 && (
-                                <>
-                                  <span className="text-gray-300 dark:text-gray-600 mx-1">
-                                    ·
-                                  </span>
-                                  <span className="text-red-600 dark:text-red-400">
-                                    {formatCurrency(client.overdue)} atras.
-                                  </span>
-                                </>
-                              )}
-                            </p>
-                          </div>
-                        </button>
-
-                        {/* Vendas do cliente */}
-                        {isOpen && (
-                          <div className="bg-gray-50/60 dark:bg-dark-bg/40 px-3 sm:px-5 pb-3">
-                            <div className="overflow-x-auto rounded-xl border border-gray-100 dark:border-dark-border bg-white dark:bg-dark-bg-secondary">
-                              <table className="w-full text-left border-collapse">
-                                <thead>
-                                  <tr className="border-b border-gray-100 dark:border-dark-border">
-                                    <th className="px-3 py-2 text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">
-                                      Venda
-                                    </th>
-                                    <th className="px-3 py-2 text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-center">
-                                      Títulos
-                                    </th>
-                                    <th className="px-3 py-2 text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-right">
-                                      Bruto
-                                    </th>
-                                    <th className="px-3 py-2 text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-right">
-                                      Recebido
-                                    </th>
-                                    <th className="px-3 py-2 text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-right">
-                                      Atrasado
-                                    </th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-50 dark:divide-dark-border">
-                                  {client.sales.map((sale) => (
-                                    <tr key={sale.venda}>
-                                      <td className="px-3 py-2 text-xs font-medium text-gray-700 dark:text-dark-text">
-                                        {sale.venda === "sem-venda"
-                                          ? "Renegociação"
-                                          : `#${sale.venda}`}
-                                      </td>
-                                      <td className="px-3 py-2 text-xs text-center text-gray-500 dark:text-dark-text-secondary">
-                                        {sale.titles}
-                                      </td>
-                                      <td className="px-3 py-2 text-xs font-semibold text-gray-900 dark:text-dark-text text-right">
-                                        {formatCurrency(sale.gross)}
-                                      </td>
-                                      <td className="px-3 py-2 text-xs font-semibold text-green-600 dark:text-green-400 text-right">
-                                        {formatCurrency(sale.received)}
-                                      </td>
-                                      <td className="px-3 py-2 text-right">
-                                        <span
-                                          className={`text-xs font-semibold ${sale.overdue > 0.01 ? "text-red-600 dark:text-red-400" : "text-gray-400 dark:text-dark-text-secondary"}`}
-                                        >
-                                          {formatCurrency(sale.overdue)}
-                                        </span>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
+                          )}
+                          <p className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                            {formatCurrency(d.pending)} em aberto
+                          </p>
+                        </div>
+                        {d.document && (
+                          <ChevronRight className="h-4 w-4 text-gray-300 dark:text-gray-600 shrink-0" />
                         )}
-                      </div>
+                      </button>
                     );
                   })
                 )}
               </div>
-            )}
-            {detailView === "clients" && (
               <Pagination
-                page={clientPage}
-                total={filteredClients.length}
+                page={page}
+                total={filtered.length}
                 perPage={PAGE_SIZE}
-                onChange={setClientPage}
+                onChange={setPage}
               />
-            )}
-
-            {detailView === "cities" && (
-              <div className="overflow-x-auto rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-gray-50 dark:bg-dark-bg border-b border-gray-100 dark:border-dark-border">
-                      <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">
-                        Cidade
-                      </th>
-                      <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-center">
-                        Clientes
-                      </th>
-                      <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-center">
-                        Fichas
-                      </th>
-                      <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-right">
-                        Valor Bruto
-                      </th>
-                      <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-right">
-                        Valor Pago
-                      </th>
-                      <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide text-right">
-                        Pendente
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50 dark:divide-dark-border">
-                    {pagedCities.map((item) => {
-                      const pending = Math.max(
-                        0,
-                        item.totalAmount -
-                          item.receivedAmount -
-                          item.discountAmount,
-                      );
-
-                      return (
-                        <tr
-                          key={item.city}
-                          className="group hover:bg-blue-50/20 dark:hover:bg-blue-900/10 transition-colors"
-                        >
-                          <td className="px-3 sm:px-6 py-3 sm:py-4">
-                            <div className="flex items-center gap-2 sm:gap-3">
-                              <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-white dark:bg-dark-bg border border-gray-100 dark:border-dark-border flex items-center justify-center text-xs shadow-sm group-hover:border-blue-200 shrink-0">
-                                📍
-                              </div>
-                              <span className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-dark-text group-hover:text-blue-700 dark:group-hover:text-blue-400 truncate max-w-[120px] sm:max-w-none">
-                                {item.city}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-center">
-                            <span className="inline-flex items-center px-2 py-0.5 sm:px-2.5 rounded-full text-[10px] sm:text-xs font-semibold bg-gray-100 dark:bg-dark-bg text-gray-600 dark:text-dark-text border border-gray-200 dark:border-dark-border group-hover:bg-white dark:group-hover:bg-dark-bg-secondary">
-                              {item.clients.size}
-                            </span>
-                          </td>
-                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-center text-xs sm:text-sm font-medium text-gray-500 dark:text-dark-text-secondary">
-                            {item.sales.size}
-                          </td>
-                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-semibold text-gray-900 dark:text-dark-text text-right">
-                            {formatCurrency(item.totalAmount)}
-                          </td>
-                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-semibold text-green-600 dark:text-green-400 text-right">
-                            {formatCurrency(item.receivedAmount)}
-                          </td>
-                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-right">
-                            <span
-                              className={`text-xs sm:text-sm font-semibold ${pending > 0.01 ? "text-red-600 dark:text-red-400" : "text-gray-400 dark:text-dark-text-secondary"}`}
-                            >
-                              {formatCurrency(pending)}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            {detailView === "cities" && (
-              <Pagination
-                page={cityPage}
-                total={cityBreakdown.length}
-                perPage={PAGE_SIZE}
-                onChange={setCityPage}
-              />
-            )}
+            </div>
           </div>
         </div>
-
-        {/* Footer Moderno */}
-        <div className="p-6 border-t border-gray-100 dark:border-dark-border bg-gray-50 dark:bg-dark-bg flex justify-end gap-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-8 py-3 bg-gray-950 hover:bg-gray-800 dark:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-xl transition-all font-semibold text-sm active:scale-95 shadow-sm"
-          >
-            Concluir Análise
-          </button>
-        </div>
       </div>
-    </div>,
+
+      {ficha && (
+        <ClientDetailModal
+          clientGroup={ficha}
+          userType="manager"
+          onClose={() => setFicha(null)}
+        />
+      )}
+    </>,
     document.body,
   );
 };

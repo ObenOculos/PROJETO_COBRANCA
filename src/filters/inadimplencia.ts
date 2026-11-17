@@ -41,6 +41,9 @@ export interface OpcoesInadimplencia {
   /** Dias para tras de vencimento considerados; null = sem janela. */
   janelaDias?: number | null;
   corteDias?: number;
+  /** Dias de atraso de um vencimento. Padrao: calculateOverdueDays; telas
+   * que somam a carteira inteira passam criarCalculoAtraso() (cache). */
+  atrasoDias?: (vencimento: string | null | undefined) => number;
 }
 
 const saldoAberto = (c: Collection) =>
@@ -53,13 +56,14 @@ export const inadimplenciaDe = (
   {
     janelaDias = INADIMPLENCIA_JANELA_DIAS,
     corteDias = INADIMPLENCIA_CORTE_DIAS,
+    atrasoDias = calculateOverdueDays,
   }: OpcoesInadimplencia = {},
 ): Inadimplencia => {
   let venceu = 0;
   let naoPago = 0;
   let atrasoRecente = 0;
   titulos.forEach((c) => {
-    const atraso = calculateOverdueDays(c.data_vencimento);
+    const atraso = atrasoDias(c.data_vencimento);
     if (atraso <= 0) return;
     if (janelaDias != null && atraso > janelaDias) return;
     const aberto = saldoAberto(c);
