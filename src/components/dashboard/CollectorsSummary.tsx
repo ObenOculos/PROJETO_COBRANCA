@@ -43,6 +43,7 @@ import {
 } from "../../filters/priority";
 import { supabase } from "../../lib/supabase";
 import { fetchAllRows } from "../../utils/fetchAllRows";
+import { buscarComCacheTela, lerCacheTela } from "../../utils/cacheTela";
 import { Collection, CollectorOverdueRange, SaleGroup } from "../../types";
 import { toYYYYMMDD } from "../../filters/dates";
 import { formatCurrency, calculateOverdueDays } from "../../utils/formatters";
@@ -779,7 +780,14 @@ const CollectorsSummary: React.FC = () => {
   >(new Map());
   useEffect(() => {
     let cancelado = false;
-    (async () => {
+    const chave = `movCarteira|${dateFrom}|${dateTo}`;
+    const cache =
+      lerCacheTela<Map<string, { entraram: number; sairam: number }>>(chave);
+    if (cache) {
+      setMovCarteira(cache.valor);
+      if (cache.fresco) return;
+    }
+    const buscar = async () => {
       const linhas = await fetchAllRows<{
         documento: string;
         cobrador_novo_id: string | null;
@@ -795,9 +803,7 @@ const CollectorsSummary: React.FC = () => {
             .lte("assigned_at", `${dateTo}T23:59:59.999-03:00`)
             .order("id", { ascending: true })
             .range(from, to),
-        () => cancelado,
       );
-      if (cancelado) return;
       const ent = new Map<string, Set<string>>();
       const sai = new Map<string, Set<string>>();
       const add = (m: Map<string, Set<string>>, k: string, d: string) => {
@@ -818,8 +824,13 @@ const CollectorsSummary: React.FC = () => {
           sairam: sai.get(id)?.size ?? 0,
         }),
       );
-      setMovCarteira(mapa);
-    })().catch((err) =>
+      return mapa;
+    };
+    buscarComCacheTela(chave, buscar)
+      .then((mapa) => {
+        if (!cancelado) setMovCarteira(mapa);
+      })
+      .catch((err) =>
       // Sem o historico o card mostra o resto (nao numero pela metade).
       console.error("Erro ao carregar entradas/saídas da carteira:", err),
     );

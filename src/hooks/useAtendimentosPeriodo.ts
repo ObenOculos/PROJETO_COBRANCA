@@ -1,4 +1,5 @@
-import { MutableRefObject, useEffect, useState } from "react";
+import { MutableRefObject, useEffect, useRef, useState } from "react";
+import { buscarComCacheTela, lerCacheTela } from "../utils/cacheTela";
 import { supabase } from "../lib/supabase";
 import { CollectionAttempt } from "../types";
 import { isEffectiveAttemptResult } from "../config/collectionAttempts";
@@ -16,7 +17,7 @@ export interface AtendimentosCobrador {
 }
 
 const ID_CHUNK = 300;
-const chunk = <T,>(arr: T[], size: number): T[][] => {
+const chunk = <T>(arr: T[], size: number): T[][] => {
   const out: T[][] = [];
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
   return out;
@@ -50,26 +51,37 @@ export function useAtendimentosPeriodo(
     AtendimentosCobrador
   > | null>(null);
   const [erro, setErro] = useState(false);
+  // Periodo/cobrador da busca anterior: trocar limpa o numero (mostra
+  // "carregando"); releitura por `versao` mantem o anterior ate o novo chegar.
+  const baseAnterior = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setErro(false);
-    (async () => {
-      try {
-        const linhas = await fetchAllRows(
-          (from, to) => {
-            let q = supabase
-              .from("collection_attempts")
-              .select("id, collector_id, collection_id, date, result")
-              // `date` e text YYYY-MM-DD (data do atendimento).
-              .gte("date", dateFrom)
-              .lte("date", dateTo);
-            if (collectorId) q = q.eq("collector_id", collectorId);
-            return q.order("id").range(from, to);
-          },
-          () => cancelled,
-        );
-        if (cancelled) return;
+    const base = `${dateFrom}|${dateTo}|${collectorId ?? ""}`;
+    const chave = `atendimentos|${base}|${versao ?? 0}`;
+    const cache = lerCacheTela<Map<string, AtendimentosCobrador>>(chave);
+    const trocouBase = baseAnterior.current !== base;
+    baseAnterior.current = base;
+    if (cache) {
+      // Volta para a tela: mostra na hora; so consulta se ja passou do prazo.
+      setAtendimentos(cache.valor);
+      if (cache.fresco) return;
+    } else if (trocouBase) {
+      setAtendimentos(null);
+    }
+    const buscar = async (): Promise<Map<string, AtendimentosCobrador>> => {
+      {
+        const linhas = await fetchAllRows((from, to) => {
+          let q = supabase
+            .from("collection_attempts")
+            .select("id, collector_id, collection_id, date, result")
+            // `date` e text YYYY-MM-DD (data do atendimento).
+            .gte("date", dateFrom)
+            .lte("date", dateTo);
+          if (collectorId) q = q.eq("collector_id", collectorId);
+          return q.order("id").range(from, to);
+        });
 
         // collection_attempts guarda o titulo, nao o cliente: resolve o
         // documento dos titulos que o contexto nao tem (gestor so carrega os
@@ -90,9 +102,9 @@ export function useAtendimentosPeriodo(
               .in("id_parcela", ids.map(Number)),
           );
           if (error) throw error;
-          if (cancelled) return;
           (data ?? []).forEach((r) => {
-            if (r.documento) docByParcela.set(String(r.id_parcela), r.documento);
+            if (r.documento)
+              docByParcela.set(String(r.id_parcela), r.documento);
           });
         }
 
@@ -117,7 +129,8 @@ export function useAtendimentosPeriodo(
           }
           const atual = clientes.get(cliente);
           clientes.set(cliente, {
-            conversou: (atual?.conversou ?? false) || isEffectiveAttemptResult(result),
+            conversou:
+              (atual?.conversou ?? false) || isEffectiveAttemptResult(result),
             prometeu: (atual?.prometeu ?? false) || result === "promise",
           });
         });
@@ -130,26 +143,29 @@ export function useAtendimentosPeriodo(
             if (c.conversou) conversaram++;
             if (c.prometeu) promessas++;
           });
-          resultado.set(id, { clientes: clientes.size, conversaram, promessas });
+          resultado.set(id, {
+            clientes: clientes.size,
+            conversaram,
+            promessas,
+          });
         });
+        return resultado;
+      }
+    };
+    buscarComCacheTela(chave, buscar)
+      .then((resultado) => {
         if (!cancelled) setAtendimentos(resultado);
-      } catch (err) {
+      })
+      .catch((err) => {
         console.error("Erro ao buscar atendimentos do período:", err);
         if (!cancelled) setErro(true);
-      }
-    })();
+      });
     return () => {
       cancelled = true;
     };
     // docByParcelaRef e ref (estavel); lido no momento da busca.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateFrom, dateTo, collectorId, versao]);
-
-  // Troca de periodo/cobrador: limpa na hora (mostra "carregando"), mas uma
-  // releitura por `versao` mantem o numero anterior ate o novo chegar.
-  useEffect(() => {
-    setAtendimentos(null);
-  }, [dateFrom, dateTo, collectorId]);
 
   return { atendimentos, erro };
 }

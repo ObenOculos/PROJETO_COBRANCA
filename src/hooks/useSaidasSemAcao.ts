@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { fetchAllRows } from "../utils/fetchAllRows";
+import { buscarComCacheTela, lerCacheTela } from "../utils/cacheTela";
 
 // Motivo gravado em atribuicoes_historico pela carteira automatica (item 55,
 // migration 20261113000002): o cliente saiu da faixa do cobrador SEM nenhum
@@ -31,6 +32,12 @@ export function useSaidasSemAcao(dateFrom: string, dateTo: string) {
   useEffect(() => {
     let cancelled = false;
     setErro(false);
+    const chave = `saidasSemAcao|${dateFrom}|${dateTo}|${versao}`;
+    const cache = lerCacheTela<SaidaSemAcao[]>(chave);
+    if (cache) {
+      setSaidas(cache.valor);
+      if (cache.fresco) return;
+    }
     const fromIso = new Date(`${dateFrom}T00:00:00`).toISOString();
     // "Tudo" (9999): sem limite superior -- a data seguinte nao cabe no ISO.
     let toIso: string | null = null;
@@ -39,8 +46,8 @@ export function useSaidasSemAcao(dateFrom: string, dateTo: string) {
       fim.setDate(fim.getDate() + 1);
       toIso = fim.toISOString();
     }
-    fetchAllRows<SaidaSemAcao>(
-      (from, to) => {
+    buscarComCacheTela(chave, () =>
+      fetchAllRows<SaidaSemAcao>((from, to) => {
         let q = supabase
           .from("atribuicoes_historico")
           .select(
@@ -53,8 +60,7 @@ export function useSaidasSemAcao(dateFrom: string, dateTo: string) {
           .order("assigned_at", { ascending: false })
           .order("id", { ascending: true })
           .range(from, to);
-      },
-      () => cancelled,
+      }),
     )
       .then((rows) => {
         if (!cancelled) setSaidas(rows);
@@ -84,5 +90,10 @@ export function useSaidasSemAcao(dateFrom: string, dateTo: string) {
     return mapa;
   }, [saidas]);
 
-  return { porCobrador, carregando: saidas === null && !erro, erro, recarregar };
+  return {
+    porCobrador,
+    carregando: saidas === null && !erro,
+    erro,
+    recarregar,
+  };
 }
