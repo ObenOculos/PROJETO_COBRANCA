@@ -82,6 +82,77 @@ export const inadimplenciaDe = (
   };
 };
 
+/**
+ * Para onde foi o que foi vendido: divide o valor original dos titulos em
+ * partes que SOMAM o total (Desempenho Loja, 16/11 -- antes Financeiro e
+ * Inadimplencia mostravam o mesmo dinheiro em cortes diferentes e nenhum
+ * fechava a conta).
+ *
+ *   vendido = recebido + desconto + aVencer + atrasoRecente
+ *             + inadJanela + inadAntigo
+ *
+ * Tudo por PARCELA (saldo aberto = original - recebido - desconto; saldo de
+ * ate 1 centavo ou negativo conta como quitado, mesmo corte da
+ * inadimplenciaDe). `inadJanela` e exatamente o `naoPago` da
+ * inadimplencia do recorte; `inadAntigo` e o saldo com atraso > corte que
+ * ficou fora da janela (zero sem janela).
+ */
+export interface ComposicaoCarteira {
+  vendido: number;
+  recebido: number;
+  desconto: number;
+  aVencer: number;
+  atrasoRecente: number;
+  inadJanela: number;
+  inadAntigo: number;
+  /** atrasoRecente + inadJanela + inadAntigo (todo saldo vencido). */
+  vencido: number;
+  /** Saldo em aberto: aVencer + vencido. */
+  emAberto: number;
+  /** Inadimplencia do mesmo recorte (o % sai daqui). */
+  inadimplencia: Inadimplencia;
+}
+
+export const composicaoCarteira = (
+  titulos: Collection[],
+  opcoes: OpcoesInadimplencia = {},
+): ComposicaoCarteira => {
+  const corteDias = opcoes.corteDias ?? INADIMPLENCIA_CORTE_DIAS;
+  const atrasoDias = opcoes.atrasoDias ?? calculateOverdueDays;
+  let vendido = 0;
+  let desconto = 0;
+  let aVencer = 0;
+  let atrasoRecente = 0;
+  let inadTotal = 0;
+  titulos.forEach((c) => {
+    vendido += Number(c.valor_original || 0);
+    desconto += Number(c.desconto || 0);
+    const aberto = saldoAberto(c);
+    if (aberto <= 0.01) return;
+    const atraso = atrasoDias(c.data_vencimento);
+    if (atraso <= 0) aVencer += aberto;
+    else if (atraso <= corteDias) atrasoRecente += aberto;
+    else inadTotal += aberto;
+  });
+  const inadimplencia = inadimplenciaDe(titulos, { ...opcoes, atrasoDias });
+  const inadJanela = inadimplencia.naoPago;
+  const inadAntigo = Math.max(0, inadTotal - inadJanela);
+  const vencido = atrasoRecente + inadTotal;
+  const emAberto = aVencer + vencido;
+  return {
+    vendido,
+    recebido: vendido - desconto - emAberto,
+    desconto,
+    aVencer,
+    atrasoRecente,
+    inadJanela,
+    inadAntigo,
+    vencido,
+    emAberto,
+    inadimplencia,
+  };
+};
+
 /** Recorte de periodo da inadimplencia na tela: janela padrao, historico
  * todo, ou o filtro de vencimento do usuario (que prevalece). */
 export type RecorteInadimplencia = "janela" | "tudo" | "filtro";
@@ -106,7 +177,13 @@ export const formatarInadimplencia = (
   pct: number,
   venceu: number,
   casas = 1,
-): string => (venceu > 0 ? `${pct.toFixed(casas)}%` : "—");
+): string =>
+  venceu > 0
+    ? `${pct.toLocaleString("pt-BR", {
+        minimumFractionDigits: casas,
+        maximumFractionDigits: casas,
+      })}%`
+    : "—";
 
 /** Faixas de cor da tela. Ajustar aqui se o gestor quiser outro corte. */
 export const FAIXA_INADIMPLENCIA = { baixa: 10, media: 25 } as const;

@@ -9,7 +9,6 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronRight,
-  DollarSign,
   MapPin,
   Users,
   X,
@@ -30,7 +29,7 @@ import { documentoCombina } from "../../filters/documento";
 import { clientKey } from "../../filters/clientStatus";
 import { todayLocalStr } from "../../config/visitStatus";
 import {
-  inadimplenciaDe,
+  composicaoCarteira,
   descricaoRecorteInadimplencia,
   formatarInadimplencia,
   INADIMPLENCIA_CORTE_DIAS,
@@ -221,7 +220,6 @@ const EnhancedStoreManagement: React.FC = () => {
       >();
       const cityCounts = new Map<string, number>();
       const clientsByCollector = new Map<string, Set<string>>();
-      let overdueAmount = 0;
       let overdueTitles = 0;
 
       // Uma passada por titulo: vendas, cidades, cobradores e atraso.
@@ -256,46 +254,27 @@ const EnhancedStoreManagement: React.FC = () => {
           set.add(clientKey(c));
         }
 
-        // ATRASO: saldo em aberto das PARCELAS com vencimento passado
-        // (por parcela, nao por venda, independente do status da origem).
+        // Parcelas vencidas com saldo (o valor vem da composicaoCarteira).
         const open = original - recebido - desconto;
         if (open > 0.01 && atrasoDias(c.data_vencimento) > 0) {
-          overdueAmount += open;
           overdueTitles += 1;
         }
       });
 
       const salesArray = Array.from(salesMap.values());
 
-      // TOTAL: soma original das fichas do período
-      const totalAmount = salesArray.reduce((sum, s) => sum + s.totalValue, 0);
-      const totalDiscount = salesArray.reduce(
-        (sum, s) => sum + s.discountValue,
-        0,
-      );
-
-      // PENDENTE: saldo devedor atual das fichas do período
-      const pendingAmount = Math.max(
-        0,
-        salesArray.reduce(
-          (sum, s) => sum + (s.totalValue - s.paidValue - s.discountValue),
-          0,
-        ),
-      );
-
-      // PAGO: derivado de Total - Pendente - Desconto → garante Total = Pago + Pendente + Desconto
-      const receivedAmount = Math.max(
-        0,
-        totalAmount - pendingAmount - totalDiscount,
-      );
+      // Valores por PARCELA, na mesma regra do card do topo
+      // (filters/inadimplencia: composicaoCarteira). Antes Em aberto e
+      // Recebido eram por venda e o vencido por parcela -- nao somavam.
+      const comp = composicaoCarteira(periodCollections, {
+        janelaDias: janelaInad,
+        atrasoDias,
+      });
+      const inad = comp.inadimplencia;
 
       const openSales = salesArray.filter(
         (s) => s.totalValue - s.paidValue - s.discountValue > 0.01,
       );
-      const inad = inadimplenciaDe(periodCollections, {
-        janelaDias: janelaInad,
-        atrasoDias,
-      });
 
       const storeCity =
         Array.from(cityCounts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ||
@@ -322,18 +301,18 @@ const EnhancedStoreManagement: React.FC = () => {
         pendingSales: openSales.length,
         clientsWithPending: new Set(openSales.map((s) => s.clientDocument))
           .size,
-        totalAmount,
-        receivedAmount,
-        pendingAmount,
-        discountAmount: totalDiscount,
-        overdueAmount,
+        totalAmount: comp.vendido,
+        receivedAmount: comp.recebido,
+        pendingAmount: comp.emAberto,
+        discountAmount: comp.desconto,
+        overdueAmount: comp.vencido,
         overdueTitles,
         dueAmount: inad.venceu,
         inadNaoPago: inad.naoPago,
         inadimplencia: inad.pct,
         atrasoRecente: inad.atrasoRecente,
         averageTicket:
-          salesArray.length > 0 ? totalAmount / salesArray.length : 0,
+          salesArray.length > 0 ? comp.vendido / salesArray.length : 0,
         clientsCount: new Set(salesArray.map((s) => s.clientDocument)).size,
       });
     });
@@ -385,21 +364,9 @@ const EnhancedStoreManagement: React.FC = () => {
     const totalClients = new Set(
       sourceCollections.map((c) => c.documento).filter((d): d is string => !!d),
     ).size;
-    const totalRevenue = storeStats.reduce(
-      (sum, s) => sum + s.receivedAmount,
-      0,
-    );
-    const totalGross = storeStats.reduce((sum, s) => sum + s.totalAmount, 0);
-    const totalPending = storeStats.reduce(
-      (sum, s) => sum + s.pendingAmount,
-      0,
-    );
-    const totalOverdue = storeStats.reduce(
-      (sum, s) => sum + s.overdueAmount,
-      0,
-    );
-    // Inadimplencia geral: soma dos valores (nao media dos % das lojas).
-    const inadGeral = inadimplenciaDe(sourceCollections, {
+    // Composicao da carteira inteira (soma dos valores, nao media das
+    // lojas): as partes somam o vendido e o % sai da mesma passada.
+    const comp = composicaoCarteira(sourceCollections, {
       janelaDias: janelaInad,
       atrasoDias,
     });
@@ -410,13 +377,85 @@ const EnhancedStoreManagement: React.FC = () => {
       unassignedStores,
       totalSales,
       totalClients,
-      totalRevenue,
-      totalGross,
-      totalPending,
-      totalOverdue,
-      inadGeral,
+      comp,
     };
   }, [storeStats, sourceCollections, janelaInad, atrasoDias]);
+
+  // Card unico do topo: as partes do vendido, na ordem da barra.
+  const compTopo = overviewStats.comp;
+  const inadTopo = compTopo.inadimplencia;
+  const periodoTexto =
+    recorteInad === "filtro"
+      ? "no período do filtro"
+      : recorteInad === "tudo"
+        ? "em todo o histórico"
+        : "nos últimos 12 meses";
+  const partesTopo: {
+    id: string;
+    label: string;
+    valor: number;
+    barra: string;
+    texto: string;
+    dica: string;
+    base?: boolean;
+  }[] = [
+    {
+      id: "recebido",
+      label: "Recebido",
+      valor: Math.max(0, compTopo.recebido),
+      barra: "bg-green-500",
+      texto: "text-green-600 dark:text-green-400",
+      dica: "Já entrou",
+    },
+    {
+      id: "desconto",
+      label: "Desconto concedido",
+      valor: compTopo.desconto,
+      barra: "bg-gray-300 dark:bg-gray-600",
+      texto: "text-gray-600 dark:text-dark-text-secondary",
+      dica: "Abatido nas negociações: não entra e não é dívida",
+    },
+    {
+      id: "aVencer",
+      label: "A vencer",
+      valor: compTopo.aVencer,
+      barra: "bg-blue-300 dark:bg-blue-700",
+      texto: "text-gray-700 dark:text-dark-text",
+      dica: "Em aberto, ainda não venceu",
+    },
+    {
+      id: "atraso",
+      label: `Atraso até ${INADIMPLENCIA_CORTE_DIAS} dias`,
+      valor: compTopo.atrasoRecente,
+      barra: "bg-amber-400",
+      texto: "text-amber-600 dark:text-amber-400",
+      dica: "Venceu há pouco: é atraso, ainda não inadimplência",
+    },
+    {
+      id: "inad",
+      label:
+        recorteInad === "janela"
+          ? "Inadimplente · últimos 12 meses"
+          : "Inadimplente",
+      valor: compTopo.inadJanela,
+      barra: "bg-red-500",
+      texto: "text-red-600 dark:text-red-400",
+      dica: `Vencido há mais de ${INADIMPLENCIA_CORTE_DIAS} dias ${periodoTexto} e não pago: é daqui que sai o %`,
+      base: true,
+    },
+    ...(recorteInad === "janela"
+      ? [
+          {
+            id: "inadAntigo",
+            label: "Inadimplente · mais antigo",
+            valor: compTopo.inadAntigo,
+            barra: "bg-red-900 dark:bg-red-300",
+            texto: "text-red-800 dark:text-red-300",
+            dica: "Vencido há mais de 12 meses e não pago: fica fora do % (use \"Tudo\" para incluir)",
+          },
+        ]
+      : []),
+  ];
 
   const exportStoreData = () => {
     // Headers with better formatting
@@ -582,77 +621,18 @@ const EnhancedStoreManagement: React.FC = () => {
           </div>
         </div>
 
-        {/* Card: Financeiro (valores) */}
-        <div className="bg-white dark:bg-dark-bg-secondary p-4 sm:p-5 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm hover:shadow-md transition-all duration-300">
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-xl shrink-0">
-                <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 dark:text-green-400" />
-              </div>
-              <h3 className="text-sm font-bold text-gray-900 dark:text-dark-text tracking-tight">
-                Financeiro
-              </h3>
-            </div>
-            <span className="text-[10px] font-medium text-gray-400 dark:text-dark-text-secondary tracking-wide shrink-0 truncate">
-              Bruto {formatCurrency(overviewStats.totalGross)}
-            </span>
-          </div>
-          {/* Destaque: Recebido */}
-          <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">
-            Recebido
-          </p>
-          <p className="text-2xl sm:text-3xl font-extrabold text-green-600 dark:text-green-400 tracking-tight truncate mb-3">
-            {formatCurrency(overviewStats.totalRevenue)}
-          </p>
-          {/* Em aberto e como ele se divide (vencido + a vencer). O
-              vencido aqui e todo atraso, de 1 dia em diante; a
-              inadimplencia ao lado so conta acima de 30 dias. */}
-          <div className="pt-3 border-t border-gray-100 dark:border-dark-border space-y-1 text-[11px] font-medium">
-            <div className="flex justify-between gap-2">
-              <span className="text-gray-500 dark:text-dark-text-secondary">
-                Em aberto
-              </span>
-              <span className="font-bold text-amber-600 dark:text-amber-400 truncate">
-                {formatCurrency(overviewStats.totalPending)}
-              </span>
-            </div>
-            <div
-              className="flex justify-between gap-2 pl-3"
-              title="Saldo das parcelas com vencimento já passado (qualquer atraso)"
-            >
-              <span className="text-gray-400 dark:text-dark-text-secondary">
-                vencido
-              </span>
-              <span className="font-semibold text-red-600 dark:text-red-400 truncate">
-                {formatCurrency(overviewStats.totalOverdue)}
-              </span>
-            </div>
-            <div className="flex justify-between gap-2 pl-3">
-              <span className="text-gray-400 dark:text-dark-text-secondary">
-                a vencer
-              </span>
-              <span className="font-semibold text-gray-700 dark:text-dark-text truncate">
-                {formatCurrency(
-                  Math.max(
-                    0,
-                    overviewStats.totalPending - overviewStats.totalOverdue,
-                  ),
-                )}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Card: Inadimplencia -- do que venceu, quanto nao foi pago
-            (filters/inadimplencia; substitui Conversao e % Recebido,
-            reuniao 16/11, itens 19-21). */}
-        <div className="bg-white dark:bg-dark-bg-secondary p-4 sm:p-5 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm hover:shadow-md transition-all duration-300">
+        {/* Card único: inadimplência + para onde foi o que foi vendido.
+            As partes somam o Vendido (filters/inadimplencia:
+            composicaoCarteira) e a parte "Inadimplente" é exatamente o
+            "não pago" do % -- antes Financeiro e Inadimplência mostravam o
+            mesmo dinheiro em cortes diferentes (16/11). */}
+        <div className="md:col-span-2 bg-white dark:bg-dark-bg-secondary p-4 sm:p-5 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm hover:shadow-md transition-all duration-300">
           <div className="flex items-center gap-2.5 mb-3">
             <div className="p-2 bg-red-50 dark:bg-red-900/20 rounded-xl shrink-0">
               <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 dark:text-red-400" />
             </div>
             <h3 className="text-sm font-bold text-gray-900 dark:text-dark-text tracking-tight">
-              Inadimplência
+              Inadimplência e carteira
             </h3>
             {recorteInad !== "filtro" && (
               <div className="ml-auto flex bg-gray-100 dark:bg-dark-bg rounded-md p-0.5 shrink-0">
@@ -678,71 +658,74 @@ const EnhancedStoreManagement: React.FC = () => {
               </div>
             )}
           </div>
-          <p
-            className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide"
-            title="Do que era esperado no período, quanto não foi pago. Parcela com até 30 dias de atraso conta como atraso, não como inadimplência."
-          >
-            {descricaoRecorteInadimplencia(recorteInad)}
-          </p>
-          <p
-            className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${overviewStats.inadGeral.venceu > 0 ? `mb-3 ${COR_NIVEL[nivelInadimplencia(overviewStats.inadGeral.pct)].text}` : "text-gray-400 dark:text-dark-text-secondary"}`}
-          >
-            {formatarInadimplencia(
-              overviewStats.inadGeral.pct,
-              overviewStats.inadGeral.venceu,
-            )}
-          </p>
-          {overviewStats.inadGeral.venceu <= 0 && (
-            <p className="text-[10px] text-gray-400 dark:text-dark-text-secondary mb-3">
-              Nada venceu há mais de {INADIMPLENCIA_CORTE_DIAS} dias neste
-              recorte: por enquanto é só atraso.
+
+          {/* O % e de onde ele sai, numa frase */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-4">
+            <p
+              className={`text-3xl font-extrabold tracking-tight ${inadTopo.venceu > 0 ? COR_NIVEL[nivelInadimplencia(inadTopo.pct)].text : "text-gray-400 dark:text-dark-text-secondary"}`}
+            >
+              {formatarInadimplencia(inadTopo.pct, inadTopo.venceu)}
             </p>
-          )}
-          <div className="pt-3 border-t border-gray-100 dark:border-dark-border space-y-1 text-[11px] font-medium">
-            <div
-              className="flex justify-between gap-2"
-              title={`Parcelas que venceram há mais de ${INADIMPLENCIA_CORTE_DIAS} dias no período: o que deveria ter entrado`}
-            >
-              <span className="text-gray-500 dark:text-dark-text-secondary">
-                Esperado
-              </span>
-              <span className="font-semibold text-gray-700 dark:text-dark-text truncate">
-                {formatCurrency(overviewStats.inadGeral.venceu)}
-              </span>
-            </div>
-            <div
-              className="flex justify-between gap-2"
-              title="Do esperado, o que entrou (descontos concedidos contam como resolvidos). Não é o mesmo que o Recebido ao lado, que soma tudo o que entrou."
-            >
-              <span className="text-gray-500 dark:text-dark-text-secondary">
-                Pago do esperado
-              </span>
-              <span className="font-semibold text-green-600 dark:text-green-400 truncate">
-                {formatCurrency(
-                  Math.max(
-                    0,
-                    overviewStats.inadGeral.venceu -
-                      overviewStats.inadGeral.naoPago,
-                  ),
-                )}
-              </span>
-            </div>
-            <div className="flex justify-between gap-2">
-              <span className="text-gray-500 dark:text-dark-text-secondary">
-                Não pago
-              </span>
-              <span className="font-semibold text-red-600 dark:text-red-400 truncate">
-                {formatCurrency(overviewStats.inadGeral.naoPago)}
-              </span>
-            </div>
-            <div className="flex justify-between gap-2">
-              <span className="text-gray-500 dark:text-dark-text-secondary">
-                Em atraso até {INADIMPLENCIA_CORTE_DIAS} dias
-              </span>
-              <span className="font-semibold text-amber-600 dark:text-amber-400 truncate">
-                {formatCurrency(overviewStats.inadGeral.atrasoRecente)}
-              </span>
-            </div>
+            <p className="text-xs text-gray-500 dark:text-dark-text-secondary flex-1 min-w-[220px]">
+              {inadTopo.venceu > 0 ? (
+                <>
+                  Do que venceu há mais de {INADIMPLENCIA_CORTE_DIAS} dias{" "}
+                  {periodoTexto} ({formatCurrency(inadTopo.venceu)}),{" "}
+                  <span className="font-semibold text-red-600 dark:text-red-400">
+                    {formatCurrency(inadTopo.naoPago)}
+                  </span>{" "}
+                  não foi pago.
+                </>
+              ) : (
+                <>
+                  Nada venceu há mais de {INADIMPLENCIA_CORTE_DIAS} dias{" "}
+                  {periodoTexto}: por enquanto é só atraso.
+                </>
+              )}
+            </p>
+          </div>
+
+          {/* Vendido dividido em partes que somam o total */}
+          <div className="flex justify-between gap-2 text-[11px] mb-1">
+            <span className="font-semibold text-gray-500 dark:text-dark-text-secondary">
+              Vendido
+            </span>
+            <span className="font-bold text-gray-900 dark:text-dark-text">
+              {formatCurrency(compTopo.vendido)}
+            </span>
+          </div>
+          <div className="flex w-full h-3 rounded-full overflow-hidden bg-gray-100 dark:bg-dark-bg mb-3">
+            {partesTopo.map((p) =>
+              p.valor > 0 && compTopo.vendido > 0 ? (
+                <div
+                  key={p.id}
+                  className={p.barra}
+                  style={{ width: `${(p.valor / compTopo.vendido) * 100}%` }}
+                  title={`${p.label}: ${formatCurrency(p.valor)}`}
+                />
+              ) : null,
+            )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-[11px] font-medium">
+            {partesTopo.map((p) => (
+              <div
+                key={p.id}
+                className={`flex items-center justify-between gap-2 min-w-0 ${p.base ? "rounded-md bg-red-50 dark:bg-red-900/20 -mx-1.5 px-1.5" : ""}`}
+                title={p.dica}
+              >
+                <span className="flex items-center gap-1.5 min-w-0 text-gray-600 dark:text-dark-text-secondary">
+                  <span className={`h-2 w-2 rounded-full shrink-0 ${p.barra}`} />
+                  <span className={`truncate ${p.base ? "font-semibold text-red-700 dark:text-red-300" : ""}`}>
+                    {p.label}
+                  </span>
+                </span>
+                {/* Sem % por parte: ao lado do % da inadimplencia, a fatia
+                    do vendido (outra base) confundia. */}
+                <span className={`font-semibold shrink-0 ${p.texto}`}>
+                  {formatCurrency(p.valor)}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
