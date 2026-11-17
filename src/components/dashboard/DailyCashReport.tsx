@@ -187,13 +187,10 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   const [selectedStore, setSelectedStore] = useState<string>("all");
   const [minAmount, setMinAmount] = useState<string>("");
   const [maxAmount, setMaxAmount] = useState<string>("");
-  const [, setLastUpdate] = useState<Date>(new Date());
   const [showUpdateNotification, setShowUpdateNotification] = useState(false);
-  const [forceUpdate, setForceUpdate] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
   const [showExportOptions, setShowExportOptions] = useState(false);
   const exportDropdownRef = useRef<HTMLDivElement>(null);
-  const [] = useState(false);
 
   // Versões diferidas dos filtros que alimentam o cálculo pesado (reportData).
   // Os inputs continuam usando o estado bruto (respondem na hora); o recálculo
@@ -206,7 +203,6 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   const dfSelectedStore = useDeferredValue(selectedStore);
   const dfMinAmount = useDeferredValue(minAmount);
   const dfMaxAmount = useDeferredValue(maxAmount);
-  const dfForceUpdate = useDeferredValue(forceUpdate);
 
   // Enquanto o valor bruto e o diferido divergem, há um recálculo pendente.
   const isCalculating =
@@ -216,8 +212,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     selectedCollector !== dfSelectedCollector ||
     selectedStore !== dfSelectedStore ||
     minAmount !== dfMinAmount ||
-    maxAmount !== dfMaxAmount ||
-    forceUpdate !== dfForceUpdate;
+    maxAmount !== dfMaxAmount;
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -244,11 +239,17 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     return count;
   }, [selectedCollector, selectedStore, minAmount, maxAmount, dateRangeMode]);
 
-  // Detectar mudanças nos salePayments para mostrar notificação
+  // Aviso "Atualizado" quando chegam dados novos. O recálculo já acontece
+  // sozinho (reportData depende de salePayments/collections); antes isto
+  // também forçava um recálculo extra com a tela de "Processando" por cima a
+  // cada atualização em tempo real.
+  const isFirstDataRef = useRef(true);
   useEffect(() => {
-    setLastUpdate(new Date());
+    if (isFirstDataRef.current) {
+      isFirstDataRef.current = false;
+      return;
+    }
     setShowUpdateNotification(true);
-    setForceUpdate((prev) => prev + 1); // Força re-render
 
     // Esconder notificação após 3 segundos
     const timer = setTimeout(() => {
@@ -309,6 +310,22 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     }
   };
 
+  // Parcelas agrupadas por documento do cliente. Antes, cada pagamento
+  // varria a carteira inteira 3–4 vezes (find/filter em `collections`): num
+  // período de um mês isso dava dezenas de milhões de comparações e era o que
+  // segurava a tela de "Processando consulta". A ordem dentro de cada grupo é
+  // a mesma de `collections`, então o "primeiro que bate" continua o mesmo.
+  const collectionsByDoc = useMemo(() => {
+    const map = new Map<string, Collection[]>();
+    for (const c of collections) {
+      if (!c.documento) continue;
+      const list = map.get(c.documento);
+      if (list) list.push(c);
+      else map.set(c.documento, [c]);
+    }
+    return map;
+  }, [collections]);
+
   const reportData = useMemo((): DailyReportData => {
     // Usar dados da tabela sale_payments em vez de collections
 
@@ -320,6 +337,17 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     const selectedStore = dfSelectedStore;
     const minAmount = dfMinAmount;
     const maxAmount = dfMaxAmount;
+
+    const NO_ROWS: Collection[] = [];
+    const rowsOf = (doc: string | undefined) =>
+      (doc && collectionsByDoc.get(doc)) || NO_ROWS;
+    // Parcela da mesma venda; sem ela (ex.: venda 0), qualquer parcela do cliente.
+    const relatedOf = (payment: (typeof salePayments)[number]) => {
+      const rows = rowsOf(payment.clientDocument);
+      return (
+        rows.find((c) => resolveSaleKey(c) === payment.saleNumber) ?? rows[0]
+      );
+    };
 
     const filteredPayments = salePayments.filter((payment) => {
       // Filtro de data
@@ -342,18 +370,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
       // Filtro de loja (buscar loja das collections para compatibilidade)
       if (selectedStore !== "all") {
-        let relatedCollection = collections.find(
-          (c) =>
-            c.documento === payment.clientDocument &&
-            resolveSaleKey(c) === payment.saleNumber,
-        );
-
-        // Fallback para buscar a loja por documento se não achar pela venda específica
-        if (!relatedCollection) {
-          relatedCollection = collections.find(
-            (c) => c.documento === payment.clientDocument,
-          );
-        }
+        const relatedCollection = relatedOf(payment);
 
         if (
           !relatedCollection ||
@@ -390,17 +407,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
       // Buscar dados da collection para obter valores originais e loja
       // Tentar match específico primeiro, se falhar (ex: venda 0), buscar qualquer registro do cliente
-      let relatedCollection = collections.find(
-        (c) =>
-          c.documento === payment.clientDocument &&
-          resolveSaleKey(c) === payment.saleNumber,
-      );
-
-      if (!relatedCollection) {
-        relatedCollection = collections.find(
-          (c) => c.documento === payment.clientDocument,
-        );
-      }
+      const relatedCollection = relatedOf(payment);
 
       if (!salesMap.has(saleKey)) {
         salesMap.set(saleKey, {
@@ -460,12 +467,16 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       }
     });
 
-    // Converter para array
-    const collectorSummary = Array.from(collectorMap.values()).map((c) => ({
-      ...c,
-      clients: Array.from(c.clients),
-      saleNumbers: Array.from(c.saleNumbers).sort(),
-    }));
+    // Converter para array, já do maior recebido para o menor (a tela e as
+    // exportações usam essa ordem; antes cada uma ordenava o array memorizado
+    // no próprio render).
+    const collectorSummary = Array.from(collectorMap.values())
+      .map((c) => ({
+        ...c,
+        clients: Array.from(c.clients),
+        saleNumbers: Array.from(c.saleNumbers).sort(),
+      }))
+      .sort((a, b) => b.receivedAmount - a.receivedAmount);
 
     // Mapear pagamentos para detalhes usando sale_payments
     const salesPaymentMap = new Map<
@@ -500,29 +511,25 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     filteredPayments.forEach((payment) => {
       const saleKey = `${payment.id}`;
 
+      const clientRows = rowsOf(payment.clientDocument);
+
       // 1. Tentar encontrar a parcela específica que foi paga
-      let specificInstallment = collections.find(
+      const specificInstallment = clientRows.find(
         (c) =>
-          c.documento === payment.clientDocument &&
           resolveSaleKey(c) === payment.saleNumber &&
           c.id_parcela.toString() ===
             payment.distribution_details?.[0]?.installmentId?.toString(),
       );
 
       // 2. Se não achou a específica (ex: venda 0 ou ajuste manual), buscar qualquer registro do cliente para pegar Nome/Loja
-      const anyClientRecord = collections.find(
-        (c) => c.documento === payment.clientDocument,
-      );
+      const anyClientRecord = clientRows[0];
 
       // 3. CALCULAR DÍVIDA TOTAL DO CLIENTE (para esta venda específica ou geral se venda 0)
       // Buscamos todas as parcelas desse cliente para ter o quadro completo
-      const clientInstallments = collections.filter(
-        (c) =>
-          c.documento === payment.clientDocument &&
-          (payment.saleNumber && payment.saleNumber !== 0
-            ? resolveSaleKey(c) === payment.saleNumber
-            : true),
-      );
+      const clientInstallments =
+        payment.saleNumber && payment.saleNumber !== 0
+          ? clientRows.filter((c) => resolveSaleKey(c) === payment.saleNumber)
+          : clientRows;
 
       const totalDebtValue = clientInstallments.reduce(
         (sum, c) => sum + (c.valor_original || 0),
@@ -653,7 +660,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     };
   }, [
     salePayments,
-    collections,
+    collectionsByDoc,
     dfSelectedDate,
     dfEndDate,
     dfDateRangeMode,
@@ -662,7 +669,6 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     dfMinAmount,
     dfMaxAmount,
     users,
-    dfForceUpdate,
   ]);
 
   const detailsTotalPages = Math.max(
@@ -714,10 +720,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       ["MÉTRICAS GERAIS"],
       ["Total Arrecadado", reportData.totalReceived],
       ["Juros (incluídos no total)", reportData.totalPaymentJuros],
-      [
-        "Total de Descontos",
-        reportData.totalPaymentDiscount,
-      ],
+      ["Total de Descontos", reportData.totalPaymentDiscount],
       ["Quantidade de Vendas", reportData.totalTransactions],
       ["Cobradores Ativos", reportData.collectorSummary.length],
       [
@@ -737,17 +740,15 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       ],
     ];
 
-    const collectorRows = reportData.collectorSummary
-      .sort((a, b) => b.receivedAmount - a.receivedAmount)
-      .map((c) => [
-        c.collectorName,
-        c.receivedAmount,
-        c.transactionCount,
-        reportData.totalReceived > 0
-          ? c.receivedAmount / reportData.totalReceived
-          : 0,
-        c.transactionCount > 0 ? c.receivedAmount / c.transactionCount : 0,
-      ]);
+    const collectorRows = reportData.collectorSummary.map((c) => [
+      c.collectorName,
+      c.receivedAmount,
+      c.transactionCount,
+      reportData.totalReceived > 0
+        ? c.receivedAmount / reportData.totalReceived
+        : 0,
+      c.transactionCount > 0 ? c.receivedAmount / c.transactionCount : 0,
+    ]);
 
     const summaryWS = XLSX.utils.aoa_to_sheet([
       ...summaryHeader,
@@ -867,7 +868,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       {isCalculating &&
         createPortal(
           <div
-            className="flex items-center justify-center bg-black/40 dark:bg-black/60 backdrop-blur-sm cursor-wait"
+            className="flex items-center justify-center bg-black/50 cursor-wait"
             style={{
               position: "fixed",
               top: 0,
@@ -909,10 +910,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
           {/* Ações Principais */}
           <div className="flex items-center gap-2">
             <button
-              onClick={async () => {
-                await refreshData();
-                setForceUpdate((prev) => prev + 1);
-              }}
+              onClick={() => refreshData()}
               className="p-2 text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 hover:dark:text-dark-text hover:bg-gray-100 dark:hover:bg-dark-bg rounded-2xl transition-colors"
               title="Atualizar"
             >
@@ -1207,7 +1205,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
         <div className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-8">
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-white/20 rounded-lg backdrop-blur-md">
+              <div className="p-2 bg-white/20 rounded-lg">
                 <TrendingUp className="h-4 w-4 text-emerald-100" />
               </div>
               <p className="text-emerald-100 text-sm font-black tracking-wide">
@@ -1223,7 +1221,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
               </p>
             )}
             {reportData.totalTransactions > 0 && (
-              <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full backdrop-blur-sm border border-white/10">
+              <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full border border-white/10">
                 <Activity className="h-3.5 w-3.5 text-emerald-200" />
                 <p className="text-emerald-100 text-xs font-bold">
                   Ticket médio:{" "}
@@ -1238,7 +1236,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white/15 backdrop-blur-md rounded-2xl p-4 border border-white/10 shadow-inner">
+            <div className="bg-white/15 rounded-2xl p-4 border border-white/10 shadow-inner">
               <div className="flex items-center gap-3 mb-2">
                 <div className="p-1.5 bg-emerald-400/30 rounded-lg">
                   <Receipt className="h-4 w-4 text-white" />
@@ -1252,7 +1250,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
               </p>
             </div>
 
-            <div className="bg-white/15 backdrop-blur-md rounded-2xl p-4 border border-white/10 shadow-inner">
+            <div className="bg-white/15 rounded-2xl p-4 border border-white/10 shadow-inner">
               <div className="flex items-center gap-3 mb-2">
                 <div className="p-1.5 bg-teal-400/30 rounded-lg">
                   <User className="h-4 w-4 text-white" />
@@ -1273,7 +1271,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       {reportData.collectorSummary.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-gray-900">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text">
               Desempenho por Cobrador
             </h3>
             <button
@@ -1286,104 +1284,101 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
           {/* Cards de Cobradores */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {reportData.collectorSummary
-              .sort((a, b) => b.receivedAmount - a.receivedAmount)
-              .map((collector, index) => {
-                const percentage =
-                  reportData.totalReceived > 0
-                    ? (collector.receivedAmount / reportData.totalReceived) *
-                      100
-                    : 0;
+            {reportData.collectorSummary.map((collector, index) => {
+              const percentage =
+                reportData.totalReceived > 0
+                  ? (collector.receivedAmount / reportData.totalReceived) * 100
+                  : 0;
 
-                return (
-                  <div
-                    key={collector.collectorId}
-                    className="bg-white dark:bg-dark-bg-secondary rounded-[1.5rem] border border-gray-100 dark:border-dark-border p-5 hover:shadow-xl dark:hover:shadow-black/25 transition-all duration-300 group animate-in fade-in slide-in-from-bottom-2"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`h-12 w-12 rounded-full flex items-center justify-center font-black text-lg shadow-sm border-2 ${
-                            index === 0
-                              ? "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/30 text-amber-700 dark:text-amber-400"
-                              : "bg-blue-50 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/30 text-blue-700 dark:text-blue-400"
-                          }`}
-                        >
-                          {collector.collectorName.charAt(0)}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <h4 className="font-bold text-gray-900 dark:text-dark-text leading-tight">
-                              {collector.collectorName}
-                            </h4>
-                            {index === 0 && (
-                              <Award className="h-4 w-4 text-amber-500 fill-amber-500" />
-                            )}
-                          </div>
-                          <p className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-wider">
-                            {collector.transactionCount} Transações
-                          </p>
-                        </div>
+              return (
+                <div
+                  key={collector.collectorId}
+                  className="bg-white dark:bg-dark-bg-secondary rounded-[1.5rem] border border-gray-100 dark:border-dark-border p-5 hover:shadow-xl dark:hover:shadow-black/25 transition-all duration-300 group animate-in fade-in slide-in-from-bottom-2"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`h-12 w-12 rounded-full flex items-center justify-center font-black text-lg shadow-sm border-2 ${
+                          index === 0
+                            ? "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/30 text-amber-700 dark:text-amber-400"
+                            : "bg-blue-50 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/30 text-blue-700 dark:text-blue-400"
+                        }`}
+                      >
+                        {collector.collectorName.charAt(0)}
                       </div>
-                      <div className="text-right">
-                        <p className="text-xl font-black text-gray-900 dark:text-dark-text">
-                          {formatCurrency(collector.receivedAmount)}
-                        </p>
-                        <p className="text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary">
-                          {percentage.toFixed(1)}% do total
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <h4 className="font-bold text-gray-900 dark:text-dark-text leading-tight">
+                            {collector.collectorName}
+                          </h4>
+                          {index === 0 && (
+                            <Award className="h-4 w-4 text-amber-500 fill-amber-500" />
+                          )}
+                        </div>
+                        <p className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-wider">
+                          {collector.transactionCount} Transações
                         </p>
                       </div>
                     </div>
-
-                    {/* Barra de Progresso */}
-                    <div className="space-y-1.5">
-                      <div className="h-1.5 w-full bg-gray-50 dark:bg-dark-bg rounded-full overflow-hidden">
-                        <div
-                          className={`h-full transition-all duration-1000 ease-out ${
-                            index === 0 ? "bg-amber-500" : "bg-blue-500"
-                          }`}
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </div>
-                      <div className="flex justify-between items-center text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary tracking-tighter">
-                        <span>
-                          Ticket:{" "}
-                          {formatCurrency(
-                            collector.transactionCount > 0
-                              ? collector.receivedAmount /
-                                  collector.transactionCount
-                              : 0,
-                          )}
-                        </span>
-                        <span>{collector.clients.length} Clientes</span>
-                      </div>
+                    <div className="text-right">
+                      <p className="text-xl font-black text-gray-900 dark:text-dark-text">
+                        {formatCurrency(collector.receivedAmount)}
+                      </p>
+                      <p className="text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary">
+                        {percentage.toFixed(1)}% do total
+                      </p>
                     </div>
-
-                    {collector.saleNumbers.length > 0 && showDetails && (
-                      <div className="mt-4 pt-4 border-t border-dashed border-gray-100 dark:border-dark-border">
-                        <p className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-wider mb-2 flex items-center gap-1">
-                          <Receipt className="h-3 w-3" /> Vendas Realizadas
-                        </p>
-                        <div className="flex flex-wrap gap-1">
-                          {collector.saleNumbers.slice(0, 5).map((num) => (
-                            <span
-                              key={num}
-                              className="px-2 py-0.5 bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text-secondary rounded text-[10px] font-bold border border-gray-100 dark:border-dark-border"
-                            >
-                              #{num}
-                            </span>
-                          ))}
-                          {collector.saleNumbers.length > 5 && (
-                            <span className="text-[10px] font-bold text-gray-400 self-center ml-1">
-                              +{collector.saleNumbers.length - 5}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )}
                   </div>
-                );
-              })}
+
+                  {/* Barra de Progresso */}
+                  <div className="space-y-1.5">
+                    <div className="h-1.5 w-full bg-gray-50 dark:bg-dark-bg rounded-full overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-1000 ease-out ${
+                          index === 0 ? "bg-amber-500" : "bg-blue-500"
+                        }`}
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary tracking-tighter">
+                      <span>
+                        Ticket:{" "}
+                        {formatCurrency(
+                          collector.transactionCount > 0
+                            ? collector.receivedAmount /
+                                collector.transactionCount
+                            : 0,
+                        )}
+                      </span>
+                      <span>{collector.clients.length} Clientes</span>
+                    </div>
+                  </div>
+
+                  {collector.saleNumbers.length > 0 && showDetails && (
+                    <div className="mt-4 pt-4 border-t border-dashed border-gray-100 dark:border-dark-border">
+                      <p className="text-[10px] font-black text-gray-400 dark:text-dark-text-secondary tracking-wider mb-2 flex items-center gap-1">
+                        <Receipt className="h-3 w-3" /> Vendas Realizadas
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {collector.saleNumbers.slice(0, 5).map((num) => (
+                          <span
+                            key={num}
+                            className="px-2 py-0.5 bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text-secondary rounded text-[10px] font-bold border border-gray-100 dark:border-dark-border"
+                          >
+                            #{num}
+                          </span>
+                        ))}
+                        {collector.saleNumbers.length > 5 && (
+                          <span className="text-[10px] font-bold text-gray-400 self-center ml-1">
+                            +{collector.saleNumbers.length - 5}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -1446,8 +1441,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
                     return (
                       <tr
                         key={`${payment.saleKey}-${index}`}
-                        className="hover:bg-blue-50/30 dark:hover:bg-dark-bg/60 transition-colors group animate-in fade-in slide-in-from-left-2"
-                        style={{ animationDelay: `${index * 50}ms` }}
+                        className="hover:bg-blue-50/30 dark:hover:bg-dark-bg/60 transition-colors group"
                       >
                         <td className="px-4 py-4">
                           <div className="flex flex-col">
