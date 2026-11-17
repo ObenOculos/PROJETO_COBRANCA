@@ -179,6 +179,41 @@ const MeuDesempenho: React.FC<Props> = ({
     };
   }, [userId, versaoRegistros, seteDias, inicioMes]);
 
+  // Item 66, etapa 3: pagamento que o cliente fez na loja/banco, atribuido ao
+  // cobrador (pedido dele ou excecao do gestor) -- nao passa por
+  // sale_payments (ver migration 20261116000003). Mesma busca do
+  // acordoPagos acima.
+  const [atribuicoesPagas, setAtribuicoesPagas] = useState<
+    { valor: number; data: string }[]
+  >([]);
+  useEffect(() => {
+    let cancelled = false;
+    const desde = seteDias < inicioMes ? seteDias : inicioMes;
+    (async () => {
+      const { data, error } = await supabase
+        .from("atribuicoes_pagamento")
+        .select("valor_aprovado, data_pagamento")
+        .eq("solicitado_por_id", userId)
+        .eq("decisao", "aprovado")
+        .gte("data_pagamento", desde);
+      if (error) {
+        console.error("Erro ao buscar pagamentos atribuídos (pago na loja):", error);
+        return;
+      }
+      if (!cancelled) {
+        setAtribuicoesPagas(
+          (data || []).map((p) => ({
+            valor: Number(p.valor_aprovado) || 0,
+            data: String(p.data_pagamento).slice(0, 10),
+          })),
+        );
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, versaoRegistros, seteDias, inicioMes]);
+
   const recebidoEntre = (de: string, ate: string): number =>
     salePayments
       .filter((p) => {
@@ -188,17 +223,20 @@ const MeuDesempenho: React.FC<Props> = ({
       .reduce((s, p) => s + valorRecebidoTotal(p), 0) +
     acordoPagos
       .filter((p) => p.data >= de && p.data <= ate)
+      .reduce((s, p) => s + p.valor, 0) +
+    atribuicoesPagas
+      .filter((p) => p.data >= de && p.data <= ate)
       .reduce((s, p) => s + p.valor, 0);
 
   const recebido = useMemo(
     () => recebidoEntre(dateFrom, dateTo),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [salePayments, acordoPagos, dateFrom, dateTo, userId],
+    [salePayments, acordoPagos, atribuicoesPagas, dateFrom, dateTo, userId],
   );
   const recebidoMes = useMemo(
     () => recebidoEntre(inicioMes, hoje),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [salePayments, acordoPagos, inicioMes, hoje, userId],
+    [salePayments, acordoPagos, atribuicoesPagas, inicioMes, hoje, userId],
   );
 
   const temMeta = metaMes > 0;

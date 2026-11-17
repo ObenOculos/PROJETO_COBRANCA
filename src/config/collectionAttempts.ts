@@ -41,9 +41,10 @@ export const ATTEMPT_RESULT_LABELS: Record<CollectionAttempt["result"], string> 
  * efetivo), usados pela meta de atendimentos do cobrador de carteira
  * (WALLET_COLLECTOR_TYPES) -- diferente da visita presencial, onde
  * "realizada" ja conta sozinho (o cobrador foi ao local, qualquer desfecho).
- * "Mensagem enviada" fica de fora: enviar nao confirma que o cliente leu ou
- * respondeu.
- * ATENCAO: a RPC parcelas_para_atribuicao (migration 20261116000003, item 66)
+ * "Mensagem enviada" entrou em 2026-11-17: decisao do gestor (reuniao do
+ * dia) de que toda interacao com o cliente -- mesmo so mandar mensagem --
+ * conta como acao de cobranca, nao so a que teve resposta confirmada.
+ * ATENCAO: a RPC atribuicao_contato_conta (migration 20261116000004, item 66)
  * repete esta lista em SQL, sem "claims_paid" e "sale_cancel_reported".
  * Mudou aqui, mude la.
  */
@@ -54,6 +55,7 @@ const EFFECTIVE_ATTEMPT_RESULTS: ReadonlySet<CollectionAttempt["result"]> =
     "partial_payment",
     "full_payment",
     "contact_made",
+    "message_sent",
     "agreement",
     "disputed",
     "claims_paid",

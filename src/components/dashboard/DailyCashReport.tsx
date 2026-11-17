@@ -21,6 +21,7 @@ import { createPortal } from "react-dom";
 import * as XLSX from "xlsx";
 import { Collection, isCollectorType } from "../../types";
 import { formatCurrency, formatDate } from "../../utils/formatters";
+import { supabase } from "../../lib/supabase";
 import { useCollection } from "../../contexts/CollectionContext";
 import { resolveSaleKey, valorRecebidoTotal } from "../../filters/sales";
 import { useAuth } from "../../contexts/AuthContext";
@@ -203,6 +204,56 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   const [showUpdateNotification, setShowUpdateNotification] = useState(false);
   const [showExportOptions, setShowExportOptions] = useState(false);
   const exportDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Item 66, etapa 3: pagamentos que o cliente fez na loja/banco, atribuídos
+  // ao cobrador (pedido dele ou exceção do gestor aprovada) -- crédito de
+  // desempenho, não é sale_payments (migration 20261116000003). Busca uma
+  // vez; "Atualizar" (refreshData) não refaz esta consulta local.
+  const [atribuicoesAprovadas, setAtribuicoesAprovadas] = useState<
+    {
+      lote: string;
+      documento: string;
+      cliente: string | null;
+      venda: number | null;
+      valor: number;
+      data_pagamento: string;
+      solicitado_por_id: string;
+    }[]
+  >([]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("atribuicoes_pagamento")
+        .select(
+          "lote, documento, cliente, venda, valor_aprovado, data_pagamento, solicitado_por_id",
+        )
+        .eq("decisao", "aprovado");
+      if (error) {
+        console.error(
+          "Erro ao buscar pagamentos atribuídos (pago na loja):",
+          error,
+        );
+        return;
+      }
+      if (!cancelled) {
+        setAtribuicoesAprovadas(
+          (data || []).map((r) => ({
+            lote: r.lote,
+            documento: r.documento,
+            cliente: r.cliente,
+            venda: r.venda,
+            valor: Number(r.valor_aprovado) || 0,
+            data_pagamento: String(r.data_pagamento).slice(0, 10),
+            solicitado_por_id: r.solicitado_por_id,
+          })),
+        );
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Versões diferidas dos filtros que alimentam o cálculo pesado (reportData).
   // Os controles continuam usando o estado bruto (respondem na hora); o
@@ -414,6 +465,108 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       if (saleNumber) collectorData.saleNumbers.add(saleNumber);
     });
 
+    // Item 66, etapa 3: agrupa as atribuições aprovadas do período (um lote
+    // pode ter parcelas de vendas diferentes do mesmo cliente -- ver caso da
+    // Jucelia) e credita como se fosse mais um pagamento, forma própria.
+    const atribPorLote = new Map<
+      string,
+      {
+        documento: string;
+        cliente: string | null;
+        solicitadoPor: string;
+        valor: number;
+        dataPagamento: string;
+        vendas: Set<string>;
+      }
+    >();
+    atribuicoesAprovadas.forEach((a) => {
+      const emIntervalo =
+        dateRangeMode === "single"
+          ? a.data_pagamento === selectedDate
+          : a.data_pagamento >= selectedDate && a.data_pagamento <= endDate;
+      if (!emIntervalo) return;
+      if (
+        selectedCollector !== "all" &&
+        a.solicitado_por_id !== selectedCollector
+      )
+        return;
+      if (selectedStore !== "all") {
+        const loja = rowsOf(a.documento)[0]?.nome_da_loja;
+        if (loja !== selectedStore) return;
+      }
+      const atual = atribPorLote.get(a.lote) ?? {
+        documento: a.documento,
+        cliente: a.cliente,
+        solicitadoPor: a.solicitado_por_id,
+        valor: 0,
+        dataPagamento: a.data_pagamento,
+        vendas: new Set<string>(),
+      };
+      atual.valor += a.valor;
+      atual.vendas.add(a.venda ? String(a.venda) : "avulsa");
+      atribPorLote.set(a.lote, atual);
+    });
+    atribPorLote.forEach((info, lote) => {
+      const collectorId = info.solicitadoPor || "unknown";
+      if (!collectorMap.has(collectorId)) {
+        collectorMap.set(collectorId, {
+          collectorId,
+          collectorName:
+            users.find((u) => u.id === collectorId)?.name || "Não atribuído",
+          receivedAmount: 0,
+          transactionCount: 0,
+          jurosAmount: 0,
+          discountAmount: 0,
+          clients: new Set(),
+          saleNumbers: new Set(),
+        });
+      }
+      const collectorData = collectorMap.get(collectorId)!;
+      collectorData.receivedAmount += info.valor;
+      collectorData.transactionCount += 1;
+      collectorData.clients.add(info.cliente || info.documento);
+
+      const clientRows = rowsOf(info.documento);
+      const totalDebtValue = clientRows.reduce(
+        (sum, c) => sum + (c.valor_original || 0),
+        0,
+      );
+      const totalAlreadyPaidValue = clientRows.reduce(
+        (sum, c) => sum + (c.valor_recebido || 0),
+        0,
+      );
+      const totalDiscountValue = clientRows.reduce(
+        (sum, c) => sum + (c.desconto || 0),
+        0,
+      );
+      const currentRemainingDebt = Math.max(
+        0,
+        totalDebtValue - (totalAlreadyPaidValue + totalDiscountValue),
+      );
+
+      salesPaymentMap.set(`atrib:${lote}`, {
+        saleKey: `atrib:${lote}`,
+        client: info.cliente || clientRows[0]?.cliente || info.documento,
+        clientDocument: info.documento,
+        saleNumber: Array.from(info.vendas).join(", "),
+        store: clientRows[0]?.nome_da_loja || "",
+        totalOriginalValue: info.valor,
+        totalReceivedValue: info.valor,
+        totalPaidOnDebt: totalAlreadyPaidValue,
+        totalPendingValue: 0,
+        paymentDiscount: 0,
+        paymentJuros: 0,
+        debtKey: `${info.documento}|atrib:${lote}`,
+        totalDebt: totalDebtValue,
+        remainingDebt: currentRemainingDebt,
+        receivedDate: info.dataPagamento,
+        collectorId,
+        collector: collectorData.collectorName,
+        paymentMethod: "atribuicao_pago_loja",
+        installments: [],
+      });
+    });
+
     // Do maior recebido para o menor (tela e exportações usam essa ordem).
     const collectorSummary = Array.from(collectorMap.values())
       .map((c) => ({
@@ -597,6 +750,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   }, [
     salePayments,
     collectionsByDoc,
+    atribuicoesAprovadas,
     dfSelectedDate,
     dfEndDate,
     dfDateRangeMode,

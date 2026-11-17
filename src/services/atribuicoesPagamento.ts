@@ -21,6 +21,9 @@ export interface ParcelaAtribuivel {
   pedido_decisao: "aberto" | "aprovado" | null;
   pedido_meu: boolean | null;
   bloqueio: string | null;
+  /** BANCO_DADOS.descricao -- identifica a parcela quando não há nº de
+   * venda (ex.: "Renegociação de Parcelas"). */
+  descricao: string | null;
 }
 
 export interface AtribuicaoPagamento {

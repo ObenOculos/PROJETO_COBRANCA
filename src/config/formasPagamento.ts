@@ -17,6 +17,9 @@ const OUTRAS_FORMAS_LABEL: Record<string, string> = {
   Cedrus: "Cedrus (sistema antigo)",
   estorno: "Estornos",
   nao_informado: "Não informado",
+  // Item 66: cliente pagou na loja/banco, credito atribuido ao cobrador
+  // (pedido dele ou excecao do gestor) -- nao e sale_payments.
+  atribuicao_pago_loja: "Pago na loja (atribuído)",
 };
 
 /** Agrupa o valor gravado: as variações de estorno viram uma só. */

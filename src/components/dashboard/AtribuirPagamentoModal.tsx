@@ -231,7 +231,10 @@ const AtribuirPagamentoModal: React.FC<Props> = ({ clientGroup, onClose }) => {
                                     alternar([p.id_parcela], e.target.checked)
                                   }
                                 />
-                                Venda #{p.venda ?? "—"} · parcela {p.parcela ?? "—"}
+                                {p.venda
+                                  ? `Venda #${p.venda}`
+                                  : p.descricao || "Parcela avulsa"}{" "}
+                                · parcela {p.parcela ?? "—"}
                                 {p.data_vencimento
                                   ? ` · venc. ${formatDate(p.data_vencimento)}`
                                   : ""}
@@ -300,7 +303,10 @@ const AtribuirPagamentoModal: React.FC<Props> = ({ clientGroup, onClose }) => {
                           key={p.id_parcela}
                           className="text-[11px] text-gray-500 dark:text-dark-text-secondary"
                         >
-                          {formatDate(p.data_pagamento)} · venda #{p.venda ?? "—"}{" "}
+                          {formatDate(p.data_pagamento)} ·{" "}
+                          {p.venda
+                            ? `venda #${p.venda}`
+                            : p.descricao || "parcela avulsa"}{" "}
                           parcela {p.parcela ?? "—"} ·{" "}
                           {formatCurrency(Number(p.valor))} — {p.bloqueio}
                         </li>

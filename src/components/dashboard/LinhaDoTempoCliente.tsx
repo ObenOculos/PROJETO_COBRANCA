@@ -16,6 +16,7 @@ import {
   Phone,
   RefreshCw,
   Smartphone,
+  Undo2,
   UserX,
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
@@ -673,6 +674,10 @@ const LinhaDoTempoCliente: React.FC<Props> = ({
         acordo_cancelado: {
           icone: <Handshake className="h-4 w-4 text-gray-500" />,
           titulo: "Acordo cancelado: ajuste dos juros já pagos",
+        },
+        estorno: {
+          icone: <Undo2 className="h-4 w-4 text-red-600" />,
+          titulo: "Estorno de pagamento",
         },
       }[primeira.origem] ?? {
         icone: <History className="h-4 w-4 text-gray-400" />,

@@ -236,8 +236,11 @@ const AtribuirExcecaoModal: React.FC<Props> = ({
                             />
                             <span className="min-w-0">
                               <span className="block text-gray-800 dark:text-dark-text">
-                                Pago em {formatDate(p.data_pagamento)} · venda #
-                                {p.venda ?? "—"} · parcela {p.parcela ?? "—"}
+                                Pago em {formatDate(p.data_pagamento)} ·{" "}
+                                {p.venda
+                                  ? `venda #${p.venda}`
+                                  : p.descricao || "parcela avulsa"}{" "}
+                                · parcela {p.parcela ?? "—"}
                               </span>
                               <span
                                 className={`block text-[11px] ${
