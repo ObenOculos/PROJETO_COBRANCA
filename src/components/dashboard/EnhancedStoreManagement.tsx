@@ -97,6 +97,10 @@ interface StoreStats {
   discountAmount: number;
   overdueAmount: number; // saldo em aberto de parcelas já vencidas
   overdueTitles: number; // nº de parcelas vencidas com saldo
+  /** Quantos clientes/vendas/títulos têm saldo em aberto (por parcela). */
+  openCounts: ContagemLoja;
+  /** Quantos clientes/vendas/títulos já tiveram algum valor recebido. */
+  paidCounts: ContagemLoja;
   /** Base da inadimplencia: valor original das parcelas com atraso acima do
    * corte, no periodo (filters/inadimplencia). */
   dueAmount: number;
@@ -109,6 +113,35 @@ interface StoreStats {
   averageTicket: number;
   clientsCount: number;
 }
+
+interface ContagemLoja {
+  clientes: number;
+  vendas: number;
+  titulos: number;
+}
+
+/** Rodapé das caixas Em aberto/Recebido do card: número grande, nome
+ * embaixo (lê sem legenda). */
+const ContagemMini: React.FC<{ c: ContagemLoja }> = ({ c }) => (
+  <div className="mt-auto pt-1.5 border-t border-black/5 dark:border-white/10 grid grid-cols-3 gap-1 text-center">
+    {(
+      [
+        ["clientes", c.clientes],
+        ["vendas", c.vendas],
+        ["títulos", c.titulos],
+      ] as const
+    ).map(([nome, n]) => (
+      <div key={nome} className="min-w-0">
+        <div className="text-[11px] font-bold text-gray-700 dark:text-dark-text truncate">
+          {n.toLocaleString("pt-BR")}
+        </div>
+        <div className="text-[9px] text-gray-400 dark:text-dark-text-secondary truncate">
+          {nome}
+        </div>
+      </div>
+    ))}
+  </div>
+);
 
 /** "Fulano, Ciclano +2" -- cabe numa linha do card. */
 const nomesCobradores = (lista: StoreCollector[], max = 2): string =>
@@ -221,6 +254,14 @@ const EnhancedStoreManagement: React.FC = () => {
       const cityCounts = new Map<string, number>();
       const clientsByCollector = new Map<string, Set<string>>();
       let overdueTitles = 0;
+      // Contagens do Em aberto e do Recebido do card (um cliente/venda pode
+      // estar nos dois: pagou parte e ainda deve o resto).
+      const abertoClientes = new Set<string>();
+      const abertoVendas = new Set<string>();
+      let abertoTitulos = 0;
+      const pagoClientes = new Set<string>();
+      const pagoVendas = new Set<string>();
+      let pagoTitulos = 0;
 
       // Uma passada por titulo: vendas, cidades, cobradores e atraso.
       periodCollections.forEach((c) => {
@@ -256,8 +297,16 @@ const EnhancedStoreManagement: React.FC = () => {
 
         // Parcelas vencidas com saldo (o valor vem da composicaoCarteira).
         const open = original - recebido - desconto;
-        if (open > 0.01 && atrasoDias(c.data_vencimento) > 0) {
-          overdueTitles += 1;
+        if (open > 0.01) {
+          abertoTitulos += 1;
+          abertoVendas.add(key);
+          abertoClientes.add(c.documento || "");
+          if (atrasoDias(c.data_vencimento) > 0) overdueTitles += 1;
+        }
+        if (recebido > 0.01) {
+          pagoTitulos += 1;
+          pagoVendas.add(key);
+          pagoClientes.add(c.documento || "");
         }
       });
 
@@ -307,6 +356,16 @@ const EnhancedStoreManagement: React.FC = () => {
         discountAmount: comp.desconto,
         overdueAmount: comp.vencido,
         overdueTitles,
+        openCounts: {
+          clientes: abertoClientes.size,
+          vendas: abertoVendas.size,
+          titulos: abertoTitulos,
+        },
+        paidCounts: {
+          clientes: pagoClientes.size,
+          vendas: pagoVendas.size,
+          titulos: pagoTitulos,
+        },
         dueAmount: inad.venceu,
         inadNaoPago: inad.naoPago,
         inadimplencia: inad.pct,
@@ -800,6 +859,10 @@ const EnhancedStoreManagement: React.FC = () => {
           );
           const inadDica = `Inadimplência: ${formatCurrency(store.inadNaoPago)} não pago de ${formatCurrency(store.dueAmount)} esperado (atraso > ${INADIMPLENCIA_CORTE_DIAS} dias)`;
           const temVencido = store.overdueAmount > 0.01;
+          const aVencerLoja = Math.max(
+            0,
+            store.pendingAmount - store.overdueAmount,
+          );
           const cidades =
             store.citiesCount > 1
               ? `${store.city} +${store.citiesCount - 1} ${store.citiesCount === 2 ? "cidade" : "cidades"}`
@@ -838,19 +901,22 @@ const EnhancedStoreManagement: React.FC = () => {
                     {cobradores}
                   </p>
                   <p className="mt-1 text-[11px] font-semibold truncate">
-                    <span className="text-amber-600 dark:text-amber-400">
-                      {formatCurrency(store.pendingAmount)} em aberto
+                    <span className="text-blue-600 dark:text-blue-400">
+                      {formatCurrency(aVencerLoja)} a vencer
                     </span>
-                    {temVencido && (
-                      <>
-                        <span className="text-gray-300 dark:text-gray-600 mx-1.5">
-                          ·
-                        </span>
-                        <span className="text-red-600 dark:text-red-400">
-                          {formatCurrency(store.overdueAmount)} vencido
-                        </span>
-                      </>
-                    )}
+                    <span className="text-gray-300 dark:text-gray-600 mx-1.5">
+                      ·
+                    </span>
+                    <span
+                      className={
+                        temVencido
+                          ? "text-red-600 dark:text-red-400"
+                          : "text-gray-400 dark:text-dark-text-secondary"
+                      }
+                    >
+                      {formatCurrency(temVencido ? store.overdueAmount : 0)}{" "}
+                      vencido
+                    </span>
                   </p>
                 </div>
                 <ChevronRight className="h-4 w-4 text-gray-300 dark:text-gray-600 shrink-0" />
@@ -897,33 +963,69 @@ const EnhancedStoreManagement: React.FC = () => {
 
                 {/* Carteira: em aberto (e quanto dele venceu) + recebido */}
                 <div className="grid grid-cols-2 gap-2 mb-3">
-                  <div className="p-2.5 rounded-xl border bg-amber-50/30 dark:bg-amber-950/10 border-amber-100/40 dark:border-amber-900/20 min-w-0">
+                  <div className="flex flex-col p-2.5 rounded-xl border bg-amber-50/30 dark:bg-amber-950/10 border-amber-100/40 dark:border-amber-900/20 min-w-0">
                     <span className="text-[9px] font-bold tracking-wider uppercase block mb-0.5 text-amber-700 dark:text-amber-400">
                       Em aberto
                     </span>
                     <div className="text-sm font-extrabold truncate text-amber-600 dark:text-amber-400">
                       {formatCurrency(store.pendingAmount)}
                     </div>
-                    <div
-                      className={`text-[10px] font-semibold truncate ${temVencido ? "text-red-600 dark:text-red-400" : "text-gray-400 dark:text-dark-text-secondary"}`}
-                      title="Saldo das parcelas com vencimento já passado (qualquer atraso)"
-                    >
-                      {temVencido
-                        ? `${formatCurrency(store.overdueAmount)} vencido (${store.overdueTitles} tít.)`
-                        : "nada vencido"}
+                    {/* Em aberto separado em a vencer e vencido, com as
+                        mesmas cores da barra do card do topo. */}
+                    <div className="mt-1 mb-2 space-y-0.5 text-[10px] font-semibold">
+                      <div
+                        className="flex items-center justify-between gap-1.5 min-w-0"
+                        title="Em aberto, ainda não venceu"
+                      >
+                        <span className="flex items-center gap-1 min-w-0 text-gray-500 dark:text-dark-text-secondary">
+                          <span className="h-1.5 w-1.5 rounded-full shrink-0 bg-blue-300" />
+                          <span className="truncate">a vencer</span>
+                        </span>
+                        <span className="shrink-0 text-blue-600 dark:text-blue-400">
+                          {formatCurrency(aVencerLoja)}
+                        </span>
+                      </div>
+                      <div
+                        className="flex items-center justify-between gap-1.5 min-w-0"
+                        title={`Em aberto, com vencimento já passado (qualquer atraso)${temVencido ? ` · ${store.overdueTitles} títulos` : ""}`}
+                      >
+                        <span className="flex items-center gap-1 min-w-0 text-gray-500 dark:text-dark-text-secondary">
+                          <span className="h-1.5 w-1.5 rounded-full shrink-0 bg-red-500" />
+                          <span className="truncate">vencido</span>
+                        </span>
+                        <span
+                          className={`shrink-0 ${temVencido ? "text-red-600 dark:text-red-400" : "text-gray-400 dark:text-dark-text-secondary"}`}
+                        >
+                          {formatCurrency(temVencido ? store.overdueAmount : 0)}
+                        </span>
+                      </div>
                     </div>
+                    <ContagemMini c={store.openCounts} />
                   </div>
-                  <div className="p-2.5 bg-green-50/30 dark:bg-green-950/10 rounded-xl border border-green-100/40 dark:border-green-900/20 min-w-0">
+                  <div className="flex flex-col p-2.5 bg-green-50/30 dark:bg-green-950/10 rounded-xl border border-green-100/40 dark:border-green-900/20 min-w-0">
                     <span className="text-[9px] font-bold text-green-700 dark:text-green-400 tracking-wider uppercase block mb-0.5">
                       Recebido
                     </span>
                     <div className="text-sm font-extrabold text-green-600 dark:text-green-400 truncate">
                       {formatCurrency(store.receivedAmount)}
                     </div>
-                    <div className="text-[10px] font-medium text-gray-400 dark:text-dark-text-secondary truncate">
-                      {store.clientsCount.toLocaleString("pt-BR")} clientes ·{" "}
-                      {store.totalSales.toLocaleString("pt-BR")} vendas
+                    {/* Mesma forma do Em aberto: o desconto (cor da barra
+                        do topo) e de quantos clientes/vendas. */}
+                    <div className="mt-1 mb-2 space-y-0.5 text-[10px] font-semibold">
+                      <div
+                        className="flex items-center justify-between gap-1.5 min-w-0"
+                        title="Desconto concedido: não entrou, mas também não é dívida"
+                      >
+                        <span className="flex items-center gap-1 min-w-0 text-gray-500 dark:text-dark-text-secondary">
+                          <span className="h-1.5 w-1.5 rounded-full shrink-0 bg-gray-300" />
+                          <span className="truncate">desconto</span>
+                        </span>
+                        <span className="shrink-0 text-gray-500 dark:text-dark-text-secondary">
+                          {formatCurrency(store.discountAmount)}
+                        </span>
+                      </div>
                     </div>
+                    <ContagemMini c={store.paidCounts} />
                   </div>
                 </div>
 
