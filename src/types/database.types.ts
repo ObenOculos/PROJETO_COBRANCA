@@ -272,27 +272,6 @@ export type Database = {
           },
         ];
       };
-      // Migration 20261110000008 (so leitura pelo app).
-      vendas_conferencia: {
-        Row: {
-          id: string;
-          documento: string;
-          chave_venda: number;
-          parcelas: number[];
-          valor_em_aberto: number;
-          cobrador_id: string | null;
-          informado_por: string;
-          informado_em: string;
-          observacao: string;
-          status: string;
-          decidido_por: string | null;
-          decidido_em: string | null;
-          decisao_motivo: string | null;
-        };
-        Insert: never;
-        Update: never;
-        Relationships: [];
-      };
       acordos: {
         Row: {
           acordo_origem_id: string | null;
@@ -302,9 +281,7 @@ export type Database = {
           created_at: string;
           created_by_id: string | null;
           desconto_percentual_aplicado: number;
-          // Migration 20261110000006.
           destino_pagamentos: string | null;
-          // Migration 20261110000005.
           encargos_reimputados: number | null;
           forma_pagamento_parcelas: string | null;
           id: string;
@@ -328,6 +305,8 @@ export type Database = {
           created_at?: string;
           created_by_id?: string | null;
           desconto_percentual_aplicado?: number;
+          destino_pagamentos?: string | null;
+          encargos_reimputados?: number | null;
           forma_pagamento_parcelas?: string | null;
           id?: string;
           juros_percentual_am_aplicado?: number;
@@ -350,6 +329,8 @@ export type Database = {
           created_at?: string;
           created_by_id?: string | null;
           desconto_percentual_aplicado?: number;
+          destino_pagamentos?: string | null;
+          encargos_reimputados?: number | null;
           forma_pagamento_parcelas?: string | null;
           id?: string;
           juros_percentual_am_aplicado?: number;
@@ -476,6 +457,87 @@ export type Database = {
           nome_da_loja?: string | null;
         };
         Relationships: [];
+      };
+      atribuicoes_pagamento: {
+        Row: {
+          cliente: string | null;
+          created_at: string;
+          data_pagamento: string;
+          decidido_em: string | null;
+          decidido_por_id: string | null;
+          decisao: string | null;
+          documento: string;
+          excecao: boolean;
+          id: string;
+          id_parcela: number;
+          lote: string;
+          observacao: string;
+          parcela: number | null;
+          resposta: string | null;
+          solicitado_por_id: string;
+          ultimo_contato_em: string | null;
+          valor: number;
+          valor_aprovado: number | null;
+          venda: number | null;
+        };
+        Insert: {
+          cliente?: string | null;
+          created_at?: string;
+          data_pagamento: string;
+          decidido_em?: string | null;
+          decidido_por_id?: string | null;
+          decisao?: string | null;
+          documento: string;
+          excecao?: boolean;
+          id?: string;
+          id_parcela: number;
+          lote: string;
+          observacao: string;
+          parcela?: number | null;
+          resposta?: string | null;
+          solicitado_por_id: string;
+          ultimo_contato_em?: string | null;
+          valor: number;
+          valor_aprovado?: number | null;
+          venda?: number | null;
+        };
+        Update: {
+          cliente?: string | null;
+          created_at?: string;
+          data_pagamento?: string;
+          decidido_em?: string | null;
+          decidido_por_id?: string | null;
+          decisao?: string | null;
+          documento?: string;
+          excecao?: boolean;
+          id?: string;
+          id_parcela?: number;
+          lote?: string;
+          observacao?: string;
+          parcela?: number | null;
+          resposta?: string | null;
+          solicitado_por_id?: string;
+          ultimo_contato_em?: string | null;
+          valor?: number;
+          valor_aprovado?: number | null;
+          venda?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "atribuicoes_pagamento_decidido_por_id_fkey";
+            columns: ["decidido_por_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "atribuicoes_pagamento_solicitado_por_id_fkey";
+            columns: ["solicitado_por_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       authorization_history: {
         Row: {
@@ -854,69 +916,72 @@ export type Database = {
           celular: string | null;
           celular1: string | null;
           celular2: string | null;
+          codigo_cliente_erp: string | null;
+          codigo_cliente_ssotica: string | null;
+          contato_nome: string | null;
+          contato_telefone: string | null;
+          contato_telefone2: string | null;
           created_at: string | null;
           data_nascimento: string | null;
           documento: string;
           email: string | null;
+          erp_atualizado_em: string | null;
           id: number;
           nome: string;
+          observacao_erp: string | null;
+          razao_social: string | null;
+          regiao: string | null;
           reincidencia_reset_at: string | null;
           telefone: string | null;
-          razao_social: string | null;
-          contato_nome: string | null;
-          contato_telefone: string | null;
-          contato_telefone2: string | null;
           vendedor_responsavel: string | null;
-          regiao: string | null;
-          observacao_erp: string | null;
-          erp_atualizado_em: string | null;
-          codigo_cliente_erp: string | null;
         };
         Insert: {
           apelido?: string | null;
           celular?: string | null;
           celular1?: string | null;
           celular2?: string | null;
+          codigo_cliente_erp?: string | null;
+          codigo_cliente_ssotica?: string | null;
+          contato_nome?: string | null;
+          contato_telefone?: string | null;
+          contato_telefone2?: string | null;
           created_at?: string | null;
           data_nascimento?: string | null;
           documento: string;
           email?: string | null;
+          erp_atualizado_em?: string | null;
           id?: number;
           nome: string;
+          observacao_erp?: string | null;
+          razao_social?: string | null;
+          regiao?: string | null;
           reincidencia_reset_at?: string | null;
           telefone?: string | null;
-          razao_social?: string | null;
-          contato_nome?: string | null;
-          contato_telefone?: string | null;
-          contato_telefone2?: string | null;
           vendedor_responsavel?: string | null;
-          regiao?: string | null;
-          observacao_erp?: string | null;
-          erp_atualizado_em?: string | null;
-          codigo_cliente_erp?: string | null;
         };
         Update: {
           apelido?: string | null;
           celular?: string | null;
           celular1?: string | null;
           celular2?: string | null;
+          codigo_cliente_erp?: string | null;
+          codigo_cliente_ssotica?: string | null;
+          contato_nome?: string | null;
+          contato_telefone?: string | null;
+          contato_telefone2?: string | null;
           created_at?: string | null;
           data_nascimento?: string | null;
           documento?: string;
           email?: string | null;
+          erp_atualizado_em?: string | null;
           id?: number;
           nome?: string;
+          observacao_erp?: string | null;
+          razao_social?: string | null;
+          regiao?: string | null;
           reincidencia_reset_at?: string | null;
           telefone?: string | null;
-          razao_social?: string | null;
-          contato_nome?: string | null;
-          contato_telefone?: string | null;
-          contato_telefone2?: string | null;
           vendedor_responsavel?: string | null;
-          regiao?: string | null;
-          observacao_erp?: string | null;
-          erp_atualizado_em?: string | null;
-          codigo_cliente_erp?: string | null;
         };
         Relationships: [];
       };
@@ -930,6 +995,7 @@ export type Database = {
           next_action: string | null;
           next_action_date: string | null;
           notes: string | null;
+          registrado_por_id: string | null;
           result: string;
           type: string;
         };
@@ -942,6 +1008,7 @@ export type Database = {
           next_action?: string | null;
           next_action_date?: string | null;
           notes?: string | null;
+          registrado_por_id?: string | null;
           result: string;
           type: string;
         };
@@ -954,6 +1021,7 @@ export type Database = {
           next_action?: string | null;
           next_action_date?: string | null;
           notes?: string | null;
+          registrado_por_id?: string | null;
           result?: string;
           type?: string;
         };
@@ -965,19 +1033,26 @@ export type Database = {
             referencedRelation: "users";
             referencedColumns: ["id"];
           },
+          {
+            foreignKeyName: "collection_attempts_registrado_por_id_fkey";
+            columns: ["registrado_por_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
         ];
       };
       collector_overdue_ranges: {
         Row: {
+          ativa: boolean;
           collector_id: string;
           created_at: string;
           created_by: string | null;
-          ativa: boolean;
+          fila_ordem: string;
           fila_peso: number | null;
           fila_peso_tarde: number | null;
-          fila_ordem: string;
-          fila_saldo_min: number | null;
           fila_saldo_max: number | null;
+          fila_saldo_min: number | null;
           id: string;
           lojas: string[] | null;
           max_dias: number | null;
@@ -986,15 +1061,15 @@ export type Database = {
           vigente_desde: string;
         };
         Insert: {
+          ativa?: boolean;
           collector_id: string;
           created_at?: string;
           created_by?: string | null;
-          ativa?: boolean;
+          fila_ordem?: string;
           fila_peso?: number | null;
           fila_peso_tarde?: number | null;
-          fila_ordem?: string;
-          fila_saldo_min?: number | null;
           fila_saldo_max?: number | null;
+          fila_saldo_min?: number | null;
           id?: string;
           lojas?: string[] | null;
           max_dias?: number | null;
@@ -1003,15 +1078,15 @@ export type Database = {
           vigente_desde?: string;
         };
         Update: {
+          ativa?: boolean;
           collector_id?: string;
           created_at?: string;
           created_by?: string | null;
-          ativa?: boolean;
+          fila_ordem?: string;
           fila_peso?: number | null;
           fila_peso_tarde?: number | null;
-          fila_ordem?: string;
-          fila_saldo_min?: number | null;
           fila_saldo_max?: number | null;
+          fila_saldo_min?: number | null;
           id?: string;
           lojas?: string[] | null;
           max_dias?: number | null;
@@ -1036,7 +1111,67 @@ export type Database = {
           },
         ];
       };
-      // Migration 20261109000012 (Fila de Cobranca: deixar para depois).
+      comissao_faixas: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          forma: string;
+          id: string;
+          meta_valor: number;
+          month: string;
+          substituida_em: string | null;
+          substituida_por: string | null;
+          user_id: string;
+          valor: number;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          forma: string;
+          id?: string;
+          meta_valor: number;
+          month: string;
+          substituida_em?: string | null;
+          substituida_por?: string | null;
+          user_id: string;
+          valor: number;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          forma?: string;
+          id?: string;
+          meta_valor?: number;
+          month?: string;
+          substituida_em?: string | null;
+          substituida_por?: string | null;
+          user_id?: string;
+          valor?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "comissao_faixas_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "comissao_faixas_substituida_por_fkey";
+            columns: ["substituida_por"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "comissao_faixas_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       conferencia_marcacoes: {
         Row: {
           acao: string;
@@ -1074,71 +1209,378 @@ export type Database = {
           registrado_por_id?: string;
           visao?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: "conferencia_marcacoes_registrado_por_id_fkey";
+            columns: ["registrado_por_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      distribuicao_config: {
+        Row: {
+          atualizado_em: string;
+          atualizado_por: string | null;
+          id: number;
+          perfis: Json;
+        };
+        Insert: {
+          atualizado_em?: string;
+          atualizado_por?: string | null;
+          id?: number;
+          perfis: Json;
+        };
+        Update: {
+          atualizado_em?: string;
+          atualizado_por?: string | null;
+          id?: number;
+          perfis?: Json;
+        };
         Relationships: [];
       };
-      // Migration 20261116000003 (item 66).
-      atribuicoes_pagamento: {
+      distribuicao_execucoes: {
+        Row: {
+          erro: string | null;
+          executado_em: string;
+          id: number;
+          resultado: Json | null;
+        };
+        Insert: {
+          erro?: string | null;
+          executado_em?: string;
+          id?: number;
+          resultado?: Json | null;
+        };
+        Update: {
+          erro?: string | null;
+          executado_em?: string;
+          id?: number;
+          resultado?: Json | null;
+        };
+        Relationships: [];
+      };
+      enderecos_historico: {
+        Row: {
+          bairro: string | null;
+          cep: string | null;
+          cidade: string | null;
+          cliente_documento: string;
+          complemento: string | null;
+          created_at: string;
+          estado: string | null;
+          id: string;
+          is_atual: boolean;
+          logradouro: string | null;
+          numero: string | null;
+        };
+        Insert: {
+          bairro?: string | null;
+          cep?: string | null;
+          cidade?: string | null;
+          cliente_documento: string;
+          complemento?: string | null;
+          created_at?: string;
+          estado?: string | null;
+          id?: string;
+          is_atual?: boolean;
+          logradouro?: string | null;
+          numero?: string | null;
+        };
+        Update: {
+          bairro?: string | null;
+          cep?: string | null;
+          cidade?: string | null;
+          cliente_documento?: string;
+          complemento?: string | null;
+          created_at?: string;
+          estado?: string | null;
+          id?: string;
+          is_atual?: boolean;
+          logradouro?: string | null;
+          numero?: string | null;
+        };
+        Relationships: [];
+      };
+      fila_adiamentos: {
+        Row: {
+          collector_id: string;
+          created_at: string;
+          dia: string;
+          documento: string;
+          id: string;
+          motivo: string;
+          observacao: string | null;
+        };
+        Insert: {
+          collector_id: string;
+          created_at?: string;
+          dia?: string;
+          documento: string;
+          id?: string;
+          motivo: string;
+          observacao?: string | null;
+        };
+        Update: {
+          collector_id?: string;
+          created_at?: string;
+          dia?: string;
+          documento?: string;
+          id?: string;
+          motivo?: string;
+          observacao?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "fila_adiamentos_collector_id_fkey";
+            columns: ["collector_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      fila_lote_itens: {
+        Row: {
+          documento: string;
+          lote_id: string;
+          posicao: number;
+          regra_id: string | null;
+          urgencia: string | null;
+        };
+        Insert: {
+          documento: string;
+          lote_id: string;
+          posicao: number;
+          regra_id?: string | null;
+          urgencia?: string | null;
+        };
+        Update: {
+          documento?: string;
+          lote_id?: string;
+          posicao?: number;
+          regra_id?: string | null;
+          urgencia?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "fila_lote_itens_lote_id_fkey";
+            columns: ["lote_id"];
+            isOneToOne: false;
+            referencedRelation: "fila_lotes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "fila_lote_itens_regra_id_fkey";
+            columns: ["regra_id"];
+            isOneToOne: false;
+            referencedRelation: "collector_overdue_ranges";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      fila_lotes: {
+        Row: {
+          collector_id: string;
+          concluido_em: string | null;
+          criado_em: string;
+          id: string;
+          tamanho_previsto: number;
+          turno: string | null;
+        };
+        Insert: {
+          collector_id: string;
+          concluido_em?: string | null;
+          criado_em?: string;
+          id?: string;
+          tamanho_previsto: number;
+          turno?: string | null;
+        };
+        Update: {
+          collector_id?: string;
+          concluido_em?: string | null;
+          criado_em?: string;
+          id?: string;
+          tamanho_previsto?: number;
+          turno?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "fila_lotes_collector_id_fkey";
+            columns: ["collector_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      manager_collector_links: {
+        Row: {
+          collector_id: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          manager_id: string;
+          vigente_ate: string | null;
+          vigente_desde: string;
+        };
+        Insert: {
+          collector_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          manager_id: string;
+          vigente_ate?: string | null;
+          vigente_desde?: string;
+        };
+        Update: {
+          collector_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          manager_id?: string;
+          vigente_ate?: string | null;
+          vigente_desde?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "manager_collector_links_collector_id_fkey";
+            columns: ["collector_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "manager_collector_links_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "manager_collector_links_manager_id_fkey";
+            columns: ["manager_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      monthly_goals: {
+        Row: {
+          created_at: string;
+          id: string;
+          month: string;
+          payments_goal: number;
+          updated_at: string;
+          user_id: string;
+          visits_goal: number;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          month: string;
+          payments_goal: number;
+          updated_at?: string;
+          user_id: string;
+          visits_goal: number;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          month?: string;
+          payments_goal?: number;
+          updated_at?: string;
+          user_id?: string;
+          visits_goal?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "monthly_goals_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      pedidos_correcao_pagamento: {
         Row: {
           cliente: string | null;
           created_at: string;
-          data_pagamento: string;
           decidido_em: string | null;
           decidido_por_id: string | null;
           decisao: string | null;
           documento: string;
+          estorno_id: string | null;
           id: string;
-          id_parcela: number;
-          lote: string;
-          observacao: string;
-          parcela: number | null;
+          motivo: string;
           resposta: string | null;
+          sale_payment_id: string;
           solicitado_por_id: string;
-          ultimo_contato_em: string;
           valor: number;
-          valor_aprovado: number | null;
-          venda: number | null;
         };
         Insert: {
           cliente?: string | null;
           created_at?: string;
-          data_pagamento: string;
           decidido_em?: string | null;
           decidido_por_id?: string | null;
           decisao?: string | null;
           documento: string;
+          estorno_id?: string | null;
           id?: string;
-          id_parcela: number;
-          lote: string;
-          observacao: string;
-          parcela?: number | null;
+          motivo: string;
           resposta?: string | null;
+          sale_payment_id: string;
           solicitado_por_id: string;
-          ultimo_contato_em: string;
           valor: number;
-          valor_aprovado?: number | null;
-          venda?: number | null;
         };
         Update: {
           cliente?: string | null;
           created_at?: string;
-          data_pagamento?: string;
           decidido_em?: string | null;
           decidido_por_id?: string | null;
           decisao?: string | null;
           documento?: string;
+          estorno_id?: string | null;
           id?: string;
-          id_parcela?: number;
-          lote?: string;
-          observacao?: string;
-          parcela?: number | null;
+          motivo?: string;
           resposta?: string | null;
+          sale_payment_id?: string;
           solicitado_por_id?: string;
-          ultimo_contato_em?: string;
           valor?: number;
-          valor_aprovado?: number | null;
-          venda?: number | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "pedidos_correcao_pagamento_decidido_por_id_fkey";
+            columns: ["decidido_por_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pedidos_correcao_pagamento_estorno_id_fkey";
+            columns: ["estorno_id"];
+            isOneToOne: false;
+            referencedRelation: "sale_payments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pedidos_correcao_pagamento_sale_payment_id_fkey";
+            columns: ["sale_payment_id"];
+            isOneToOne: false;
+            referencedRelation: "sale_payments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pedidos_correcao_pagamento_solicitado_por_id_fkey";
+            columns: ["solicitado_por_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       pedidos_desconto: {
         Row: {
@@ -1198,230 +1640,17 @@ export type Database = {
           valor_devido?: number;
           valor_pago?: number;
         };
-        Relationships: [];
-      };
-      pedidos_correcao_pagamento: {
-        Row: {
-          cliente: string | null;
-          created_at: string;
-          decidido_em: string | null;
-          decidido_por_id: string | null;
-          decisao: string | null;
-          documento: string;
-          estorno_id: string | null;
-          id: string;
-          motivo: string;
-          resposta: string | null;
-          sale_payment_id: string;
-          solicitado_por_id: string;
-          valor: number;
-        };
-        Insert: {
-          cliente?: string | null;
-          created_at?: string;
-          decidido_em?: string | null;
-          decidido_por_id?: string | null;
-          decisao?: string | null;
-          documento: string;
-          estorno_id?: string | null;
-          id?: string;
-          motivo: string;
-          resposta?: string | null;
-          sale_payment_id: string;
-          solicitado_por_id: string;
-          valor: number;
-        };
-        Update: {
-          cliente?: string | null;
-          created_at?: string;
-          decidido_em?: string | null;
-          decidido_por_id?: string | null;
-          decisao?: string | null;
-          documento?: string;
-          estorno_id?: string | null;
-          id?: string;
-          motivo?: string;
-          resposta?: string | null;
-          sale_payment_id?: string;
-          solicitado_por_id?: string;
-          valor?: number;
-        };
-        Relationships: [];
-      };
-      fila_adiamentos: {
-        Row: {
-          collector_id: string;
-          created_at: string;
-          dia: string;
-          documento: string;
-          id: string;
-          motivo: string;
-          observacao: string | null;
-        };
-        Insert: {
-          collector_id: string;
-          created_at?: string;
-          dia?: string;
-          documento: string;
-          id?: string;
-          motivo: string;
-          observacao?: string | null;
-        };
-        Update: {
-          collector_id?: string;
-          created_at?: string;
-          dia?: string;
-          documento?: string;
-          id?: string;
-          motivo?: string;
-          observacao?: string | null;
-        };
-        Relationships: [];
-      };
-      enderecos_historico: {
-        Row: {
-          bairro: string | null;
-          cep: string | null;
-          cidade: string | null;
-          cliente_documento: string;
-          complemento: string | null;
-          created_at: string;
-          estado: string | null;
-          id: string;
-          is_atual: boolean;
-          logradouro: string | null;
-          numero: string | null;
-        };
-        Insert: {
-          bairro?: string | null;
-          cep?: string | null;
-          cidade?: string | null;
-          cliente_documento: string;
-          complemento?: string | null;
-          created_at?: string;
-          estado?: string | null;
-          id?: string;
-          is_atual?: boolean;
-          logradouro?: string | null;
-          numero?: string | null;
-        };
-        Update: {
-          bairro?: string | null;
-          cep?: string | null;
-          cidade?: string | null;
-          cliente_documento?: string;
-          complemento?: string | null;
-          created_at?: string;
-          estado?: string | null;
-          id?: string;
-          is_atual?: boolean;
-          logradouro?: string | null;
-          numero?: string | null;
-        };
-        Relationships: [];
-      };
-      manager_collector_links: {
-        Row: {
-          collector_id: string;
-          created_at: string;
-          created_by: string | null;
-          id: string;
-          manager_id: string;
-          vigente_ate: string | null;
-          vigente_desde: string;
-        };
-        Insert: {
-          collector_id: string;
-          created_at?: string;
-          created_by?: string | null;
-          id?: string;
-          manager_id: string;
-          vigente_ate?: string | null;
-          vigente_desde?: string;
-        };
-        Update: {
-          collector_id?: string;
-          created_at?: string;
-          created_by?: string | null;
-          id?: string;
-          manager_id?: string;
-          vigente_ate?: string | null;
-          vigente_desde?: string;
-        };
         Relationships: [
           {
-            foreignKeyName: "manager_collector_links_collector_id_fkey";
-            columns: ["collector_id"];
+            foreignKeyName: "pedidos_desconto_decidido_por_id_fkey";
+            columns: ["decidido_por_id"];
             isOneToOne: false;
             referencedRelation: "users";
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "manager_collector_links_created_by_fkey";
-            columns: ["created_by"];
-            isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "manager_collector_links_manager_id_fkey";
-            columns: ["manager_id"];
-            isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
-      // Migration 20261116000007 (item 72). Escrita so pela RPC definir_metas_mes.
-      comissao_faixas: {
-        Row: {
-          id: string;
-          user_id: string;
-          month: string;
-          meta_valor: number;
-          forma: "percentual" | "fixo";
-          valor: number;
-          created_at: string;
-          created_by: string | null;
-          substituida_em: string | null;
-          substituida_por: string | null;
-        };
-        Insert: never;
-        Update: never;
-        Relationships: [];
-      };
-      monthly_goals: {
-        Row: {
-          created_at: string;
-          id: string;
-          month: string;
-          payments_goal: number;
-          updated_at: string;
-          user_id: string;
-          visits_goal: number;
-        };
-        Insert: {
-          created_at?: string;
-          id?: string;
-          month: string;
-          payments_goal: number;
-          updated_at?: string;
-          user_id: string;
-          visits_goal: number;
-        };
-        Update: {
-          created_at?: string;
-          id?: string;
-          month?: string;
-          payments_goal?: number;
-          updated_at?: string;
-          user_id?: string;
-          visits_goal?: number;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "monthly_goals_user_id_fkey";
-            columns: ["user_id"];
+            foreignKeyName: "pedidos_desconto_solicitado_por_id_fkey";
+            columns: ["solicitado_por_id"];
             isOneToOne: false;
             referencedRelation: "users";
             referencedColumns: ["id"];
@@ -1513,17 +1742,17 @@ export type Database = {
           collector_name: string | null;
           created_at: string | null;
           discount_amount: number | null;
-          juros_amount: number;
           distribution_details: Json | null;
           estorno_de: string | null;
           id: string;
           is_agreement: boolean | null;
+          juros_amount: number;
           motivo: string | null;
           notes: string | null;
           payment_amount: number;
           payment_date: string;
-          pedido_desconto_id: string | null;
           payment_method: string | null;
+          pedido_desconto_id: string | null;
           registrado_por_id: string | null;
           sale_number: number | null;
           store_name: string | null;
@@ -1536,17 +1765,17 @@ export type Database = {
           collector_name?: string | null;
           created_at?: string | null;
           discount_amount?: number | null;
-          juros_amount?: number;
           distribution_details?: Json | null;
           estorno_de?: string | null;
           id?: string;
           is_agreement?: boolean | null;
+          juros_amount?: number;
           motivo?: string | null;
           notes?: string | null;
           payment_amount: number;
           payment_date?: string;
-          pedido_desconto_id?: string | null;
           payment_method?: string | null;
+          pedido_desconto_id?: string | null;
           registrado_por_id?: string | null;
           sale_number?: number | null;
           store_name?: string | null;
@@ -1559,17 +1788,17 @@ export type Database = {
           collector_name?: string | null;
           created_at?: string | null;
           discount_amount?: number | null;
-          juros_amount?: number;
           distribution_details?: Json | null;
           estorno_de?: string | null;
           id?: string;
           is_agreement?: boolean | null;
+          juros_amount?: number;
           motivo?: string | null;
           notes?: string | null;
           payment_amount?: number;
           payment_date?: string;
-          pedido_desconto_id?: string | null;
           payment_method?: string | null;
+          pedido_desconto_id?: string | null;
           registrado_por_id?: string | null;
           sale_number?: number | null;
           store_name?: string | null;
@@ -1588,6 +1817,13 @@ export type Database = {
             columns: ["estorno_de"];
             isOneToOne: false;
             referencedRelation: "sale_payments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "sale_payments_pedido_desconto_id_fkey";
+            columns: ["pedido_desconto_id"];
+            isOneToOne: false;
+            referencedRelation: "pedidos_desconto";
             referencedColumns: ["id"];
           },
         ];
@@ -1716,6 +1952,65 @@ export type Database = {
           },
         ];
       };
+      ssotica_acordo_parcelas: {
+        Row: {
+          acordo_id: string;
+          atualizado_em: string;
+          data_lancamento: string | null;
+          data_recebimento: string | null;
+          data_vencimento: string | null;
+          documento: string | null;
+          id_parcela: number;
+          ligado_em: string;
+          nome_da_loja: string | null;
+          numero: number;
+          recebido_espelhado: number;
+          status: string | null;
+          valor: number | null;
+          valor_recebido: number;
+        };
+        Insert: {
+          acordo_id: string;
+          atualizado_em?: string;
+          data_lancamento?: string | null;
+          data_recebimento?: string | null;
+          data_vencimento?: string | null;
+          documento?: string | null;
+          id_parcela: number;
+          ligado_em?: string;
+          nome_da_loja?: string | null;
+          numero: number;
+          recebido_espelhado?: number;
+          status?: string | null;
+          valor?: number | null;
+          valor_recebido?: number;
+        };
+        Update: {
+          acordo_id?: string;
+          atualizado_em?: string;
+          data_lancamento?: string | null;
+          data_recebimento?: string | null;
+          data_vencimento?: string | null;
+          documento?: string | null;
+          id_parcela?: number;
+          ligado_em?: string;
+          nome_da_loja?: string | null;
+          numero?: number;
+          recebido_espelhado?: number;
+          status?: string | null;
+          valor?: number | null;
+          valor_recebido?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ssotica_acordo_parcelas_acordo_id_fkey";
+            columns: ["acordo_id"];
+            isOneToOne: false;
+            referencedRelation: "acordos";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       users: {
         Row: {
           active: boolean;
@@ -1785,8 +2080,118 @@ export type Database = {
         };
         Relationships: [];
       };
+      vendas_conferencia: {
+        Row: {
+          chave_venda: number;
+          cobrador_id: string | null;
+          decidido_em: string | null;
+          decidido_por: string | null;
+          decisao_motivo: string | null;
+          documento: string;
+          id: string;
+          informado_em: string;
+          informado_por: string;
+          observacao: string;
+          parcelas: number[];
+          status: string;
+          valor_em_aberto: number;
+        };
+        Insert: {
+          chave_venda: number;
+          cobrador_id?: string | null;
+          decidido_em?: string | null;
+          decidido_por?: string | null;
+          decisao_motivo?: string | null;
+          documento: string;
+          id?: string;
+          informado_em?: string;
+          informado_por: string;
+          observacao: string;
+          parcelas: number[];
+          status?: string;
+          valor_em_aberto: number;
+        };
+        Update: {
+          chave_venda?: number;
+          cobrador_id?: string | null;
+          decidido_em?: string | null;
+          decidido_por?: string | null;
+          decisao_motivo?: string | null;
+          documento?: string;
+          id?: string;
+          informado_em?: string;
+          informado_por?: string;
+          observacao?: string;
+          parcelas?: number[];
+          status?: string;
+          valor_em_aberto?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "vendas_conferencia_cobrador_id_fkey";
+            columns: ["cobrador_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "vendas_conferencia_decidido_por_fkey";
+            columns: ["decidido_por"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "vendas_conferencia_informado_por_fkey";
+            columns: ["informado_por"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
+      atribuicoes_pagamento_vigentes: {
+        Row: {
+          cliente: string | null;
+          created_at: string | null;
+          data_pagamento: string | null;
+          decidido_em: string | null;
+          decidido_por_id: string | null;
+          decisao: string | null;
+          documento: string | null;
+          excecao: boolean | null;
+          id: string | null;
+          id_parcela: number | null;
+          lote: string | null;
+          observacao: string | null;
+          parcela: number | null;
+          resposta: string | null;
+          solicitado_por_id: string | null;
+          ultimo_contato_em: string | null;
+          valor: number | null;
+          valor_aprovado: number | null;
+          valor_vigente: number | null;
+          venda: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "atribuicoes_pagamento_decidido_por_id_fkey";
+            columns: ["decidido_por_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "atribuicoes_pagamento_solicitado_por_id_fkey";
+            columns: ["solicitado_por_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       banco_dados_clientes_ativos: {
         Row: {
           acrescimo: number | null;
@@ -1943,6 +2348,23 @@ export type Database = {
       };
     };
     Functions: {
+      _aplicar_distribuicao_carteira: {
+        Args: {
+          p_motivo: string;
+          p_perfis: Json;
+          p_retirar_de: string[];
+          p_usuario: string;
+        };
+        Returns: Json;
+      };
+      _saldo_para_desconto: {
+        Args: { p_documento: string; p_parcelas: number[] };
+        Returns: number;
+      };
+      abrir_lote_fila: {
+        Args: { p_itens: Json; p_tamanho_previsto: number; p_turno: string };
+        Returns: string;
+      };
       acordo_lancamento_ciclone: {
         Args: { p_acordo_id: string };
         Returns: Json;
@@ -1951,8 +2373,40 @@ export type Database = {
         Args: { p_acordo_id: string };
         Returns: Json;
       };
+      aplicar_distribuicao_carteira: {
+        Args: { p_perfis: Json; p_retirar_de?: string[] };
+        Returns: Json;
+      };
       app_current_user_id: { Args: never; Returns: string };
       app_current_user_type: { Args: never; Returns: string };
+      atribuicao_bloqueio_parcela: {
+        Args: { p_id_parcela: number };
+        Returns: string;
+      };
+      atribuicao_contato_conta: {
+        Args: { p_result: string };
+        Returns: boolean;
+      };
+      atribuicoes_painel_gestor: {
+        Args: never;
+        Returns: {
+          cliente: string;
+          cobrador_id: string;
+          contatos: number;
+          data_pagamento: string;
+          documento: string;
+          id_parcela: number;
+          loja: string;
+          parcela: number;
+          pedido_cobrador_id: string;
+          pedido_decisao: string;
+          pedido_lote: string;
+          ultimo_contato_em: string;
+          ultimo_resultado: string;
+          valor: number;
+          venda: number;
+        }[];
+      };
       atribuir_clientes_em_lote: {
         Args: {
           p_clientes?: string[];
@@ -1978,12 +2432,20 @@ export type Database = {
           documentos_atualizados: number;
         }[];
       };
+      atribuir_pagamento_excecao: {
+        Args: {
+          p_cobrador_id: string;
+          p_documento: string;
+          p_motivo: string;
+          p_parcelas: number[];
+        };
+        Returns: Json;
+      };
       cancelar_acordo: {
-        // p_destino_pagamentos: migration 20261110000006.
         Args: {
           p_acordo_id: string;
-          p_motivo: string;
           p_destino_pagamentos?: string;
+          p_motivo: string;
         };
         Returns: {
           acordo_origem_id: string | null;
@@ -1993,6 +2455,8 @@ export type Database = {
           created_at: string;
           created_by_id: string | null;
           desconto_percentual_aplicado: number;
+          destino_pagamentos: string | null;
+          encargos_reimputados: number | null;
           forma_pagamento_parcelas: string | null;
           id: string;
           juros_percentual_am_aplicado: number;
@@ -2022,6 +2486,7 @@ export type Database = {
         };
         Returns: number;
       };
+      cancelar_parcelas_ssotica: { Args: { p_itens: Json }; Returns: Json };
       cancelar_vendas: {
         Args: {
           p_chaves?: number[];
@@ -2034,6 +2499,17 @@ export type Database = {
       cancelar_visitas_de_clientes_quitados: {
         Args: { p_documentos: string[] };
         Returns: number;
+      };
+      carteira_por_cobrador: {
+        Args: never;
+        Returns: {
+          clientes_em_aberto: number;
+          collector_id: string;
+        }[];
+      };
+      cliente_loja_referencia: {
+        Args: { p_documento: string };
+        Returns: string;
       };
       cliente_max_atraso_dias: {
         Args: { p_documento: string };
@@ -2073,6 +2549,45 @@ export type Database = {
           documento: string;
         }[];
       };
+      cobrador_teve_acao_recente: {
+        Args: { p_cobrador: string; p_documento: string };
+        Returns: boolean;
+      };
+      conferencia_conversas: {
+        Args: { p_fim: string; p_inicio: string };
+        Returns: {
+          cobrador_id: string;
+          contatos: number;
+          data_pagamento: string;
+          documento: string;
+          id_parcela: number;
+          pedido_cobrador_id: string;
+          pedido_decisao: string;
+          pedido_lote: string;
+          pode_pedir: boolean;
+          ultimo_contato_em: string;
+          ultimo_resultado: string;
+          valor: number;
+          valor_aprovado: number;
+        }[];
+      };
+      conferencia_recebimentos: {
+        Args: { p_fim: string; p_inicio: string; p_so_carteira?: boolean };
+        Returns: {
+          app_cedrus: number;
+          app_janela: number;
+          app_lancamentos: number;
+          app_valor: number;
+          base_janela: number;
+          base_parcelas: number;
+          base_valor: number;
+          carteira_id: string;
+          cliente: string;
+          cobrador_id: string;
+          documento: string;
+          na_carteira: boolean;
+        }[];
+      };
       converter_valor_brasileiro: { Args: { valor: string }; Returns: number };
       criar_acordo:
         | {
@@ -2089,6 +2604,8 @@ export type Database = {
               created_at: string;
               created_by_id: string | null;
               desconto_percentual_aplicado: number;
+              destino_pagamentos: string | null;
+              encargos_reimputados: number | null;
               forma_pagamento_parcelas: string | null;
               id: string;
               juros_percentual_am_aplicado: number;
@@ -2133,6 +2650,8 @@ export type Database = {
               created_at: string;
               created_by_id: string | null;
               desconto_percentual_aplicado: number;
+              destino_pagamentos: string | null;
+              encargos_reimputados: number | null;
               forma_pagamento_parcelas: string | null;
               id: string;
               juros_percentual_am_aplicado: number;
@@ -2154,6 +2673,61 @@ export type Database = {
               isSetofReturn: false;
             };
           };
+      criar_usuario_com_login: {
+        Args: {
+          p_login: string;
+          p_name: string;
+          p_senha: string;
+          p_type: string;
+        };
+        Returns: string;
+      };
+      decidir_atribuicao_pagamento: {
+        Args: { p_aprovar: boolean; p_lote: string; p_resposta?: string };
+        Returns: Json;
+      };
+      decidir_pedido_correcao: {
+        Args: {
+          p_aprovar: boolean;
+          p_pedido: string;
+          p_resposta?: string;
+          p_valor?: number;
+        };
+        Returns: Json;
+      };
+      decidir_pedido_desconto: {
+        Args: {
+          p_aprovar: boolean;
+          p_desconto_aprovado?: number;
+          p_id: string;
+          p_resposta?: string;
+        };
+        Returns: Json;
+      };
+      decidir_venda_cancelada: {
+        Args: { p_conferencia_id: string; p_decisao: string; p_motivo: string };
+        Returns: {
+          chave_venda: number;
+          cobrador_id: string | null;
+          decidido_em: string | null;
+          decidido_por: string | null;
+          decisao_motivo: string | null;
+          documento: string;
+          id: string;
+          informado_em: string;
+          informado_por: string;
+          observacao: string;
+          parcelas: number[];
+          status: string;
+          valor_em_aberto: number;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "vendas_conferencia";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       definir_configuracao_padrao_acordo: {
         Args: {
           p_desconto_maximo_percentual: number;
@@ -2189,24 +2763,32 @@ export type Database = {
           isSetofReturn: false;
         };
       };
-      // Migration 20261106000008: varias regras por cobrador.
-      salvar_regra_carteira: {
+      definir_fila_cobranca: {
+        Args: { p_collector_id: string; p_pesos: Json };
+        Returns: undefined;
+      };
+      definir_metas_mes: {
         Args: {
-          // NULL = regra nova; senao encerra esta e abre a versao nova.
-          p_regra_id: string | null;
-          p_collector_id: string;
-          // Ajuste manual apos `supabase gen types`: NULL = faixa sem teto.
-          p_max_dias: number | null;
-          p_min_dias: number;
-          // NULL = todas as lojas.
-          p_lojas?: string[] | null;
-          p_ativa?: boolean;
+          p_faixas: Json;
+          p_forma: string;
+          p_month: string;
+          p_user_id: string;
+          p_visits_goal: number;
         };
+        Returns: undefined;
+      };
+      definir_regra_carteira_ativa: {
+        Args: { p_ativa: boolean; p_regra_id: string };
         Returns: {
           ativa: boolean;
           collector_id: string;
           created_at: string;
           created_by: string | null;
+          fila_ordem: string;
+          fila_peso: number | null;
+          fila_peso_tarde: number | null;
+          fila_saldo_max: number | null;
+          fila_saldo_min: number | null;
           id: string;
           lojas: string[] | null;
           max_dias: number | null;
@@ -2225,121 +2807,65 @@ export type Database = {
         Args: { p_collector_id: string };
         Returns: undefined;
       };
-      definir_regra_carteira_ativa: {
-        Args: { p_regra_id: string; p_ativa: boolean };
+      distribuicao_carteira_previa: {
+        Args: { p_perfis: Json; p_retirar_de?: string[] };
         Returns: Json;
-      };
-      // Migration 20261109000010 (Fila de Cobranca).
-      definir_fila_cobranca: {
-        Args: { p_collector_id: string; p_pesos: Json };
-        Returns: undefined;
-      };
-      // Migration 20261109000014.
-      carteira_por_cobrador: {
-        Args: Record<PropertyKey, never>;
-        Returns: { collector_id: string; clientes_em_aberto: number }[];
-      };
-      // Migration 20261111000005.
-      ultimos_contatos_titulos: {
-        Args: { p_ids: string[]; p_desde: string; p_efetivos: string[] };
-        Returns: {
-          collection_id: string;
-          papel: "ultimo" | "efetivo";
-          date: string;
-          result: string;
-          notes: string | null;
-          next_action_date: string | null;
-        }[];
-      };
-      // Migration 20261111000004 (substitui a 20261111000002/0003).
-      conferencia_recebimentos: {
-        Args: { p_inicio: string; p_fim: string; p_so_carteira?: boolean };
-        Returns: {
-          cobrador_id: string | null;
-          carteira_id: string | null;
-          documento: string | null;
-          cliente: string | null;
-          base_valor: number;
-          base_parcelas: number;
-          app_valor: number;
-          app_lancamentos: number;
-          app_cedrus: number;
-          na_carteira: boolean;
-        }[];
-      };
-      // Migration 20261110000001.
-      criar_usuario_com_login: {
-        Args: { p_name: string; p_login: string; p_type: string; p_senha: string };
-        Returns: string;
-      };
-      // Migration 20261110000008.
-      informar_venda_cancelada: {
-        Args: {
-          p_documento: string;
-          p_chaves: number[];
-          p_observacao: string;
-          p_tipo_contato?: string;
-          p_em_nome_de?: string;
-        };
-        Returns: number;
-      };
-      decidir_venda_cancelada: {
-        Args: { p_conferencia_id: string; p_decisao: string; p_motivo: string };
-        Returns: unknown;
-      };
-      // Migration 20261110000003.
-      fila_lote_atual: {
-        Args: Record<PropertyKey, never>;
-        Returns: {
-          lote_id: string;
-          criado_em: string;
-          turno: string | null;
-          tamanho_previsto: number;
-          documento: string;
-          posicao: number;
-          regra_id: string | null;
-          urgencia: string | null;
-          finalizado: boolean;
-        }[];
-      };
-      abrir_lote_fila: {
-        Args: {
-          p_itens: Json;
-          p_turno: string | null;
-          p_tamanho_previsto: number;
-        };
-        Returns: string | null;
-      };
-      fila_item_finalizado: {
-        Args: { p_collector: string; p_documento: string; p_desde: string };
-        Returns: boolean;
-      };
-      // Migration 20261110000002.
-      redefinir_senha_usuario: {
-        Args: { p_user_id: string; p_senha: string };
-        Returns: undefined;
       };
       encerrar_regra_carteira: {
         Args: { p_regra_id: string };
         Returns: undefined;
       };
-      // Migration 20261106000007 (resultado em jsonb, formato em
-      // src/components/dashboard/CarteiraDistribuicao.tsx).
-      distribuicao_carteira_previa: {
-        Args: { p_perfis: Json; p_retirar_de?: string[] };
+      estornar_pagamento: {
+        Args: { p_motivo: string; p_pagamento: string; p_valor: number };
         Returns: Json;
       };
-      lojas_ultima_baixa_externa: {
-        Args: Record<PropertyKey, never>;
-        Returns: { loja: string; ultima_baixa: string | null }[];
+      estornar_pagamentos_acordo_cancelado: {
+        Args: { p_acordo_id: string; p_motivo: string };
+        Returns: number;
       };
-      aplicar_distribuicao_carteira: {
-        Args: { p_perfis: Json; p_retirar_de?: string[] };
-        Returns: Json;
+      estornar_valor_no_titulo: {
+        Args: { p_id_parcela: number; p_valor: number };
+        Returns: undefined;
       };
-      lojas_carteira: {
+      executar_distribuicao_automatica: { Args: never; Returns: Json };
+      faixa_cobre_cliente: {
+        Args: {
+          p_atraso: number;
+          p_loja: string;
+          p_lojas: string[];
+          p_max_dias: number;
+          p_min_dias: number;
+        };
+        Returns: boolean;
+      };
+      fila_item_finalizado: {
+        Args: { p_collector: string; p_desde: string; p_documento: string };
+        Returns: boolean;
+      };
+      fila_lote_atual: {
         Args: never;
-        Returns: { loja: string; clientes_em_aberto: number }[];
+        Returns: {
+          criado_em: string;
+          documento: string;
+          finalizado: boolean;
+          lote_id: string;
+          posicao: number;
+          regra_id: string;
+          tamanho_previsto: number;
+          turno: string;
+          urgencia: string;
+        }[];
+      };
+      importar_parcelas_ssotica: { Args: { p_linhas: Json }; Returns: Json };
+      informar_venda_cancelada: {
+        Args: {
+          p_chaves: number[];
+          p_documento: string;
+          p_em_nome_de?: string;
+          p_observacao: string;
+          p_tipo_contato?: string;
+        };
+        Returns: number;
       };
       liberar_cliente_da_carteira: {
         Args: {
@@ -2349,47 +2875,122 @@ export type Database = {
         };
         Returns: number;
       };
+      lojas_carteira: {
+        Args: never;
+        Returns: {
+          clientes_em_aberto: number;
+          loja: string;
+        }[];
+      };
+      lojas_ultima_baixa_externa: {
+        Args: never;
+        Returns: {
+          loja: string;
+          ultima_baixa: string;
+        }[];
+      };
       marcar_acordos_quebrados: { Args: never; Returns: number };
+      parcelas_para_atribuicao: {
+        Args: { p_documento: string };
+        Returns: {
+          bloqueio: string;
+          data_pagamento: string;
+          data_vencimento: string;
+          descricao: string;
+          id_parcela: number;
+          loja: string;
+          parcela: number;
+          pedido_decisao: string;
+          pedido_meu: boolean;
+          ultimo_contato_em: string;
+          valor: number;
+          venda: number;
+        }[];
+      };
+      parcelas_para_excecao: {
+        Args: { p_cobrador_id: string; p_documento: string };
+        Returns: {
+          bloqueio: string;
+          data_pagamento: string;
+          data_vencimento: string;
+          descricao: string;
+          id_parcela: number;
+          loja: string;
+          parcela: number;
+          pedido_decisao: string;
+          pedido_meu: boolean;
+          ultimo_contato_em: string;
+          valor: number;
+          venda: number;
+        }[];
+      };
+      pedidos_desconto_do_cliente: {
+        Args: { p_documento: string };
+        Returns: {
+          created_at: string;
+          decidido_em: string;
+          decidido_por_id: string;
+          decisao: string;
+          desconto_aprovado: number;
+          desconto_pedido: number;
+          desconto_usado: number;
+          id: string;
+          motivo: string;
+          parcelas: number[];
+          resposta: string;
+          solicitado_por_id: string;
+          tipo: string;
+          valido_ate: string;
+          valor_devido: number;
+          valor_pago: number;
+        }[];
+      };
+      pedir_atribuicao_pagamento: {
+        Args: {
+          p_documento: string;
+          p_observacao: string;
+          p_parcelas: number[];
+        };
+        Returns: string;
+      };
+      pedir_desconto: {
+        Args: {
+          p_documento: string;
+          p_motivo: string;
+          p_parcelas: number[];
+          p_tipo: string;
+          p_valor_pago: number;
+        };
+        Returns: string;
+      };
+      plano_distribuicao_carteira: {
+        Args: { p_perfis: Json; p_retirar_de?: string[] };
+        Returns: {
+          acao: string;
+          atraso: number;
+          bloqueado_por: string;
+          cliente: string;
+          cobrador_atual: string;
+          cobrador_destino: string;
+          documento: string;
+          loja: string;
+          situacao: string;
+        }[];
+      };
       process_payment: {
         Args: {
           p_client_document: string;
           p_collector_id: string;
           p_discount_amount?: number;
-          p_notes?: string;
-          p_payment_amount: number;
-          p_payment_method?: string;
           p_juros_amount?: number;
-          p_sale_number?: number;
-          p_payment_date?: string;
+          p_notes?: string;
           p_parcelas?: number[];
+          p_payment_amount: number;
+          p_payment_date?: string;
+          p_payment_method?: string;
+          p_sale_number?: number;
         };
         Returns: undefined;
-      };
-      registrar_contato: {
-        Args: {
-          p_data: string;
-          p_data_promessa?: string;
-          p_documento: string;
-          p_motivo_reagendamento?: string;
-          p_nome_cliente: string;
-          p_notas: string;
-          p_notas_proximo?: string;
-          p_notas_reagendamento_nova?: string;
-          p_notas_reagendamento_original?: string;
-          p_proxima_acao?: string;
-          p_proxima_data?: string;
-          p_proximo_canal?: string;
-          p_proximo_horario?: string;
-          p_reagendar?: boolean;
-          p_resultado: string;
-          p_rotulo_resultado?: string;
-          p_situacao_liberacao?: string;
-          p_em_nome_de?: string;
-          p_tipo: string;
-          p_titulos: string[];
-          p_visita_id?: string;
-        };
-        Returns: Json;
       };
       reagendar_visita: {
         Args: {
@@ -2440,164 +3041,9 @@ export type Database = {
           isSetofReturn: true;
         };
       };
-      // Migration 20261116000007 (item 72).
-      definir_metas_mes: {
-        Args: {
-          p_user_id: string;
-          p_month: string;
-          p_visits_goal: number;
-          p_forma: string;
-          p_faixas: Json;
-        };
+      redefinir_senha_usuario: {
+        Args: { p_senha: string; p_user_id: string };
         Returns: undefined;
-      };
-      // Migration 20261116000004 (item 66, etapa 2).
-      atribuicoes_painel_gestor: {
-        Args: Record<PropertyKey, never>;
-        Returns: {
-          id_parcela: number;
-          documento: string;
-          cliente: string | null;
-          venda: number | null;
-          parcela: number | null;
-          valor: number;
-          data_pagamento: string;
-          loja: string | null;
-          cobrador_id: string;
-          contatos: number;
-          ultimo_contato_em: string;
-          ultimo_resultado: string;
-          pedido_lote: string | null;
-          pedido_decisao: string | null;
-          pedido_cobrador_id: string | null;
-        }[];
-      };
-      // Migration 20261117000002 (Conferência × pagos na loja).
-      conferencia_conversas: {
-        Args: { p_inicio: string; p_fim: string };
-        Returns: {
-          id_parcela: number;
-          documento: string;
-          valor: number;
-          data_pagamento: string;
-          cobrador_id: string | null;
-          contatos: number;
-          ultimo_contato_em: string | null;
-          ultimo_resultado: string | null;
-          pode_pedir: boolean;
-          pedido_lote: string | null;
-          pedido_decisao: string | null;
-          pedido_cobrador_id: string | null;
-          valor_aprovado: number | null;
-        }[];
-      };
-      // Migration 20261116000003 (item 66).
-      parcelas_para_atribuicao: {
-        Args: { p_documento: string };
-        Returns: {
-          id_parcela: number;
-          venda: number | null;
-          parcela: number | null;
-          data_vencimento: string | null;
-          valor: number;
-          data_pagamento: string;
-          loja: string | null;
-          ultimo_contato_em: string | null;
-          pedido_decisao: string | null;
-          pedido_meu: boolean | null;
-          bloqueio: string | null;
-        }[];
-      };
-      pedir_atribuicao_pagamento: {
-        Args: { p_documento: string; p_parcelas: number[]; p_observacao: string };
-        Returns: string;
-      };
-      // Migration 20261117000004 (exceção do gestor).
-      parcelas_para_excecao: {
-        Args: { p_documento: string; p_cobrador_id: string };
-        Returns: {
-          id_parcela: number;
-          venda: number | null;
-          parcela: number | null;
-          data_vencimento: string | null;
-          valor: number;
-          data_pagamento: string;
-          loja: string | null;
-          ultimo_contato_em: string | null;
-          pedido_decisao: string | null;
-          pedido_meu: boolean | null;
-          bloqueio: string | null;
-        }[];
-      };
-      atribuir_pagamento_excecao: {
-        Args: {
-          p_documento: string;
-          p_parcelas: number[];
-          p_cobrador_id: string;
-          p_motivo: string;
-        };
-        Returns: Json;
-      };
-      decidir_atribuicao_pagamento: {
-        Args: { p_lote: string; p_aprovar: boolean; p_resposta?: string };
-        Returns: Json;
-      };
-      pedir_desconto: {
-        Args: {
-          p_documento: string;
-          p_tipo: string;
-          p_parcelas: number[];
-          p_valor_pago: number;
-          p_motivo: string;
-        };
-        Returns: string;
-      };
-      decidir_pedido_desconto: {
-        Args: {
-          p_id: string;
-          p_aprovar: boolean;
-          p_desconto_aprovado?: number;
-          p_resposta?: string;
-        };
-        Returns: Json;
-      };
-      pedidos_desconto_do_cliente: {
-        Args: { p_documento: string };
-        Returns: {
-          id: string;
-          tipo: string;
-          parcelas: number[];
-          valor_devido: number;
-          valor_pago: number;
-          desconto_pedido: number;
-          motivo: string;
-          solicitado_por_id: string;
-          created_at: string;
-          decisao: string | null;
-          desconto_aprovado: number | null;
-          valido_ate: string | null;
-          resposta: string | null;
-          decidido_por_id: string | null;
-          decidido_em: string | null;
-          desconto_usado: number;
-        }[];
-      };
-      decidir_pedido_correcao: {
-        Args: {
-          p_pedido: string;
-          p_aprovar: boolean;
-          p_valor?: number;
-          p_resposta?: string;
-        };
-        Returns: Json;
-      };
-      estornar_pagamento: {
-        Args: {
-          p_pagamento: string;
-          p_valor: number;
-          p_motivo: string;
-        };
-        Returns: Json;
       };
       registrar_ajuste_recebimento: {
         Args: {
@@ -2610,6 +3056,32 @@ export type Database = {
           p_usuario_id: string;
         };
         Returns: undefined;
+      };
+      registrar_contato: {
+        Args: {
+          p_data: string;
+          p_data_promessa?: string;
+          p_documento: string;
+          p_em_nome_de?: string;
+          p_motivo_reagendamento?: string;
+          p_nome_cliente: string;
+          p_notas: string;
+          p_notas_proximo?: string;
+          p_notas_reagendamento_nova?: string;
+          p_notas_reagendamento_original?: string;
+          p_proxima_acao?: string;
+          p_proxima_data?: string;
+          p_proximo_canal?: string;
+          p_proximo_horario?: string;
+          p_reagendar?: boolean;
+          p_resultado: string;
+          p_rotulo_resultado?: string;
+          p_situacao_liberacao?: string;
+          p_tipo: string;
+          p_titulos: string[];
+          p_visita_id?: string;
+        };
+        Returns: Json;
       };
       registrar_pagamento_acordo: {
         Args: {
@@ -2639,6 +3111,49 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      registrar_pagamento_acordo_interno: {
+        Args: {
+          p_acordo_parcela_id: string;
+          p_collector_id: string;
+          p_data_pagamento: string;
+          p_notes: string;
+          p_registrado_por_id: string;
+          p_valor_pago: number;
+        };
+        Returns: {
+          acordo_parcela_id: string;
+          collector_id: string | null;
+          created_at: string;
+          data_pagamento: string;
+          estorno_de: string | null;
+          id: string;
+          motivo: string | null;
+          notes: string | null;
+          registrado_por_id: string | null;
+          valor_encargos: number | null;
+          valor_pago: number;
+          valor_principal: number | null;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "acordo_pagamentos";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      regra_carteira_conflito: {
+        Args: {
+          p_ignorar_id: string;
+          p_lojas: string[];
+          p_max_dias: number;
+          p_min_dias: number;
+        };
+        Returns: string;
+      };
+      reimputar_encargos_acordo_cancelado: {
+        Args: { p_acordo_id: string };
+        Returns: number;
+      };
       remover_cobrador: { Args: { p_documento: string }; Returns: undefined };
       remover_cobrador_em_lote: {
         Args: {
@@ -2650,6 +3165,39 @@ export type Database = {
       };
       resolve_auth_email: { Args: { p_login: string }; Returns: string };
       saldo_acordo_parcela: { Args: { p_parcela_id: string }; Returns: number };
+      salvar_regra_carteira: {
+        Args: {
+          p_ativa?: boolean;
+          p_collector_id: string;
+          p_lojas?: string[];
+          p_max_dias: number;
+          p_min_dias: number;
+          p_regra_id: string;
+        };
+        Returns: {
+          ativa: boolean;
+          collector_id: string;
+          created_at: string;
+          created_by: string | null;
+          fila_ordem: string;
+          fila_peso: number | null;
+          fila_peso_tarde: number | null;
+          fila_saldo_max: number | null;
+          fila_saldo_min: number | null;
+          id: string;
+          lojas: string[] | null;
+          max_dias: number | null;
+          min_dias: number;
+          vigente_ate: string | null;
+          vigente_desde: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "collector_overdue_ranges";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       situacao_primaria_do_tipo: { Args: { p_type: string }; Returns: string };
       texto_para_valor: { Args: { p: string }; Returns: number };
       titulo_em_acordo_ativo: {
@@ -2660,6 +3208,17 @@ export type Database = {
         Args: { p_cobrador_destino: string; p_cobrador_origem: string };
         Returns: {
           clientes_transferidos: number;
+        }[];
+      };
+      ultimos_contatos_titulos: {
+        Args: { p_desde: string; p_efetivos: string[]; p_ids: string[] };
+        Returns: {
+          collection_id: string;
+          date: string;
+          next_action_date: string;
+          notes: string;
+          papel: string;
+          result: string;
         }[];
       };
       update_client_address:

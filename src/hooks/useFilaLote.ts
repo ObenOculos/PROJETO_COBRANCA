@@ -82,7 +82,9 @@ export function useFilaLote(collectorId: string | null | undefined) {
           regra_id: i.regraId,
           urgencia: i.urgencia,
         })),
-        p_turno: turno,
+        // p_turno e obrigatorio na RPC mas aceita NULL de verdade (text sem
+        // default); o tipo gerado so marca "| null" quando ha DEFAULT NULL.
+        p_turno: turno as TurnoFila,
         p_tamanho_previsto: tamanhoPrevisto,
       });
       if (error) {

@@ -49,10 +49,15 @@ const SummaryCard: React.FC<{
     green: "text-green-600 dark:text-green-400",
     blue: "text-blue-600 dark:text-blue-400",
   };
+  // Linha com alerta ganha um "chip" de fundo colorido no valor, nao so a
+  // cor do texto -- e o que mais ajuda a achar rapido o que esta ruim num
+  // card com varias linhas (pedido do usuario 2026-11-17: contraste).
   const rowClasses: Record<string, string> = {
-    red: "text-red-600 dark:text-red-400",
-    amber: "text-amber-600 dark:text-amber-400",
-    green: "text-green-600 dark:text-green-400",
+    red: "text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-1.5 rounded",
+    amber:
+      "text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-1.5 rounded",
+    green:
+      "text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-1.5 rounded",
   };
   return (
     <div
@@ -70,7 +75,7 @@ const SummaryCard: React.FC<{
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
       title={hint}
-      className={`min-w-0 rounded-xl border ${selecionado ? "border-blue-400 bg-blue-50/50 dark:border-blue-700 dark:bg-blue-900/10" : "border-gray-100 dark:border-dark-border/40 bg-gray-50/60 dark:bg-dark-bg/30"} ${compact ? "px-3 py-2" : "px-4 py-3"} ${onClick ? "cursor-pointer transition-colors hover:border-blue-300 hover:bg-blue-50/50 dark:hover:border-blue-800 dark:hover:bg-blue-900/10" : ""}`}
+      className={`min-w-0 rounded-xl border ${selecionado ? "border-blue-400 bg-blue-50/50 dark:border-blue-700 dark:bg-blue-900/10" : "border-gray-200 dark:border-dark-border bg-gray-100 dark:bg-dark-bg"} ${compact ? "px-3 py-2" : "px-4 py-3"} ${onClick ? "cursor-pointer transition-colors hover:border-blue-300 hover:bg-blue-50/50 dark:hover:border-blue-800 dark:hover:bg-blue-900/10" : ""}`}
     >
       <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary">
         <Icon className="h-4 w-4 flex-shrink-0" />
@@ -89,7 +94,7 @@ const SummaryCard: React.FC<{
       {children}
       {rows.length > 0 && (
         <div
-          className={`border-t border-gray-100 dark:border-dark-border/40 ${compact ? "mt-1.5 pt-1.5 space-y-0.5" : "mt-2 pt-2 space-y-1"}`}
+          className={`border-t border-gray-300 dark:border-dark-border/60 ${compact ? "mt-1.5 pt-1.5 space-y-0.5" : "mt-2 pt-2 space-y-1"}`}
         >
           {rows.map((r) => (
             <div
@@ -112,7 +117,7 @@ const SummaryCard: React.FC<{
                 {r.label}
               </span>
               <span
-                className={`font-semibold whitespace-nowrap ${r.tone ? rowClasses[r.tone] : "text-gray-700 dark:text-dark-text"}`}
+                className={`font-bold whitespace-nowrap ${r.tone ? rowClasses[r.tone] : "text-gray-900 dark:text-dark-text"}`}
               >
                 {r.value}
               </span>

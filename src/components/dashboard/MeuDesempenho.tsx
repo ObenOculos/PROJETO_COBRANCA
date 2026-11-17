@@ -1,70 +1,39 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import {
-  CalendarClock,
-  ChevronDown,
-  ChevronUp,
-  Gauge,
-  PhoneCall,
-  Wallet,
-  Users,
-} from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { ChevronDown, ChevronUp, Gauge, Users, Wallet } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { formatCurrency } from "../../utils/formatters";
-import { todayLocalStr, addDaysLocalStr } from "../../config/visitStatus";
-import { useAtendimentosPeriodo } from "../../hooks/useAtendimentosPeriodo";
+import { addDaysLocalStr, todayLocalStr } from "../../config/visitStatus";
 import SummaryCard from "../common/SummaryCard";
 import { valorRecebidoTotal } from "../../filters/sales";
+import { inadimplenciaDe, formatarInadimplencia } from "../../filters/inadimplencia";
+import { Collection } from "../../types";
 
 /**
  * "Meu desempenho" do cobrador de carteira: mesmo formato de card do Resumo
- * por Cobrador do gestor (pergunta, numero em destaque, detalhe em linhas),
- * com o que o cobrador precisa para se situar. Compacto e recolhivel -- fica
- * acima da lista de trabalho.
+ * por Cobrador do gestor (pergunta, numero em destaque, detalhe em linhas).
+ * Compacto e recolhivel -- fica acima da lista de trabalho.
+ *
+ * Pedido do usuario (2026-11-17): o mais simples possivel -- 4 grupos fixos
+ * (Carteira, Vencido, Numero de clientes, Desempenho), sem recorte de
+ * periodo na carteira. Carteira e Vencido foram unidos e depois separados
+ * de novo (o gestor quis mais destaque pro valor vencido) -- pra nao
+ * repetir "A vencer" nos dois cards, ele so aparece dentro de Carteira; o
+ * card Vencido guarda só o valor vencido e o alerta de sem agendamento. O
+ * Desempenho ganhou um alternador Dia/Semana/Mes: a meta so faz sentido no
+ * mes, entao so aparece nessa opcao.
  */
-
-type Periodo = "hoje" | "semana" | "mes";
-const PERIODOS: { key: Periodo; label: string }[] = [
-  { key: "hoje", label: "Hoje" },
-  { key: "semana", label: "7 dias" },
-  { key: "mes", label: "Mês" },
-];
 
 const fmtNum = (n: number): string => n.toLocaleString("pt-BR");
 
-/** Dias uteis (seg-sex) de `de` ate `ate`, inclusive. So getters UTC sobre a
- * string YYYY-MM-DD (ver CLAUDE.md sobre datas). */
-const diasUteis = (de: string, ate: string): number => {
-  const [y1, m1, d1] = de.split("-").map(Number);
-  const [y2, m2, d2] = ate.split("-").map(Number);
-  const dt = new Date(Date.UTC(y1, m1 - 1, d1));
-  const fim = Date.UTC(y2, m2 - 1, d2);
-  let n = 0;
-  while (dt.getTime() <= fim) {
-    const dow = dt.getUTCDay();
-    if (dow !== 0 && dow !== 6) n++;
-    dt.setUTCDate(dt.getUTCDate() + 1);
-  }
-  return n;
-};
-
-const ultimoDiaDoMes = (hoje: string): string => {
-  const [y, m] = hoje.split("-").map(Number);
-  const d = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  return `${hoje.slice(0, 7)}-${String(d).padStart(2, "0")}`;
-};
-
 /** Atalhos dos cards para a Carteira completa ja filtrada. */
-export type FiltroDesempenho =
-  | "todos"
-  | "paraHoje"
-  | "atendidosHoje"
-  | "semAtendimento"
-  | "criticos";
+export type FiltroDesempenho = "todos" | "semAtendimento";
+
+type JanelaDesempenho = "dia" | "semana" | "mes";
 
 interface Props {
   userId: string;
-  /** Titulos do cobrador (id_parcela -> documento, para contar clientes). */
-  myCollections: { id_parcela?: number | string | null; documento?: string | null }[];
+  /** Titulos do cobrador (para contar clientes e calcular inadimplencia). */
+  myCollections: Collection[];
   salePayments: {
     collectorId?: string | null;
     paymentDate: string;
@@ -73,18 +42,14 @@ interface Props {
   }[];
   /** Meta de recebimento do mes (0 = sem meta). */
   metaMes: number;
-  /** Muda a cada registro feito na tela: rele atendimentos e acordos. */
+  /** Muda a cada registro feito na tela: rele os pagamentos de acordo. */
   versaoRegistros: number;
-  compromissos: {
-    agendados: number;
-    promessas: number;
-    acordosQuebrados: number;
-  };
   carteira: {
     vencido: number;
     aVencer: number;
     clientes: number;
-    criticos: number;
+    /** Clientes com pelo menos um título vencido (pior status). */
+    comAtraso: number;
     semAtendimento: number;
   };
   onFiltrar: (filtro: FiltroDesempenho) => void;
@@ -96,15 +61,12 @@ const MeuDesempenho: React.FC<Props> = ({
   salePayments,
   metaMes,
   versaoRegistros,
-  compromissos,
   carteira,
   onFiltrar,
 }) => {
   const hoje = todayLocalStr();
   const inicioMes = `${hoje.slice(0, 7)}-01`;
-  const seteDias = addDaysLocalStr(hoje, -6);
 
-  const [periodo, setPeriodo] = useState<Periodo>("hoje");
   const [aberto, setAberto] = useState(() => {
     try {
       return localStorage.getItem("meu_desempenho_aberto") !== "0";
@@ -122,44 +84,26 @@ const MeuDesempenho: React.FC<Props> = ({
       return !v;
     });
 
-  const dateFrom =
-    periodo === "hoje" ? hoje : periodo === "semana" ? seteDias : inicioMes;
-  const dateTo = hoje;
-
-  // Clientes atendidos: mesma conta do Resumo por Cobrador (gestor).
-  const docByParcelaRef = useRef<Map<string, string>>(new Map());
-  useEffect(() => {
-    const m = docByParcelaRef.current;
-    myCollections.forEach((c) => {
-      if (c.id_parcela != null && c.documento) {
-        m.set(String(c.id_parcela), c.documento);
-      }
-    });
-  }, [myCollections]);
-  const { atendimentos, erro: atendimentosErro } = useAtendimentosPeriodo(
-    dateFrom,
-    dateTo,
-    docByParcelaRef,
-    userId,
-    versaoRegistros,
-  );
-  const atend = atendimentos?.get(userId);
+  const [janela, setJanela] = useState<JanelaDesempenho>("mes");
+  const inicioFiltro = useMemo(() => {
+    if (janela === "dia") return hoje;
+    if (janela === "semana") return addDaysLocalStr(hoje, -6);
+    return inicioMes;
+  }, [janela, hoje, inicioMes]);
 
   // Parcelas de acordo pagas (acordo_pagamentos nao passa por
   // sale_payments -- ver "Recuperacao do Mes" no CollectorDashboard).
-  // Busca desde o inicio do mes ou 7 dias atras, o que vier antes.
   const [acordoPagos, setAcordoPagos] = useState<
     { valor: number; data: string }[]
   >([]);
   useEffect(() => {
     let cancelled = false;
-    const desde = seteDias < inicioMes ? seteDias : inicioMes;
     (async () => {
       const { data, error } = await supabase
         .from("acordo_pagamentos")
         .select("valor_pago, data_pagamento")
         .eq("collector_id", userId)
-        .gte("data_pagamento", desde);
+        .gte("data_pagamento", inicioFiltro);
       if (error) {
         console.error("Erro ao buscar pagamentos de acordo:", error);
         return;
@@ -168,7 +112,6 @@ const MeuDesempenho: React.FC<Props> = ({
         setAcordoPagos(
           (data || []).map((p) => ({
             valor: Number(p.valor_pago),
-            // data_pagamento e sempre YYYY-MM-DD (todayLocalStr).
             data: String(p.data_pagamento).slice(0, 10),
           })),
         );
@@ -177,25 +120,25 @@ const MeuDesempenho: React.FC<Props> = ({
     return () => {
       cancelled = true;
     };
-  }, [userId, versaoRegistros, seteDias, inicioMes]);
+  }, [userId, versaoRegistros, inicioFiltro]);
 
   // Item 66, etapa 3: pagamento que o cliente fez na loja/banco, atribuido ao
   // cobrador (pedido dele ou excecao do gestor) -- nao passa por
-  // sale_payments (ver migration 20261116000003). Mesma busca do
-  // acordoPagos acima.
+  // sale_payments (ver migration 20261116000003). Le a view
+  // atribuicoes_pagamento_vigentes (valor_vigente = LEAST(valor_aprovado,
+  // valor_recebido atual); some se o ERP desfizer a baixa -- migration
+  // 20261117000007).
   const [atribuicoesPagas, setAtribuicoesPagas] = useState<
     { valor: number; data: string }[]
   >([]);
   useEffect(() => {
     let cancelled = false;
-    const desde = seteDias < inicioMes ? seteDias : inicioMes;
     (async () => {
       const { data, error } = await supabase
-        .from("atribuicoes_pagamento")
-        .select("valor_aprovado, data_pagamento")
+        .from("atribuicoes_pagamento_vigentes")
+        .select("valor_vigente, data_pagamento")
         .eq("solicitado_por_id", userId)
-        .eq("decisao", "aprovado")
-        .gte("data_pagamento", desde);
+        .gte("data_pagamento", inicioFiltro);
       if (error) {
         console.error("Erro ao buscar pagamentos atribuídos (pago na loja):", error);
         return;
@@ -203,7 +146,7 @@ const MeuDesempenho: React.FC<Props> = ({
       if (!cancelled) {
         setAtribuicoesPagas(
           (data || []).map((p) => ({
-            valor: Number(p.valor_aprovado) || 0,
+            valor: Number(p.valor_vigente) || 0,
             data: String(p.data_pagamento).slice(0, 10),
           })),
         );
@@ -212,51 +155,32 @@ const MeuDesempenho: React.FC<Props> = ({
     return () => {
       cancelled = true;
     };
-  }, [userId, versaoRegistros, seteDias, inicioMes]);
+  }, [userId, versaoRegistros, inicioFiltro]);
 
-  const recebidoEntre = (de: string, ate: string): number =>
-    salePayments
-      .filter((p) => {
-        const d = (p.paymentDate || "").slice(0, 10);
-        return p.collectorId === userId && d >= de && d <= ate;
-      })
-      .reduce((s, p) => s + valorRecebidoTotal(p), 0) +
-    acordoPagos
-      .filter((p) => p.data >= de && p.data <= ate)
-      .reduce((s, p) => s + p.valor, 0) +
-    atribuicoesPagas
-      .filter((p) => p.data >= de && p.data <= ate)
-      .reduce((s, p) => s + p.valor, 0);
+  const recebidoPeriodo = useMemo(() => {
+    const doApp = salePayments
+      .filter(
+        (p) =>
+          p.collectorId === userId &&
+          (p.paymentDate || "").slice(0, 10) >= inicioFiltro,
+      )
+      .reduce((s, p) => s + valorRecebidoTotal(p), 0);
+    const doAcordo = acordoPagos.reduce((s, p) => s + p.valor, 0);
+    const doAtribuido = atribuicoesPagas.reduce((s, p) => s + p.valor, 0);
+    return doApp + doAcordo + doAtribuido;
+  }, [salePayments, acordoPagos, atribuicoesPagas, userId, inicioFiltro]);
 
-  const recebido = useMemo(
-    () => recebidoEntre(dateFrom, dateTo),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [salePayments, acordoPagos, atribuicoesPagas, dateFrom, dateTo, userId],
-  );
-  const recebidoMes = useMemo(
-    () => recebidoEntre(inicioMes, hoje),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [salePayments, acordoPagos, atribuicoesPagas, inicioMes, hoje, userId],
-  );
+  const temMeta = janela === "mes" && metaMes > 0;
+  const progresso = temMeta
+    ? Math.min((recebidoPeriodo / metaMes) * 100, 100)
+    : 0;
+  const falta = Math.max(0, metaMes - recebidoPeriodo);
 
-  const temMeta = metaMes > 0;
-  const progresso = temMeta ? Math.min((recebidoMes / metaMes) * 100, 100) : 0;
-  const falta = Math.max(0, metaMes - recebidoMes);
-  const diasRestantes = diasUteis(hoje, ultimoDiaDoMes(hoje));
-  const porDia = diasRestantes > 0 ? falta / diasRestantes : falta;
-  const diasNoPeriodo = Math.max(1, diasUteis(dateFrom, dateTo));
+  const inad = useMemo(() => inadimplenciaDe(myCollections), [myCollections]);
+  const valorTotal = carteira.vencido + carteira.aVencer;
 
-  const compromissosHoje = compromissos.agendados + compromissos.promessas;
-
-  const atendValor = (n: number | undefined) =>
-    atendimentosErro ? "—" : atendimentos === null ? "…" : fmtNum(n ?? 0);
-
-  const legendaPeriodo =
-    periodo === "hoje"
-      ? "hoje"
-      : periodo === "semana"
-        ? "nos últimos 7 dias"
-        : "no mês";
+  const legendaJanela =
+    janela === "dia" ? "hoje" : janela === "semana" ? "últimos 7 dias" : "no mês";
 
   return (
     <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border shadow-sm px-4 py-3 space-y-2">
@@ -277,27 +201,10 @@ const MeuDesempenho: React.FC<Props> = ({
         {!aberto && (
           // Recolhido: uma linha com o essencial.
           <span className="text-xs text-gray-500 dark:text-dark-text-secondary truncate">
-            {formatCurrency(recebido, false)} recebido ·{" "}
-            {atendValor(atend?.clientes)} atendidos · {compromissosHoje} para
-            hoje
+            {formatCurrency(recebidoPeriodo, false)} recebido {legendaJanela} ·{" "}
+            {fmtNum(carteira.clientes)} clientes na carteira
           </span>
         )}
-        <div className="ml-auto inline-flex rounded-lg border border-gray-200 dark:border-dark-border overflow-hidden text-xs">
-          {PERIODOS.map((p) => (
-            <button
-              key={p.key}
-              type="button"
-              onClick={() => setPeriodo(p.key)}
-              className={`px-2.5 py-1 transition-colors ${
-                periodo === p.key
-                  ? "bg-blue-600 text-white"
-                  : "text-gray-600 dark:text-dark-text-secondary hover:bg-gray-50 dark:hover:bg-dark-bg-secondary"
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
       </div>
 
       {aberto && (
@@ -305,28 +212,110 @@ const MeuDesempenho: React.FC<Props> = ({
           <SummaryCard
             compact
             icon={Wallet}
-            title="Quanto recebi"
-            value={formatCurrency(recebido, false)}
+            title="Carteira"
+            onClick={() => onFiltrar("todos")}
+            hint="Ver a carteira completa"
+            value={formatCurrency(valorTotal, false)}
+            valueTone="neutral"
+            caption="valor total em aberto"
+            rows={[
+              {
+                label: "A vencer",
+                value: formatCurrency(carteira.aVencer, false),
+              },
+              {
+                label: "% inadimplente",
+                value: formatarInadimplencia(inad.pct, inad.venceu),
+              },
+            ]}
+          />
+
+          <SummaryCard
+            compact
+            icon={Wallet}
+            title="Vencido"
+            value={formatCurrency(carteira.vencido, false)}
+            valueTone="red"
+            caption="valor vencido"
+            rows={[
+              {
+                label: "Sem agendamento",
+                value: fmtNum(carteira.semAtendimento),
+                tone: carteira.semAtendimento > 0 ? "amber" : undefined,
+                onClick: () => onFiltrar("semAtendimento"),
+                hint: "Ver quem está sem atendimento há 7 dias",
+              },
+            ]}
+          />
+
+          <SummaryCard
+            compact
+            icon={Users}
+            title="Número de clientes"
+            onClick={() => onFiltrar("todos")}
+            hint="Ver a carteira completa"
+            value={fmtNum(carteira.clientes)}
+            valueTone="blue"
+            caption="clientes na carteira"
+            rows={[
+              {
+                label: "Com atraso",
+                value: fmtNum(carteira.comAtraso),
+                tone: carteira.comAtraso > 0 ? "red" : undefined,
+              },
+              {
+                label: "Em dia",
+                value: fmtNum(carteira.clientes - carteira.comAtraso),
+              },
+            ]}
+          />
+
+          <SummaryCard
+            compact
+            icon={Gauge}
+            title="Desempenho"
+            value={formatCurrency(recebidoPeriodo, false)}
             valueTone="green"
-            caption={legendaPeriodo}
+            caption={`recebido ${legendaJanela}`}
             rows={
               temMeta
                 ? [
-                    {
-                      label: `Meta do mês ${formatCurrency(metaMes, false)}`,
-                      value: `${progresso.toFixed(0)}%`,
-                    },
+                    { label: "Meta do mês", value: formatCurrency(metaMes, false) },
                     falta > 0
                       ? {
-                          label: `Falta (${diasRestantes} dias úteis)`,
-                          value: `${formatCurrency(porDia, false)}/dia`,
+                          label: "P/ alcançar a meta",
+                          value: formatCurrency(falta, false),
                           tone: "amber",
                         }
                       : { label: "Meta", value: "atingida", tone: "green" },
                   ]
-                : [{ label: "Meta do mês", value: "não definida" }]
+                : janela === "mes" && metaMes === 0
+                  ? [{ label: "Meta do mês", value: "não definida" }]
+                  : []
             }
           >
+            <div className="flex items-center gap-1 mt-1 mb-0.5">
+              {(
+                [
+                  { key: "dia", label: "Dia" },
+                  { key: "semana", label: "Semana" },
+                  { key: "mes", label: "Mês" },
+                ] as { key: JanelaDesempenho; label: string }[]
+              ).map((opt) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => setJanela(opt.key)}
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors touch-manipulation ${
+                    janela === opt.key
+                      ? "bg-green-600 text-white"
+                      : "bg-gray-100 dark:bg-dark-bg text-gray-600 dark:text-dark-text-secondary hover:bg-gray-200 dark:hover:bg-dark-border"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
             {temMeta && (
               <div className="mt-1 h-1.5 bg-gray-200/70 dark:bg-dark-bg-secondary rounded-full overflow-hidden">
                 <div
@@ -336,97 +325,6 @@ const MeuDesempenho: React.FC<Props> = ({
               </div>
             )}
           </SummaryCard>
-
-          <SummaryCard
-            compact
-            icon={PhoneCall}
-            title="Quantos atendi"
-            {...(periodo === "hoje"
-              ? {
-                  onClick: () => onFiltrar("atendidosHoje"),
-                  hint: "Ver os clientes atendidos hoje",
-                }
-              : {})}
-            value={atendValor(atend?.clientes)}
-            valueTone="blue"
-            caption={`clientes ${legendaPeriodo} (cada um conta 1 vez)`}
-            rows={[
-              {
-                label: "Consegui conversar",
-                value: atendValor(atend?.conversaram),
-              },
-              {
-                label: "Promessas de pagamento",
-                value: atendValor(atend?.promessas),
-              },
-              ...(periodo !== "hoje" && atend
-                ? [
-                    {
-                      label: "Média por dia útil",
-                      value: fmtNum(Math.round(atend.clientes / diasNoPeriodo)),
-                    },
-                  ]
-                : []),
-            ]}
-          />
-
-          <SummaryCard
-            compact
-            icon={CalendarClock}
-            title="Meus compromissos"
-            onClick={() => onFiltrar("paraHoje")}
-            hint="Ver os clientes para hoje"
-            value={fmtNum(compromissosHoje)}
-            valueTone={compromissosHoje > 0 ? "red" : "neutral"}
-            caption="para hoje"
-            rows={[
-              { label: "Contatos agendados", value: fmtNum(compromissos.agendados) },
-              { label: "Promessas a cobrar", value: fmtNum(compromissos.promessas) },
-              ...(compromissos.acordosQuebrados > 0
-                ? [
-                    {
-                      label: "Acordos quebrados",
-                      value: fmtNum(compromissos.acordosQuebrados),
-                      tone: "red" as const,
-                    },
-                  ]
-                : []),
-            ]}
-          />
-
-          <SummaryCard
-            compact
-            icon={Users}
-            title="Minha carteira"
-            onClick={() => onFiltrar("todos")}
-            hint="Ver a carteira completa"
-            value={formatCurrency(carteira.vencido, false)}
-            valueTone="red"
-            caption={`vencido · ${fmtNum(carteira.clientes)} clientes`}
-            rows={[
-              {
-                label: "Críticos (+90 dias)",
-                value: fmtNum(carteira.criticos),
-                onClick: () => onFiltrar("criticos"),
-                hint: "Ver só os críticos",
-              },
-              {
-                label: "Sem atendimento há 7 dias",
-                value: fmtNum(carteira.semAtendimento),
-                tone: carteira.semAtendimento > 0 ? "amber" : undefined,
-                onClick: () => onFiltrar("semAtendimento"),
-                hint: "Ver quem está sem atendimento há 7 dias",
-              },
-              ...(carteira.aVencer > 0.01
-                ? [
-                    {
-                      label: "A vencer (no prazo)",
-                      value: formatCurrency(carteira.aVencer, false),
-                    },
-                  ]
-                : []),
-            ]}
-          />
         </div>
       )}
     </div>

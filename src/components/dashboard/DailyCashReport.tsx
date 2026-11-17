@@ -207,8 +207,11 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
 
   // Item 66, etapa 3: pagamentos que o cliente fez na loja/banco, atribuídos
   // ao cobrador (pedido dele ou exceção do gestor aprovada) -- crédito de
-  // desempenho, não é sale_payments (migration 20261116000003). Busca uma
-  // vez; "Atualizar" (refreshData) não refaz esta consulta local.
+  // desempenho, não é sale_payments (migration 20261116000003). Lê a view
+  // atribuicoes_pagamento_vigentes (valor_vigente = LEAST(valor_aprovado,
+  // valor_recebido atual); some se o ERP desfizer a baixa -- migration
+  // 20261117000007). Busca uma vez; "Atualizar" (refreshData) não refaz
+  // esta consulta local.
   const [atribuicoesAprovadas, setAtribuicoesAprovadas] = useState<
     {
       lote: string;
@@ -224,11 +227,10 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     let cancelled = false;
     (async () => {
       const { data, error } = await supabase
-        .from("atribuicoes_pagamento")
+        .from("atribuicoes_pagamento_vigentes")
         .select(
-          "lote, documento, cliente, venda, valor_aprovado, data_pagamento, solicitado_por_id",
-        )
-        .eq("decisao", "aprovado");
+          "lote, documento, cliente, venda, valor_vigente, data_pagamento, solicitado_por_id",
+        );
       if (error) {
         console.error(
           "Erro ao buscar pagamentos atribuídos (pago na loja):",
@@ -238,15 +240,19 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       }
       if (!cancelled) {
         setAtribuicoesAprovadas(
-          (data || []).map((r) => ({
-            lote: r.lote,
-            documento: r.documento,
-            cliente: r.cliente,
-            venda: r.venda,
-            valor: Number(r.valor_aprovado) || 0,
-            data_pagamento: String(r.data_pagamento).slice(0, 10),
-            solicitado_por_id: r.solicitado_por_id,
-          })),
+          (data || [])
+            .filter(
+              (r) => r.lote && r.documento && r.solicitado_por_id && r.data_pagamento,
+            )
+            .map((r) => ({
+              lote: r.lote as string,
+              documento: r.documento as string,
+              cliente: r.cliente,
+              venda: r.venda,
+              valor: Number(r.valor_vigente) || 0,
+              data_pagamento: String(r.data_pagamento).slice(0, 10),
+              solicitado_por_id: r.solicitado_por_id as string,
+            })),
         );
       }
     })();

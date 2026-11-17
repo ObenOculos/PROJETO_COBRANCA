@@ -1247,16 +1247,8 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   const listaRef = useRef<HTMLDivElement>(null);
   const filtrarPeloPainel = React.useCallback((filtro: FiltroDesempenho) => {
     setWalletFilters({});
-    setSituacaoCarteira(
-      filtro === "paraHoje"
-        ? "paraHoje"
-        : filtro === "atendidosHoje"
-          ? "atendidosHoje"
-          : filtro === "semAtendimento"
-            ? "semAtendimento"
-            : "todos",
-    );
-    setFaixaCarteira(filtro === "criticos" ? "critical" : "todas");
+    setSituacaoCarteira(filtro === "semAtendimento" ? "semAtendimento" : "todos");
+    setFaixaCarteira("todas");
     setWalletTab("carteira");
     requestAnimationFrame(() =>
       listaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
@@ -1273,7 +1265,8 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       vencido = 0,
       aVencer = 0,
       criticos = 0,
-      semAtendimento = 0;
+      semAtendimento = 0,
+      comAtraso = 0;
     openClientGroups.forEach((g) => {
       const motivo = motivoParaHojeDe(g.document);
       if (motivo === "agendado") agendados++;
@@ -1282,6 +1275,9 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       const saldo = saldoPorDocumento.get(g.document);
       vencido += saldo?.vencido ?? 0;
       aVencer += saldo?.aVencer ?? 0;
+      // Pior status do cliente: se tem algo vencido, conta so ali -- nao
+      // soma nos dois grupos (card "Numero de clientes").
+      if ((saldo?.vencido ?? 0) > 0) comAtraso++;
       if (faixaDoCliente(g) === "critical") criticos++;
       if (estaNaSituacao(g, "semAtendimento")) semAtendimento++;
     });
@@ -1291,6 +1287,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
         vencido,
         aVencer,
         clientes: openClientGroups.length,
+        comAtraso,
         criticos,
         semAtendimento,
       },
@@ -1365,7 +1362,6 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
           salePayments={salePayments}
           metaMes={stats.targetValue}
           versaoRegistros={versaoRegistros}
-          compromissos={painel.compromissos}
           carteira={painel.carteira}
           onFiltrar={filtrarPeloPainel}
         />

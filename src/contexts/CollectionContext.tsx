@@ -775,12 +775,15 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     lojas: string[] | null,
     ativa = true,
   ) => {
+    // p_regra_id/p_max_dias sao obrigatorios na RPC mas aceitam NULL de
+    // verdade (uuid/integer sem valor); o tipo gerado nao marca isso --
+    // so DEFAULT NULL vira "| null" no gen types, parametro sem default nao.
     const { error: rpcError } = await supabase.rpc("salvar_regra_carteira", {
-      p_regra_id: regraId,
+      p_regra_id: regraId as string,
       p_collector_id: collectorId,
       p_min_dias: minDias,
-      p_max_dias: maxDias,
-      p_lojas: lojas && lojas.length > 0 ? lojas : null,
+      p_max_dias: maxDias as number,
+      p_lojas: lojas && lojas.length > 0 ? lojas : undefined,
       p_ativa: ativa,
     });
     if (rpcError) {
