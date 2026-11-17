@@ -1031,9 +1031,15 @@ const EnhancedStoreManagement: React.FC = () => {
 
                 {/* Barra da inadimplência: de onde sai o % da etiqueta */}
                 <div>
-                  <p className="text-[10px] font-semibold tracking-wide text-gray-400 dark:text-dark-text-secondary truncate mb-1">
+                  {/* Só o nome: os valores da conta ("não pago de
+                      esperado") não aparecem no resto do card e confundiam
+                      com o vencido (17/11). Ficam na dica e no modal. */}
+                  <p
+                    className="text-[10px] font-semibold tracking-wide text-gray-400 dark:text-dark-text-secondary truncate mb-1"
+                    title={store.dueAmount > 0 ? inadDica : undefined}
+                  >
                     {store.dueAmount > 0
-                      ? `${formatCurrencyCompact(store.inadNaoPago)} não pago de ${formatCurrencyCompact(store.dueAmount)} esperado`
+                      ? "Inadimplência"
                       : `Nada venceu há mais de ${INADIMPLENCIA_CORTE_DIAS} dias`}
                   </p>
                   <div className="w-full bg-gray-100 dark:bg-dark-bg rounded-full h-1.5">
