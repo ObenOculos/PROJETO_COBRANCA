@@ -66,7 +66,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [showInactivityModal, setShowInactivityModal] = useState(false);
   const [showInactiveAccountModal, setShowInactiveAccountModal] =
     useState(false);
-  // Outra conta entrou neste navegador (outra aba): esta aba foi desconectada.
+  // Outra conta entrou neste navegador (outra aba): esta aba passou para ela.
   const [contaTrocada, setContaTrocada] = useState<string | null>(null);
   // Login com outra conta ja conectada neste navegador: pede confirmacao.
   const [confirmarTroca, setConfirmarTroca] = useState<{
@@ -80,8 +80,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // o perfil mostrado e por aba (sessionStorage). Se outra conta entra em
   // outra aba, esta aba passaria a consultar e gravar com a conta nova
   // mostrando a antiga (bug relatado em 17/11). Cada aba guarda o id de Auth
-  // da propria conta e se desconecta quando a sessao do navegador muda.
+  // da propria conta e, quando a sessao do navegador muda, passa para a
+  // conta nova com aviso -- o mesmo que acontece ao recarregar a aba (antes
+  // dizia "desconectada" e o F5 conectava na outra conta).
   const authIdRef = useRef<string | null>(null);
+  // Login em andamento NESTA aba: o proprio login trata o SIGNED_IN.
+  const entrandoRef = useRef(false);
   const userRef = useRef<User | null>(null);
   userRef.current = user;
 
@@ -107,11 +111,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(userObj);
   };
 
-  /** Desconecta SO esta aba (a sessao do navegador e da outra conta). */
-  const desconectarAba = (nomeOutraConta: string) => {
+  /** Passa esta aba para a conta da sessao do navegador. `aviso`: a aba
+   * estava com outra conta (mostra o aviso); sem aviso = estava no login. */
+  const seguirContaDoNavegador = async (authUserId: string, aviso: boolean) => {
+    // Limpa a conta antiga antes (telas e caches recarregam do zero).
     clearLocalSession();
     setUser(null);
-    setContaTrocada(nomeOutraConta);
+    const { data: row } = await supabase
+      .from("users")
+      .select("id, name, login, type, active, created_at, auth_email")
+      .eq("auth_user_id", authUserId)
+      .maybeSingle();
+    if (!row || row.active === false) return; // fica no login
+    guardarSessao(buildUser(row), authUserId);
+    if (aviso) setContaTrocada(row.name);
   };
 
   /** Nome da conta de uma sessao de Auth (para os avisos). */
@@ -126,12 +139,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   /** Confere se a sessao do navegador ainda e a desta aba. */
   const conferirConta = useCallback(async () => {
-    if (!userRef.current || !authIdRef.current) return;
+    if (!userRef.current || !authIdRef.current || entrandoRef.current) return;
     const { data } = await supabase.auth.getSession();
     const idSessao = data.session?.user.id ?? null;
     if (!idSessao) return; // saiu: o SIGNED_OUT ja trata
     if (idSessao !== authIdRef.current) {
-      desconectarAba(await nomeDaConta(idSessao));
+      await seguirContaDoNavegador(idSessao, true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -203,15 +216,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           return;
         }
         const idSessao = session?.user.id;
-        if (
-          idSessao &&
-          userRef.current &&
-          authIdRef.current &&
-          idSessao !== authIdRef.current
-        ) {
+        if (!idSessao || entrandoRef.current) return;
+        // Outra conta entrou (aba com conta) ou alguem entrou em outra aba
+        // (aba no login): segue a conta do navegador.
+        const comConta = !!userRef.current && !!authIdRef.current;
+        const mudou = comConta && idSessao !== authIdRef.current;
+        const entrouEmOutraAba = !comConta && event === "SIGNED_IN";
+        if (mudou || entrouEmOutraAba) {
           // Fora do callback do Auth (nao chamar o Supabase dentro dele).
           setTimeout(() => {
-            void nomeDaConta(idSessao).then(desconectarAba);
+            void seguirContaDoNavegador(idSessao, mudou);
           }, 0);
         }
       },
@@ -389,10 +403,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return true;
       };
 
+      entrandoRef.current = true;
       return await withLoading(performLogin(), "Fazendo login...");
     } catch (err) {
       console.error("Erro no login:", err);
       return false;
+    } finally {
+      entrandoRef.current = false;
     }
   };
 
@@ -505,18 +522,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         </div>
       )}
 
-      {/* Esta aba foi desconectada: outra conta entrou neste navegador */}
-      {contaTrocada && !user && (
+      {/* Outra conta entrou neste navegador: esta aba passou para ela */}
+      {contaTrocada && user && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl p-6 max-w-md w-full shadow-xl text-center">
             <h3 className="text-lg font-bold text-gray-900 dark:text-dark-text mb-2">
-              Esta aba foi desconectada
+              A conta deste navegador mudou
             </h3>
             <p className="text-sm text-gray-600 dark:text-dark-text-secondary mb-6">
-              <strong>{contaTrocada}</strong> entrou neste navegador em outra
-              aba. Só uma conta fica conectada por vez no mesmo navegador. Para
-              usar duas contas ao mesmo tempo, use uma janela anônima ou outro
-              navegador.
+              <strong>{contaTrocada}</strong> entrou em outra aba, e esta aba
+              passou para a conta de <strong>{contaTrocada}</strong>. Só uma
+              conta fica conectada por vez no mesmo navegador. Para usar duas
+              contas ao mesmo tempo, use uma janela anônima ou outro navegador.
             </p>
             <button
               onClick={() => setContaTrocada(null)}
