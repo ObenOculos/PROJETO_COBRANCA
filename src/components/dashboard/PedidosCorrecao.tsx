@@ -70,7 +70,15 @@ const PedidosCorrecao: React.FC = () => {
         Date.now() - DIAS_HISTORICO * 86400000,
       ).toISOString();
       const lista = await listarPedidosCorrecao({ desde });
-      const ids = Array.from(new Set(lista.map((p) => p.sale_payment_id)));
+      // Pagamento pedido + o estorno gravado (valor efetivamente estornado,
+      // que pode ser menor que o pedido).
+      const ids = Array.from(
+        new Set(
+          lista.flatMap((p) =>
+            p.estorno_id ? [p.sale_payment_id, p.estorno_id] : [p.sale_payment_id],
+          ),
+        ),
+      );
       const mapa = new Map<string, PagamentoResumo>();
       // Lotes pequenos: a lista de ids vai na URL.
       for (let i = 0; i < ids.length; i += 200) {
@@ -170,6 +178,12 @@ const PedidosCorrecao: React.FC = () => {
     }
   };
 
+  /** Valor estornado (positivo): o do estorno gravado; sem ele, o pedido. */
+  const valorEstornado = (p: PedidoCorrecao): number => {
+    const est = p.estorno_id ? pagamentos.get(p.estorno_id) : undefined;
+    return est ? Math.abs(Number(est.payment_amount)) : Number(p.valor);
+  };
+
   const abertos = (pedidos ?? []).filter((p) => !p.decisao);
   const decididos = (pedidos ?? []).filter((p) => p.decisao);
   const totalAbertos = abertos.reduce((s, p) => s + Number(p.valor), 0);
@@ -246,7 +260,7 @@ const PedidosCorrecao: React.FC = () => {
               rows={[
                 {
                   label: "Estornados",
-                  value: `${okDecididos.length} · ${formatCurrency(okDecididos.reduce((s, p) => s + Number(p.valor), 0))}`,
+                  value: `${okDecididos.length} · ${formatCurrency(okDecididos.reduce((s, p) => s + valorEstornado(p), 0))}`,
                   tone: "green",
                 },
                 {
@@ -414,7 +428,9 @@ const PedidosCorrecao: React.FC = () => {
                       ) : (
                         <XCircle className="h-3 w-3" />
                       )}
-                      {p.decisao === "estornado" ? "Estornado" : "Recusado"}
+                      {p.decisao === "estornado"
+                        ? `Estornado ${formatCurrency(valorEstornado(p))}`
+                        : "Recusado"}
                     </span>{" "}
                     · {p.cliente ?? p.documento} ·{" "}
                     {nomePorId.get(p.solicitado_por_id) ?? "cobrador"} pediu{" "}

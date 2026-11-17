@@ -37,6 +37,8 @@ export interface NotificacaoDestino {
   visao?: "cash-report";
   /** Atribuicao de Cobradores: filtro de cobrador. */
   atribuicao?: "without_collector";
+  /** Pagina Cobradores: abrir nesta aba. */
+  cobradores?: "conferencia";
 }
 
 export interface NotificacaoGerada {

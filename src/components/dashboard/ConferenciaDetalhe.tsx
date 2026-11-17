@@ -82,6 +82,8 @@ interface Props {
   conversas?: ConversaConferencia[];
   /** O pago na loja aprovado soma nesta linha (visao "Todos": so numa). */
   lojaNaLinha?: boolean;
+  /** Valor que o cobrador ainda pode pedir como pago na loja. */
+  podePedir?: number;
   onMarcar: (
     acao: "conferido" | "reaberto",
     observacao: string,
@@ -95,8 +97,17 @@ const PainelMarcacao: React.FC<{
   marcacoes: ConferenciaMarcacao[];
   estado: ConferenciaEstadoMarcacao;
   nomePorId: Map<string, string>;
+  podePedir: number;
   onMarcar: Props["onMarcar"];
-}> = ({ baseValor, appValor, marcacoes, estado, nomePorId, onMarcar }) => {
+}> = ({
+  baseValor,
+  appValor,
+  marcacoes,
+  estado,
+  nomePorId,
+  podePedir,
+  onMarcar,
+}) => {
   const [obs, setObs] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -185,6 +196,13 @@ const PainelMarcacao: React.FC<{
           novo no mês). Confira de novo.
         </div>
       )}
+      {acao === "conferido" && podePedir > 0.009 && (
+        <div className="text-[11px] font-medium text-amber-700 dark:text-amber-400">
+          O cobrador ainda pode pedir {formatCurrency(podePedir)} como pago na
+          loja (até 30 dias do pagamento). Se o pedido vier e for aprovado
+          depois, ele soma ao app desta linha.
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row gap-2">
         <input
           type="text"
@@ -248,6 +266,7 @@ const ConferenciaDetalhe: React.FC<Props> = ({
   estadoMarcacao,
   conversas = [],
   lojaNaLinha = true,
+  podePedir = 0,
   onMarcar,
 }) => {
   // Por parcela: quem conversou antes do pagamento e o pedido "pago na loja".
@@ -700,6 +719,7 @@ const ConferenciaDetalhe: React.FC<Props> = ({
         marcacoes={marcacoes}
         estado={estadoMarcacao}
         nomePorId={nomePorId}
+        podePedir={podePedir}
         onMarcar={onMarcar}
       />
 

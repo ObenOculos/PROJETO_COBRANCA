@@ -33,6 +33,7 @@ import {
   ConversaConferencia,
 } from "../../services/atribuicoesPagamento";
 import { ATTEMPT_RESULT_LABELS } from "../../config/collectionAttempts";
+import { usePendenciasCorrecoes } from "../../services/pendenciasCorrecoes";
 import { formatCurrency } from "../../utils/formatters";
 import { todayLocalStr } from "../../config/visitStatus";
 import {
@@ -458,10 +459,13 @@ const ConferenciaRecebimentos: React.FC = () => {
     return m;
   }, [conversas]);
 
-  /** Abre Correções > Pagos na loja (onde o pedido e decidido). */
-  const abrirPedidosLoja = () => {
+  // Pedidos sem decisao em Correções (as tres filas): atalho no topo.
+  const pendentesCorrecoes = usePendenciasCorrecoes(true);
+
+  /** Abre Correções (na aba pedida), onde os pedidos sao decididos. */
+  const abrirCorrecoes = (aba?: "loja") => {
     try {
-      localStorage.setItem("correcoesVisao", "loja");
+      if (aba) localStorage.setItem("correcoesVisao", aba);
     } catch {
       // sem storage: abre na primeira aba
     }
@@ -471,6 +475,7 @@ const ConferenciaRecebimentos: React.FC = () => {
       }),
     );
   };
+  const abrirPedidosLoja = () => abrirCorrecoes("loja");
 
   // Historico por documento, em ordem de registro (a ultima vale).
   const marcacoesPorDoc = useMemo(() => {
@@ -596,7 +601,12 @@ const ConferenciaRecebimentos: React.FC = () => {
       });
       const historico = marcacoesPorDoc.get(l.documento ?? "");
       const ultima = historico?.[historico.length - 1];
-      const marcacao = estadoMarcacao(ultima, visao, baseValor, appValor);
+      // Marcado e os valores mudaram, mas agora confere (ex.: pago na loja
+      // aprovado depois da marcacao): continua conferido, sem o aviso
+      // "mudou depois de conferido".
+      const estado = estadoMarcacao(ultima, visao, baseValor, appValor);
+      const marcacao =
+        estado === "mudou" && situacao === "confere" ? "conferido" : estado;
       if (marcacao !== "conferido" && CONFERENCIA_GRUPO[situacao] === "acao")
         g.pendencias++;
       g.clientes.push({
@@ -830,6 +840,17 @@ const ConferenciaRecebimentos: React.FC = () => {
         </h2>
 
         <div className="flex flex-wrap items-center gap-2">
+          {pendentesCorrecoes > 0 && (
+            <button
+              onClick={() => abrirCorrecoes()}
+              title="Pedidos dos cobradores (correção, pago na loja, desconto) esperando decisão em Correções"
+              className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-300"
+            >
+              <Hourglass className="h-3.5 w-3.5" />
+              {pendentesCorrecoes}{" "}
+              {pendentesCorrecoes === 1 ? "pedido" : "pedidos"} para decidir
+            </button>
+          )}
           <div className="flex bg-gray-100 dark:bg-dark-bg rounded-md p-0.5">
             {(
               [
@@ -1314,6 +1335,7 @@ const ConferenciaRecebimentos: React.FC = () => {
                                 }
                                 estadoMarcacao={c.marcacao}
                                 conversas={c.loja?.linhas ?? []}
+                                podePedir={c.loja?.podePedir ?? 0}
                                 lojaNaLinha={
                                   visao === "todos" ? c.lojaAprovado > 0 : true
                                 }

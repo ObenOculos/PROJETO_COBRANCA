@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Scale } from "lucide-react";
 import PedidosCorrecao from "./PedidosCorrecao";
 import PedidosAtribuicao from "./PedidosAtribuicao";
 import PedidosDesconto from "./PedidosDesconto";
@@ -29,6 +30,7 @@ const AbaPedidosGestor: React.FC = () => {
   });
   return (
     <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
       <div
         role="tablist"
         className="inline-flex rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg-secondary p-1"
@@ -49,6 +51,28 @@ const AbaPedidosGestor: React.FC = () => {
             {v.label}
           </button>
         ))}
+      </div>
+        {/* Atalho: a conferencia do mes (Cobradores > Conferência) mostra o
+            dinheiro baixado x registrado e o pedido de cada cliente. */}
+        <button
+          type="button"
+          onClick={() =>
+            window.dispatchEvent(
+              new CustomEvent("notificationClick", {
+                detail: {
+                  destino: {
+                    aba: "collectors-summary",
+                    cobradores: "conferencia",
+                  },
+                },
+              }),
+            )
+          }
+          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg-secondary px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-bg"
+        >
+          <Scale className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+          Conferência de recebimentos
+        </button>
       </div>
       {visao === "correcoes" ? (
         <PedidosCorrecao />

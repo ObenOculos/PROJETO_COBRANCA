@@ -20,7 +20,6 @@ import {
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useOffline } from "../../hooks/useOffline";
-import { useNotifications } from "../../contexts/NotificationContext";
 import { calculateOverdueDays, formatCurrency } from "../../utils/formatters";
 import { supabase } from "../../lib/supabase";
 import { addDaysLocalStr, todayLocalStr } from "../../config/visitStatus";
@@ -227,7 +226,6 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
     const [pedidoEnviando, setPedidoEnviando] = useState(false);
     const [pedidoErro, setPedidoErro] = useState<string | null>(null);
     const [pedidoEnviado, setPedidoEnviado] = useState(false);
-    const { addNotification } = useNotifications();
     const [loading, setLoading] = useState(false);
     const [distributionAmount, setDistributionAmount] = useState<string>("");
     const [paymentMethod, setPaymentMethod] = useState("dinheiro");
@@ -858,36 +856,6 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       parcelasAbertas,
     ]);
 
-    // Função para notificar manager sobre pagamentos com desconto
-    const notifyManagerAboutDiscount = (discountAmount: number) => {
-      if (!user || user.type !== "collector" || discountAmount <= 0) {
-        return;
-      }
-
-      const paymentAmount = amountToDistribute;
-      const originalPendingAmount = totalPending;
-      const discountPercentage =
-        originalPendingAmount > 0
-          ? ((discountAmount / originalPendingAmount) * 100).toFixed(1)
-          : "0";
-
-      const notificationData = {
-        type: "payment" as const,
-        title: "Pagamento com Desconto Aplicado",
-        message: `${user.name || "Cobrador"} aplicou desconto de ${formatCurrency(discountAmount)} (${discountPercentage}%) no cliente ${clientGroup.client}. Valor pago: ${formatCurrency(paymentAmount)} | Valor original: ${formatCurrency(originalPendingAmount)}`,
-        priority:
-          discountAmount > 1000 ? ("high" as const) : ("medium" as const),
-        relatedId: `discount-${clientGroup.document}-${Date.now()}`,
-        targetUserType: "manager" as const, // Notificação direcionada para managers
-      };
-
-      try {
-        addNotification(notificationData);
-      } catch (error) {
-        console.error("❌ Erro ao enviar notificação:", error);
-      }
-    };
-
     // ---------- Etapas: 1 Valor -> 2 Pagamento -> 3 Conferir ----------
     // Cada "Continuar" valida so a sua etapa; o erro aparece na propria tela
     // (sem alert -- dialog nativo trava a aba).
@@ -1134,14 +1102,10 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
           }
         }
 
-        // Verificar se houve desconto aplicado e notificar manager
-        const totalDiscountApplied = saleDistribution.reduce(
-          (sum, item) => sum + item.appliedDiscount,
-          0,
-        );
-        if (totalDiscountApplied > 0) {
-          notifyManagerAboutDiscount(totalDiscountApplied);
-        }
+        // Desconto: o gestor e avisado pela regra de notificacoes
+        // (config/notificationRules, "Desconto na Venda"), que le os
+        // pagamentos do banco. O aviso local daqui so ficava no aparelho de
+        // quem registrou (removido em 17/11).
       } catch (error) {
         console.error("Erro ao aplicar distribuição:", error);
         showErrorNotification(error);

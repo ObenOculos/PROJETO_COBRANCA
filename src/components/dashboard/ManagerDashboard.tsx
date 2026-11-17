@@ -188,6 +188,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
         setCollectionsView(destino.visao ?? "table");
         void requestCollections();
       }
+      if (destino.cobradores) changeSummaryView(destino.cobradores);
       if (destino.atribuicao) {
         setAssignmentPreset({ status: destino.atribuicao, nonce: Date.now() });
         changeAtribuicaoView("manual");
