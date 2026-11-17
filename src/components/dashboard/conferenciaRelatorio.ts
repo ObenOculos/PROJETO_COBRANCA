@@ -13,6 +13,8 @@ import {
 export interface LinhaRelatorio {
   cliente: string;
   documento: string;
+  /** Código do cliente no Ciclone ("" = sem código). */
+  codigo: string;
   cobradorNome: string;
   carteiraNome: string;
   situacao: ConferenciaSituacao;
@@ -130,7 +132,7 @@ export const exportarTxt = (d: DadosRelatorio) => {
     linhas.push("CLIENTES:", "-".repeat(70));
     d.linhas.forEach((l, i) => {
       linhas.push(
-        `${i + 1}. ${l.cliente} (${l.documento || "sem documento"})`,
+        `${i + 1}. ${l.cliente} (${l.documento || "sem documento"}${l.codigo ? ` · Cód. ${l.codigo}` : ""})`,
         `   Cobrador: ${l.cobradorNome}${l.carteiraNome ? ` · carteira: ${l.carteiraNome}` : ""}`,
         `   Situação: ${CONFERENCIA_SITUACAO_LABEL[l.situacao]}`,
         `   Base: ${formatCurrency(l.baseValor)} (${l.baseParcelas} parcela(s))   App: ${formatCurrency(l.appValor)} (${l.appLancamentos} lançamento(s))   Diferença: ${formatCurrency(l.appValor - l.baseValor)}`,
@@ -200,6 +202,7 @@ export const exportarExcel = (d: DadosRelatorio) => {
     [
       "Cliente",
       "CPF/CNPJ",
+      "Código Ciclone",
       "Cobrador",
       "Carteira (se de outro cobrador)",
       "Situação",
@@ -214,6 +217,7 @@ export const exportarExcel = (d: DadosRelatorio) => {
     ...d.linhas.map((l) => [
       l.cliente,
       l.documento,
+      l.codigo,
       l.cobradorNome,
       l.carteiraNome,
       CONFERENCIA_SITUACAO_LABEL[l.situacao],
@@ -229,6 +233,7 @@ export const exportarExcel = (d: DadosRelatorio) => {
   clientesWS["!cols"] = [
     { wch: 36 },
     { wch: 20 },
+    { wch: 14 },
     { wch: 24 },
     { wch: 24 },
     { wch: 30 },
@@ -312,7 +317,7 @@ export const imprimir = (d: DadosRelatorio) => {
       ${d.linhas
         .map((l) => {
           const df = l.appValor - l.baseValor;
-          return `<tr><td>${esc(l.cliente)}<div class="doc">${esc(l.documento)}${l.carteiraNome ? ` · carteira: ${esc(l.carteiraNome)}` : ""}</div></td><td>${esc(l.cobradorNome)}</td><td>${esc(CONFERENCIA_SITUACAO_LABEL[l.situacao])}${l.conferencia ? `<div class="doc">${esc(l.conferencia)}</div>` : ""}</td><td class="n">${l.baseParcelas > 0 ? formatCurrency(l.baseValor) : "—"}</td><td class="n">${l.appLancamentos > 0 ? formatCurrency(l.appValor) : "—"}</td><td class="n" style="color:${corDif(df)}">${Math.abs(df) < 0.005 ? "—" : formatCurrency(df)}</td></tr>`;
+          return `<tr><td>${esc(l.cliente)}<div class="doc">${esc(l.documento)}${l.codigo ? ` · Cód. ${esc(l.codigo)}` : ""}${l.carteiraNome ? ` · carteira: ${esc(l.carteiraNome)}` : ""}</div></td><td>${esc(l.cobradorNome)}</td><td>${esc(CONFERENCIA_SITUACAO_LABEL[l.situacao])}${l.conferencia ? `<div class="doc">${esc(l.conferencia)}</div>` : ""}</td><td class="n">${l.baseParcelas > 0 ? formatCurrency(l.baseValor) : "—"}</td><td class="n">${l.appLancamentos > 0 ? formatCurrency(l.appValor) : "—"}</td><td class="n" style="color:${corDif(df)}">${Math.abs(df) < 0.005 ? "—" : formatCurrency(df)}</td></tr>`;
         })
         .join("")}
     </tbody>

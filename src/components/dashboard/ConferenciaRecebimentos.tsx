@@ -291,7 +291,10 @@ const Diferenca: React.FC<{ valor: number }> = ({ valor }) => {
 };
 
 const ConferenciaRecebimentos: React.FC = () => {
-  const { users, getClientGroups } = useCollection();
+  const { users, getClientGroups, clientesRegistry } = useCollection();
+  /** Código do cliente no Ciclone (cadastro), quando houver. */
+  const codigoDe = (documento: string): string =>
+    clientesRegistry.get(documento)?.codigo_cliente_erp?.trim() ?? "";
   const { user } = useAuth();
   // Linha com o detalhe aberto (chave da linha) e Ficha aberta.
   const [aberta, setAberta] = useState<string | null>(null);
@@ -665,10 +668,12 @@ const ConferenciaRecebimentos: React.FC = () => {
     return base.filter(
       (c) =>
         normalizar(c.cliente).includes(texto) ||
+        (termo.length >= 2 && codigoDe(c.documento).includes(termo)) ||
         (digitos.length >= 3 &&
           c.documento.replace(/\D/g, "").includes(digitos)),
     );
-  }, [grupos, grupoAtual, busca]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- codigoDe le o cadastro
+  }, [grupos, grupoAtual, busca, clientesRegistry]);
 
   const resumo = useMemo(() => {
     const r = {
@@ -779,6 +784,7 @@ const ConferenciaRecebimentos: React.FC = () => {
       linhas: lista.map((c) => ({
         cliente: c.cliente,
         documento: c.documento,
+        codigo: codigoDe(c.documento),
         cobradorNome: c.cobradorNome,
         carteiraNome: carteiraDeOutro(c),
         situacao: c.situacao,
@@ -1114,7 +1120,7 @@ const ConferenciaRecebimentos: React.FC = () => {
                 type="text"
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
-                placeholder="Buscar cliente ou CPF/CNPJ"
+                placeholder="Buscar cliente, CPF/CNPJ ou código"
                 className="w-full rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg pl-8 pr-8 py-1.5 text-sm text-gray-900 dark:text-dark-text placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               {busca && (
@@ -1219,6 +1225,12 @@ const ConferenciaRecebimentos: React.FC = () => {
                             </div>
                             <div className="text-[11px] text-gray-400 dark:text-dark-text-secondary">
                               {c.documento}
+                              {codigoDe(c.documento) && (
+                                <span title="Código do cliente no Ciclone">
+                                  {" "}
+                                  · Cód. {codigoDe(c.documento)}
+                                </span>
+                              )}
                               {outraCarteira && ` · carteira: ${outraCarteira}`}
                             </div>
                             {c.loja?.conversa && (
