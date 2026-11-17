@@ -182,8 +182,9 @@ const AtribuirPagamentoModal: React.FC<Props> = ({ clientGroup, onClose }) => {
                   Carregando…
                 </div>
               ) : grupos.length === 0 ? (
-                <div className="py-6 text-center text-sm text-gray-500 dark:text-dark-text-secondary">
-                  Nenhum pagamento da loja pode ser pedido para este cliente.
+                <div className="py-4 text-center text-sm text-gray-500 dark:text-dark-text-secondary">
+                  Nenhum pagamento da loja pode ser pedido para este cliente
+                  {outras.length > 0 ? " — o motivo de cada parcela está abaixo." : "."}
                   <br />
                   Vale para pagamento dos últimos 30 dias, com uma conversa sua
                   registrada no Atender (promessa, contato realizado, acordo…)
@@ -283,15 +284,16 @@ const AtribuirPagamentoModal: React.FC<Props> = ({ clientGroup, onClose }) => {
                     onClick={() => setVerOutras((v) => !v)}
                     className="flex items-center gap-1 text-xs text-gray-500 dark:text-dark-text-secondary hover:text-gray-700"
                   >
-                    {verOutras ? (
+                    {verOutras || grupos.length === 0 ? (
                       <ChevronDown className="h-3.5 w-3.5" />
                     ) : (
                       <ChevronRight className="h-3.5 w-3.5" />
                     )}
-                    Outras {outras.length} parcelas pagas que não podem ser
-                    pedidas
+                    {grupos.length === 0
+                      ? `${outras.length} ${outras.length === 1 ? "parcela paga que não pode ser pedida" : "parcelas pagas que não podem ser pedidas"}`
+                      : `Outras ${outras.length} parcelas pagas que não podem ser pedidas`}
                   </button>
-                  {verOutras && (
+                  {(verOutras || grupos.length === 0) && (
                     <ul className="mt-1 space-y-0.5">
                       {outras.map((p) => (
                         <li
