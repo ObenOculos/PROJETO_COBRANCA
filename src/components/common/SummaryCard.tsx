@@ -22,6 +22,11 @@ const SummaryCard: React.FC<{
   caption?: string;
   rows: SummaryCardRow[];
   children?: React.ReactNode;
+  /** Conteudo ao lado do titulo/valor/legenda, em 2 colunas (sm+) -- cai
+   * para embaixo em telas estreitas. Uso: informacao extra que merece ficar
+   * ao lado em vez de empilhada (ex.: mini cards de faixa). `rows` continua
+   * embaixo, ocupando a largura toda dos dois. */
+  aside?: React.ReactNode;
   /** Versao mais baixa (painel do cobrador, acima da lista de trabalho). */
   compact?: boolean;
   /** Card clicavel (ex.: aplica um filtro na lista). */
@@ -38,6 +43,7 @@ const SummaryCard: React.FC<{
   caption,
   rows,
   children,
+  aside,
   compact = false,
   onClick,
   hint,
@@ -77,20 +83,25 @@ const SummaryCard: React.FC<{
       title={hint}
       className={`min-w-0 rounded-xl border ${selecionado ? "border-blue-400 bg-blue-50/50 dark:border-blue-700 dark:bg-blue-900/10" : "border-gray-200 dark:border-dark-border bg-gray-100 dark:bg-dark-bg"} ${compact ? "px-3 py-2" : "px-4 py-3"} ${onClick ? "cursor-pointer transition-colors hover:border-blue-300 hover:bg-blue-50/50 dark:hover:border-blue-800 dark:hover:bg-blue-900/10" : ""}`}
     >
-      <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary">
-        <Icon className="h-4 w-4 flex-shrink-0" />
-        <span className="truncate">{title}</span>
-      </div>
-      <div
-        className={`${compact ? "mt-0.5 text-xl" : "mt-1 text-2xl"} font-bold truncate ${valueClasses[valueTone]}`}
-      >
-        {value}
-      </div>
-      {caption && (
-        <div className="text-[11px] text-gray-400 dark:text-dark-text-secondary truncate">
-          {caption}
+      <div className={aside ? "grid grid-cols-1 sm:grid-cols-2 gap-3" : undefined}>
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary">
+            <Icon className="h-4 w-4 flex-shrink-0" />
+            <span className="truncate">{title}</span>
+          </div>
+          <div
+            className={`${compact ? "mt-0.5 text-xl" : "mt-1 text-2xl"} font-bold truncate ${valueClasses[valueTone]}`}
+          >
+            {value}
+          </div>
+          {caption && (
+            <div className="text-[11px] text-gray-400 dark:text-dark-text-secondary truncate">
+              {caption}
+            </div>
+          )}
         </div>
-      )}
+        {aside && <div className="min-w-0">{aside}</div>}
+      </div>
       {children}
       {rows.length > 0 && (
         <div

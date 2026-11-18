@@ -16,13 +16,13 @@ import {
   ChevronRight,
   Search,
   FileDown,
-  Zap,
   Trash2,
   RefreshCw,
   Phone,
   MessageCircle,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
+import SummaryCard from "../common/SummaryCard";
 import * as XLSX from "xlsx";
 import { useAuth } from "../../contexts/AuthContext";
 import { ScheduledVisit, isCollectorType, UserType } from "../../types";
@@ -118,7 +118,6 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     approveVisitCancellation,
     rejectVisitCancellation,
     fetchScheduledVisits,
-    collections, // Add collections from context
     reincidenciaResets,
   } = useCollection();
   const { user } = useAuth();
@@ -148,44 +147,6 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   const [outcomeFilter, setOutcomeFilter] = useState<string>("all");
   const [cityFilter, setCityFilter] = useState<string>("all");
   const [neighborhoodFilter, setNeighborhoodFilter] = useState<string>("all");
-  const [showCityStats, setShowCityStats] = useState(false);
-
-  // Calculate city statistics
-  const cityStats = useMemo(() => {
-    const stats: Record<
-      string,
-      { totalClients: number; scheduledVisits: number }
-    > = {};
-
-    // Count total unique clients per city from collections
-    const clientsByCity = new Map<string, Set<string>>();
-    collections.forEach((c) => {
-      if (c.cidade && c.documento) {
-        if (!clientsByCity.has(c.cidade)) {
-          clientsByCity.set(c.cidade, new Set());
-        }
-        clientsByCity.get(c.cidade)?.add(c.documento);
-      }
-    });
-
-    clientsByCity.forEach((clients, city) => {
-      stats[city] = { totalClients: clients.size, scheduledVisits: 0 };
-    });
-
-    // Count scheduled visits per city
-    scheduledVisits.forEach((v) => {
-      if (v.clientCity && v.status === "agendada") {
-        if (!stats[v.clientCity]) {
-          stats[v.clientCity] = { totalClients: 0, scheduledVisits: 0 };
-        }
-        stats[v.clientCity].scheduledVisits++;
-      }
-    });
-
-    return Object.entries(stats)
-      .map(([name, data]) => ({ name, ...data }))
-      .sort((a, b) => b.totalClients - a.totalClients);
-  }, [collections, scheduledVisits]);
 
   // Calculate first and last day of the current month for default filters
   const today = new Date();
@@ -974,7 +935,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     return (
       <>
         {/* Barra de Filtros — visual unificado (igual às demais telas) */}
-        <div className="bg-white dark:bg-dark-bg-secondary p-3 rounded-2xl border border-gray-150/80 dark:border-dark-border shadow-sm space-y-3">
+        <div className="bg-white dark:bg-dark-bg-secondary p-3 rounded-2xl border border-gray-200 dark:border-dark-border shadow-sm space-y-3">
           {/* Linha: busca + ações */}
           <div className="flex flex-row flex-wrap items-center gap-3">
             <div className="relative flex-1 min-w-0">
@@ -986,7 +947,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
                 placeholder="Buscar por cliente, documento ou endereço..."
-                className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder-gray-450"
+                className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder-gray-400"
               />
             </div>
 
@@ -1001,7 +962,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               className={`md:hidden px-3 py-2 rounded-xl border flex items-center justify-center gap-1.5 shrink-0 transition-all ${
                 mobileFiltersOpen || activeFiltersCount > 0
                   ? "bg-blue-600 border-blue-600 text-white shadow-sm"
-                  : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border"
+                  : "bg-gray-100 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border"
               }`}
             >
               {activeFiltersCount > 0 && (
@@ -1030,7 +991,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                 className={`flex-1 md:flex-none px-4 py-2 rounded-xl text-sm font-medium transition-all border flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 ${
                   showFilters || activeFiltersCount > 0
                     ? "bg-blue-600 border-blue-600 text-white shadow-sm"
-                    : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
+                    : "bg-gray-100 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
                 }`}
               >
                 <Filter className="h-3.5 w-3.5" />
@@ -1084,7 +1045,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                     className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
                       isActive
                         ? "bg-blue-600 border-blue-600 text-white shadow-sm"
-                        : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
+                        : "bg-gray-100 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
                     }`}
                   >
                     {q.label}
@@ -1107,7 +1068,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                     className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
                       isActive
                         ? "bg-blue-600 border-blue-600 text-white shadow-sm"
-                        : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
+                        : "bg-gray-100 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-200 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
                     }`}
                   >
                     {p.label}
@@ -1123,7 +1084,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
 
             {/* Painel avançado */}
             {showFilters && (
-              <div className="pt-3 border-t border-gray-100 dark:border-dark-border animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="pt-3 border-t border-gray-200 dark:border-dark-border animate-in fade-in slide-in-from-top-2 duration-200">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="space-y-2">
                     <label
@@ -1140,7 +1101,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                         setTypeFilter(e.target.value as UserType | "all");
                         setSelectedCollector("all");
                       }}
-                      className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                      className="w-full px-4 py-2 bg-gray-100 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
                     >
                       <option value="all">Todos</option>
                       <option value="internal_collector">Interno</option>
@@ -1164,7 +1125,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                       name="collectorFilter"
                       value={selectedCollector}
                       onChange={(e) => setSelectedCollector(e.target.value)}
-                      className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                      className="w-full px-4 py-2 bg-gray-100 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
                     >
                       <option value="all">Todos os Cobradores</option>
                       {visibleCollectors.map((collector) => (
@@ -1187,7 +1148,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                       name="statusFilter"
                       value={statusFilter}
                       onChange={(e) => setStatusFilter(e.target.value)}
-                      className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                      className="w-full px-4 py-2 bg-gray-100 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
                     >
                       <option value="all">Todos os Status</option>
                       <option value="agendada">Agendada</option>
@@ -1210,7 +1171,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                       name="outcomeFilter"
                       value={outcomeFilter}
                       onChange={(e) => setOutcomeFilter(e.target.value)}
-                      className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                      className="w-full px-4 py-2 bg-gray-100 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
                     >
                       <option value="all">Todas as Observações</option>
                       {VISIT_OUTCOME_OPTIONS.map((opt) => (
@@ -1233,7 +1194,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                       name="overdueFilter"
                       value={overdueFilter}
                       onChange={(e) => setOverdueFilter(e.target.value)}
-                      className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                      className="w-full px-4 py-2 bg-gray-100 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
                     >
                       <option value="all">Todas as Visitas</option>
                       <option value="overdue">Somente Atrasadas</option>
@@ -1256,7 +1217,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                         setCityFilter(e.target.value);
                         setNeighborhoodFilter("all");
                       }}
-                      className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                      className="w-full px-4 py-2 bg-gray-100 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
                     >
                       <option value="all">Todas as Cidades</option>
                       {availableCities.map((city) => (
@@ -1279,7 +1240,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                       name="neighborhoodFilter"
                       value={neighborhoodFilter}
                       onChange={(e) => setNeighborhoodFilter(e.target.value)}
-                      className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                      className="w-full px-4 py-2 bg-gray-100 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
                     >
                       <option value="all">Todos os Bairros</option>
                       {availableNeighborhoods.map((neighborhood) => (
@@ -1303,7 +1264,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                       name="dateFromFilter"
                       value={dateFromFilter}
                       onChange={(e) => setDateFromFilter(e.target.value)}
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                      className="w-full px-3 py-2 bg-gray-100 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
                     />
                   </div>
 
@@ -1320,7 +1281,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                       name="dateToFilter"
                       value={dateToFilter}
                       onChange={(e) => setDateToFilter(e.target.value)}
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                      className="w-full px-3 py-2 bg-gray-100 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
                     />
                   </div>
 
@@ -1336,7 +1297,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                       name="visitsPerPage"
                       value={visitsPerPage}
                       onChange={handleVisitsPerPageChange}
-                      className="w-full px-4 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                      className="w-full px-4 py-2 bg-gray-100 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
                     >
                       <option value={5}>5 por Página</option>
                       <option value={10}>10 por Página</option>
@@ -1361,7 +1322,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
 
         {/* Chips de filtros ativos */}
         {filterChips.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5 p-2 bg-gray-50/50 dark:bg-dark-bg/25 rounded-xl border border-gray-150/40 dark:border-dark-border/40">
+          <div className="flex flex-wrap items-center gap-1.5 p-2 bg-gray-100/50 dark:bg-dark-bg/25 rounded-xl border border-gray-200/60 dark:border-dark-border/40">
             <span className="text-[11px] font-medium text-gray-400 dark:text-dark-text-secondary pl-1.5 mr-1">
               Filtros ativos:
             </span>
@@ -1401,7 +1362,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
 
         {/* Visit Cards */}
         {Object.keys(groupedVisits).length === 0 ? (
-          <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-8 sm:p-12 text-center">
+          <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-8 sm:p-12 text-center">
             <Calendar className="h-10 w-10 sm:h-12 sm:w-12 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 dark:text-dark-text tracking-tight mb-2">
               Nenhum registro encontrado
@@ -1438,7 +1399,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               return (
                 <div
                   key={collectorId}
-                  className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border overflow-hidden transition-all duration-300"
+                  className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border overflow-hidden transition-all duration-300"
                 >
                   {/* Linha: cabeçalho + barra de exclusão lateral (estilo Cobranças) */}
                   <div className="flex items-stretch">
@@ -1461,7 +1422,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                               {visits.length === 1 ? "Visita" : "Visitas"}
                             </p>
                             {/* Color Dots Summary — Novo */}
-                            <div className="flex items-center gap-1.5 ml-1 border-l border-gray-100 dark:border-dark-border pl-2">
+                            <div className="flex items-center gap-1.5 ml-1 border-l border-gray-200 dark:border-dark-border pl-2">
                               {statusCounts.agendada > 0 && (
                                 <div
                                   className="flex items-center gap-1"
@@ -1523,7 +1484,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                             </span>
                           </button>
                         )}
-                        <div className="bg-gray-50 dark:bg-dark-bg p-2 rounded-xl border border-gray-100 dark:border-dark-border">
+                        <div className="bg-gray-100 dark:bg-dark-bg p-2 rounded-xl border border-gray-200 dark:border-dark-border">
                           {isExpanded ? (
                             <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
                           ) : (
@@ -1570,7 +1531,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                   {isExpanded && (
                     <div className="px-4 sm:px-6 pb-6 animate-in fade-in slide-in-from-top-4 duration-300">
                       {visits.length === 0 ? (
-                        <div className="text-center py-12 bg-gray-50 dark:bg-dark-bg rounded-2xl border border-dashed border-gray-200 dark:border-dark-border">
+                        <div className="text-center py-12 bg-gray-100 dark:bg-dark-bg rounded-2xl border border-dashed border-gray-200 dark:border-dark-border">
                           <Calendar className="h-10 w-10 text-gray-300 mx-auto mb-3" />
                           <p className="text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">
                             Nenhuma visita encontrada
@@ -1593,7 +1554,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                               <div className="hidden md:block overflow-x-auto">
                                 <table className="w-full text-left border-collapse">
                                   <thead>
-                                    <tr className="border-b border-gray-100 dark:border-dark-border">
+                                    <tr className="border-b border-gray-200 dark:border-dark-border">
                                       <th className="pb-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">
                                         Cliente / Documento
                                       </th>
@@ -1818,7 +1779,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
 
                                       {visit.status ===
                                         "cancelamento_solicitado" && (
-                                        <div className="flex gap-2 border-t border-gray-100 dark:border-dark-border pt-4 mt-2">
+                                        <div className="flex gap-2 border-t border-gray-200 dark:border-dark-border pt-4 mt-2">
                                           <button
                                             onClick={() =>
                                               handleOpenApproval(
@@ -1861,7 +1822,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
 
                               {/* Paginação — Estilo Dashboard Refinado */}
                               {totalPages > 1 && (
-                                <div className="bg-white dark:bg-dark-bg-secondary border border-gray-100 dark:border-dark-border px-4 py-4 rounded-2xl shadow-sm mt-6">
+                                <div className="bg-white dark:bg-dark-bg-secondary border border-gray-200 dark:border-dark-border px-4 py-4 rounded-2xl shadow-sm mt-6">
                                   <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                                     <div className="flex items-center gap-2">
                                       <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-3 py-1.5 rounded-lg text-xs font-semibold border border-blue-100 dark:border-blue-900/30">
@@ -1894,7 +1855,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                           }))
                                         }
                                         disabled={currentPage === 1}
-                                        className="p-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-gray-400 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                                        className="p-2.5 bg-gray-100 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-gray-400 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                                       >
                                         <ChevronLeft className="h-4 w-4" />
                                       </button>
@@ -1924,7 +1885,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                                 className={`w-9 h-9 flex items-center justify-center text-xs font-semibold rounded-xl transition-all border ${
                                                   pNum === currentPage
                                                     ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-                                                    : "bg-white dark:bg-dark-bg text-gray-400 border-gray-100 dark:border-dark-border hover:bg-gray-50"
+                                                    : "bg-white dark:bg-dark-bg text-gray-400 border-gray-200 dark:border-dark-border hover:bg-gray-50"
                                                 }`}
                                               >
                                                 {pNum}
@@ -1944,7 +1905,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                           }))
                                         }
                                         disabled={currentPage === totalPages}
-                                        className="p-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-gray-400 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                                        className="p-2.5 bg-gray-100 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-gray-400 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                                       >
                                         <ChevronRight className="h-4 w-4" />
                                       </button>
@@ -1970,7 +1931,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   const renderCancellationsTab = () => (
     <div className="space-y-6">
       {pendingRequests.length === 0 ? (
-        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-12 text-center">
+        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-12 text-center">
           <div className="h-16 w-16 bg-green-50 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-green-100 dark:border-green-900/30">
             <CheckCircle className="h-8 w-8 text-green-500" />
           </div>
@@ -1995,10 +1956,10 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
           </div>
 
           {/* Visualização em Tabela (Desktop) */}
-          <div className="hidden md:block bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border overflow-hidden">
+          <div className="hidden md:block bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border overflow-hidden">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-gray-50/50 dark:bg-dark-bg border-b border-gray-100 dark:border-dark-border">
+                <tr className="bg-gray-100/50 dark:bg-dark-bg border-b border-gray-200 dark:border-dark-border">
                   <th className="px-6 py-4 text-xs font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">
                     Cliente / Cobrador
                   </th>
@@ -2095,7 +2056,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                     </span>
                   </div>
 
-                  <div className="bg-gray-50 dark:bg-dark-bg p-3.5 rounded-xl mb-4 border border-gray-100 dark:border-dark-border">
+                  <div className="bg-gray-100 dark:bg-dark-bg p-3.5 rounded-xl mb-4 border border-gray-200 dark:border-dark-border">
                     <p className="text-[10px] font-semibold text-gray-400 tracking-wide mb-1.5">
                       Motivo do Cancelamento
                     </p>
@@ -2232,7 +2193,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
     <>
       <div className="space-y-6">
         {/* Header */}
-        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-4 sm:p-5">
+        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-4 sm:p-5">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <div className="p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-xl shrink-0">
@@ -2252,7 +2213,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
             {onClose && (
               <button
                 onClick={onClose}
-                className="p-2.5 text-gray-400 hover:text-gray-900 dark:hover:text-dark-text bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl transition-all shrink-0"
+                className="p-2.5 text-gray-400 hover:text-gray-900 dark:hover:text-dark-text bg-gray-100 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl transition-all shrink-0"
                 title="Fechar"
               >
                 <X className="h-5 w-5" />
@@ -2267,7 +2228,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               className={`flex items-center justify-center px-6 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all shrink-0 ${
                 activeTab === "visits"
                   ? "bg-blue-600 text-white shadow-md shadow-blue-500/10"
-                  : "bg-white dark:bg-dark-bg text-gray-500 dark:text-dark-text-secondary border border-gray-100 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
+                  : "bg-white dark:bg-dark-bg text-gray-500 dark:text-dark-text-secondary border border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
               }`}
             >
               <Calendar className="h-4 w-4 mr-2" />
@@ -2278,7 +2239,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               className={`flex items-center justify-center px-6 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all shrink-0 relative ${
                 activeTab === "cancellations"
                   ? "bg-blue-600 text-white shadow-md shadow-blue-500/10"
-                  : "bg-white dark:bg-dark-bg text-gray-500 dark:text-dark-text-secondary border border-gray-100 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
+                  : "bg-white dark:bg-dark-bg text-gray-500 dark:text-dark-text-secondary border border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
               }`}
             >
               <AlertTriangle className="h-4 w-4 mr-2" />
@@ -2296,7 +2257,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                 className={`flex items-center justify-center px-6 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all shrink-0 ${
                   activeTab === "scheduledDates"
                     ? "bg-blue-600 text-white shadow-md shadow-blue-500/10"
-                    : "bg-white dark:bg-dark-bg text-gray-500 dark:text-dark-text-secondary border border-gray-100 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
+                    : "bg-white dark:bg-dark-bg text-gray-500 dark:text-dark-text-secondary border border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
                 }`}
               >
                 <CalendarClock className="h-4 w-4 mr-2" />
@@ -2309,7 +2270,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               className={`flex items-center justify-center px-6 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all shrink-0 relative ${
                 activeTab === "reincidentes"
                   ? "bg-blue-600 text-white shadow-md shadow-blue-500/10"
-                  : "bg-white dark:bg-dark-bg text-gray-500 dark:text-dark-text-secondary border border-gray-100 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
+                  : "bg-white dark:bg-dark-bg text-gray-500 dark:text-dark-text-secondary border border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
               }`}
             >
               <RefreshCw className="h-4 w-4 mr-2" />
@@ -2329,229 +2290,104 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
           </div>
         </div>
 
-        {/* Grid de Cards Executivos — Scroll horizontal em mobile com padding vertical para evitar corte de sombras */}
+        {/* Grid de Cards Executivos — Scroll horizontal em mobile com padding vertical para evitar corte de sombras.
+            Padrão SummaryCard (2026-11-18): mesmo cartão usado em Carteira/Resumo por Cobrador. */}
         <div className="flex overflow-x-auto pt-3 pb-5 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pt-0 sm:pb-0 sm:overflow-visible sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-4 custom-scrollbar snap-x">
-          {/* Card: Total de Visitas */}
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => {
-              applyQuickFilter("all");
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                applyQuickFilter("all");
-              }
-            }}
-            title="Mostrar todas as visitas (limpar filtros)"
-            className={`min-w-[44%] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 rounded-2xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-all snap-start cursor-pointer ${
-              activeFiltersCount === 0 && activeTab === "visits"
-                ? "border-blue-500 ring-2 ring-blue-500/10"
-                : "border-gray-100 dark:border-dark-border"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
-                <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              </div>
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">
-                Total Geral
-              </p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">
-                {overviewStats.totalVisits}
-              </p>
-            </div>
+          <div className="min-w-[44%] sm:min-w-0 snap-start">
+            <SummaryCard
+              icon={Calendar}
+              title="Total Geral"
+              value={String(overviewStats.totalVisits)}
+              caption="todas as visitas visíveis"
+              onClick={() => applyQuickFilter("all")}
+              hint="Mostrar todas as visitas (limpar filtros)"
+              selecionado={activeFiltersCount === 0 && activeTab === "visits"}
+              rows={[
+                {
+                  label: "Canceladas",
+                  value: String(overviewStats.canceladas),
+                  tone: overviewStats.canceladas > 0 ? "amber" : undefined,
+                },
+              ]}
+            />
           </div>
 
-          {/* Card: Agendadas */}
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => {
-              setActiveTab("visits");
-              setStatusFilter("agendada");
-              setOverdueFilter("not_overdue");
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
+          <div className="min-w-[44%] sm:min-w-0 snap-start">
+            <SummaryCard
+              icon={Clock}
+              title="Agendadas"
+              value={String(overviewStats.agendadas)}
+              valueTone="blue"
+              caption="dentro do prazo"
+              onClick={() => {
                 setActiveTab("visits");
                 setStatusFilter("agendada");
-                setOverdueFilter("all");
+                setOverdueFilter("not_overdue");
+              }}
+              hint="Filtrar visitas agendadas"
+              selecionado={
+                statusFilter === "agendada" &&
+                overdueFilter === "not_overdue" &&
+                activeTab === "visits"
               }
-            }}
-            title="Filtrar visitas agendadas"
-            className={`min-w-[44%] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 rounded-2xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-all snap-start cursor-pointer ${
-              statusFilter === "agendada" &&
-              overdueFilter === "not_overdue" &&
-              activeTab === "visits"
-                ? "border-blue-500 ring-2 ring-blue-500/10"
-                : "border-gray-100 dark:border-dark-border"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-2.5 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl">
-                <Clock className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-              </div>
-              {overviewStats.atrasadas > 0 ? (
-                <span className="text-[10px] font-semibold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded-md tracking-wide border border-red-100 dark:border-red-900/35 flex items-center gap-1 animate-pulse">
-                  <Zap className="h-3 w-3 fill-current" />
-                  {overviewStats.atrasadas} Atrasadas
-                </span>
-              ) : (
-                <span className="text-[10px] font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-md tracking-wide border border-green-100 dark:border-green-900/35">
-                  Em Dia
-                </span>
-              )}
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">
-                Agendadas
-              </p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">
-                {overviewStats.agendadas}
-              </p>
-            </div>
+              rows={
+                overviewStats.atrasadas > 0
+                  ? [
+                      {
+                        label: "Atrasadas",
+                        value: String(overviewStats.atrasadas),
+                        tone: "red",
+                      },
+                    ]
+                  : [{ label: "Status", value: "Em dia", tone: "green" }]
+              }
+            />
           </div>
 
-          {/* Card: Realizadas */}
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => {
-              setActiveTab("visits");
-              setStatusFilter("realizada");
-              setOverdueFilter("all");
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
+          <div className="min-w-[44%] sm:min-w-0 snap-start">
+            <SummaryCard
+              icon={CheckCircle}
+              title="Realizadas"
+              value={String(overviewStats.realizadas)}
+              valueTone="green"
+              caption="visitas concluídas"
+              onClick={() => {
                 setActiveTab("visits");
                 setStatusFilter("realizada");
                 setOverdueFilter("all");
-              }
-            }}
-            title="Filtrar visitas realizadas"
-            className={`min-w-[44%] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 rounded-2xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-all snap-start cursor-pointer ${
-              statusFilter === "realizada" && activeTab === "visits"
-                ? "border-green-500 ring-2 ring-green-500/10"
-                : "border-gray-100 dark:border-dark-border"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-2.5 bg-green-50 dark:bg-green-900/20 rounded-xl">
-                <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-              </div>
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">
-                Realizadas
-              </p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">
-                {overviewStats.realizadas}
-              </p>
-            </div>
+              }}
+              hint="Filtrar visitas realizadas"
+              selecionado={statusFilter === "realizada" && activeTab === "visits"}
+              rows={[
+                {
+                  label: "% do total",
+                  value:
+                    overviewStats.totalVisits > 0
+                      ? `${Math.round((overviewStats.realizadas / overviewStats.totalVisits) * 100)}%`
+                      : "—",
+                },
+              ]}
+            />
           </div>
 
-          {/* Card: Solicitações de Cancelamento */}
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => {
-              setActiveTab("cancellations");
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                setActiveTab("cancellations");
+          <div className="min-w-[44%] sm:min-w-0 snap-start">
+            <SummaryCard
+              icon={AlertTriangle}
+              title="Solicitações"
+              value={String(overviewStats.pendingRequests)}
+              valueTone={overviewStats.pendingRequests > 0 ? "red" : "neutral"}
+              caption="de cancelamento"
+              onClick={() => setActiveTab("cancellations")}
+              hint="Ir para solicitações de cancelamento"
+              selecionado={activeTab === "cancellations"}
+              rows={
+                overviewStats.pendingRequests > 0
+                  ? [{ label: "Status", value: "Aguardando", tone: "amber" }]
+                  : []
               }
-            }}
-            title="Ir para solicitações de cancelamento"
-            className={`min-w-[44%] sm:min-w-0 bg-white dark:bg-dark-bg-secondary p-4 rounded-2xl border shadow-sm flex flex-col justify-between hover:shadow-md transition-all snap-start cursor-pointer ${
-              activeTab === "cancellations"
-                ? "border-amber-500 ring-2 ring-amber-500/10"
-                : "border-gray-100 dark:border-dark-border"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-2.5 bg-amber-50 dark:bg-amber-900/20 rounded-xl">
-                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-              </div>
-              {overviewStats.pendingRequests > 0 && (
-                <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-md tracking-wide border border-amber-100 dark:border-amber-900/35">
-                  Aguardando
-                </span>
-              )}
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide mb-1">
-                Solicitações
-              </p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight">
-                {overviewStats.pendingRequests}
-              </p>
-            </div>
+            />
           </div>
         </div>
-
-        {/* Resumo por Cidade - Colapsável */}
-        {user?.type === "manager" && (
-          <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border overflow-hidden">
-            <button
-              onClick={() => setShowCityStats(!showCityStats)}
-              className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-dark-bg transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <MapPin className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-dark-text">
-                  Resumo de Clientes por Cidade
-                </h3>
-              </div>
-              {showCityStats ? (
-                <ChevronUp className="h-5 w-5 text-gray-500" />
-              ) : (
-                <ChevronDown className="h-5 w-5 text-gray-500" />
-              )}
-            </button>
-
-            {showCityStats && (
-              <div className="px-6 pb-6 animate-in slide-in-from-top-2 duration-200">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {cityStats.map((stat) => (
-                    <div
-                      key={stat.name}
-                      className="p-4 bg-gray-50 dark:bg-dark-bg rounded-2xl border border-gray-100 dark:border-dark-border flex flex-col"
-                    >
-                      <span className="text-sm font-semibold text-gray-900 dark:text-dark-text truncate mb-2">
-                        {stat.name}
-                      </span>
-                      <div className="flex items-center justify-between text-xs text-gray-500 dark:text-dark-text-secondary">
-                        <span>Total de Clientes:</span>
-                        <span className="font-bold text-gray-900 dark:text-dark-text">
-                          {stat.totalClients}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-gray-500 dark:text-dark-text-secondary mt-1">
-                        <span>Visitas Agendadas:</span>
-                        <span className="font-bold text-blue-600 dark:text-blue-400">
-                          {stat.scheduledVisits}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                  {cityStats.length === 0 && (
-                    <p className="text-sm text-gray-500 col-span-full text-center py-4">
-                      Nenhum dado geográfico disponível.
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Content */}
         <div className="animate-in fade-in duration-500">
@@ -2559,7 +2395,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
           {activeTab === "cancellations" && renderCancellationsTab()}
 
           {activeTab === "scheduledDates" && (
-            <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-6">
+            <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-6">
               <AllowedVisitDatesManager />
             </div>
           )}
@@ -2567,8 +2403,8 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
           {activeTab === "reincidentes" && (
             <div className="space-y-4">
               {renderFilters()}
-              <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border overflow-hidden">
-                <div className="px-5 py-4 border-b border-gray-100 dark:border-dark-border">
+              <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border overflow-hidden">
+                <div className="px-5 py-4 border-b border-gray-200 dark:border-dark-border">
                   <h3 className="text-sm font-bold text-gray-900 dark:text-dark-text">
                     Clientes reincidentes
                   </h3>
@@ -2581,7 +2417,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                 </div>
 
                 {reincidentes.length > 0 && (
-                  <div className="px-5 py-3 border-b border-gray-100 dark:border-dark-border flex flex-wrap items-center justify-between gap-3 bg-gray-50/40 dark:bg-dark-bg/20">
+                  <div className="px-5 py-3 border-b border-gray-200 dark:border-dark-border flex flex-wrap items-center justify-between gap-3 bg-gray-100/40 dark:bg-dark-bg/20">
                     <span className="text-xs font-semibold text-gray-600 dark:text-dark-text">
                       {reincidentes.length}{" "}
                       {reincidentes.length === 1 ? "cliente" : "clientes"}
@@ -2603,7 +2439,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                           );
                           setReincidentesPage(1);
                         }}
-                        className="px-3 py-1.5 bg-white dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-xs font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                        className="px-3 py-1.5 bg-white dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-xs font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
                       >
                         <option value="remarcacoes">Mais remarcações</option>
                         <option value="sequencia">Maior sequência</option>
@@ -2684,7 +2520,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                           </div>
 
                           {aberto && (
-                            <ol className="mt-3 ml-1 border-l-2 border-gray-150 dark:border-dark-border space-y-2 pl-4">
+                            <ol className="mt-3 ml-1 border-l-2 border-gray-200 dark:border-dark-border space-y-2 pl-4">
                               {cliente.elos.map((step, i) => (
                                 <li
                                   key={step.visitId}
@@ -2706,7 +2542,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                 )}
 
                 {reincidentesTotalPaginas > 1 && (
-                  <div className="px-5 py-3 border-t border-gray-100 dark:border-dark-border flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="px-5 py-3 border-t border-gray-200 dark:border-dark-border flex flex-col sm:flex-row items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-3 py-1.5 rounded-lg text-xs font-semibold border border-blue-100 dark:border-blue-900/30">
                         Pág {reincidentesPaginaAtual} /{" "}
@@ -2734,7 +2570,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                           )
                         }
                         disabled={reincidentesPaginaAtual === 1}
-                        className="p-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-gray-400 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                        className="p-2.5 bg-gray-100 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-gray-400 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                         aria-label="Página anterior"
                       >
                         <ChevronLeft className="h-4 w-4" />
@@ -2758,7 +2594,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                               className={`w-9 h-9 flex items-center justify-center text-xs font-semibold rounded-xl transition-all border ${
                                 pNum === reincidentesPaginaAtual
                                   ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-                                  : "bg-white dark:bg-dark-bg text-gray-400 border-gray-100 dark:border-dark-border hover:bg-gray-50"
+                                  : "bg-white dark:bg-dark-bg text-gray-400 border-gray-200 dark:border-dark-border hover:bg-gray-50"
                               }`}
                             >
                               {pNum}
@@ -2778,7 +2614,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                         disabled={
                           reincidentesPaginaAtual === reincidentesTotalPaginas
                         }
-                        className="p-2.5 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-gray-400 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                        className="p-2.5 bg-gray-100 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-gray-400 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                         aria-label="Próxima página"
                       >
                         <ChevronRight className="h-4 w-4" />
@@ -2822,7 +2658,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               </div>
 
               {selectedRequest.cancellationRequestReason && (
-                <div className="mb-4 p-3 bg-gray-50 rounded-2xl">
+                <div className="mb-4 p-3 bg-gray-100 rounded-2xl">
                   <div className="text-sm font-medium text-gray-700 mb-1">
                     Motivo solicitado:
                   </div>

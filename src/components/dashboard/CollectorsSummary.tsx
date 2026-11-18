@@ -223,6 +223,71 @@ const fmtNum = (n: number): string => n.toLocaleString("pt-BR");
 const pctInad = (venceu: number, naoPago: number): number =>
   venceu > 0 ? (naoPago / venceu) * 100 : 0;
 
+/** Faixas da Carteira Automatica como mini cards (pedido do usuario
+ * 2026-11-17: melhor leitura que 1 frase corrida com "·"), lado a lado com o
+ * valor/legenda do card via a prop `aside` do SummaryCard. Clique expande as
+ * lojas da faixa aqui mesmo, embaixo -- sem modal, pra ficar leve. */
+const FaixasAlcance: React.FC<{ regras: CollectorOverdueRange[] }> = ({
+  regras,
+}) => {
+  const [expandidaId, setExpandidaId] = useState<string | null>(null);
+  const ordenadas = [...regras].sort((x, y) => x.minDias - y.minDias);
+  const expandida = ordenadas.find((r) => r.id === expandidaId) ?? null;
+
+  return (
+    <div className="sm:mt-0 mt-2">
+      <div
+        className="text-[11px] font-semibold text-gray-500 dark:text-dark-text-secondary mb-1.5"
+        title="Faixas de dias em atraso que a Atribuição Automática usa para dividir estes clientes entre lojas; clique numa faixa para ver quais lojas ela cobre"
+      >
+        Faixas de atraso × lojas
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {ordenadas.map((r) => {
+          const aberta = r.id === expandidaId;
+          const qtdLojas = r.lojas?.length ?? 0;
+          return (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() =>
+                setExpandidaId((cur) => (cur === r.id ? null : r.id))
+              }
+              className={`px-2.5 py-1.5 rounded-lg border shadow-sm text-left transition-colors ${
+                aberta
+                  ? "border-blue-400 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20"
+                  : r.ativa
+                    ? "border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg-secondary hover:border-blue-300"
+                    : "border-amber-300 dark:border-amber-800/40 bg-amber-50 dark:bg-amber-900/10"
+              }`}
+            >
+              <div className="text-[11px] font-bold text-gray-900 dark:text-dark-text whitespace-nowrap">
+                {r.minDias}–{r.maxDias ?? "+"} dias
+              </div>
+              <div className="text-[10px] text-gray-500 dark:text-dark-text-secondary whitespace-nowrap">
+                {qtdLojas > 0 ? `${qtdLojas} ${qtdLojas === 1 ? "loja" : "lojas"}` : "todas as lojas"}
+                {!r.ativa && " · pausada"}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      {expandida && (
+        <div className="mt-1.5 rounded-lg border border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-bg px-3 py-2 text-xs text-gray-700 dark:text-dark-text-secondary">
+          {expandida.lojas && expandida.lojas.length > 0
+            ? expandida.lojas.join(" · ")
+            : "Todas as lojas"}
+          {!expandida.ativa && (
+            <span className="ml-2 font-semibold text-amber-600 dark:text-amber-400">
+              Faixa pausada
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const CollectorsSummary: React.FC = () => {
   const {
     users,
@@ -959,9 +1024,6 @@ const CollectorsSummary: React.FC = () => {
     };
   }, [dateFrom, dateTo]);
 
-  const textoFaixa = (r: CollectorOverdueRange) =>
-    `${r.minDias}–${r.maxDias ?? "+"}${r.lojas && r.lojas.length > 0 ? ` (${r.lojas.length} ${r.lojas.length === 1 ? "loja" : "lojas"})` : ""}${r.ativa ? "" : " pausada"}`;
-
   const [expandedVaoSair, setExpandedVaoSair] = useState<string | null>(
     null,
   );
@@ -1481,14 +1543,6 @@ const CollectorsSummary: React.FC = () => {
                           valueTone={vaoSair.length > 0 ? "red" : "neutral"}
                           caption={`vão sair da carteira em até ${URGENTE_SAIDA_CARTEIRA_DIAS} dias`}
                           rows={[
-                            {
-                              label: "Alcance",
-                              value: [...regras]
-                                .sort((x, y) => x.minDias - y.minDias)
-                                .map(textoFaixa)
-                                .join(" · "),
-                              hint: "Faixas de atraso (dias) e lojas que a Atribuição Automática entrega a este cobrador",
-                            },
                             ...(vaoSair.length > 0
                               ? [
                                   {
@@ -1531,6 +1585,7 @@ const CollectorsSummary: React.FC = () => {
                               hint: "Clientes que passaram da faixa no período sem nenhuma ação do cobrador. Clique para ver e devolver.",
                             },
                           ]}
+                          aside={<FaixasAlcance regras={regras} />}
                         />
                         {expandedVaoSair === row.id && vaoSair.length > 0 && (
                           <ul className="mt-1.5 rounded-lg bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-800/30 px-3 py-2 text-xs text-red-800 dark:text-red-300 space-y-0.5 max-h-56 overflow-y-auto">
