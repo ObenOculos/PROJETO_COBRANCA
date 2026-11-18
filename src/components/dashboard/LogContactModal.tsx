@@ -979,7 +979,10 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
                             setOpcao(o.key);
                             setError("");
                           }}
-                          className={`px-3 py-2.5 rounded-xl border-2 text-left transition-all ${
+                          // flex-col + justify-start: botao esticado pela
+                          // grade centraliza o conteudo por padrao, e o
+                          // titulo de quem tem subtitulo curto descia.
+                          className={`flex flex-col justify-start gap-0.5 px-3 py-2.5 rounded-xl border-2 text-left transition-all ${
                             opcao === o.key
                               ? o.ativo
                               : "bg-gray-50 border-gray-200 hover:border-indigo-300 dark:bg-dark-bg-secondary dark:border-dark-border"
