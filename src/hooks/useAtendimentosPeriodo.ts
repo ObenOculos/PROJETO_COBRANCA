@@ -14,6 +14,9 @@ export interface AtendimentosCobrador {
   conversaram: number;
   /** Desses, quantos deram promessa de pagamento. */
   promessas: number;
+  /** Total de registros no periodo, sem deduplicar por cliente (cliente
+   * acionado 3x conta 3 aqui, 1 em `clientes`). */
+  tentativas: number;
 }
 
 const ID_CHUNK = 300;
@@ -25,7 +28,8 @@ const chunk = <T>(arr: T[], size: number): T[][] => {
 
 /**
  * Atendimentos registrados (collection_attempts: Atender, Fila, pagamento,
- * venda cancelada) no periodo, por cobrador. Fonte unica do "Clientes
+ * venda cancelada; e visitas presenciais concluidas do cobrador externo) no
+ * periodo, por cobrador. Fonte unica do "Clientes
  * atendidos" -- Resumo por Cobrador (gestor) e Meu desempenho (cobrador).
  *
  * Contados por CLIENTE, nunca por titulo (um registro grava uma linha por
@@ -108,6 +112,27 @@ export function useAtendimentosPeriodo(
           });
         }
 
+        // Visitas presenciais concluidas no periodo. O cobrador externo nao usa
+        // o Atender: o trabalho dele fica so em scheduled_visits (visita
+        // feita, nao encontrado, remarcada na rua) -- sem isto ele aparecia
+        // com 0 acionamentos (achado 2026-11-18). Visita de ligacao/WhatsApp
+        // fica de fora: essa ja vira collection_attempt pelo Atender.
+        // Data = visitEffectiveDate (config/visitStatus): realizada no dia
+        // da visita, as demais na data agendada.
+        const visitas = await fetchAllRows((from, to) => {
+          let q = supabase
+            .from("scheduled_visits")
+            .select("id, collector_id, client_document, status")
+            .in("status", ["realizada", "nao_encontrado", "reagendada"])
+            .or("channel.is.null,channel.eq.presencial")
+            .or(
+              `and(data_visita_realizada.gte.${dateFrom},data_visita_realizada.lte.${dateTo}),` +
+                `and(data_visita_realizada.is.null,scheduled_date.gte.${dateFrom},scheduled_date.lte.${dateTo})`,
+            );
+          if (collectorId) q = q.eq("collector_id", collectorId);
+          return q.order("id").range(from, to);
+        });
+
         // cobrador -> cliente -> {conversou, prometeu} em algum atendimento
         // do periodo. Uma unidade so (cliente) para nao ter de comparar
         // "atendimentos" com "clientes".
@@ -115,8 +140,34 @@ export function useAtendimentosPeriodo(
           string,
           Map<string, { conversou: boolean; prometeu: boolean }>
         >();
+        // Total de linhas por cobrador, sem deduplicar por cliente -- ver
+        // `tentativas` em AtendimentosCobrador.
+        const tentativasPorCobrador = new Map<string, number>();
+        visitas.forEach((v) => {
+          if (!v.collector_id) return;
+          tentativasPorCobrador.set(
+            v.collector_id,
+            (tentativasPorCobrador.get(v.collector_id) ?? 0) + 1,
+          );
+          const cliente = v.client_document || `v:${v.id}`;
+          let clientes = porCobrador.get(v.collector_id);
+          if (!clientes) {
+            clientes = new Map();
+            porCobrador.set(v.collector_id, clientes);
+          }
+          const atual = clientes.get(cliente);
+          clientes.set(cliente, {
+            // Visita feita = encontrou o cliente.
+            conversou: (atual?.conversou ?? false) || v.status === "realizada",
+            prometeu: atual?.prometeu ?? false,
+          });
+        });
         linhas.forEach((l) => {
           if (!l.collector_id) return;
+          tentativasPorCobrador.set(
+            l.collector_id,
+            (tentativasPorCobrador.get(l.collector_id) ?? 0) + 1,
+          );
           // Sem documento (titulo apagado): o proprio titulo vira a chave,
           // para nao sumir com o atendimento.
           const cliente =
@@ -147,6 +198,7 @@ export function useAtendimentosPeriodo(
             clientes: clientes.size,
             conversaram,
             promessas,
+            tentativas: tentativasPorCobrador.get(id) ?? 0,
           });
         });
         return resultado;

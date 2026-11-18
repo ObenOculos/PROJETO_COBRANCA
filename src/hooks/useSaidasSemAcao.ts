@@ -19,11 +19,21 @@ export interface SaidaSemAcao {
   assigned_at: string;
 }
 
-/** Saidas sem acao no periodo [dateFrom, dateTo] (YYYY-MM-DD local; dateTo
- * "9999-12-31" = sem limite), agrupadas pelo cobrador de quem o cliente
- * saiu. Um cliente que saiu mais de uma vez do mesmo cobrador aparece uma
- * vez (a saida mais recente). */
-export function useSaidasSemAcao(dateFrom: string, dateTo: string) {
+/**
+ * Saidas sem acao no periodo [dateFrom, dateTo] (YYYY-MM-DD local; dateTo
+ * "9999-12-31" = sem limite) de UM cobrador (`cobradorId`), para a lista
+ * detalhada do modal "Saídas sem ação". Sem `cobradorId` nao busca nada --
+ * o numero por cobrador (pra todas as linhas do Resumo) vem de
+ * useCarteiraMovimentacao, agregado no banco; baixar aqui a lista inteira
+ * de todo mundo so pra contar era o gargalo (achado 2026-11-18). Um
+ * cliente que saiu mais de uma vez do mesmo cobrador aparece uma vez (a
+ * saida mais recente).
+ */
+export function useSaidasSemAcao(
+  dateFrom: string,
+  dateTo: string,
+  cobradorId?: string | null,
+) {
   const [saidas, setSaidas] = useState<SaidaSemAcao[] | null>(null);
   const [erro, setErro] = useState(false);
   const [versao, setVersao] = useState(0);
@@ -32,7 +42,11 @@ export function useSaidasSemAcao(dateFrom: string, dateTo: string) {
   useEffect(() => {
     let cancelled = false;
     setErro(false);
-    const chave = `saidasSemAcao|${dateFrom}|${dateTo}|${versao}`;
+    if (!cobradorId) {
+      setSaidas(null);
+      return;
+    }
+    const chave = `saidasSemAcao|${dateFrom}|${dateTo}|${cobradorId}|${versao}`;
     const cache = lerCacheTela<SaidaSemAcao[]>(chave);
     if (cache) {
       setSaidas(cache.valor);
@@ -54,6 +68,7 @@ export function useSaidasSemAcao(dateFrom: string, dateTo: string) {
             "id, documento, cliente_nome, nome_da_loja, cobrador_anterior_id, cobrador_novo_id, assigned_at",
           )
           .eq("motivo", MOTIVO_SAIDA_SEM_ACAO)
+          .eq("cobrador_anterior_id", cobradorId)
           .gte("assigned_at", fromIso);
         if (toIso) q = q.lt("assigned_at", toIso);
         return q
@@ -72,7 +87,7 @@ export function useSaidasSemAcao(dateFrom: string, dateTo: string) {
     return () => {
       cancelled = true;
     };
-  }, [dateFrom, dateTo, versao]);
+  }, [dateFrom, dateTo, cobradorId, versao]);
 
   const porCobrador = useMemo(() => {
     const mapa = new Map<string, SaidaSemAcao[]>();

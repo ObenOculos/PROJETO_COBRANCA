@@ -1315,22 +1315,6 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <div className="px-4 py-2 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-100 dark:border-red-900/30">
-              <span className="block text-xs text-red-600 dark:text-red-400 font-medium">
-                Críticos (+90d)
-              </span>
-              <span className="text-lg font-bold text-red-700 dark:text-red-300">
-                {stats.critical}
-              </span>
-            </div>
-            <div className="px-4 py-2 bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-100 dark:border-orange-900/30">
-              <span className="block text-xs text-orange-600 dark:text-orange-400 font-medium">
-                Alerta (+60d)
-              </span>
-              <span className="text-lg font-bold text-orange-700 dark:text-orange-300">
-                {stats.high}
-              </span>
-            </div>
             <button
               type="button"
               onClick={toggleFocusMode}
@@ -1508,6 +1492,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
               valor={situacaoCarteira}
               onChange={(v) => setSituacaoCarteira(v as SituacaoCarteira)}
               total={walletFilteredGroups.length + quitadosNaCarteira.length}
+              todosHint="Inclui os quitados recentes (abaixo) — o card 'Número de clientes' acima conta só quem ainda deve"
               opcoes={[
                 { key: "paraHoje", label: "Para hoje" },
                 { key: "atendidosHoje", label: "Atendidos hoje" },
@@ -2340,6 +2325,10 @@ interface CarteiraChipsProps {
   opcoes: { key: string; label: string; count: number }[];
   todosKey?: string;
   todosLabel?: string;
+  /** Dica no chip "Todos" -- usada quando o total aqui soma algo que o card
+   * acima (Numero de clientes) nao conta, pra nao parecer que os numeros
+   * nao batem (ex.: quitados). */
+  todosHint?: string;
 }
 const CarteiraChips: React.FC<CarteiraChipsProps> = ({
   valor,
@@ -2348,6 +2337,7 @@ const CarteiraChips: React.FC<CarteiraChipsProps> = ({
   opcoes,
   todosKey = "todos",
   todosLabel = "Todos",
+  todosHint,
 }) => {
   const visiveis = opcoes.filter((o) => o.count > 0);
   useEffect(() => {
@@ -2369,6 +2359,7 @@ const CarteiraChips: React.FC<CarteiraChipsProps> = ({
             <button
               type="button"
               onClick={() => onChange(o.key)}
+              title={o.key === todosKey ? todosHint : undefined}
               className={`px-1.5 py-0.5 rounded-md transition-colors ${
                 valor === o.key
                   ? "font-bold text-gray-900 dark:text-dark-text bg-gray-100 dark:bg-dark-bg-tertiary"

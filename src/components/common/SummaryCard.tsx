@@ -8,6 +8,9 @@ export interface SummaryCardRow {
   onClick?: () => void;
   /** Dica ao passar o mouse na linha clicavel. */
   hint?: string;
+  /** Busca em andamento -- pulsa o valor (ex.: "…") pra nao parecer parado
+   * nem misturar com um valor final zerado. */
+  loading?: boolean;
 }
 
 /** Card de resumo: uma pergunta (titulo), a resposta em destaque e o detalhe
@@ -35,6 +38,9 @@ const SummaryCard: React.FC<{
   hint?: string;
   /** Card que esta filtrando a lista agora (borda de destaque). */
   selecionado?: boolean;
+  /** Conteudo no canto superior direito, ao lado do titulo (ex.: navegador
+   * de mes). Clique nele nao dispara o onClick do card. */
+  headerRight?: React.ReactNode;
 }> = ({
   icon: Icon,
   title,
@@ -48,6 +54,7 @@ const SummaryCard: React.FC<{
   onClick,
   hint,
   selecionado = false,
+  headerRight,
 }) => {
   const valueClasses: Record<string, string> = {
     neutral: "text-gray-900 dark:text-dark-text",
@@ -85,9 +92,19 @@ const SummaryCard: React.FC<{
     >
       <div className={aside ? "grid grid-cols-1 sm:grid-cols-2 gap-3" : undefined}>
         <div className="min-w-0">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary">
-            <Icon className="h-4 w-4 flex-shrink-0" />
-            <span className="truncate">{title}</span>
+          <div className="flex items-center justify-between gap-1.5">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-dark-text-secondary min-w-0">
+              <Icon className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">{title}</span>
+            </div>
+            {headerRight && (
+              <div
+                className="flex-shrink-0"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {headerRight}
+              </div>
+            )}
           </div>
           <div
             className={`${compact ? "mt-0.5 text-xl" : "mt-1 text-2xl"} font-bold truncate ${valueClasses[valueTone]}`}
@@ -128,7 +145,7 @@ const SummaryCard: React.FC<{
                 {r.label}
               </span>
               <span
-                className={`font-bold whitespace-nowrap ${r.tone ? rowClasses[r.tone] : "text-gray-900 dark:text-dark-text"}`}
+                className={`font-bold whitespace-nowrap ${r.loading ? "animate-pulse" : ""} ${r.tone ? rowClasses[r.tone] : "text-gray-900 dark:text-dark-text"}`}
               >
                 {r.value}
               </span>
