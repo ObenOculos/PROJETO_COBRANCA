@@ -465,23 +465,9 @@ const CollectorsSummary: React.FC = () => {
   // Sem isto, a coluna "Realizadas" (scheduled_visits) era o unico sinal de
   // trabalho do cobrador de carteira -- e ela so conta contato que estava
   // agendado, o que quase nunca acontece na Fila de Cobranca.
-  // Titulo -> documento ja conhecido no contexto (evita reconsultar
-  // BANCO_DADOS); lido por ref para a busca nao rodar de novo a cada
-  // recarga de `collections`.
-  const docByParcelaRef = useRef<Map<string, string>>(new Map());
-  useEffect(() => {
-    const m = docByParcelaRef.current;
-    collections.forEach((c) => {
-      if (c.id_parcela != null && c.documento) {
-        m.set(String(c.id_parcela), c.documento);
-      }
-    });
-  }, [collections]);
-
   const { atendimentos, erro: atendimentosErro } = useAtendimentosPeriodo(
     dateFrom,
     dateTo,
-    docByParcelaRef,
   );
 
   // Carteira automatica (item 55): clientes que sairam da faixa do cobrador

@@ -49,8 +49,9 @@ export const ATTEMPT_RESULT_LABELS: Record<CollectionAttempt["result"], string> 
  * dia) de que toda interacao com o cliente -- mesmo so mandar mensagem --
  * conta como acao de cobranca, nao so a que teve resposta confirmada.
  * ATENCAO: a RPC atribuicao_contato_conta (migration 20261116000004, item 66)
- * repete esta lista em SQL, sem "claims_paid" e "sale_cancel_reported".
- * Mudou aqui, mude la.
+ * repete esta lista em SQL, sem "claims_paid" e "sale_cancel_reported"; a
+ * RPC atendimentos_periodo (migration 20261118000004) repete a lista inteira.
+ * Mudou aqui, mude nas duas.
  */
 const EFFECTIVE_ATTEMPT_RESULTS: ReadonlySet<CollectionAttempt["result"]> =
   new Set([

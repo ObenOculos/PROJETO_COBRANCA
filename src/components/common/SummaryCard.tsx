@@ -21,6 +21,9 @@ const SummaryCard: React.FC<{
   icon: React.ElementType;
   title: string;
   value: string;
+  /** Busca do valor principal em andamento -- pulsa (mesmo papel do
+   * `loading` das linhas). */
+  valueLoading?: boolean;
   valueTone?: "neutral" | "red" | "green" | "blue";
   caption?: string;
   rows: SummaryCardRow[];
@@ -45,6 +48,7 @@ const SummaryCard: React.FC<{
   icon: Icon,
   title,
   value,
+  valueLoading = false,
   valueTone = "neutral",
   caption,
   rows,
@@ -107,7 +111,7 @@ const SummaryCard: React.FC<{
             )}
           </div>
           <div
-            className={`${compact ? "mt-0.5 text-xl" : "mt-1 text-2xl"} font-bold truncate ${valueClasses[valueTone]}`}
+            className={`${compact ? "mt-0.5 text-xl" : "mt-1 text-2xl"} font-bold truncate ${valueLoading ? "animate-pulse" : ""} ${valueClasses[valueTone]}`}
           >
             {value}
           </div>

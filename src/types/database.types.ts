@@ -2453,6 +2453,16 @@ export type Database = {
       };
       app_current_user_id: { Args: never; Returns: string };
       app_current_user_type: { Args: never; Returns: string };
+      atendimentos_periodo: {
+        Args: { p_inicio: string; p_fim: string; p_collector?: string | null };
+        Returns: {
+          collector_id: string;
+          clientes: number;
+          conversaram: number;
+          promessas: number;
+          tentativas: number;
+        }[];
+      };
       atribuicao_bloqueio_parcela: {
         Args: { p_id_parcela: number };
         Returns: string;

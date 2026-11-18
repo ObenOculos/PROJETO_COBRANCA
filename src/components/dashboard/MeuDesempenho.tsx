@@ -185,11 +185,18 @@ const MeuDesempenho: React.FC<Props> = ({
       ? ontem
       : hoje;
 
+  // Cada busca guarda o periodo a que pertence: ao trocar Hoje/Ontem/mes, o
+  // total so aparece quando as duas buscas do periodo NOVO chegaram -- antes
+  // somava os pagamentos do app (recalculados na hora) com acordos/atribuidos
+  // do periodo anterior e o valor "passeava" (achado 2026-11-18).
+  const periodo = `${inicioFiltro}|${fimFiltro}`;
+
   // Parcelas de acordo pagas (acordo_pagamentos nao passa por
   // sale_payments -- ver "Recuperacao do Mes" no CollectorDashboard).
-  const [acordoPagos, setAcordoPagos] = useState<
-    { valor: number; data: string }[]
-  >([]);
+  const [acordoPagos, setAcordoPagos] = useState<{
+    periodo: string;
+    total: number;
+  } | null>(null);
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -201,15 +208,15 @@ const MeuDesempenho: React.FC<Props> = ({
         .lte("data_pagamento", fimFiltro);
       if (error) {
         console.error("Erro ao buscar pagamentos de acordo:", error);
+        // Como antes: conta 0 desta fonte (nao trava o card em "…").
+        if (!cancelled) setAcordoPagos({ periodo: `${inicioFiltro}|${fimFiltro}`, total: 0 });
         return;
       }
       if (!cancelled) {
-        setAcordoPagos(
-          (data || []).map((p) => ({
-            valor: Number(p.valor_pago),
-            data: String(p.data_pagamento).slice(0, 10),
-          })),
-        );
+        setAcordoPagos({
+          periodo: `${inicioFiltro}|${fimFiltro}`,
+          total: (data || []).reduce((s, p) => s + Number(p.valor_pago), 0),
+        });
       }
     })();
     return () => {
@@ -223,9 +230,10 @@ const MeuDesempenho: React.FC<Props> = ({
   // atribuicoes_pagamento_vigentes (valor_vigente = LEAST(valor_aprovado,
   // valor_recebido atual); some se o ERP desfizer a baixa -- migration
   // 20261117000007).
-  const [atribuicoesPagas, setAtribuicoesPagas] = useState<
-    { valor: number; data: string }[]
-  >([]);
+  const [atribuicoesPagas, setAtribuicoesPagas] = useState<{
+    periodo: string;
+    total: number;
+  } | null>(null);
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -237,15 +245,17 @@ const MeuDesempenho: React.FC<Props> = ({
         .lte("data_pagamento", fimFiltro);
       if (error) {
         console.error("Erro ao buscar pagamentos atribuídos (pago na loja):", error);
+        if (!cancelled) setAtribuicoesPagas({ periodo: `${inicioFiltro}|${fimFiltro}`, total: 0 });
         return;
       }
       if (!cancelled) {
-        setAtribuicoesPagas(
-          (data || []).map((p) => ({
-            valor: Number(p.valor_vigente) || 0,
-            data: String(p.data_pagamento).slice(0, 10),
-          })),
-        );
+        setAtribuicoesPagas({
+          periodo: `${inicioFiltro}|${fimFiltro}`,
+          total: (data || []).reduce(
+            (s, p) => s + (Number(p.valor_vigente) || 0),
+            0,
+          ),
+        });
       }
     })();
     return () => {
@@ -253,7 +263,15 @@ const MeuDesempenho: React.FC<Props> = ({
     };
   }, [userId, versaoRegistros, inicioFiltro, fimFiltro]);
 
-  const recebidoPeriodo = useMemo(() => {
+  // null = ainda buscando o periodo atual (mostra "…" pulsando, nunca uma
+  // soma parcial).
+  const recebidoPeriodo = useMemo((): number | null => {
+    if (
+      acordoPagos?.periodo !== periodo ||
+      atribuicoesPagas?.periodo !== periodo
+    ) {
+      return null;
+    }
     const doApp = salePayments
       .filter((p) => {
         if (p.collectorId !== userId) return false;
@@ -261,28 +279,18 @@ const MeuDesempenho: React.FC<Props> = ({
         return data >= inicioFiltro && data <= fimFiltro;
       })
       .reduce((s, p) => s + valorRecebidoTotal(p), 0);
-    const doAcordo = acordoPagos.reduce((s, p) => s + p.valor, 0);
-    const doAtribuido = atribuicoesPagas.reduce((s, p) => s + p.valor, 0);
-    return doApp + doAcordo + doAtribuido;
-  }, [salePayments, acordoPagos, atribuicoesPagas, userId, inicioFiltro, fimFiltro]);
+    return doApp + acordoPagos.total + atribuicoesPagas.total;
+  }, [salePayments, acordoPagos, atribuicoesPagas, periodo, userId, inicioFiltro, fimFiltro]);
+  const recebidoTexto =
+    recebidoPeriodo === null ? "…" : formatCurrency(recebidoPeriodo, false);
 
   // Clientes acionados no periodo (mesma fonte do Resumo por Cobrador do
   // gestor -- collection_attempts / isEffectiveAttemptResult). Pedido do
   // usuario (2026-11-18): o cobrador reclamava de nao ter como ver "quantos
   // acionei hoje" sem abrir outra tela.
-  const docByParcelaRef = useRef<Map<string, string>>(new Map());
-  useEffect(() => {
-    const m = docByParcelaRef.current;
-    myCollections.forEach((c) => {
-      if (c.id_parcela != null && c.documento) {
-        m.set(String(c.id_parcela), c.documento);
-      }
-    });
-  }, [myCollections]);
   const { atendimentos, erro: atendimentosErro } = useAtendimentosPeriodo(
     inicioFiltro,
     fimFiltro,
-    docByParcelaRef,
     userId,
     versaoRegistros,
   );
@@ -300,9 +308,9 @@ const MeuDesempenho: React.FC<Props> = ({
 
   const temMeta = janela === "mes" && metaMes > 0;
   const progresso = temMeta
-    ? Math.min((recebidoPeriodo / metaMes) * 100, 100)
+    ? Math.min(((recebidoPeriodo ?? 0) / metaMes) * 100, 100)
     : 0;
-  const falta = Math.max(0, metaMes - recebidoPeriodo);
+  const falta = Math.max(0, metaMes - (recebidoPeriodo ?? 0));
 
   const inad = useMemo(() => inadimplenciaDe(myCollections), [myCollections]);
   const valorTotal = carteira.vencido + carteira.aVencer;
@@ -349,7 +357,7 @@ const MeuDesempenho: React.FC<Props> = ({
         {!aberto && (
           // Recolhido: uma linha com o essencial.
           <span className="text-xs text-gray-500 dark:text-dark-text-secondary truncate">
-            {formatCurrency(recebidoPeriodo, false)} recebido {legendaJanela} ·{" "}
+            {recebidoTexto} recebido {legendaJanela} ·{" "}
             {fmtNum(carteira.clientes)} clientes na carteira
           </span>
         )}
@@ -361,7 +369,8 @@ const MeuDesempenho: React.FC<Props> = ({
             compact
             icon={Gauge}
             title="Desempenho"
-            value={formatCurrency(recebidoPeriodo, false)}
+            value={recebidoTexto}
+            valueLoading={recebidoPeriodo === null}
             valueTone="green"
             caption={`recebido ${legendaJanela}`}
             headerRight={
@@ -432,13 +441,15 @@ const MeuDesempenho: React.FC<Props> = ({
               ...(temMeta
                 ? [
                     { label: "Meta do mês", value: formatCurrency(metaMes, false) },
-                    falta > 0
-                      ? {
-                          label: "P/ alcançar a meta",
-                          value: formatCurrency(falta, false),
-                          tone: "amber" as const,
-                        }
-                      : { label: "Meta", value: "atingida", tone: "green" as const },
+                    recebidoPeriodo === null
+                      ? { label: "P/ alcançar a meta", value: "…", loading: true }
+                      : falta > 0
+                        ? {
+                            label: "P/ alcançar a meta",
+                            value: formatCurrency(falta, false),
+                            tone: "amber" as const,
+                          }
+                        : { label: "Meta", value: "atingida", tone: "green" as const },
                   ]
                 : janela === "mes" && metaMes === 0
                   ? [{ label: "Meta do mês", value: "não definida" }]
