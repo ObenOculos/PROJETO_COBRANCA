@@ -22,6 +22,16 @@ RENEGOCIACAO (acordo do financeiro, gera titulos novos) e DESCONTO nao sao
 recebimento -- vao para `desconto`; titulo encerrado so por renegociacao vira
 status "renegociado". Ver FORMA_RENEGOCIACAO/FORMA_DESCONTO abaixo.
 
+Pagamento do app nunca regride (2026-11-18, caso real cliente Ciclone
+100116): o cobrador pode registrar um pagamento no app antes do Ciclone ter a
+baixa lancada (PIX caiu, ninguem lancou no ERP ainda). Sem cuidado, a rodada
+seguinte deste script veria saldo aberto no Ciclone e desfaria o pagamento do
+app -- o titulo voltaria a aparecer pro cobrador cobrar de novo, sem aviso.
+Ver `proteger_e_filtrar_alteradas`: uma rodada normal (status em_atraso/
+pendente/recebido) nunca BAIXA valor_recebido do que ja esta gravado; so
+cancelamento/agrupamento/renegociacao (decisao explicita do ERP) tem
+prioridade sobre o que o app registrou.
+
 Idempotencia: id_parcela nao existe no Ciclone e BANCO_DADOS.id_parcela e
 bigint sem identity, entao cada fncrt_uuid precisa de um id_parcela estavel
 entre rodadas. Isso mora na tabela auxiliar `ciclone_titulo_map`
@@ -740,34 +750,86 @@ def carregar_atuais(sb: SupabaseRestClient, colunas: list[str]) -> dict:
         inicio += 1000
 
 
-def linhas_alteradas(sb: SupabaseRestClient, linhas: list[dict]) -> list[dict]:
-    """So as linhas novas ou com alguma coluna diferente do app.
+# Status do Ciclone que refletem uma decisao EXPLICITA do ERP (cancelamento,
+# titulo agrupado numa fatura, encerrado por renegociacao) -- sempre valem
+# nesta rodada, mesmo que reduzam valor_recebido: aqui nao e "o Ciclone ainda
+# nao viu o pagamento", e "o Ciclone decidiu outra coisa sobre o titulo".
+STATUS_SEMPRE_VALE = {"cancelado", "agrupado", "renegociado"}
 
-    Regravar as ~36 mil parcelas iguais a cada rodada disparava um evento
-    realtime por linha para cada tela aberta (o gestor travava no sync das
-    5h/12h/17h) e trabalho a toa no banco. O resultado gravado e o mesmo: o
-    ERP continua valendo por cima de qualquer diferenca. Se a leitura falhar,
-    grava tudo como antes."""
+# Colunas financeiras que uma rodada normal (status em_atraso/pendente/
+# recebido) nao pode regredir -- ver proteger_e_filtrar_alteradas.
+COLUNAS_PROTEGIDAS = (
+    "valor_recebido",
+    "status",
+    "data_de_recebimento",
+    "desconto",
+    "dias_em_atraso",
+)
+
+
+def proteger_e_filtrar_alteradas(
+    atuais: dict, linhas: list[dict]
+) -> tuple[list[dict], list[dict]]:
+    """Decide o que de fato grava em BANCO_DADOS nesta rodada.
+
+    Caso real 2026-11-18 (cliente Ciclone 100116): o cobrador registra o
+    pagamento no app (`process_payment` grava valor_recebido/status direto em
+    BANCO_DADOS); o Ciclone ainda nao tinha a baixa lancada; a rodada
+    seguinte do sync viu saldo aberto no ERP e desfez o pagamento do app sem
+    aviso -- o titulo voltou a aparecer pro cobrador cobrar de novo. Esta
+    funcao fecha essa lacuna: uma rodada normal (status em_atraso/pendente/
+    recebido) nunca pode BAIXAR valor_recebido do que ja esta gravado; so
+    aplica a versao do Ciclone quando ela iguala ou supera o valor atual.
+    Titulo protegido continua recebendo as colunas NAO financeiras do Ciclone
+    (endereco, multa, juros, vencimento etc.) normalmente -- so o grupo
+    COLUNAS_PROTEGIDAS fica como estava.
+
+    status em STATUS_SEMPRE_VALE (cancelado/agrupado/renegociado) nunca e
+    protegido: e uma decisao explicita do ERP, nao "o Ciclone ainda nao viu".
+    Se o Ciclone nunca bater com o que o app registrou (ex.: cobrador errou o
+    cliente), o titulo fica protegido indefinidamente -- so um estorno manual
+    (tela de correcao, item 62) desfaz; por isso cada protecao e logada pro
+    gestor poder conferir, nunca fica silenciosa.
+
+    Tambem resolve o que `linhas_alteradas` (antiga) fazia: so grava o que
+    realmente mudou em relacao ao app -- regravar ~36 mil linhas iguais a
+    cada rodada disparava um evento realtime por linha para cada tela aberta
+    (item 65).
+
+    Devolve (linhas_para_gravar, titulos_protegidos_para_log).
+    """
     if not linhas:
-        return linhas
+        return linhas, []
     colunas = [c for c in linhas[0] if c != "id_parcela"]
-    try:
-        atuais = carregar_atuais(sb, colunas)
-    except Exception as exc:  # noqa: BLE001 -- melhor gravar tudo que falhar
-        logger.warning("Nao foi possivel comparar com o app (%s); gravando todas as linhas", exc)
-        return linhas
     alteradas = []
+    protegidos = []
     for linha in linhas:
         atual = atuais.get(linha["id_parcela"])
+        linha_final = linha
+        if atual is not None and linha["status"] not in STATUS_SEMPRE_VALE:
+            recebido_atual = como_decimal(atual.get("valor_recebido"))
+            recebido_novo = como_decimal(linha["valor_recebido"])
+            if recebido_novo + Decimal("0.01") < recebido_atual:
+                protegidos.append({
+                    "id_parcela": linha["id_parcela"],
+                    "documento": linha["documento"],
+                    "cliente": linha["cliente"],
+                    "valor_recebido_app": float(recebido_atual),
+                    "valor_recebido_ciclone_agora": float(recebido_novo),
+                    "status_ciclone_agora": linha["status"],
+                })
+                linha_final = dict(linha)
+                for col in COLUNAS_PROTEGIDAS:
+                    linha_final[col] = atual.get(col)
         if atual is None or any(
-            _normalizar(linha[c]) != _normalizar(atual.get(c)) for c in colunas
+            _normalizar(linha_final[c]) != _normalizar(atual.get(c)) for c in colunas
         ):
-            alteradas.append(linha)
+            alteradas.append(linha_final)
     logger.info(
-        "BANCO_DADOS: %d de %d linhas mudaram (as iguais nao sao regravadas)",
+        "BANCO_DADOS: %d de %d linhas vao ser gravadas (iguais ao app nao sao regravadas)",
         len(alteradas), len(linhas),
     )
-    return alteradas
+    return alteradas, protegidos
 
 
 def upsert_banco_dados(sb: SupabaseRestClient, linhas: list[dict]) -> None:
@@ -985,7 +1047,24 @@ def main() -> None:
     logger.info("Gravando %d clientes...", len(clientes_por_documento))
     upsert_clientes(sb, clientes_por_documento)
 
-    alteradas = linhas_alteradas(sb, linhas_banco_dados)
+    colunas_banco_dados = (
+        [c for c in linhas_banco_dados[0] if c != "id_parcela"] if linhas_banco_dados else []
+    )
+    try:
+        atuais_banco_dados = carregar_atuais(sb, colunas_banco_dados) if colunas_banco_dados else {}
+    except Exception as exc:  # noqa: BLE001 -- cai no caminho "gravar tudo, sem protecao" (atuais={})
+        logger.error(
+            "Nao foi possivel comparar com o app (%s); gravando todas as linhas SEM a "
+            "protecao contra regressao de pagamento do app.", exc,
+        )
+        atuais_banco_dados = {}
+    alteradas, protegidos = proteger_e_filtrar_alteradas(atuais_banco_dados, linhas_banco_dados)
+    if protegidos:
+        logger.warning(
+            "%d titulo(s) com pagamento do app protegido contra esta rodada do Ciclone "
+            "(Ciclone ainda nao bateu, nao foi sobrescrito): %s",
+            len(protegidos), protegidos,
+        )
     logger.info("Gravando %d linhas em BANCO_DADOS...", len(alteradas))
     upsert_banco_dados(sb, alteradas)
 
