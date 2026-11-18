@@ -28,7 +28,7 @@ import {
   podeDarDescontoNaQuitacao,
 } from "../../config/profiles";
 import { ATTEMPT_RESULT_LABELS } from "../../config/collectionAttempts";
-import { isForaDaCobranca } from "../../types/status";
+import { isForaDaCobranca, isRenegociado } from "../../types/status";
 import {
   clientBalanceSplit,
   hasInstallmentBalance,
@@ -390,6 +390,23 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       return Array.from(mapa.values());
     }, [parcelasAbertas]);
     const variasVendas = vendasDaLista.length > 1;
+    // Venda com alguma parcela ja marcada "Renegociado" pelo Ciclone: sinal
+    // de que o cliente renegociou parte da divida (normal -- so uma parcela
+    // pode ter ido). So aviso, nao bloqueia: o pagamento marcado aqui pode
+    // pertencer ao titulo novo da renegociacao, nao a este (caso real
+    // 18/11/2026: pagamento lancado na venda antiga, que ja tinha sido
+    // renegociada horas antes).
+    const vendasComRenegociacaoParcial = useMemo(() => {
+      const vistas = new Set<number>();
+      return vendasDaLista.filter((v) => {
+        if (vistas.has(v.saleNumber)) return false;
+        vistas.add(v.saleNumber);
+        const sale = (clientSales || []).find(
+          (s) => s.saleNumber === v.saleNumber,
+        );
+        return sale?.installments.some((i) => isRenegociado(i.status)) ?? false;
+      });
+    }, [vendasDaLista, clientSales]);
     const corDaVenda = (saleNumber: number) =>
       CORES_VENDA[
         Math.max(
@@ -1536,6 +1553,27 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
                       <h3 className="text-sm font-semibold text-gray-900 dark:text-dark-text mb-2">
                         O que o cliente está pagando?
                       </h3>
+                      {vendasComRenegociacaoParcial.length > 0 && (
+                        <div className="mb-2">
+                          <Aviso
+                            tom="atencao"
+                            titulo="Parte desta dívida já foi renegociada"
+                          >
+                            <p>
+                              {vendasComRenegociacaoParcial
+                                .map((v) => nomeVenda(v.saleNumber))
+                                .join(", ")}{" "}
+                              {vendasComRenegociacaoParcial.length === 1
+                                ? "tem"
+                                : "têm"}{" "}
+                              parcela(s) marcada(s) como renegociada(s) pelo
+                              Ciclone -- parte da dívida já virou um título
+                              novo. Confira se este pagamento não é do título
+                              renegociado antes de marcar as parcelas.
+                            </p>
+                          </Aviso>
+                        </div>
+                      )}
                       {variasVendas && (
                         <div className="mb-2 space-y-2">
                           <div className="flex items-center justify-between gap-2">
