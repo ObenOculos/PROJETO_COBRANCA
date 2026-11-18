@@ -46,10 +46,17 @@ export function useAtendimentosPeriodo(
   // numero do periodo anterior); releitura por `versao` mantem o anterior ate
   // o novo chegar (a base nao inclui a versao).
   const base = `${dateFrom}|${dateTo}|${collectorId ?? ""}`;
+  // Ja nasce com o guardado no cache (se houver): sem isto, toda entrada na
+  // tela passava um quadro em "…" antes do efeito ler o cache (2026-11-18).
   const [estado, setEstado] = useState<{
     base: string;
     valor: Map<string, AtendimentosCobrador>;
-  } | null>(null);
+  } | null>(() => {
+    const c = lerCacheTela<Map<string, AtendimentosCobrador>>(
+      `atendimentos|${base}|${versao ?? 0}`,
+    );
+    return c ? { base, valor: c.valor } : null;
+  });
   const [erro, setErro] = useState(false);
 
   useEffect(() => {

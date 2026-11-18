@@ -25,10 +25,17 @@ export function useCarteiraMovimentacao(
   carregando: boolean;
   erro: boolean;
 } {
+  // Ja nasce com o guardado no cache (se houver): sem isto, toda entrada na
+  // tela passava um quadro em "…" antes do efeito ler o cache (2026-11-18).
+  const [inicial] = useState(() =>
+    lerCacheTela<Map<string, MovimentacaoCobrador>>(
+      `carteiraMovimentacao|${dateFrom}|${dateTo}|${versao}`,
+    ),
+  );
   const [movimentacao, setMovimentacao] = useState<
     Map<string, MovimentacaoCobrador>
-  >(new Map());
-  const [carregando, setCarregando] = useState(true);
+  >(() => inicial?.valor ?? new Map());
+  const [carregando, setCarregando] = useState(!inicial);
   const [erro, setErro] = useState(false);
 
   useEffect(() => {

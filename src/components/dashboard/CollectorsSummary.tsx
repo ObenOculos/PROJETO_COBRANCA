@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { buscarComCacheTela, lerCacheTela } from "../../utils/cacheTela";
 import {
   ClipboardList,
   Info,
@@ -314,38 +315,54 @@ const CollectorsSummary: React.FC = () => {
   // valor_recebido atual); some se o ERP desfizer a baixa -- migration
   // 20261117000007). Busca uma vez (gestor vê todas via RLS); não refaz a
   // cada novo período.
-  const [atribuicoesAprovadas, setAtribuicoesAprovadas] = useState<
-    { collectorId: string; valor: number; data: string }[]
-  >([]);
+  // Guardada no cache de tela (2026-11-18): antes cada entrada na aba
+  // comecava sem elas e o Recebido/metas "recalculavam" ao chegar. Agora a
+  // volta mostra o guardado na hora; na 1a entrada o Recebido fica em "…"
+  // ate chegar (nunca um valor sem o pago na loja).
+  type AtribuicaoAprovada = { collectorId: string; valor: number; data: string };
+  const CHAVE_ATRIBUICOES = "atribuicoesVigentes|todas";
+  const [atribuicoesEstado, setAtribuicoesEstado] = useState<
+    AtribuicaoAprovada[] | null
+  >(() => lerCacheTela<AtribuicaoAprovada[]>(CHAVE_ATRIBUICOES)?.valor ?? null);
+  const atribuicoesProntas = atribuicoesEstado !== null;
+  const atribuicoesAprovadas = useMemo(
+    () => atribuicoesEstado ?? [],
+    [atribuicoesEstado],
+  );
   useEffect(() => {
     let cancelado = false;
-    (async () => {
+    if (lerCacheTela(CHAVE_ATRIBUICOES)?.fresco) return;
+    buscarComCacheTela(CHAVE_ATRIBUICOES, async () => {
       const { data, error } = await supabase
         .from("atribuicoes_pagamento_vigentes")
         .select("solicitado_por_id, valor_vigente, data_pagamento");
-      if (error) {
+      if (error) throw error;
+      return (data || [])
+        .filter((r) => r.solicitado_por_id && r.data_pagamento)
+        .map((r) => ({
+          collectorId: r.solicitado_por_id as string,
+          valor: Number(r.valor_vigente) || 0,
+          data: String(r.data_pagamento).slice(0, 10),
+        }));
+    })
+      .then((lista) => {
+        if (!cancelado) setAtribuicoesEstado(lista);
+      })
+      .catch((error) => {
         console.error(
           "Erro ao buscar pagamentos atribuídos (pago na loja):",
           error,
         );
-        return;
-      }
-      if (!cancelado) {
-        setAtribuicoesAprovadas(
-          (data || [])
-            .filter((r) => r.solicitado_por_id && r.data_pagamento)
-            .map((r) => ({
-              collectorId: r.solicitado_por_id as string,
-              valor: Number(r.valor_vigente) || 0,
-              data: String(r.data_pagamento).slice(0, 10),
-            })),
-        );
-      }
-    })();
+        // Como antes: segue sem o pago na loja (nao trava em "…").
+        if (!cancelado) setAtribuicoesEstado((v) => v ?? []);
+      });
     return () => {
       cancelado = true;
     };
   }, []);
+  /** Recebido em "…" ate o pago na loja chegar (1a entrada na aba). */
+  const fmtRecebido = (v: number): string =>
+    atribuicoesProntas ? formatCurrency(v, false) : "…";
   const [activePreset, setActivePreset] = useState<PresetKey | "">(
     "month-atual",
   );
@@ -983,8 +1000,11 @@ const CollectorsSummary: React.FC = () => {
     return [
       {
         label: `Meta de ${nomeMesAtual}`,
-        value: `${m.pct.toFixed(0)}% de ${formatCurrency(m.meta, false)}`,
-        tone: m.pct >= 100 ? ("green" as const) : undefined,
+        value: atribuicoesProntas
+          ? `${m.pct.toFixed(0)}% de ${formatCurrency(m.meta, false)}`
+          : "…",
+        loading: !atribuicoesProntas,
+        tone: atribuicoesProntas && m.pct >= 100 ? ("green" as const) : undefined,
         hint: `${formatCurrency(m.recebido, false)} recebidos no mês atual`,
       },
     ];
@@ -1277,7 +1297,8 @@ const CollectorsSummary: React.FC = () => {
             <SummaryCard
               icon={Gauge}
               title="Desempenho"
-              value={formatCurrency(totals.recebidoPeriodo, false)}
+              value={fmtRecebido(totals.recebidoPeriodo)}
+              valueLoading={!atribuicoesProntas}
               valueTone="green"
               caption={previstaPeriodHint}
               rows={[
@@ -1287,7 +1308,9 @@ const CollectorsSummary: React.FC = () => {
                         label: "Meta do mês",
                         value: formatCurrency(metaGeral.meta, false),
                       },
-                      metaGeral.meta - metaGeral.recebido > 0
+                      !atribuicoesProntas
+                        ? { label: "P/ alcançar a meta", value: "…", loading: true }
+                        : metaGeral.meta - metaGeral.recebido > 0
                         ? {
                             label: "P/ alcançar a meta",
                             value: formatCurrency(
@@ -1439,7 +1462,8 @@ const CollectorsSummary: React.FC = () => {
                 <SummaryCard
                   icon={Gauge}
                   title="Desempenho"
-                  value={formatCurrency(row.recebidoPeriodo, false)}
+                  value={fmtRecebido(row.recebidoPeriodo)}
+                  valueLoading={!atribuicoesProntas}
                   valueTone="green"
                   caption={previstaPeriodHint}
                   rows={[
@@ -1853,8 +1877,10 @@ const CollectorsSummary: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-3 py-3 text-right whitespace-nowrap">
-                    <div className="font-semibold text-green-600 dark:text-green-400">
-                      {formatCurrency(row.recebidoPeriodo, false)}
+                    <div
+                      className={`font-semibold text-green-600 dark:text-green-400 ${atribuicoesProntas ? "" : "animate-pulse"}`}
+                    >
+                      {fmtRecebido(row.recebidoPeriodo)}
                     </div>
                     <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
                       {formatCurrency(row.previstaValor, false)} ainda vence
