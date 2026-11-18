@@ -15,6 +15,9 @@ import {
   ChevronDown,
   FileSpreadsheet,
   User,
+  Users,
+  Store,
+  Check,
   Wallet,
 } from "lucide-react";
 import { createPortal } from "react-dom";
@@ -195,8 +198,18 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   );
   // "Escolher datas" aberto (datas livres em vez de um atalho).
   const [customDates, setCustomDates] = useState(false);
-  const [selectedCollector, setSelectedCollector] = useState<string>("all");
-  const [selectedStore, setSelectedStore] = useState<string>("all");
+  // Filtro de cobrador/loja por exclusão (igual ao Resumo por Cobrador):
+  // conjunto vazio = todos selecionados; marcar/desmarcar no dropdown.
+  const [excludedCollectorIds, setExcludedCollectorIds] = useState<
+    Set<string>
+  >(new Set());
+  const [excludedStores, setExcludedStores] = useState<Set<string>>(
+    new Set(),
+  );
+  const [collectorMenuOpen, setCollectorMenuOpen] = useState(false);
+  const [storeMenuOpen, setStoreMenuOpen] = useState(false);
+  const collectorMenuRef = useRef<HTMLDivElement>(null);
+  const storeMenuRef = useRef<HTMLDivElement>(null);
   // Cobrador clicado nos cards: filtra só a lista de pagamentos.
   const [focusCollector, setFocusCollector] = useState<string | null>(null);
   // Forma de pagamento clicada no card do total: filtra só a lista.
@@ -268,16 +281,16 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
   const dfSelectedDate = useDeferredValue(selectedDate);
   const dfEndDate = useDeferredValue(endDate);
   const dfDateRangeMode = useDeferredValue(dateRangeMode);
-  const dfSelectedCollector = useDeferredValue(selectedCollector);
-  const dfSelectedStore = useDeferredValue(selectedStore);
+  const dfExcludedCollectorIds = useDeferredValue(excludedCollectorIds);
+  const dfExcludedStores = useDeferredValue(excludedStores);
 
   // Enquanto o valor bruto e o diferido divergem, há um recálculo pendente.
   const isCalculating =
     selectedDate !== dfSelectedDate ||
     endDate !== dfEndDate ||
     dateRangeMode !== dfDateRangeMode ||
-    selectedCollector !== dfSelectedCollector ||
-    selectedStore !== dfSelectedStore;
+    excludedCollectorIds !== dfExcludedCollectorIds ||
+    excludedStores !== dfExcludedStores;
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -287,6 +300,18 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
         !exportDropdownRef.current.contains(event.target as Node)
       ) {
         setShowExportOptions(false);
+      }
+      if (
+        collectorMenuRef.current &&
+        !collectorMenuRef.current.contains(event.target as Node)
+      ) {
+        setCollectorMenuOpen(false);
+      }
+      if (
+        storeMenuRef.current &&
+        !storeMenuRef.current.contains(event.target as Node)
+      ) {
+        setStoreMenuOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -353,6 +378,50 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [users]);
 
+  const toggleCollectorFilter = (id: string) => {
+    setExcludedCollectorIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const toggleSelectAllCollectors = () => {
+    setExcludedCollectorIds((prev) =>
+      prev.size === 0
+        ? new Set(availableCollectors.map((c) => c.id))
+        : new Set(),
+    );
+  };
+  const isCollectorFilterChecked = (id: string) => !excludedCollectorIds.has(id);
+  const collectorFilterLabel =
+    excludedCollectorIds.size === 0
+      ? "Todos os cobradores"
+      : excludedCollectorIds.size >= availableCollectors.length
+        ? "Nenhum cobrador"
+        : `${availableCollectors.length - excludedCollectorIds.size} de ${availableCollectors.length} cobradores`;
+
+  const toggleStoreFilter = (store: string) => {
+    setExcludedStores((prev) => {
+      const next = new Set(prev);
+      if (next.has(store)) next.delete(store);
+      else next.add(store);
+      return next;
+    });
+  };
+  const toggleSelectAllStores = () => {
+    setExcludedStores((prev) =>
+      prev.size === 0 ? new Set(availableStores) : new Set(),
+    );
+  };
+  const isStoreFilterChecked = (store: string) => !excludedStores.has(store);
+  const storeFilterLabel =
+    excludedStores.size === 0
+      ? "Todas as lojas"
+      : excludedStores.size >= availableStores.length
+        ? "Nenhuma loja"
+        : `${availableStores.length - excludedStores.size} de ${availableStores.length} lojas`;
+
   const handleOpenClientModal = (document: string) => {
     const groups = getClientGroups();
     const group = groups.find((g) => g.document === document);
@@ -381,8 +450,8 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     const selectedDate = dfSelectedDate;
     const endDate = dfEndDate;
     const dateRangeMode = dfDateRangeMode;
-    const selectedCollector = dfSelectedCollector;
-    const selectedStore = dfSelectedStore;
+    const excludedCollectorIds = dfExcludedCollectorIds;
+    const excludedStores = dfExcludedStores;
 
     const NO_ROWS: Collection[] = [];
     const rowsOf = (doc: string | undefined) =>
@@ -406,17 +475,17 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       if (!isInDateRange) return false;
 
       if (
-        selectedCollector !== "all" &&
-        payment.collectorId !== selectedCollector
+        excludedCollectorIds.size > 0 &&
+        excludedCollectorIds.has(payment.collectorId || "")
       )
         return false;
 
       // Loja vem da parcela (sale_payments não guarda a loja).
-      if (selectedStore !== "all") {
+      if (excludedStores.size > 0) {
         const relatedCollection = relatedOf(payment);
         if (
-          !relatedCollection ||
-          relatedCollection.nome_da_loja !== selectedStore
+          relatedCollection?.nome_da_loja &&
+          excludedStores.has(relatedCollection.nome_da_loja)
         ) {
           return false;
         }
@@ -471,6 +540,12 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       if (saleNumber) collectorData.saleNumbers.add(saleNumber);
     });
 
+    // Uma linha por pagamento.
+    const salesPaymentMap = new Map<
+      string,
+      DailyReportData["payments"][number]
+    >();
+
     // Item 66, etapa 3: agrupa as atribuições aprovadas do período (um lote
     // pode ter parcelas de vendas diferentes do mesmo cliente -- ver caso da
     // Jucelia) e credita como se fosse mais um pagamento, forma própria.
@@ -492,13 +567,13 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
           : a.data_pagamento >= selectedDate && a.data_pagamento <= endDate;
       if (!emIntervalo) return;
       if (
-        selectedCollector !== "all" &&
-        a.solicitado_por_id !== selectedCollector
+        excludedCollectorIds.size > 0 &&
+        excludedCollectorIds.has(a.solicitado_por_id || "")
       )
         return;
-      if (selectedStore !== "all") {
+      if (excludedStores.size > 0) {
         const loja = rowsOf(a.documento)[0]?.nome_da_loja;
-        if (loja !== selectedStore) return;
+        if (loja && excludedStores.has(loja)) return;
       }
       const atual = atribPorLote.get(a.lote) ?? {
         documento: a.documento,
@@ -581,12 +656,6 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
         saleNumbers: Array.from(c.saleNumbers).sort(),
       }))
       .sort((a, b) => b.receivedAmount - a.receivedAmount);
-
-    // Uma linha por pagamento.
-    const salesPaymentMap = new Map<
-      string,
-      DailyReportData["payments"][number]
-    >();
 
     filteredPayments.forEach((payment) => {
       const saleKey = `${payment.id}`;
@@ -760,8 +829,8 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     dfSelectedDate,
     dfEndDate,
     dfDateRangeMode,
-    dfSelectedCollector,
-    dfSelectedStore,
+    dfExcludedCollectorIds,
+    dfExcludedStores,
     users,
   ]);
 
@@ -1106,32 +1175,105 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
             Escolher datas
           </button>
 
-          <select
-            aria-label="Cobrador"
-            value={selectedCollector}
-            onChange={(e) => setSelectedCollector(e.target.value)}
-            className={selectClass(selectedCollector !== "all")}
-          >
-            <option value="all">Todos os cobradores</option>
-            {availableCollectors.map((collector) => (
-              <option key={collector.id} value={collector.id}>
-                {collector.name}
-              </option>
-            ))}
-          </select>
-          <select
-            aria-label="Loja"
-            value={selectedStore}
-            onChange={(e) => setSelectedStore(e.target.value)}
-            className={selectClass(selectedStore !== "all")}
-          >
-            <option value="all">Todas as lojas</option>
-            {availableStores.map((store) => (
-              <option key={store} value={store}>
-                {store}
-              </option>
-            ))}
-          </select>
+          <div className="relative" ref={collectorMenuRef}>
+            <button
+              onClick={() => setCollectorMenuOpen((v) => !v)}
+              className={`flex items-center gap-1.5 ${selectClass(excludedCollectorIds.size > 0)}`}
+            >
+              <Users className="h-3.5 w-3.5" />
+              {collectorFilterLabel}
+              <ChevronDown className="h-3.5 w-3.5" />
+            </button>
+
+            {collectorMenuOpen && (
+              <div className="absolute z-20 mt-1 w-64 max-h-80 overflow-y-auto rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg-secondary shadow-lg p-2">
+                <button
+                  onClick={toggleSelectAllCollectors}
+                  className="w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                >
+                  {excludedCollectorIds.size === 0
+                    ? "Desmarcar todos"
+                    : "Selecionar todos"}
+                </button>
+                <div className="my-1 border-t border-gray-100 dark:border-dark-border/40" />
+                {availableCollectors.map((collector) => (
+                  <label
+                    key={collector.id}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-bg cursor-pointer"
+                  >
+                    <span
+                      className={`flex items-center justify-center h-4 w-4 rounded border ${
+                        isCollectorFilterChecked(collector.id)
+                          ? "bg-blue-600 border-blue-600"
+                          : "border-gray-300 dark:border-dark-border"
+                      }`}
+                    >
+                      {isCollectorFilterChecked(collector.id) && (
+                        <Check className="h-3 w-3 text-white" />
+                      )}
+                    </span>
+                    <input
+                      type="checkbox"
+                      className="hidden"
+                      checked={isCollectorFilterChecked(collector.id)}
+                      onChange={() => toggleCollectorFilter(collector.id)}
+                    />
+                    {collector.name}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="relative" ref={storeMenuRef}>
+            <button
+              onClick={() => setStoreMenuOpen((v) => !v)}
+              className={`flex items-center gap-1.5 ${selectClass(excludedStores.size > 0)}`}
+            >
+              <Store className="h-3.5 w-3.5" />
+              {storeFilterLabel}
+              <ChevronDown className="h-3.5 w-3.5" />
+            </button>
+
+            {storeMenuOpen && (
+              <div className="absolute z-20 mt-1 w-64 max-h-80 overflow-y-auto rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg-secondary shadow-lg p-2">
+                <button
+                  onClick={toggleSelectAllStores}
+                  className="w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                >
+                  {excludedStores.size === 0
+                    ? "Desmarcar todas"
+                    : "Selecionar todas"}
+                </button>
+                <div className="my-1 border-t border-gray-100 dark:border-dark-border/40" />
+                {availableStores.map((store) => (
+                  <label
+                    key={store}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-bg cursor-pointer"
+                  >
+                    <span
+                      className={`flex items-center justify-center h-4 w-4 rounded border ${
+                        isStoreFilterChecked(store)
+                          ? "bg-blue-600 border-blue-600"
+                          : "border-gray-300 dark:border-dark-border"
+                      }`}
+                    >
+                      {isStoreFilterChecked(store) && (
+                        <Check className="h-3 w-3 text-white" />
+                      )}
+                    </span>
+                    <input
+                      type="checkbox"
+                      className="hidden"
+                      checked={isStoreFilterChecked(store)}
+                      onChange={() => toggleStoreFilter(store)}
+                    />
+                    {store}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {(customDates || !activeQuickRange) && (
