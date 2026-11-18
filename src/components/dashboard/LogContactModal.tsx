@@ -11,6 +11,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Phone,
+  AlertTriangle,
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
@@ -23,6 +24,20 @@ import {
   rescheduleReasonForAttemptResult,
 } from "../../config/collectionAttempts";
 import { releaseSituacaoForAttemptResult } from "../../config/visitOutcomes";
+import { CONTACT_NOTE_TEMPLATES } from "../../config/contactNoteTemplates";
+import {
+  LIMITE_TENTATIVAS_SEM_RETORNO,
+  RESULTADOS_SEM_RETORNO,
+  dataMaxRemarcacao,
+  isentoDaReincidencia,
+  precisaAutorizacaoRemarcacao,
+} from "../../config/reincidencia";
+import {
+  contarTentativasSemRetorno,
+  pedirAutorizacaoRemarcacao,
+  reportarTentativasGestor,
+  temCasoPendente,
+} from "../../utils/casosGestor";
 import {
   buildRescheduleNotes,
   rescheduleReasonLabel,
@@ -60,7 +75,9 @@ interface LogContactModalProps {
   onRegistrarPagamento?: () => void;
 }
 
-// Motivo do contato -> tipo/resultado de collection_attempts.
+// Motivo do contato -> tipo/resultado de collection_attempts. Desde
+// 2026-11-18 (3 opcoes) o Atender nao grava mais not_found, refusal nem
+// message_sent -- continuam validos no banco e no historico antigo.
 const STATUS_TO_ATTEMPT: Record<
   string,
   { type: CollectionAttempt["type"]; result: CollectionAttempt["result"] }
@@ -68,13 +85,75 @@ const STATUS_TO_ATTEMPT: Record<
   promessa_pagamento: { type: "call", result: "promise" },
   contato_realizado: { type: "call", result: "contact_made" },
   nao_atende: { type: "call", result: "no_answer" },
-  telefone_errado: { type: "call", result: "not_found" },
-  recusou_pagar: { type: "call", result: "refusal" },
-  mensagem_enviada: { type: "whatsapp", result: "message_sent" },
   contestou_divida: { type: "call", result: "disputed" },
   diz_que_pagou: { type: "call", result: "claims_paid" },
   venda_cancelada: { type: "call", result: "sale_cancel_reported" },
 };
+
+type OpcaoContato = "sem_retorno" | "com_retorno" | "acao";
+type AcaoContato = "diz_que_pagou" | "venda_cancelada" | "contestou_divida";
+
+const OPCOES_CONTATO: {
+  key: OpcaoContato;
+  label: string;
+  sub: string;
+  ativo: string;
+  dot: string;
+}[] = [
+  {
+    key: "sem_retorno",
+    label: "Sem retorno",
+    sub: "Tentou e não falou com o cliente",
+    ativo:
+      "bg-amber-50 border-amber-500 dark:bg-amber-900/20 dark:border-amber-500",
+    dot: "bg-amber-500",
+  },
+  {
+    key: "com_retorno",
+    label: "Com retorno",
+    sub: "Falou com o cliente",
+    ativo:
+      "bg-emerald-50 border-emerald-500 dark:bg-emerald-900/20 dark:border-emerald-500",
+    dot: "bg-emerald-500",
+  },
+  {
+    key: "acao",
+    label: "Precisa de ação",
+    sub: "Já pagou, venda cancelada ou contestou",
+    ativo: "bg-rose-50 border-rose-500 dark:bg-rose-900/20 dark:border-rose-500",
+    dot: "bg-rose-500",
+  },
+];
+
+const ACOES_CONTATO: { key: AcaoContato; label: string }[] = [
+  { key: "diz_que_pagou", label: "Diz que já pagou" },
+  { key: "venda_cancelada", label: "Venda cancelada" },
+  { key: "contestou_divida", label: "Contestou a dívida" },
+];
+
+/** Opcao escolhida -> chave do STATUS_TO_ATTEMPT. Sem escolha completa cai
+ * em "contato_realizado" so como valor neutro: o Avancar fica bloqueado. */
+const statusDaOpcao = (
+  opcao: OpcaoContato | null,
+  prometeu: boolean,
+  acao: AcaoContato | null,
+): string => {
+  if (opcao === "sem_retorno") return "nao_atende";
+  if (opcao === "com_retorno")
+    return prometeu ? "promessa_pagamento" : "contato_realizado";
+  if (opcao === "acao" && acao) return acao;
+  return "contato_realizado";
+};
+
+/** Chave dos modelos de observacao (config/contactNoteTemplates). */
+const chaveModelos = (opcao: OpcaoContato | null, status: string) =>
+  opcao === "sem_retorno"
+    ? "sem_retorno"
+    : opcao === "com_retorno" && status === "contato_realizado"
+      ? "com_retorno"
+      : opcao
+        ? status
+        : "";
 
 const CHANNEL_LABEL: Record<ScheduledVisitChannel, string> = {
   presencial: "Presencial",
@@ -156,7 +235,18 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
   const step2EnteredAt = useRef(0);
   const [mode, setMode] = useState<"contato" | "sem_contato">("contato");
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState("promessa_pagamento");
+  // Tres opcoes (pedido do gestor, 2026-11-18): Sem retorno / Com retorno /
+  // Precisa de acao -- o detalhe (telefone errado, caixa postal, mensagem
+  // sem resposta...) vai na observacao. Cada combinacao cai num `status` do
+  // STATUS_TO_ATTEMPT, entao as regras que dependem do resultado
+  // (remarcacao, item 83, meta, credito do pago na loja, SPC) nao mudam.
+  // Mensagem sem resposta agora e "Sem retorno" (no_answer): deixa de contar
+  // como atendimento, decisao do gestor -- revisa em parte o item 81.
+  const [opcao, setOpcao] = useState<OpcaoContato | null>(null);
+  const [prometeu, setPrometeu] = useState(false);
+  const [acao, setAcao] = useState<AcaoContato | null>(null);
+  const status = statusDaOpcao(opcao, prometeu, acao);
+  const modelosKey = chaveModelos(opcao, status);
   const [notes, setNotes] = useState("");
   const [promiseDate, setPromiseDate] = useState("");
   const [error, setError] = useState("");
@@ -200,6 +290,27 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
     mode === "contato" &&
     (!!releaseSituacao || pagouComComprovante || informaVendaCancelada);
 
+  // Item 83: clientes reincidentes (config/reincidencia.ts; gestor isento).
+  // Remarcacao = a data escolhida empurra o agendamento que ja existe.
+  const isento = isentoDaReincidencia(user?.type);
+  const ehRemarcacao =
+    !!linkedVisit && (mode === "sem_contato" || reschedules);
+  const remarcacoesFeitas = linkedVisit?.rescheduleCount ?? 0;
+  const maxDataRemarcacao =
+    !isento && ehRemarcacao && linkedVisit
+      ? dataMaxRemarcacao(linkedVisit.scheduledDate)
+      : undefined;
+  const remarcacaoVaiAoGestor =
+    !isento && ehRemarcacao && precisaAutorizacaoRemarcacao(remarcacoesFeitas);
+  // Depois de salvar uma tentativa sem retorno: 5 ou mais -> aviso antes de
+  // fechar, com a opcao de reportar ao gestor.
+  const [alertaTentativas, setAlertaTentativas] = useState<{
+    qtd: number;
+    pendente: boolean;
+  } | null>(null);
+  const [obsGestor, setObsGestor] = useState("");
+  const [reportando, setReportando] = useState(false);
+
   // Sugestao do proximo contato, enquanto o cobrador nao mexeu no campo:
   // nao atendeu/mensagem -> amanha; promessa -> dia seguinte ao prometido
   // (conferir se pagou); sem contato -> amanha se remarca, hoje se agenda.
@@ -208,8 +319,8 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
       if (mode === "sem_contato") {
         setNextDate(linkedVisit ? addDaysLocalStr(today, 1) : today);
       } else if (
+        // Sem retorno: tentar de novo amanha.
         status === "nao_atende" ||
-        status === "mensagem_enviada" ||
         // Vai enviar o comprovante: cobrar amanha.
         status === "diz_que_pagou"
       ) {
@@ -221,8 +332,10 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
       }
     }
     if (!nextChannelTouched) {
+      // Contato feito pelo WhatsApp: o proximo ja sugere WhatsApp (antes
+      // dependia da opcao "Mensagem enviada", que saiu).
       setNextChannel(
-        mode === "contato" && status === "mensagem_enviada"
+        mode === "contato" && canalUsado === "whatsapp"
           ? "whatsapp"
           : linkedChannel,
       );
@@ -230,6 +343,7 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
   }, [
     mode,
     status,
+    canalUsado,
     promiseDate,
     nextDateTouched,
     nextChannelTouched,
@@ -313,7 +427,11 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
     }
     if (linkedVisit) {
       const when = formatDateBR(linkedVisit.scheduledDate);
-      if (effectiveNext && reschedules) {
+      if (effectiveNext && reschedules && remarcacaoVaiAoGestor) {
+        preview.push(
+          `Este agendamento já foi remarcado ${remarcacoesFeitas} vezes: a nova data (${formatDateBR(effectiveNext)}) vai para autorização do gestor. O contato fica registrado e o agendamento de ${when} continua até ele decidir.`,
+        );
+      } else if (effectiveNext && reschedules) {
         preview.push(
           `O contato agendado para ${when} será remarcado para ${formatDateBR(effectiveNext)} (motivo: ${rescheduleReasonLabel(rescheduleReasonForAttemptResult(result))}).`,
         );
@@ -330,7 +448,11 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
       preview.push("Nenhum próximo contato será agendado.");
     }
   } else {
-    if (linkedVisit && nextDate) {
+    if (linkedVisit && nextDate && remarcacaoVaiAoGestor) {
+      preview.push(
+        `Este agendamento já foi remarcado ${remarcacoesFeitas} vezes: a nova data (${formatDateBR(nextDate)}) vai para autorização do gestor. O agendamento de ${formatDateBR(linkedVisit.scheduledDate)} continua até ele decidir.`,
+      );
+    } else if (linkedVisit && nextDate) {
       preview.push(
         `O contato agendado para ${formatDateBR(linkedVisit.scheduledDate)} será remarcado para ${formatDateBR(nextDate)} (motivo: ${rescheduleReasonLabel(remarcarReason)}).`,
       );
@@ -363,11 +485,12 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
   /** Validacao da etapa 1 (o que aconteceu). */
   const validateStep1 = (): string | null => {
     if (mode === "sem_contato") return null;
+    if (!opcao) return "Escolha como foi o contato.";
+    if (opcao === "acao" && !acao) return "Escolha qual ação.";
     if (status === "diz_que_pagou" && !comprovante)
       return "Informe se o cliente já enviou o comprovante.";
     if (status === "venda_cancelada" && vendasCanceladas.size === 0)
       return "Marque qual venda o cliente informou como cancelada.";
-    if (!notes.trim()) return "Por favor, adicione uma observação sobre o contato.";
     if (titulosEmAberto.length === 0)
       return "Este cliente não tem título em aberto para registrar o contato.";
     return null;
@@ -393,10 +516,31 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
       setError("Escolha uma data a partir de hoje.");
       return;
     }
+    if (maxDataRemarcacao && nextDate > maxDataRemarcacao) {
+      setError(
+        `A nova data pode ir até ${formatDateBR(maxDataRemarcacao)} (60 dias a partir do agendamento).`,
+      );
+      return;
+    }
     setLoading(true);
     setError("");
     try {
-      if (linkedVisit) {
+      if (linkedVisit && remarcacaoVaiAoGestor) {
+        const notas = buildRescheduleNotes(
+          linkedVisit,
+          nextDate,
+          nextTime || undefined,
+          remarcarReason,
+        );
+        await pedirAutorizacaoRemarcacao({
+          visitId: linkedVisit.id,
+          novaData: nextDate,
+          novoHorario: nextTime || undefined,
+          motivoChave: remarcarReason,
+          notasOriginal: notas.original,
+          notasNova: notas.nova,
+        });
+      } else if (linkedVisit) {
         await rescheduleVisit(
           linkedVisit.id,
           nextDate,
@@ -449,6 +593,12 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
     }
     if (effectiveNext && effectiveNext < today) {
       setError("O próximo contato não pode ser em data passada.");
+      return;
+    }
+    if (maxDataRemarcacao && effectiveNext && effectiveNext > maxDataRemarcacao) {
+      setError(
+        `A nova data pode ir até ${formatDateBR(maxDataRemarcacao)} (60 dias a partir do agendamento).`,
+      );
       return;
     }
 
@@ -528,6 +678,26 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
 
       await reload(!!releaseSituacao);
       invalidarHistoricoCliente(client.document);
+
+      // Item 83, regra 3: tentativa sem retorno -> confere o acumulado e,
+      // a partir de 5, avisa antes de fechar (a cada nova tentativa).
+      // Falha aqui nunca desfaz nem trava o registro ja salvo.
+      if (!isento && !releaseSituacao && RESULTADOS_SEM_RETORNO.has(result)) {
+        try {
+          const qtd = await contarTentativasSemRetorno(client.document);
+          if (qtd >= LIMITE_TENTATIVAS_SEM_RETORNO) {
+            const pendente = await temCasoPendente(
+              client.document,
+              "tentativas_sem_retorno",
+            );
+            setAlertaTentativas({ qtd, pendente });
+            return;
+          }
+        } catch (avisoErr) {
+          console.error("Erro ao conferir tentativas sem retorno:", avisoErr);
+        }
+      }
+
       onSuccess();
       if (pagouComComprovante) onRegistrarPagamento?.();
     } catch (err) {
@@ -571,6 +741,96 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
     ) : null;
 
   const stepLabels = ["O que aconteceu", "Próximo contato"] as const;
+
+  const fecharAviso = () => {
+    setAlertaTentativas(null);
+    onSuccess();
+  };
+  const reportarAoGestor = async () => {
+    setReportando(true);
+    setError("");
+    try {
+      await reportarTentativasGestor(client.document, obsGestor);
+      fecharAviso();
+    } catch (err) {
+      setError("Não foi possível reportar: " + errorMessage(err));
+    } finally {
+      setReportando(false);
+    }
+  };
+
+  if (alertaTentativas) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[100]">
+        <div className="bg-white dark:bg-dark-bg rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden border border-gray-200 dark:border-dark-border max-h-[95vh] flex flex-col">
+          <div className="px-6 py-4 border-b border-amber-100 dark:border-dark-border bg-amber-50 dark:bg-amber-900/20 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-bold text-gray-900 dark:text-dark-text">
+                {alertaTentativas.qtd} tentativas sem retorno
+              </h3>
+              <p className="text-xs text-gray-600 dark:text-dark-text-secondary">
+                {client.client}
+              </p>
+            </div>
+          </div>
+          <div className="p-6 space-y-4 overflow-y-auto">
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                {error}
+              </div>
+            )}
+            <p className="text-sm text-gray-700 dark:text-dark-text">
+              O contato foi registrado. Este cliente já recebeu{" "}
+              <strong>{alertaTentativas.qtd} tentativas de contato</strong>{" "}
+              sem retorno e ainda tem pendência em aberto.
+            </p>
+            {alertaTentativas.pendente ? (
+              <p className="text-sm text-gray-600 dark:text-dark-text-secondary">
+                Este caso já foi reportado ao gestor e está aguardando a
+                avaliação. Você pode continuar tentando enquanto isso.
+              </p>
+            ) : (
+              <>
+                <p className="text-sm text-gray-600 dark:text-dark-text-secondary">
+                  Você pode continuar tentando ou reportar ao gestor, que
+                  avalia se o cliente sai da carteira e vai para o SPC.
+                </p>
+                <textarea
+                  value={obsGestor}
+                  onChange={(e) => setObsGestor(e.target.value)}
+                  placeholder="Observação para o gestor (opcional)"
+                  rows={2}
+                  className={`${inputClass} py-3 resize-none`}
+                />
+              </>
+            )}
+            <div className="pt-2 flex gap-3">
+              <button
+                type="button"
+                onClick={fecharAviso}
+                disabled={reportando}
+                className="flex-1 px-4 py-3 border border-gray-200 text-gray-600 font-bold rounded-xl hover:bg-gray-50 transition-all dark:border-dark-border dark:text-dark-text-secondary disabled:opacity-50"
+              >
+                Continuar tentando
+              </button>
+              {!alertaTentativas.pendente && (
+                <button
+                  type="button"
+                  onClick={reportarAoGestor}
+                  disabled={reportando}
+                  className="flex-1 px-4 py-3 bg-amber-600 text-white font-bold rounded-xl hover:bg-amber-700 transition-all disabled:opacity-50"
+                >
+                  {reportando ? "Reportando..." : "Reportar ao gestor"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[100]">
@@ -707,42 +967,77 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
                 <>
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-gray-400">
-                      Resultado do Contato
+                      Como foi o contato?
                     </label>
-                    <select
-                      value={status}
-                      onChange={(e) => setStatus(e.target.value)}
-                      className={inputClass}
-                    >
-                      <option value="promessa_pagamento">
-                        Promessa de Pagamento
-                      </option>
-                      <option value="diz_que_pagou">
-                        Cliente diz que já pagou
-                      </option>
-                      <option value="venda_cancelada">
-                        Cliente informa venda cancelada
-                      </option>
-                      <option value="contato_realizado">
-                        Contato Realizado (Sem acordo)
-                      </option>
-                      <option value="nao_atende">
-                        Telefone não atende / Ocupado
-                      </option>
-                      <option value="telefone_errado">
-                        Telefone Errado / Inexistente
-                      </option>
-                      <option value="recusou_pagar">
-                        Recusou Pagar / Contestação
-                      </option>
-                      <option value="mensagem_enviada">
-                        Mensagem Enviada (WhatsApp/SMS)
-                      </option>
-                      <option value="contestou_divida">
-                        Contestou a Dívida (SPC)
-                      </option>
-                    </select>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      {OPCOES_CONTATO.map((o) => (
+                        <button
+                          key={o.key}
+                          type="button"
+                          aria-pressed={opcao === o.key}
+                          onClick={() => {
+                            setOpcao(o.key);
+                            setError("");
+                          }}
+                          className={`px-3 py-2.5 rounded-xl border-2 text-left transition-all ${
+                            opcao === o.key
+                              ? o.ativo
+                              : "bg-gray-50 border-gray-200 hover:border-indigo-300 dark:bg-dark-bg-secondary dark:border-dark-border"
+                          }`}
+                        >
+                          <span className="flex items-center gap-1.5 text-sm font-bold text-gray-900 dark:text-dark-text">
+                            <span className={`w-2 h-2 rounded-full ${o.dot}`} />
+                            {o.label}
+                          </span>
+                          <span className="block text-[11px] leading-snug text-gray-500 dark:text-dark-text-secondary">
+                            {o.sub}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
+
+                  {opcao === "com_retorno" && (
+                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-dark-text cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={prometeu}
+                        onChange={(e) => setPrometeu(e.target.checked)}
+                        className="rounded border-gray-300"
+                      />
+                      Prometeu pagar
+                    </label>
+                  )}
+
+                  {opcao === "acao" && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-gray-400">
+                        Qual ação?
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {ACOES_CONTATO.map((a) => (
+                          <button
+                            key={a.key}
+                            type="button"
+                            aria-pressed={acao === a.key}
+                            onClick={() => {
+                              setAcao(a.key);
+                              setError("");
+                            }}
+                            className={toggleClass(acao === a.key)}
+                          >
+                            {a.label}
+                          </button>
+                        ))}
+                      </div>
+                      {acao === "contestou_divida" && (
+                        <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
+                          O cliente sai da sua carteira e vai para Aguardando
+                          Jurídico (SPC).
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {status === "venda_cancelada" && (
                     <div className="space-y-1.5">
@@ -850,6 +1145,21 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
                     <label className="text-xs font-bold text-gray-400">
                       Observações da Conversa
                     </label>
+                    {(CONTACT_NOTE_TEMPLATES[modelosKey]?.length ?? 0) > 0 && (
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {CONTACT_NOTE_TEMPLATES[modelosKey].map((modelo) => (
+                          <button
+                            key={modelo}
+                            type="button"
+                            onClick={() => setNotes(modelo)}
+                            title="Preenche a observação com este modelo — edite a parte entre [ ]"
+                            className="px-2.5 py-1.5 rounded-lg border text-[11px] font-medium text-left leading-snug bg-gray-50 text-gray-600 border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text-secondary dark:hover:border-indigo-700 dark:hover:text-indigo-300"
+                          >
+                            {modelo}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     <div className="relative">
                       <MessageSquare className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
                       <textarea
@@ -959,6 +1269,7 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
                             setNextDateTouched(true);
                           }}
                           min={today}
+                          max={maxDataRemarcacao}
                           className={`${inputClass} pl-10`}
                         />
                       </div>
@@ -979,6 +1290,13 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
                       </div>
                     </div>
                   </div>
+
+                  {maxDataRemarcacao && (
+                    <p className="text-[11px] text-gray-500 dark:text-dark-text-secondary -mt-1">
+                      Remarcação até {formatDateBR(maxDataRemarcacao)} (60
+                      dias a partir do agendamento).
+                    </p>
+                  )}
 
                   {criaAgendamentoNovo && (
                     <div className="space-y-1.5">
@@ -1025,7 +1343,12 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
             )}
             <button
               type="submit"
-              disabled={loading}
+              disabled={
+                loading ||
+                (step === 1 &&
+                  mode !== "sem_contato" &&
+                  (!opcao || (opcao === "acao" && !acao) || !notes.trim()))
+              }
               className="flex-1 px-4 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-none transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading ? (

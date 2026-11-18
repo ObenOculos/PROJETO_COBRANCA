@@ -3,17 +3,19 @@ import { Scale } from "lucide-react";
 import PedidosCorrecao from "./PedidosCorrecao";
 import PedidosAtribuicao from "./PedidosAtribuicao";
 import PedidosDesconto from "./PedidosDesconto";
+import CasosGestor from "./CasosGestor";
 
 // Aba "Correções" do gestor: pedidos de correção de pagamento (item 62) e
-// pagos na loja depois da cobrança (item 66) e pedidos de desconto (item 71).
-// Cada um carrega só quando aparece.
+// pagos na loja depois da cobrança (item 66), pedidos de desconto (item 71)
+// e clientes reincidentes (item 83). Cada um carrega só quando aparece.
 
-type Visao = "correcoes" | "loja" | "descontos";
+type Visao = "correcoes" | "loja" | "descontos" | "reincidentes";
 
 const VISOES: { key: Visao; label: string }[] = [
   { key: "correcoes", label: "Correções de pagamento" },
   { key: "loja", label: "Pagos na loja" },
   { key: "descontos", label: "Descontos" },
+  { key: "reincidentes", label: "Reincidentes" },
 ];
 
 const AbaPedidosGestor: React.FC = () => {
@@ -23,7 +25,11 @@ const AbaPedidosGestor: React.FC = () => {
     try {
       const pedida = localStorage.getItem("correcoesVisao");
       localStorage.removeItem("correcoesVisao");
-      return pedida === "loja" || pedida === "descontos" ? pedida : "correcoes";
+      return pedida === "loja" ||
+        pedida === "descontos" ||
+        pedida === "reincidentes"
+        ? pedida
+        : "correcoes";
     } catch {
       return "correcoes";
     }
@@ -78,8 +84,10 @@ const AbaPedidosGestor: React.FC = () => {
         <PedidosCorrecao />
       ) : visao === "loja" ? (
         <PedidosAtribuicao />
-      ) : (
+      ) : visao === "descontos" ? (
         <PedidosDesconto />
+      ) : (
+        <CasosGestor />
       )}
     </div>
   );

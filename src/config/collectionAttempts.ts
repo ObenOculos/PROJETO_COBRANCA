@@ -20,7 +20,11 @@ export const ATTEMPT_TYPE_LABELS: Record<CollectionAttempt["type"], string> = {
 };
 
 export const ATTEMPT_RESULT_LABELS: Record<CollectionAttempt["result"], string> = {
-  no_answer: "Não atendeu",
+  // "Sem retorno" desde 2026-11-18: virou a opcao unica de tentativa sem
+  // conversa no Atender (nao atende, telefone errado, mensagem sem resposta).
+  // Trocar o rotulo e seguro: isEffectiveLabel so precisa casar os
+  // efetivos, e no_answer nunca foi efetivo.
+  no_answer: "Sem retorno",
   busy: "Ocupado",
   not_found: "Não encontrado",
   promise: "Promessa de pagamento",

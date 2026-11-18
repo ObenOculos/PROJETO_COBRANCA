@@ -53,8 +53,15 @@ import {
 } from "../../config/visitStatus";
 import {
   RESCHEDULE_REASONS,
+  buildRescheduleNotes,
   countPriorReschedules,
 } from "../../config/rescheduleReasons";
+import {
+  dataMaxRemarcacao,
+  isentoDaReincidencia,
+  precisaAutorizacaoRemarcacao,
+} from "../../config/reincidencia";
+import { pedirAutorizacaoRemarcacao } from "../../utils/casosGestor";
 
 // Visitas por pagina na lista de atrasadas.
 const OVERDUE_PER_PAGE = 10;
@@ -1885,6 +1892,23 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
     ? countPriorReschedules(selectedVisitForReschedule, scheduledVisits)
     : 0;
 
+  // Item 83 (config/reincidencia.ts; gestor isento): ate 60 dias do
+  // agendamento e, depois da 3a remarcacao seguida, pedido ao gestor. O
+  // banco aplica o mesmo (reagendar_visita); aqui e para o cobrador ver antes.
+  const isentoReincidencia = isentoDaReincidencia(user?.type);
+  const remarcacoesFeitas = selectedVisitForReschedule
+    ? Math.max(
+        selectedVisitForReschedule.rescheduleCount ?? 0,
+        rescheduleWarningCount,
+      )
+    : 0;
+  const remarcaVaiAoGestor =
+    !isentoReincidencia && precisaAutorizacaoRemarcacao(remarcacoesFeitas);
+  const maxDataRemarcacao =
+    selectedVisitForReschedule && !isentoReincidencia
+      ? dataMaxRemarcacao(selectedVisitForReschedule.scheduledDate)
+      : undefined;
+
   const handleConfirmReschedule = async () => {
     if (isRescheduling) return;
     if (!selectedVisitForReschedule || !rescheduleDate || !rescheduleTime) {
@@ -1905,9 +1929,39 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
       setShowDateValidationModal(true);
       return;
     }
+    if (maxDataRemarcacao && rescheduleDate > maxDataRemarcacao) {
+      setDateValidationMessage(
+        `A nova data pode ir até ${maxDataRemarcacao.split("-").reverse().join("/")} (60 dias a partir do agendamento).`,
+      );
+      setShowDateValidationModal(true);
+      return;
+    }
 
     setIsRescheduling(true);
     try {
+      if (remarcaVaiAoGestor) {
+        const notas = buildRescheduleNotes(
+          selectedVisitForReschedule,
+          rescheduleDate,
+          rescheduleTime,
+          rescheduleReason,
+        );
+        await pedirAutorizacaoRemarcacao({
+          visitId: selectedVisitForReschedule.id,
+          novaData: rescheduleDate,
+          novoHorario: rescheduleTime,
+          motivoChave: rescheduleReason,
+          notasOriginal: notas.original,
+          notasNova: notas.nova,
+        });
+        triggerNotification(
+          "Pedido de remarcação enviado ao gestor. A visita atual continua até ele decidir.",
+          "success",
+        );
+        handleCloseRescheduleModal();
+        return;
+      }
+
       await rescheduleVisit(
         selectedVisitForReschedule.id,
         rescheduleDate,
@@ -3505,6 +3559,7 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                                   setRescheduleDate(e.target.value)
                                 }
                                 min={getLocalDate()}
+                                max={maxDataRemarcacao}
                                 className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                 required
                               />
@@ -3559,8 +3614,22 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                     </select>
                   </div>
 
-                  {/* Aviso de reincidência: conscientiza, não bloqueia. */}
-                  {rescheduleWarningCount >= 2 && (
+                  {/* Item 83: no limite, a remarcacao vira pedido ao gestor. */}
+                  {remarcaVaiAoGestor ? (
+                    <div className="mt-4 p-3 bg-amber-50 border border-amber-300 rounded-2xl flex items-start gap-2">
+                      <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div className="text-xs text-amber-800">
+                        <p className="font-semibold mb-1">
+                          Esta cobrança já foi reagendada {remarcacoesFeitas}x
+                        </p>
+                        <p>
+                          A nova data vai para autorização do gestor, que
+                          decide se o cliente continua na carteira ou vai
+                          para o SPC. A visita atual continua até ele decidir.
+                        </p>
+                      </div>
+                    </div>
+                  ) : rescheduleWarningCount >= 2 && (
                     <div className="mt-4 p-3 bg-amber-50 border border-amber-300 rounded-2xl flex items-start gap-2">
                       <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
                       <div className="text-xs text-amber-800">
@@ -3601,7 +3670,11 @@ const VisitScheduler: React.FC<VisitSchedulerProps> = ({
                     ) : (
                       <CheckCircle className="h-4 w-4 mr-2" />
                     )}
-                    {isRescheduling ? "Reagendando..." : "Reagendar"}
+                    {isRescheduling
+                      ? "Enviando..."
+                      : remarcaVaiAoGestor
+                        ? "Pedir autorização ao gestor"
+                        : "Reagendar"}
                   </button>
                 </div>
               </div>

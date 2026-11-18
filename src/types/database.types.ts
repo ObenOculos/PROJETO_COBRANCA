@@ -791,6 +791,80 @@ export type Database = {
           },
         ];
       };
+      casos_gestor: {
+        Row: {
+          atualizado_em: string;
+          cliente_nome: string | null;
+          collector_id: string;
+          criado_em: string;
+          decidido_em: string | null;
+          decidido_por: string | null;
+          documento: string;
+          id: string;
+          motivo: string;
+          motivo_reagendamento: string | null;
+          notas_nova: string | null;
+          notas_original: string | null;
+          nova_data: string | null;
+          novo_horario: string | null;
+          observacao: string | null;
+          observacao_gestor: string | null;
+          quantidade: number;
+          status: string;
+          visita_id: string | null;
+        };
+        Insert: {
+          atualizado_em?: string;
+          cliente_nome?: string | null;
+          collector_id: string;
+          criado_em?: string;
+          decidido_em?: string | null;
+          decidido_por?: string | null;
+          documento: string;
+          id?: string;
+          motivo: string;
+          motivo_reagendamento?: string | null;
+          notas_nova?: string | null;
+          notas_original?: string | null;
+          nova_data?: string | null;
+          novo_horario?: string | null;
+          observacao?: string | null;
+          observacao_gestor?: string | null;
+          quantidade: number;
+          status?: string;
+          visita_id?: string | null;
+        };
+        Update: {
+          atualizado_em?: string;
+          cliente_nome?: string | null;
+          collector_id?: string;
+          criado_em?: string;
+          decidido_em?: string | null;
+          decidido_por?: string | null;
+          documento?: string;
+          id?: string;
+          motivo?: string;
+          motivo_reagendamento?: string | null;
+          notas_nova?: string | null;
+          notas_original?: string | null;
+          nova_data?: string | null;
+          novo_horario?: string | null;
+          observacao?: string | null;
+          observacao_gestor?: string | null;
+          quantidade?: number;
+          status?: string;
+          visita_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "casos_gestor_collector_id_fkey";
+            columns: ["collector_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       ciclone_renegociacao_titulos: {
         Row: {
           baixa_uuid: string;
@@ -2500,6 +2574,15 @@ export type Database = {
         Args: { p_documentos: string[] };
         Returns: number;
       };
+      carteira_movimentacao_periodo: {
+        Args: { p_fim: string; p_inicio: string };
+        Returns: {
+          cobrador_id: string;
+          entraram: number;
+          sairam: number;
+          saidas_sem_acao: number;
+        }[];
+      };
       carteira_por_cobrador: {
         Args: never;
         Returns: {
@@ -2681,6 +2764,10 @@ export type Database = {
           p_type: string;
         };
         Returns: string;
+      };
+      decidir_caso_gestor: {
+        Args: { p_caso_id: string; p_decisao: string; p_observacao?: string };
+        Returns: Json;
       };
       decidir_atribuicao_pagamento: {
         Args: { p_aprovar: boolean; p_lote: string; p_resposta?: string };
@@ -2953,6 +3040,18 @@ export type Database = {
         };
         Returns: string;
       };
+      pedir_autorizacao_remarcacao: {
+        Args: {
+          p_motivo_chave?: string;
+          p_notas_nova?: string;
+          p_notas_original?: string;
+          p_nova_data: string;
+          p_novo_horario?: string;
+          p_observacao?: string;
+          p_visit_id: string;
+        };
+        Returns: string;
+      };
       pedir_desconto: {
         Args: {
           p_documento: string;
@@ -3165,6 +3264,10 @@ export type Database = {
       };
       resolve_auth_email: { Args: { p_login: string }; Returns: string };
       saldo_acordo_parcela: { Args: { p_parcela_id: string }; Returns: number };
+      reportar_tentativas_gestor: {
+        Args: { p_documento: string; p_observacao?: string };
+        Returns: string;
+      };
       salvar_regra_carteira: {
         Args: {
           p_ativa?: boolean;
@@ -3200,6 +3303,10 @@ export type Database = {
       };
       situacao_primaria_do_tipo: { Args: { p_type: string }; Returns: string };
       texto_para_valor: { Args: { p: string }; Returns: number };
+      tentativas_sem_retorno: {
+        Args: { p_documento: string };
+        Returns: number;
+      };
       titulo_em_acordo_ativo: {
         Args: { p_id_parcela: number };
         Returns: boolean;
