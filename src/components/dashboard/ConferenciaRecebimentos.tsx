@@ -30,6 +30,11 @@ import AtribuirExcecaoModal from "./AtribuirExcecaoModal";
 import { supabase } from "../../lib/supabase";
 import { fetchAllRows } from "../../utils/fetchAllRows";
 import {
+  buscarComCacheTela,
+  invalidarCacheTela,
+  lerCacheTela,
+} from "../../utils/cacheTela";
+import {
   carregarConversasConferencia,
   ConversaConferencia,
 } from "../../services/atribuicoesPagamento";
@@ -344,73 +349,112 @@ const ConferenciaRecebimentos: React.FC = () => {
     }
   };
 
+  // RPC pesada (varre o mes inteiro) e so leitura -- não muda com marcar()
+  // nem com a exceção do gestor (essas não alteram base/app da linha).
+  // Cache stale-while-revalidate (utils/cacheTela): mostra o que tem na
+  // hora e corrige em segundo plano, em vez de refazer a cada volta à aba.
   useEffect(() => {
     let cancelado = false;
-    setLinhas(null);
     setErro(null);
     const { inicio, fim } = limitesDoMes(mes);
-    (async () => {
-      try {
-        const dados = await fetchAllRows<LinhaRpc>((from, to) =>
-          supabase
-            .rpc("conferencia_recebimentos", {
-              p_inicio: inicio,
-              p_fim: fim,
-              p_so_carteira: visao === "carteira",
-            })
-            // Ordem unica para a paginacao (CLAUDE.md): documento + cobrador.
-            .order("documento")
-            .order("cobrador_id")
-            .range(from, to),
-        );
+    const chave = `conferenciaLinhas|${mes}|${visao}`;
+    const cache = lerCacheTela<LinhaRpc[]>(chave);
+    if (cache) {
+      setLinhas(cache.valor);
+      if (cache.fresco) return;
+    } else {
+      setLinhas(null);
+    }
+    const buscar = () =>
+      fetchAllRows<LinhaRpc>((from, to) =>
+        supabase
+          .rpc("conferencia_recebimentos", {
+            p_inicio: inicio,
+            p_fim: fim,
+            p_so_carteira: visao === "carteira",
+          })
+          // Ordem unica para a paginacao (CLAUDE.md): documento + cobrador.
+          .order("documento")
+          .order("cobrador_id")
+          .range(from, to),
+      );
+    buscarComCacheTela(chave, buscar)
+      .then((dados) => {
         if (!cancelado) setLinhas(dados);
-      } catch (e) {
+      })
+      .catch((e) => {
         console.error("Erro ao carregar conferência de recebimentos:", e);
         if (!cancelado)
           setErro(e instanceof Error ? e.message : "Falha ao carregar");
-      }
-    })();
+      });
     return () => {
       cancelado = true;
     };
   }, [mes, visao]);
 
+  // marcar() grava uma marcacao nova -- a mudanca e conhecida, por isso
+  // invalida o cache na hora em vez de esperar o prazo (dado de decisão,
+  // não é so leitura; ver utils/cacheTela.ts).
+  const marcacoesVersaoRef = useRef(versaoMarcacoes);
   useEffect(() => {
     let cancelado = false;
     const { inicio } = limitesDoMes(mes);
-    (async () => {
-      try {
-        const dados = await fetchAllRows<ConferenciaMarcacao>((from, to) =>
-          supabase
-            .from("conferencia_marcacoes")
-            .select("*")
-            .eq("mes", inicio)
-            .order("created_at")
-            .order("id")
-            .range(from, to)
-            .returns<ConferenciaMarcacao[]>(),
-        );
+    const chave = `conferenciaMarcacoes|${mes}`;
+    const acaoLocal = marcacoesVersaoRef.current !== versaoMarcacoes;
+    marcacoesVersaoRef.current = versaoMarcacoes;
+    if (acaoLocal) invalidarCacheTela(chave);
+    const cache = lerCacheTela<ConferenciaMarcacao[]>(chave);
+    if (cache) {
+      setMarcacoes(cache.valor);
+      if (cache.fresco) return;
+    }
+    const buscar = () =>
+      fetchAllRows<ConferenciaMarcacao>((from, to) =>
+        supabase
+          .from("conferencia_marcacoes")
+          .select("*")
+          .eq("mes", inicio)
+          .order("created_at")
+          .order("id")
+          .range(from, to)
+          .returns<ConferenciaMarcacao[]>(),
+      );
+    buscarComCacheTela(chave, buscar)
+      .then((dados) => {
         if (!cancelado) setMarcacoes(dados);
-      } catch (e) {
+      })
+      .catch((e) => {
         // Sem a tabela (migration nao aplicada) a conferencia segue sem
         // marcacoes; o detalhe avisa ao tentar marcar.
         console.error("Erro ao carregar marcações da conferência:", e);
         if (!cancelado) setMarcacoes([]);
-      }
-    })();
+      });
     return () => {
       cancelado = true;
     };
   }, [mes, versaoMarcacoes]);
 
   // Conversas e pedidos "pago na loja" das baixas do mes. Sem a migration
-  // 20261117000002 fica vazio e a tela segue como antes.
+  // 20261117000002 fica vazio e a tela segue como antes. Mesma lógica de
+  // invalidação do cache que marcacoes: a exceção do gestor (onAtribuido)
+  // tambem bump versaoMarcacoes e muda esse dado.
   const [conversas, setConversas] = useState<ConversaConferencia[]>([]);
+  const conversasVersaoRef = useRef(versaoMarcacoes);
   useEffect(() => {
     let cancelado = false;
-    setConversas([]);
     const { inicio, fim } = limitesDoMes(mes);
-    carregarConversasConferencia(inicio, fim)
+    const chave = `conferenciaConversas|${mes}`;
+    const acaoLocal = conversasVersaoRef.current !== versaoMarcacoes;
+    conversasVersaoRef.current = versaoMarcacoes;
+    if (acaoLocal) invalidarCacheTela(chave);
+    const cache = lerCacheTela<ConversaConferencia[]>(chave);
+    if (cache) {
+      setConversas(cache.valor);
+      if (cache.fresco) return;
+    } else {
+      setConversas([]);
+    }
+    buscarComCacheTela(chave, () => carregarConversasConferencia(inicio, fim))
       .then((d) => {
         if (!cancelado) setConversas(d);
       })

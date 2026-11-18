@@ -35,6 +35,12 @@ export function gravarCacheTela<T>(chave: string, valor: T): void {
   memoria.set(chave, { valor, em: Date.now() });
 }
 
+/** Descarta o valor guardado -- use antes de refazer a busca quando uma
+ * ação local (gravação) tornou o cache sabidamente desatualizado. */
+export function invalidarCacheTela(chave: string): void {
+  memoria.delete(chave);
+}
+
 const emAndamento = new Map<string, Promise<unknown>>();
 
 /** Busca e grava no cache. A busca NAO e cancelada quando a tela desmonta
