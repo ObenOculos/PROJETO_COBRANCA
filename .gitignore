@@ -53,3 +53,6 @@ scripts/focco/saida/
 scripts/focco/dre/script_outputs/
 scripts/focco/dre/*.log
 scripts/focco/dre/execution_report_*.json
+
+# Planilhas de cobradores com dados de clientes (nao versionar)
+planilhas_*/

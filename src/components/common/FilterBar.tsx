@@ -324,11 +324,11 @@ const FilterBar: React.FC<FilterBarProps> = ({
     <div className="space-y-3 mb-4">
       {/* Barra de Filtros Unificada */}
       <div className="bg-white dark:bg-dark-bg-secondary p-3 rounded-2xl border border-gray-150/80 dark:border-dark-border shadow-sm space-y-3">
-        <div className="flex flex-row items-center gap-3">
+        <div className="flex flex-row flex-wrap md:flex-nowrap items-center gap-3">
           {leading}
           {/* Busca */}
           {showSearch && (
-            <div className="relative flex-1">
+            <div className="relative flex-1 min-w-0">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
               <input
                 id="search-input"

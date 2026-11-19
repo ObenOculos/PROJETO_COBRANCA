@@ -35,6 +35,14 @@ import {
   EyeOff,
   CalendarClock,
   AlertTriangle,
+  Hourglass,
+  SkipForward,
+  ShieldAlert,
+  Repeat,
+  Store,
+  ChevronLeft,
+  ChevronRight,
+  Percent,
 } from "lucide-react";
 import FilterBar from "../common/FilterBar";
 import { CollectionTable, CollectionTableRef } from "./CollectionTable";
@@ -1017,6 +1025,15 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     adiamentosCarregados &&
     esperaCarregada &&
     loteCarregado;
+  // "Montando a sua fila..." so na primeira montagem. Fechar a Ficha ou o
+  // Atender rele contatos/escada/lote (versaoRegistros) e, durante a
+  // releitura, dadosDaFilaProntos fica falso -- a lista atual continua na
+  // tela ate os dados novos chegarem. dadosDaFilaProntos segue travando a
+  // abertura de lote novo (nunca com dado pela metade). 2026-11-19.
+  const [filaJaMontada, setFilaJaMontada] = useState(false);
+  useEffect(() => {
+    if (dadosDaFilaProntos) setFilaJaMontada(true);
+  }, [dadosDaFilaProntos]);
 
   // Registro novo (Atender, depois, pagamento...): rele a situacao do lote.
   useEffect(() => {
@@ -1329,20 +1346,20 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   ]);
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border p-6 shadow-sm">
-        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-1">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-dark-text">
+    <div className="space-y-3 md:space-y-6">
+      <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border px-4 py-3 md:p-6 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0 md:space-y-1">
+            <h1 className="text-base md:text-2xl font-bold text-gray-900 dark:text-dark-text truncate">
               Central de{" "}
               {USER_TYPE_LABELS[user?.type as keyof typeof USER_TYPE_LABELS] ??
                 "Cobrança"}
             </h1>
-            <p className="text-sm text-gray-500 dark:text-dark-text-secondary">
+            <p className="hidden md:block text-sm text-gray-500 dark:text-dark-text-secondary">
               Gestão de carteira ativa e recuperação de crédito.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex shrink-0 items-center gap-3">
             <button
               type="button"
               onClick={toggleFocusMode}
@@ -1391,30 +1408,34 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
         showStatusPills={false}
         collapsible
         leading={
-          <div className="flex gap-2 shrink-0">
+          // No celular: controle segmentado com rotulo curto ("Fila" |
+          // "Carteira"); no computador, o nome completo.
+          <div className="flex w-full md:w-auto shrink-0 gap-1 p-1 md:p-0 md:gap-2 rounded-xl bg-gray-100 dark:bg-dark-bg-secondary md:bg-transparent md:dark:bg-transparent">
             <button
               type="button"
               onClick={() => setWalletTab("fila")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+              className={`flex flex-1 md:flex-none items-center justify-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-xs md:text-sm font-bold transition-colors ${
                 walletTab === "fila"
-                  ? "bg-indigo-600 text-white"
+                  ? "bg-indigo-600 text-white shadow-sm"
                   : "text-gray-500 hover:bg-gray-50 dark:hover:bg-dark-bg-secondary"
               }`}
             >
               <Rocket className="w-4 h-4" />
-              Fila de Cobrança
+              <span className="md:hidden">Fila</span>
+              <span className="hidden md:inline">Fila de Cobrança</span>
             </button>
             <button
               type="button"
               onClick={() => setWalletTab("carteira")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+              className={`flex flex-1 md:flex-none items-center justify-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-xs md:text-sm font-bold transition-colors ${
                 walletTab === "carteira"
-                  ? "bg-indigo-600 text-white"
+                  ? "bg-indigo-600 text-white shadow-sm"
                   : "text-gray-500 hover:bg-gray-50 dark:hover:bg-dark-bg-secondary"
               }`}
             >
               <Users className="w-4 h-4" />
-              Carteira completa
+              <span className="md:hidden">Carteira</span>
+              <span className="hidden md:inline">Carteira completa</span>
             </button>
           </div>
         }
@@ -1447,7 +1468,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
               {erroLote ??
                 "Não foi possível carregar os contatos da sua carteira (instabilidade na conexão). Atualize a página em instantes."}
             </div>
-          ) : !dadosDaFilaProntos ? (
+          ) : !dadosDaFilaProntos && !filaJaMontada ? (
             <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border shadow-sm p-8 text-center text-sm text-gray-400">
               Montando a sua fila...
             </div>
@@ -1514,8 +1535,8 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
         </>
       ) : (
         <div className="bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-gray-100 dark:border-dark-border">
-            <h3 className="font-bold text-gray-900 dark:text-dark-text">
+          <div className="px-4 py-3 md:p-4 border-b border-gray-100 dark:border-dark-border">
+            <h3 className="hidden md:block font-bold text-gray-900 dark:text-dark-text">
               Carteira completa
             </h3>
             <CarteiraChips
@@ -1557,91 +1578,76 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
             />
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <WalletTableHead
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={toggleSort}
+          {(["card", "row"] as const).map((layout) => {
+            const linhas = paginatedClients.map((group) => (
+              <ClientQueueRow
+                key={group.clientId}
+                layout={layout}
+                group={group}
+                lastContact={lastContacts[group.document]}
+                acordoAtivo={!!getAcordoAtivoDoCliente(group.document)}
+                copiedDoc={copiedDoc}
+                copyDocument={copyDocument}
+                user={user}
+                onOpenDetail={onOpenDetail}
+                onOpenLog={onOpenLog}
+                onOpenAcordo={onOpenAcordo}
+                urgenteInfo={urgenteInfoByDocument.get(group.document)}
+                scheduledContact={scheduledContactByDocument.get(group.document)}
+                aposContato={aposContato}
+                quitadoEm={
+                  quitadoEmPorDocumento.has(group.document)
+                    ? (quitadoEmPorDocumento.get(group.document) ?? null)
+                    : undefined
+                }
+                contatosNaoCarregados={
+                  quitadoEmPorDocumento.has(group.document) &&
+                  !quitadoRecente(group.document)
+                }
               />
-              <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
-                {paginatedClients.length > 0 ? (
-                  paginatedClients.map((group) => (
-                    <ClientQueueRow
-                      key={group.clientId}
-                      group={group}
-                      lastContact={lastContacts[group.document]}
-                      acordoAtivo={!!getAcordoAtivoDoCliente(group.document)}
-                      copiedDoc={copiedDoc}
-                      copyDocument={copyDocument}
-                      user={user}
-                      onOpenDetail={onOpenDetail}
-                      onOpenLog={onOpenLog}
-                      onOpenAcordo={onOpenAcordo}
-                      urgenteInfo={urgenteInfoByDocument.get(group.document)}
-                      scheduledContact={scheduledContactByDocument.get(group.document)}
-                      aposContato={aposContato}
-                      quitadoEm={
-                        quitadoEmPorDocumento.has(group.document)
-                          ? (quitadoEmPorDocumento.get(group.document) ?? null)
-                          : undefined
-                      }
-                      contatosNaoCarregados={
-                        quitadoEmPorDocumento.has(group.document) &&
-                        !quitadoRecente(group.document)
-                      }
-                    />
-                  ))
-                ) : (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="px-6 py-12 text-center text-sm text-gray-500"
-                    >
-                      Nenhum cliente encontrado.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+            ));
+            const vazio = (
+              <p className="px-6 py-12 text-center text-sm text-gray-500">
+                Nenhum cliente encontrado.
+              </p>
+            );
+            return layout === "card" ? (
+              <div
+                key="card"
+                className="md:hidden divide-y divide-gray-100 dark:divide-dark-border"
+              >
+                {linhas.length > 0 ? linhas : vazio}
+              </div>
+            ) : (
+              <div key="row" className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <WalletTableHead
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                  />
+                  <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
+                    {linhas.length > 0 ? (
+                      linhas
+                    ) : (
+                      <tr>
+                        <td colSpan={6}>{vazio}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })}
 
           {totalPages > 1 && (
-            <div className="p-4 border-t border-gray-100 dark:border-dark-border flex items-center justify-between bg-gray-50/30 dark:bg-dark-bg-secondary/30">
-              <p className="text-xs text-gray-500">
-                Mostrando {paginatedClients.length} de{" "}
-                {carteiraFiltrada.length}
-              </p>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.max(1, prev - 1))
-                  }
-                  disabled={currentPage === 1}
-                  className="px-4 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40"
-                >
-                  Anterior
-                </button>
-                <div className="flex items-center gap-1">
-                  <span className="w-8 h-8 flex items-center justify-center bg-indigo-600 text-white rounded-lg text-xs font-bold">
-                    {currentPage}
-                  </span>
-                  <span className="text-xs text-gray-400 px-1">de</span>
-                  <span className="text-xs text-gray-600 dark:text-dark-text font-bold">
-                    {totalPages}
-                  </span>
-                </div>
-                <button
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.min(totalPages, prev + 1))
-                  }
-                  disabled={currentPage === totalPages}
-                  className="px-4 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40"
-                >
-                  Próxima
-                </button>
-              </div>
-            </div>
+            <Paginacao
+              page={currentPage}
+              totalPages={totalPages}
+              mostrando={paginatedClients.length}
+              total={carteiraFiltrada.length}
+              onChange={setCurrentPage}
+            />
           )}
         </div>
       )}
@@ -1718,6 +1724,9 @@ interface ClientQueueRowProps {
   /** Quitado antigo achado pela busca: os contatos dele nao sao lidos (so
    * os dos quitados recentes), entao "Sem registros" seria falso. */
   contatosNaoCarregados?: boolean;
+  /** "row" = linha da tabela (computador); "card" = cartao compacto do
+   * celular. Mesma logica, so muda o desenho. */
+  layout?: "row" | "card";
 }
 
 // Linha da agenda/fila de atendimento, reusada em cada secao priorizada
@@ -1742,6 +1751,7 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
   onAdiar,
   quitadoEm,
   contatosNaoCarregados,
+  layout = "row",
 }) => {
   const { acordoAtivoOverdueMap } = useCollection();
   const maxAtraso = clientMaxOverdueDays(group, acordoAtivoOverdueMap);
@@ -1772,6 +1782,412 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
   // Loja(s) do cliente: cobrador com mais de uma loja precisa saber de qual
   // esta cobrando. A primeira e a da parcela em aberto mais antiga.
   const lojas = clientStoresForDisplay(group);
+
+  // Proximo passo: retorno combinado no ultimo contato efetivo. Retorno de
+  // acordo ("Acordo criado") e a proxima parcela do acordo, nao uma promessa.
+  // Data passada com o cliente sem nada vencido = cumprida: cinza, nao
+  // vermelho (2026-11-12; mesma regra de "Marcados para hoje").
+  const retornoInfo = (() => {
+    const retorno = lastContact?.efetivo?.nextActionDate;
+    if (!retorno) return null;
+    const deAcordo = lastContact?.efetivo?.result === "agreement";
+    const passou = retorno < todayLocalStr();
+    const cumprida = passou && emDia;
+    const dataCurta = new Date(retorno + "T00:00:00").toLocaleDateString(
+      "pt-BR",
+      { day: "2-digit", month: "2-digit" },
+    );
+    const rotulo = deAcordo
+      ? cumprida
+        ? `Parcela do acordo de ${dataCurta} — em dia`
+        : passou
+          ? `Parcela do acordo venceu ${dataCurta}`
+          : `Parcela do acordo em ${dataCurta}`
+      : cumprida
+        ? `Promessa de ${dataCurta} — em dia`
+        : passou
+          ? `Promessa venceu ${dataCurta}`
+          : `Prometeu pagar ${dataCurta}`;
+    const dica = deAcordo
+      ? "Vencimento da próxima parcela do acordo"
+      : "Data em que o cliente prometeu pagar";
+    return { rotulo, dica, passou, cumprida };
+  })();
+  const agendadoRotulo = scheduledContact
+    ? `${isVisitOverdue(scheduledContact) ? "Atrasado: " : ""}${
+        scheduledContact.channel === "whatsapp" ? "WhatsApp" : "Ligar"
+      } em ${new Date(
+        scheduledContact.scheduledDate + "T00:00:00",
+      ).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}${
+        scheduledContact.scheduledTime
+          ? ` às ${formatHorario(scheduledContact.scheduledTime)}`
+          : ""
+      }`
+    : null;
+
+  const phoneModal =
+    showPhoneModal &&
+    phoneValue &&
+    createPortal(
+      <div
+        className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[100]"
+        onClick={fecharTelefone}
+      >
+        <div
+          className="bg-white dark:bg-dark-bg rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden border border-gray-200 dark:border-dark-border"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-5 py-4 border-b border-gray-100 dark:border-dark-border flex items-center justify-between bg-gray-50 dark:bg-dark-bg-secondary">
+            <h3 className="font-bold text-gray-900 dark:text-dark-text">
+              {group.client}
+            </h3>
+            <button
+              onClick={fecharTelefone}
+              className="p-1.5 hover:bg-gray-200 dark:hover:bg-dark-bg-tertiary rounded-full transition-colors"
+            >
+              <X className="w-4 h-4 text-gray-500" />
+            </button>
+          </div>
+          <div className="p-5 space-y-4">
+            <p className="text-2xl font-bold text-gray-900 dark:text-dark-text text-center">
+              {phoneValue}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  usouTelefone.current = true;
+                  copyDocument(phoneValue);
+                }}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-dark-bg-secondary text-gray-700 dark:text-dark-text font-bold text-sm rounded-xl hover:bg-gray-200 dark:hover:bg-dark-bg-tertiary transition-colors"
+              >
+                {copiedDoc === phoneValue ? (
+                  <Check className="w-4 h-4 text-green-600" />
+                ) : (
+                  <Copy className="w-4 h-4" />
+                )}
+                {copiedDoc === phoneValue ? "Copiado!" : "Copiar"}
+              </button>
+              <button
+                onClick={() => {
+                  usouTelefone.current = true;
+                  handleCall(group);
+                }}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white font-bold text-sm rounded-xl hover:bg-indigo-700 transition-colors"
+              >
+                <Phone className="w-4 h-4" />
+                Ligar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>,
+      document.body,
+    );
+
+  if (layout === "card") {
+    // Celular (abaixo de md): cartao compacto. Selos so com icone + cor (o
+    // texto vai no title/aria-label, ver feedback do usuario 2026-11-13);
+    // CPF, razao social, apelido e vendas ficam na Ficha (toque no cartao).
+    const hoje = todayLocalStr();
+    const falouHoje =
+      !!lastContact?.efetivo && todayLocalStr(lastContact.efetivo.date) === hoje;
+    const tentouHoje =
+      !falouHoje && !!lastContact && todayLocalStr(lastContact.date) === hoje;
+    const selos: { key: string; icon: React.ReactNode; texto: string; cls: string; curto?: string }[] = [];
+    if (acordoAtivo)
+      selos.push({
+        key: "acordo",
+        icon: <Handshake className="w-3.5 h-3.5" />,
+        texto: "Em acordo",
+        cls: "bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800",
+      });
+    if (urgenteInfo)
+      selos.push({
+        key: "urgente",
+        icon: <Hourglass className="w-3.5 h-3.5" />,
+        curto: `${urgenteInfo.diasRestantes}d`,
+        texto: `${urgenteInfo.semAcao ? "Sem nenhuma ação — " : ""}Faltam ${urgenteInfo.diasRestantes} ${urgenteInfo.diasRestantes === 1 ? "dia" : "dias"} na carteira`,
+        cls: urgenteInfo.semAcao
+          ? "bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
+          : "bg-pink-50 text-pink-600 border-pink-200 dark:bg-pink-900/20 dark:text-pink-300 dark:border-pink-800",
+      });
+    if (adiamento)
+      selos.push({
+        key: "adiado",
+        icon: <SkipForward className="w-3.5 h-3.5" />,
+        texto: `Deixado para depois: ${MOTIVO_ADIAMENTO_SELO[adiamento.motivo]}${adiamento.observacao ? ` (${adiamento.observacao})` : ""}`,
+        cls: "bg-gray-100 text-gray-600 border-gray-200 dark:bg-dark-bg-tertiary dark:text-dark-text-secondary dark:border-dark-border",
+      });
+    if (espera && !quitado)
+      selos.push({
+        key: "espera",
+        icon: espera.emLimbo ? (
+          <ShieldAlert className="w-3.5 h-3.5" />
+        ) : (
+          <Repeat className="w-3.5 h-3.5" />
+        ),
+        curto: espera.emLimbo ? undefined : `${espera.tentativas}ª`,
+        texto: seloEspera(espera),
+        cls: espera.emLimbo
+          ? "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800"
+          : "bg-slate-50 text-slate-600 border-slate-200 dark:bg-dark-bg-tertiary dark:text-dark-text-secondary dark:border-dark-border",
+      });
+    if (encargo?.conferirNoErp)
+      selos.push({
+        key: "conferir",
+        icon: <AlertTriangle className="w-3.5 h-3.5" />,
+        texto: "Conferir juros no Ciclone: o percentual cadastrado parece errado",
+        cls: "bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800",
+      });
+
+    const botaoIcone =
+      "flex items-center justify-center w-10 h-10 rounded-xl border transition-colors disabled:opacity-40 disabled:cursor-not-allowed";
+
+    return (
+      <>
+        <div
+          className="px-4 py-3 active:bg-gray-50 dark:active:bg-dark-bg-secondary cursor-pointer"
+          onClick={() => onOpenDetail(group)}
+        >
+          {/* Nome + dias de atraso */}
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-bold text-sm text-gray-900 dark:text-dark-text truncate">
+                {group.client}
+              </p>
+              {lojas.length > 0 && (
+                <p className="flex items-center gap-1 text-[11px] text-indigo-700 dark:text-indigo-300 truncate">
+                  <Store className="w-3 h-3 shrink-0" />
+                  <span className="truncate">{lojas.join(" | ")}</span>
+                </p>
+              )}
+            </div>
+            {quitado ? (
+              <span
+                className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                title={`Pagou tudo. Fica aqui por ${QUITADO_VISIVEL_DIAS} dias depois da quitação e não entra na Fila.`}
+              >
+                <CheckCircle className="w-3 h-3" />
+                {quitadoEm
+                  ? new Date(quitadoEm + "T00:00:00").toLocaleDateString("pt-BR", {
+                      day: "2-digit",
+                      month: "2-digit",
+                    })
+                  : "Quitado"}
+              </span>
+            ) : (
+              <span
+                className={`shrink-0 whitespace-nowrap px-2 py-0.5 rounded-full text-[10px] font-bold ${PRIORITY_COLOR_CLASSES[priorityBucket(maxAtraso)]}`}
+                title="Dias de atraso"
+              >
+                {maxAtraso}d
+              </span>
+            )}
+          </div>
+
+          {/* Valor: selos Vencido (ja com multa/juros de hoje) x A vencer --
+              padrao SaldoAberto, so icone + valor. A conta dos juros fica na
+              Ficha (e no title). Quitado ja tem o selo no topo. */}
+          {!quitado && (saldo.vencido > 0.01 || saldo.aVencer > 0.01) && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              {saldo.vencido > 0.01 && (
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400"
+                  title={
+                    encargo && encargo.encargo > 0.009
+                      ? `Vencido ${formatCurrency(saldo.vencido)} + multa ${formatCurrency(encargo.multa)} + juros ${formatCurrency(encargo.juros)} (Ciclone, até hoje). Cobre o total de hoje, não só o vencido.`
+                      : "Vencido: parcelas com vencimento passado"
+                  }
+                >
+                  <AlertCircle className="w-3 h-3" />
+                  {formatCurrency(
+                    saldo.vencido + (encargo && encargo.encargo > 0.009 ? encargo.encargo : 0),
+                  )}
+                  {encargo && encargo.encargo > 0.009 && (
+                    <Percent
+                      className="w-3 h-3 text-amber-600 dark:text-amber-400"
+                      aria-label="com multa e juros de hoje"
+                    />
+                  )}
+                </span>
+              )}
+              {saldo.aVencer > 0.01 && (
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 dark:bg-dark-bg-tertiary dark:text-dark-text-secondary"
+                  title="A vencer: parcelas dentro do prazo, não estão atrasadas"
+                >
+                  <Clock className="w-3 h-3" />
+                  {formatCurrency(saldo.aVencer)}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Ultimo contato ("ha X dias · resultado", sem a anotacao crua --
+              ela fica na Ficha) + selos a direita */}
+          {(contatosNaoCarregados || lastContact || selos.length > 0) && (
+            <div className="mt-1.5 flex items-center justify-between gap-2 min-w-0">
+              <p className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-dark-text-secondary min-w-0">
+                {contatosNaoCarregados ? (
+                  <>
+                    <MessageSquare className="w-3.5 h-3.5 shrink-0 text-gray-400" />
+                    <span className="italic">Histórico na ficha</span>
+                  </>
+                ) : lastContact ? (
+                  (() => {
+                    const dias = Math.max(
+                      0,
+                      diasEntre(todayLocalStr(lastContact.date), hoje),
+                    );
+                    const quando = falouHoje
+                      ? "Falou hoje"
+                      : tentouHoje
+                        ? "Tentou hoje"
+                        : dias === 1
+                          ? "Ontem"
+                          : `Há ${dias} dias`;
+                    const resultado =
+                      ATTEMPT_RESULT_LABELS[
+                        lastContact.result as keyof typeof ATTEMPT_RESULT_LABELS
+                      ] ?? lastContact.result;
+                    return (
+                      <>
+                        {falouHoje ? (
+                          <UserCheck className="w-3.5 h-3.5 shrink-0 text-green-600" />
+                        ) : tentouHoje ? (
+                          <Clock className="w-3.5 h-3.5 shrink-0 text-amber-600" />
+                        ) : (
+                          <MessageSquare className="w-3.5 h-3.5 shrink-0 text-gray-400" />
+                        )}
+                        <span
+                          className="truncate"
+                          title={lastContact.note || undefined}
+                        >
+                          <span
+                            className={`font-bold ${
+                              falouHoje
+                                ? "text-green-700 dark:text-green-400"
+                                : tentouHoje
+                                  ? "text-amber-700 dark:text-amber-300"
+                                  : "text-gray-700 dark:text-dark-text"
+                            }`}
+                          >
+                            {quando}
+                          </span>
+                          {resultado ? ` · ${resultado}` : ""}
+                        </span>
+                      </>
+                    );
+                  })()
+                ) : null}
+              </p>
+              {selos.length > 0 && (
+                <div className="flex shrink-0 gap-1">
+                  {selos.map((s) => (
+                    <span
+                      key={s.key}
+                      title={s.texto}
+                      aria-label={s.texto}
+                      className={`inline-flex items-center gap-0.5 h-6 px-1.5 rounded-full border text-[10px] font-bold ${s.cls}`}
+                    >
+                      {s.icon}
+                      {s.curto}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {agendadoRotulo && scheduledContact && (
+            <p
+              className={`mt-1 flex items-center gap-1.5 text-[11px] font-bold ${
+                isVisitOverdue(scheduledContact)
+                  ? "text-red-600 dark:text-red-400"
+                  : "text-purple-600 dark:text-purple-300"
+              }`}
+              title="Contato que você agendou no Atender"
+            >
+              <CalendarClock className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">{agendadoRotulo}</span>
+            </p>
+          )}
+          {retornoInfo && (
+            <p
+              className={`mt-1 flex items-center gap-1.5 text-[11px] font-bold ${
+                retornoInfo.cumprida
+                  ? "text-gray-500 dark:text-dark-text-secondary"
+                  : retornoInfo.passou
+                    ? "text-red-600 dark:text-red-400"
+                    : "text-amber-600 dark:text-amber-300"
+              }`}
+              title={retornoInfo.dica}
+            >
+              <Clock className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">{retornoInfo.rotulo}</span>
+            </p>
+          )}
+
+          {/* Acoes */}
+          {!quitado && (
+            <div
+              className="mt-2.5 flex items-center gap-2"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setShowPhoneModal(true)}
+                disabled={!phoneValue}
+                title={phoneValue ? "Telefone" : "Cliente sem telefone"}
+                aria-label="Telefone"
+                className={`${botaoIcone} bg-indigo-50 text-indigo-600 border-indigo-100 dark:bg-indigo-900/20 dark:border-indigo-900/40`}
+              >
+                <Phone className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => {
+                  handleWhatsApp(group, user, saldo.vencido, encargo);
+                  aposContato(group, "whatsapp");
+                }}
+                disabled={!phoneValue}
+                title={phoneValue ? "Chamar no WhatsApp" : "Cliente sem telefone"}
+                aria-label="WhatsApp"
+                className={`${botaoIcone} bg-green-50 text-green-600 border-green-100 dark:bg-green-900/20 dark:border-green-900/40`}
+              >
+                <WhatsAppIcon className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => onOpenAcordo(group)}
+                title="Negociar / Acordo"
+                aria-label="Negociar / Acordo"
+                className={`${botaoIcone} bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-900/20 dark:border-amber-900/40`}
+              >
+                <Handshake className="w-4 h-4" />
+              </button>
+              {onAdiar && !adiamento && (
+                <button
+                  onClick={() => onAdiar(group)}
+                  title="Deixar para depois: sai do lote atual"
+                  aria-label="Deixar para depois"
+                  className={`${botaoIcone} text-gray-500 border-gray-200 dark:text-dark-text-secondary dark:border-dark-border`}
+                >
+                  <SkipForward className="w-4 h-4" />
+                </button>
+              )}
+              <button
+                onClick={() => onOpenLog(group)}
+                className="ml-auto flex-1 max-w-[9rem] h-10 inline-flex items-center justify-center gap-1.5 bg-blue-600 text-white active:bg-blue-700 rounded-xl text-xs font-bold shadow-sm"
+                title="Registrar como foi o contato e agendar o próximo"
+              >
+                <MessageSquare className="w-4 h-4" />
+                Atender
+              </button>
+            </div>
+          )}
+        </div>
+        {phoneModal}
+      </>
+    );
+  }
+
   return (
     <>
     <tr className="group hover:bg-gray-50/80 dark:hover:bg-dark-bg-secondary transition-colors cursor-pointer">
@@ -1970,7 +2386,7 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
           "Prometeu pagar em" = data que o CLIENTE prometeu (promessa
           registrada no Atender, collection_attempts.next_action_date). */}
       <td className="px-6 py-4" onClick={() => onOpenDetail(group)}>
-        {scheduledContact || lastContact?.efetivo?.nextActionDate ? (
+        {scheduledContact || retornoInfo ? (
           <div className="flex flex-col gap-1">
             {scheduledContact && (
               <span
@@ -1982,62 +2398,24 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
                 title="Contato que você agendou no Atender"
               >
                 <CalendarClock className="w-3 h-3" />
-                {isVisitOverdue(scheduledContact) ? "Atrasado: " : ""}
-                {scheduledContact.channel === "whatsapp" ? "WhatsApp" : "Ligar"}
-                {" em "}
-                {new Date(
-                  scheduledContact.scheduledDate + "T00:00:00",
-                ).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
-                {scheduledContact.scheduledTime
-                  ? ` às ${formatHorario(scheduledContact.scheduledTime)}`
-                  : ""}
+                {agendadoRotulo}
               </span>
             )}
-            {lastContact?.efetivo?.nextActionDate &&
-              (() => {
-                // Retorno de acordo ("Acordo criado") e a proxima parcela do
-                // acordo, nao uma promessa. Data passada com o cliente sem
-                // nada vencido = cumprida: cinza, nao vermelho (2026-11-12;
-                // mesma regra de "Marcados para hoje").
-                const retorno = lastContact.efetivo.nextActionDate;
-                const deAcordo = lastContact.efetivo.result === "agreement";
-                const passou = retorno < todayLocalStr();
-                const cumprida = passou && emDia;
-                const dataCurta = new Date(retorno + "T00:00:00").toLocaleDateString(
-                  "pt-BR",
-                  { day: "2-digit", month: "2-digit" },
-                );
-                const rotulo = deAcordo
-                  ? cumprida
-                    ? `Parcela do acordo de ${dataCurta} — em dia`
-                    : passou
-                      ? `Parcela do acordo venceu ${dataCurta}`
-                      : `Parcela do acordo em ${dataCurta}`
-                  : cumprida
-                    ? `Promessa de ${dataCurta} — em dia`
-                    : passou
-                      ? `Promessa venceu ${dataCurta}`
-                      : `Prometeu pagar ${dataCurta}`;
-                return (
-                  <span
-                    className={`inline-flex items-center gap-1 w-fit px-2 py-1 rounded-full text-[10px] font-bold border whitespace-nowrap ${
-                      cumprida
-                        ? "bg-gray-50 text-gray-500 border-gray-200 dark:bg-dark-bg-tertiary dark:border-dark-border dark:text-dark-text-secondary"
-                        : passou
-                          ? "bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400"
-                          : "bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-300"
-                    }`}
-                    title={
-                      deAcordo
-                        ? "Vencimento da próxima parcela do acordo"
-                        : "Data em que o cliente prometeu pagar"
-                    }
-                  >
-                    <Clock className="w-3 h-3" />
-                    {rotulo}
-                  </span>
-                );
-              })()}
+            {retornoInfo && (
+              <span
+                className={`inline-flex items-center gap-1 w-fit px-2 py-1 rounded-full text-[10px] font-bold border whitespace-nowrap ${
+                  retornoInfo.cumprida
+                    ? "bg-gray-50 text-gray-500 border-gray-200 dark:bg-dark-bg-tertiary dark:border-dark-border dark:text-dark-text-secondary"
+                    : retornoInfo.passou
+                      ? "bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400"
+                      : "bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-300"
+                }`}
+                title={retornoInfo.dica}
+              >
+                <Clock className="w-3 h-3" />
+                {retornoInfo.rotulo}
+              </span>
+            )}
           </div>
         ) : (
           <span className="text-xs text-gray-300 italic">—</span>
@@ -2181,63 +2559,7 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
         )}
       </td>
     </tr>
-    {showPhoneModal &&
-      phoneValue &&
-      createPortal(
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[100]"
-          onClick={fecharTelefone}
-        >
-          <div
-            className="bg-white dark:bg-dark-bg rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden border border-gray-200 dark:border-dark-border"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-5 py-4 border-b border-gray-100 dark:border-dark-border flex items-center justify-between bg-gray-50 dark:bg-dark-bg-secondary">
-              <h3 className="font-bold text-gray-900 dark:text-dark-text">
-                {group.client}
-              </h3>
-              <button
-                onClick={fecharTelefone}
-                className="p-1.5 hover:bg-gray-200 dark:hover:bg-dark-bg-tertiary rounded-full transition-colors"
-              >
-                <X className="w-4 h-4 text-gray-500" />
-              </button>
-            </div>
-            <div className="p-5 space-y-4">
-              <p className="text-2xl font-bold text-gray-900 dark:text-dark-text text-center">
-                {phoneValue}
-              </p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    usouTelefone.current = true;
-                    copyDocument(phoneValue);
-                  }}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-dark-bg-secondary text-gray-700 dark:text-dark-text font-bold text-sm rounded-xl hover:bg-gray-200 dark:hover:bg-dark-bg-tertiary transition-colors"
-                >
-                  {copiedDoc === phoneValue ? (
-                    <Check className="w-4 h-4 text-green-600" />
-                  ) : (
-                    <Copy className="w-4 h-4" />
-                  )}
-                  {copiedDoc === phoneValue ? "Copiado!" : "Copiar"}
-                </button>
-                <button
-                  onClick={() => {
-                    usouTelefone.current = true;
-                    handleCall(group);
-                  }}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white font-bold text-sm rounded-xl hover:bg-indigo-700 transition-colors"
-                >
-                  <Phone className="w-4 h-4" />
-                  Ligar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>,
-        document.body,
-      )}
+    {phoneModal}
     </>
   );
 };
@@ -2398,7 +2720,7 @@ const CarteiraChips: React.FC<CarteiraChipsProps> = ({
   }, [valor, todosKey, visiveis, onChange]);
   if (visiveis.length === 0) return null;
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-x-1 gap-y-1 text-xs">
+    <div className="mt-2 -mx-4 px-4 md:mx-0 md:px-0 flex flex-nowrap md:flex-wrap items-center gap-x-1 gap-y-1 text-xs overflow-x-auto md:overflow-visible whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {[{ key: todosKey, label: todosLabel, count: total }, ...visiveis].map(
         (o, i) => (
           <React.Fragment key={o.key}>
@@ -2411,7 +2733,7 @@ const CarteiraChips: React.FC<CarteiraChipsProps> = ({
               type="button"
               onClick={() => onChange(o.key)}
               title={o.key === todosKey ? todosHint : undefined}
-              className={`px-1.5 py-0.5 rounded-md transition-colors ${
+              className={`shrink-0 px-1.5 py-0.5 rounded-md transition-colors ${
                 valor === o.key
                   ? "font-bold text-gray-900 dark:text-dark-text bg-gray-100 dark:bg-dark-bg-tertiary"
                   : "text-gray-500 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
@@ -2423,6 +2745,51 @@ const CarteiraChips: React.FC<CarteiraChipsProps> = ({
           </React.Fragment>
         ),
       )}
+    </div>
+  );
+};
+
+/** Paginacao das listas da carteira: no celular so as setas, no
+ * computador com "Anterior"/"Proxima". */
+const Paginacao: React.FC<{
+  page: number;
+  totalPages: number;
+  mostrando: number;
+  total: number;
+  onChange: (page: number) => void;
+}> = ({ page, totalPages, mostrando, total, onChange }) => {
+  const botao =
+    "inline-flex items-center gap-1 h-8 px-2 sm:px-3 text-xs font-bold text-gray-600 dark:text-dark-text-secondary bg-white dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-lg hover:bg-gray-50 dark:hover:bg-dark-bg-secondary disabled:opacity-40";
+  return (
+    <div className="px-4 py-3 border-t border-gray-100 dark:border-dark-border flex items-center justify-between gap-2 bg-gray-50/30 dark:bg-dark-bg-secondary/30">
+      <p className="text-xs text-gray-500">
+        {mostrando} de {total}
+      </p>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => onChange(Math.max(1, page - 1))}
+          disabled={page === 1}
+          className={botao}
+          aria-label="Página anterior"
+        >
+          <ChevronLeft className="w-4 h-4" />
+          <span className="hidden sm:inline">Anterior</span>
+        </button>
+        <span className="text-xs text-gray-500 tabular-nums">
+          <span className="font-bold text-gray-900 dark:text-dark-text">{page}</span>
+          {" / "}
+          {totalPages}
+        </span>
+        <button
+          onClick={() => onChange(Math.min(totalPages, page + 1))}
+          disabled={page === totalPages}
+          className={botao}
+          aria-label="Próxima página"
+        >
+          <span className="hidden sm:inline">Próxima</span>
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
     </div>
   );
 };
@@ -2487,8 +2854,8 @@ const AgendaSection: React.FC<AgendaSectionProps> = ({
   }, [groups]);
 
   const cabecalho = titulo ? (
-    <div className="px-6 pt-4 pb-2">
-      <h3 className="font-bold text-gray-900 dark:text-dark-text">{titulo}</h3>
+    <div className="px-4 md:px-6 pt-3 md:pt-4 pb-2">
+      <h3 className="font-bold text-sm md:text-base text-gray-900 dark:text-dark-text">{titulo}</h3>
       {subtitulo && (
         <p className="text-xs text-gray-500 dark:text-dark-text-secondary mt-0.5">
           {subtitulo}
@@ -2522,64 +2889,54 @@ const AgendaSection: React.FC<AgendaSectionProps> = ({
       className={`bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border border-l-4 ${accentBorderClass} shadow-sm overflow-hidden`}
     >
       {cabecalho}
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <WalletTableHead sortKey={null} sortDir="desc" />
-          <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
-            {visible.map((group) => (
-              <ClientQueueRow
-                key={group.clientId}
-                group={group}
-                lastContact={lastContacts[group.document]}
-                acordoAtivo={!!getAcordoAtivoDoCliente(group.document)}
-                copiedDoc={copiedDoc}
-                copyDocument={copyDocument}
-                user={user}
-                onOpenDetail={onOpenDetail}
-                onOpenLog={onOpenLog}
-                onOpenAcordo={onOpenAcordo}
-                urgenteInfo={urgenteInfoByDocument.get(group.document)}
-                scheduledContact={scheduledContactByDocument.get(group.document)}
-                aposContato={aposContato}
-                adiamento={adiamentos?.get(group.document)}
-                espera={esperaFila?.get(group.document)}
-                onAdiar={onAdiar}
-              />
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {totalPages > 1 && (
-        <div className="p-3 border-t border-gray-100 dark:border-dark-border flex items-center justify-between bg-gray-50/30 dark:bg-dark-bg-secondary/30">
-          <p className="text-xs text-gray-500">
-            Mostrando {visible.length} de {groups.length}
-          </p>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-              disabled={page === 1}
-              className="px-3 py-1.5 text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40"
-            >
-              Anterior
-            </button>
-            <div className="flex items-center gap-1">
-              <span className="w-7 h-7 flex items-center justify-center bg-indigo-600 text-white rounded-lg text-xs font-bold">
-                {page}
-              </span>
-              <span className="text-xs text-gray-400 px-1">de</span>
-              <span className="text-xs text-gray-600 dark:text-dark-text font-bold">
-                {totalPages}
-              </span>
-            </div>
-            <button
-              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-              disabled={page === totalPages}
-              className="px-3 py-1.5 text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40"
-            >
-              Próxima
-            </button>
+      {(["card", "row"] as const).map((layout) => {
+        const linhas = visible.map((group) => (
+          <ClientQueueRow
+            key={group.clientId}
+            layout={layout}
+            group={group}
+            lastContact={lastContacts[group.document]}
+            acordoAtivo={!!getAcordoAtivoDoCliente(group.document)}
+            copiedDoc={copiedDoc}
+            copyDocument={copyDocument}
+            user={user}
+            onOpenDetail={onOpenDetail}
+            onOpenLog={onOpenLog}
+            onOpenAcordo={onOpenAcordo}
+            urgenteInfo={urgenteInfoByDocument.get(group.document)}
+            scheduledContact={scheduledContactByDocument.get(group.document)}
+            aposContato={aposContato}
+            adiamento={adiamentos?.get(group.document)}
+            espera={esperaFila?.get(group.document)}
+            onAdiar={onAdiar}
+          />
+        ));
+        return layout === "card" ? (
+          <div
+            key="card"
+            className="md:hidden divide-y divide-gray-100 dark:divide-dark-border border-t border-gray-100 dark:border-dark-border"
+          >
+            {linhas}
           </div>
-        </div>
+        ) : (
+          <div key="row" className="hidden md:block overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <WalletTableHead sortKey={null} sortDir="desc" />
+              <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
+                {linhas}
+              </tbody>
+            </table>
+          </div>
+        );
+      })}
+      {totalPages > 1 && (
+        <Paginacao
+          page={page}
+          totalPages={totalPages}
+          mostrando={visible.length}
+          total={groups.length}
+          onChange={setPage}
+        />
       )}
     </div>
   );

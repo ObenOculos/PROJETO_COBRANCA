@@ -105,11 +105,22 @@ const MeuDesempenho: React.FC<Props> = ({
   const hoje = todayLocalStr();
   const inicioMes = `${hoje.slice(0, 7)}-01`;
 
+  // Sem escolha salva: aberto no computador, recolhido no celular (a fila
+  // aparece de cara; 2026-11-19). Depois vale o que o cobrador escolheu.
   const [aberto, setAberto] = useState(() => {
+    const celular = (() => {
+      try {
+        return window.matchMedia("(max-width: 767px)").matches;
+      } catch {
+        return false;
+      }
+    })();
     try {
-      return localStorage.getItem("meu_desempenho_aberto") !== "0";
+      const salvo = localStorage.getItem("meu_desempenho_aberto");
+      if (salvo === null) return !celular;
+      return salvo !== "0";
     } catch {
-      return true;
+      return !celular;
     }
   });
   const alternar = () =>
@@ -121,6 +132,26 @@ const MeuDesempenho: React.FC<Props> = ({
       }
       return !v;
     });
+
+  // Slides do celular: qual card esta visivel (pontinhos abaixo).
+  const TOTAL_SLIDES = 4;
+  const slidesRef = useRef<HTMLDivElement>(null);
+  const [slideAtual, setSlideAtual] = useState(0);
+  const aoRolarSlides = () => {
+    const el = slidesRef.current;
+    const primeiro = el?.firstElementChild as HTMLElement | null;
+    if (!el || !primeiro) return;
+    const passo = primeiro.offsetWidth + 8; // gap-2
+    setSlideAtual(
+      Math.min(TOTAL_SLIDES - 1, Math.max(0, Math.round(el.scrollLeft / passo))),
+    );
+  };
+  const irParaSlide = (i: number) => {
+    const el = slidesRef.current;
+    const primeiro = el?.firstElementChild as HTMLElement | null;
+    if (!el || !primeiro) return;
+    el.scrollTo({ left: i * (primeiro.offsetWidth + 8), behavior: "smooth" });
+  };
 
   const [janela, setJanela] = useState<JanelaDesempenho | null>("mes");
   const ontem = useMemo(() => addDaysLocalStr(hoje, -1), [hoje]);
@@ -364,7 +395,14 @@ const MeuDesempenho: React.FC<Props> = ({
       </div>
 
       {aberto && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
+        <>
+        {/* Celular: slides que arrastam para o lado (um card por vez, o
+            proximo aparecendo na borda); a partir de sm, grade normal. */}
+        <div
+          ref={slidesRef}
+          onScroll={aoRolarSlides}
+          className="-mx-4 px-4 flex gap-2 overflow-x-auto snap-x snap-mandatory scroll-px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:w-[85%] [&>*]:shrink-0 [&>*]:snap-start sm:mx-0 sm:px-0 sm:grid sm:grid-cols-2 xl:grid-cols-4 sm:overflow-visible sm:[&>*]:w-auto"
+        >
           <SummaryCard
             compact
             icon={Gauge}
@@ -403,7 +441,7 @@ const MeuDesempenho: React.FC<Props> = ({
                   </button>
                 </div>
                 {calendarioAberto && (
-                  <div className="absolute right-0 mt-1 z-30 w-52 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg-secondary shadow-lg p-2">
+                  <div className="relative sm:absolute sm:right-0 mt-1 z-30 w-52 max-w-full rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg-secondary shadow-lg p-2">
                     <div className="grid grid-cols-7 gap-0.5 text-center text-[9px] text-gray-400 dark:text-dark-text-secondary mb-1">
                       {DIAS_SEMANA.map((d, i) => (
                         <span key={i}>{d}</span>
@@ -562,6 +600,22 @@ const MeuDesempenho: React.FC<Props> = ({
             ]}
           />
         </div>
+        <div className="sm:hidden flex justify-center gap-1.5 pt-0.5">
+          {Array.from({ length: TOTAL_SLIDES }, (_, i) => (
+            <button
+              key={i}
+              type="button"
+              aria-label={`Ir para o card ${i + 1}`}
+              onClick={() => irParaSlide(i)}
+              className={`h-1.5 rounded-full transition-all ${
+                i === slideAtual
+                  ? "w-4 bg-blue-600 dark:bg-blue-400"
+                  : "w-1.5 bg-gray-300 dark:bg-dark-border"
+              }`}
+            />
+          ))}
+        </div>
+        </>
       )}
     </div>
   );
