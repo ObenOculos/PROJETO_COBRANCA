@@ -16,6 +16,25 @@ export const LIMITE_REMARCACOES = 3;
 /** A partir de quantas tentativas sem retorno o cobrador e avisado. */
 export const LIMITE_TENTATIVAS_SEM_RETORNO = 5;
 
+/**
+ * Escada da Fila de Cobranca (2026-11-19, decisao do usuario): dias de
+ * espera depois da ultima tentativa sem retorno, pela quantidade de
+ * tentativas (1a, 2a, 3a, 4a). Na LIMITE_TENTATIVAS_SEM_RETORNO-esima o
+ * cliente vai para o limbo do gestor. Espelho em SQL:
+ * fila_espera_cobrador (migration 20261119000003). Mudou aqui, mude la.
+ */
+export const ESCADA_SEM_RETORNO_DIAS: readonly number[] = [15, 15, 30, 30];
+
+/** Texto do selo da fila: por que o cliente voltou / onde esta. */
+export const textoEsperaFila = (
+  tentativas: number,
+  diasDesdeUltima: number,
+  emLimbo: boolean,
+): string =>
+  emLimbo
+    ? `Aguardando o gestor: ${tentativas} tentativas sem retorno`
+    : `${tentativas}ª tentativa sem retorno · última há ${diasDesdeUltima} ${diasDesdeUltima === 1 ? "dia" : "dias"}`;
+
 /** Tentativas em que o cliente nao respondeu. "Mensagem enviada" entra aqui
  * (cliente nao respondeu) mesmo contando como atendimento nas metricas
  * (EFFECTIVE_ATTEMPT_RESULTS, item 81). Mesma lista do SQL

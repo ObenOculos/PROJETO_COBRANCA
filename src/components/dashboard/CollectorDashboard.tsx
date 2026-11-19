@@ -93,6 +93,8 @@ import {
   turnoDaFila,
 } from "../../filters/filaCobranca";
 import { AdiamentoDoDia, useFilaAdiamentos } from "../../hooks/useFilaAdiamentos";
+import { EsperaFila, useFilaEspera } from "../../hooks/useFilaEspera";
+import { textoEsperaFila } from "../../config/reincidencia";
 import { useFilaLote } from "../../hooks/useFilaLote";
 import { comRetentativa } from "../../utils/supabaseRetry";
 
@@ -117,6 +119,21 @@ import {
   addDaysLocalStr,
   isVisitOverdue,
 } from "../../config/visitStatus";
+
+/** Dias de calendario entre duas datas YYYY-MM-DD (b - a). */
+const diasEntre = (a: string, b: string): number => {
+  const [ya, ma, da] = a.split("-").map(Number);
+  const [yb, mb, db] = b.split("-").map(Number);
+  return Math.round((Date.UTC(yb, mb - 1, db) - Date.UTC(ya, ma - 1, da)) / 86400000);
+};
+
+/** Selo da escada da fila (por que o cliente voltou / limbo do gestor). */
+const seloEspera = (e: EsperaFila): string =>
+  textoEsperaFila(
+    e.tentativas,
+    Math.max(0, diasEntre(e.ultimaTentativa, todayLocalStr())),
+    e.emLimbo,
+  );
 
 const toDate = (dateInput: string | Date | null | undefined): Date | null => {
   if (!dateInput) return null;
@@ -336,6 +353,12 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     adiar,
     carregado: adiamentosCarregados,
   } = useFilaAdiamentos(user?.id);
+  // Escada da fila (2026-11-19): cliente sem retorno volta em 15/15/30/30
+  // dias e, na 5a tentativa, vai para o limbo do gestor.
+  const { espera: esperaFila, carregado: esperaCarregada } = useFilaEspera(
+    user?.id,
+    versaoRegistros,
+  );
   const [turnoFila, setTurnoFila] = useState<TurnoFila>(() => turnoDaFila());
   useEffect(() => {
     const t = window.setInterval(() => setTurnoFila(turnoDaFila()), 60_000);
@@ -948,7 +971,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   // Quem pode entrar no PROXIMO lote: deve algo vencido (montarLoteFila
   // confere), sem compromisso marcado (hoje ou futuro), sem contato efetivo
   // nos ultimos SEM_CONTATO_DIAS dias, nao tentado nem deixado para depois
-  // hoje.
+  // hoje, fora da espera da escada sem retorno e fora do limbo do gestor.
   const candidatosLote = useMemo(
     () =>
       openClientGroups.filter((g) => {
@@ -962,6 +985,9 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
         if (interacaoDoCliente(doc) !== "sem") return false;
         if (tentouHojeSemSucesso(doc)) return false;
         if (adiamentos.has(doc)) return false;
+        const espera = esperaFila.get(doc);
+        if (espera?.emLimbo) return false;
+        if (espera?.voltaEm && espera.voltaEm > today) return false;
         return true;
       }),
     [
@@ -973,6 +999,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       interacaoDoCliente,
       tentouHojeSemSucesso,
       adiamentos,
+      esperaFila,
     ],
   );
 
@@ -988,6 +1015,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     !carregandoTitulos &&
     attemptsCarregados &&
     adiamentosCarregados &&
+    esperaCarregada &&
     loteCarregado;
 
   // Registro novo (Atender, depois, pagamento...): rele a situacao do lote.
@@ -1438,7 +1466,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
               accentBorderClass="border-l-indigo-400 dark:border-l-indigo-600"
               groups={lotePendentes}
               pageSize={lotePendentes.length || 10}
-              emptyMessage={`Nenhum cliente na fila agora: os clientes das faixas definidas pela gestão já foram contatados nos últimos ${SEM_CONTATO_DIAS} dias, tentados ou deixados para depois hoje. Consulte a Carteira completa.`}
+              emptyMessage={`Nenhum cliente na fila agora: os clientes das faixas definidas pela gestão já foram contatados nos últimos ${SEM_CONTATO_DIAS} dias, tentados ou deixados para depois hoje, estão esperando a próxima tentativa (15 ou 30 dias sem retorno) ou com o gestor. Consulte a Carteira completa.`}
               lastContacts={lastContacts}
               getAcordoAtivoDoCliente={getAcordoAtivoDoCliente}
               copiedDoc={copiedDoc}
@@ -1451,6 +1479,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
               scheduledContactByDocument={scheduledContactByDocument}
               aposContato={aposContato}
               adiamentos={adiamentos}
+              esperaFila={esperaFila}
               onAdiar={setAdiandoGroup}
             />
           )}
@@ -1472,6 +1501,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
               scheduledContactByDocument={scheduledContactByDocument}
               aposContato={aposContato}
               adiamentos={adiamentos}
+              esperaFila={esperaFila}
             />
           )}
           {adiandoGroup && (
@@ -1677,6 +1707,8 @@ interface ClientQueueRowProps {
   scheduledContact?: ScheduledVisit;
   /** Fila de Cobranca: deixado para depois hoje (selo). */
   adiamento?: AdiamentoDoDia;
+  /** Escada sem retorno da fila: selo com a tentativa ou o limbo. */
+  espera?: EsperaFila;
   /** Presente so no lote da fila: mostra o botao "Depois". */
   onAdiar?: (group: ClientGroup) => void;
   /** Cliente quitado (Carteira completa): dia da quitacao, ou null se o
@@ -1706,6 +1738,7 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
   scheduledContact,
   aposContato,
   adiamento,
+  espera,
   onAdiar,
   quitadoEm,
   contatosNaoCarregados,
@@ -1870,6 +1903,24 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
               title={adiamento.observacao ?? undefined}
             >
               Deixado para depois: {MOTIVO_ADIAMENTO_SELO[adiamento.motivo]}
+            </span>
+          )}
+          {espera && quitadoEm === undefined && (
+            <span
+              className={`w-fit px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                espera.emLimbo
+                  ? "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800"
+                  : "bg-slate-50 text-slate-600 border-slate-200 dark:bg-dark-bg-tertiary dark:text-dark-text-secondary dark:border-dark-border"
+              }`}
+              title={
+                espera.emLimbo
+                  ? "Saiu da sua fila. O gestor decide: SPC ou volta para você cobrar."
+                  : espera.voltaEm
+                    ? `Sem retorno: volta à fila em ${espera.voltaEm.split("-").reverse().join("/")}`
+                    : undefined
+              }
+            >
+              {seloEspera(espera)}
             </span>
           )}
         </div>
@@ -2398,6 +2449,8 @@ interface AgendaSectionProps {
   scheduledContactByDocument: Map<string, ScheduledVisit>;
   /** Fila de Cobranca: deixados para depois hoje (selo na linha). */
   adiamentos?: Map<string, AdiamentoDoDia>;
+  /** Escada sem retorno (selo "2a tentativa..." / "Aguardando o gestor"). */
+  esperaFila?: Map<string, EsperaFila>;
   /** So no lote da fila: botao "Depois" na linha. */
   onAdiar?: (group: ClientGroup) => void;
 }
@@ -2425,6 +2478,7 @@ const AgendaSection: React.FC<AgendaSectionProps> = ({
   scheduledContactByDocument,
   aposContato,
   adiamentos,
+  esperaFila,
   onAdiar,
 }) => {
   const [page, setPage] = useState(1);
@@ -2488,6 +2542,7 @@ const AgendaSection: React.FC<AgendaSectionProps> = ({
                 scheduledContact={scheduledContactByDocument.get(group.document)}
                 aposContato={aposContato}
                 adiamento={adiamentos?.get(group.document)}
+                espera={esperaFila?.get(group.document)}
                 onAdiar={onAdiar}
               />
             ))}

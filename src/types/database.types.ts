@@ -2935,6 +2935,16 @@ export type Database = {
         };
         Returns: boolean;
       };
+      fila_espera_cobrador: {
+        Args: { p_collector?: string | null };
+        Returns: {
+          documento: string;
+          tentativas: number;
+          ultima_tentativa: string;
+          volta_em: string | null;
+          em_limbo: boolean;
+        }[];
+      };
       fila_item_finalizado: {
         Args: { p_collector: string; p_desde: string; p_documento: string };
         Returns: boolean;
