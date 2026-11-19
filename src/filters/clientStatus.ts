@@ -4,6 +4,7 @@
 // helpers devem ser reutilizados por todas as telas que classificam clientes.
 import { Collection, ClientGroup, SaleGroup } from "../types";
 import { calculateOverdueDays } from "../utils/formatters";
+import { toYYYYMMDD } from "./dates";
 
 export type ClientPaymentStatus = "pago" | "parcial" | "pendente";
 
@@ -91,6 +92,37 @@ export const hasInstallmentBalance = (
   hasOpenBalance(
     (c.valor_original || 0) - (c.valor_recebido || 0) - (c.desconto || 0),
   );
+
+/**
+ * Parcela com saldo, recortada por vencimento (de..ate, YYYY-MM-DD; vazio =
+ * sem limite daquele lado). Fonte unica do Resumo por Cobrador e do card
+ * Valores da Atribuicao de Cobradores com filtro de vencimento -- antes cada
+ * tela recortava de um jeito e os numeros do mesmo mes nao batiam
+ * (2026-11-19). null = parcela sem saldo (nao entra em nenhum total).
+ *
+ * data_vencimento vem de BANCO_DADOS (coluna text, DD/MM/YYYY misturado com
+ * YYYY-MM-DD): passa por toYYYYMMDD, nunca compara a string crua.
+ * "Vencida" e a mesma regra de toda a carteira (calculateOverdueDays > 0).
+ */
+export const parcelaNoPeriodo = (
+  c: Pick<
+    Collection,
+    "valor_original" | "valor_recebido" | "desconto" | "data_vencimento"
+  >,
+  de: string,
+  ate: string,
+): { saldo: number; noPeriodo: boolean; vencida: boolean } | null => {
+  if (!hasInstallmentBalance(c)) return null;
+  const saldo =
+    (c.valor_original || 0) - (c.valor_recebido || 0) - (c.desconto || 0);
+  const venc = toYYYYMMDD(c.data_vencimento);
+  const noPeriodo = !!venc && (!de || venc >= de) && (!ate || venc <= ate);
+  return {
+    saldo,
+    noPeriodo,
+    vencida: calculateOverdueDays(c.data_vencimento) > 0,
+  };
+};
 
 /**
  * Quantos dias o cliente que quitou continua visivel na Carteira completa do

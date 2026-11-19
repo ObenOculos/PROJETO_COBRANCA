@@ -7,7 +7,11 @@
 // fazia antes desta extracao.
 import { Collection } from "../types";
 import { parseAndNormalizeDate, toYYYYMMDD } from "./dates";
-import { getClientPaymentStatus, normalizePaymentStatus } from "./clientStatus";
+import {
+  getClientPaymentStatus,
+  hasInstallmentBalance,
+  normalizePaymentStatus,
+} from "./clientStatus";
 import { NOT_SCHEDULED_FILTER_VALUE } from "../config/visitStatus";
 import { documentoCombina } from "./documento";
 
@@ -175,10 +179,25 @@ const matchesDueRange = (
   // Datas de filtro invalidas -> nao restringe (inclui todos).
   if ((filters.dueFrom && !fromDate) || (filters.dueTo && !toDate)) return true;
 
+  // So parcela EM ABERTO conta para o vencimento (2026-11-19): antes o filtro
+  // "vence em novembro" trazia cliente cuja parcela de novembro ja estava
+  // paga, e a Atribuicao nao batia com o Resumo por Cobrador. Excecao: quem
+  // pediu o status "Pago" quer ver o que ja foi pago, entao a parcela quitada
+  // continua valendo.
+  const statuses = Array.isArray(filters.paymentStatus)
+    ? filters.paymentStatus
+    : filters.paymentStatus
+      ? [filters.paymentStatus]
+      : [];
+  const incluiQuitadas = statuses.some(
+    (s) => normalizePaymentStatus(s) === "pago",
+  );
+
   let hasValidDate = false;
   let hasDateInRange = false;
 
   for (const collection of client.collections) {
+    if (!incluiQuitadas && !hasInstallmentBalance(collection)) continue;
     const dueDate = parseAndNormalizeDate(collection.data_vencimento);
     if (!dueDate) continue;
 

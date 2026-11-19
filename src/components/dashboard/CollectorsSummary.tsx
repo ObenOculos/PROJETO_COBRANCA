@@ -1,4 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  PERIODO_PRESETS,
+  PeriodoPreset,
+  fimDoMes,
+  inicioDoMes,
+  periodoDoPreset,
+} from "../../filters/periodo";
 import { buscarComCacheTela, lerCacheTela } from "../../utils/cacheTela";
 import {
   ClipboardList,
@@ -36,6 +43,7 @@ import {
   clientMaxOverdueDays,
   clientReferenceStore,
   collectionsBalanceSplit,
+  parcelaNoPeriodo,
 } from "../../filters/clientStatus";
 import {
   diasAteSairDasRegras,
@@ -44,8 +52,7 @@ import {
 import { supabase } from "../../lib/supabase";
 import { inadimplenciaDe, formatarInadimplencia } from "../../filters/inadimplencia";
 import { Collection, CollectorOverdueRange, SaleGroup } from "../../types";
-import { toYYYYMMDD } from "../../filters/dates";
-import { formatCurrency, calculateOverdueDays } from "../../utils/formatters";
+import { formatCurrency } from "../../utils/formatters";
 import ContactScheduler from "./ContactScheduler";
 import CollectorPerformanceModal from "./CollectorPerformanceModal";
 import VisitScheduler from "./VisitScheduler";
@@ -101,7 +108,7 @@ interface CollectorRow {
   reincidentes: ReincidenteCliente[];
 }
 
-type PresetKey = "month-atual" | "today" | "week" | "month30" | "all";
+type PresetKey = PeriodoPreset;
 
 // Chaves pelas quais a tabela/cards podem ser ordenados (clicando no titulo
 // da coluna). "reincidentesQtd" nao e campo direto de CollectorRow (e o
@@ -141,14 +148,6 @@ const SORT_GETTERS: Record<SortKey, (row: CollectorRow) => number | string> =
     reincidentesQtd: (r) => r.reincidentes.length,
   };
 
-// Sentinelas para "Tudo": faixa larga o bastante pra cobrir qualquer registro
-// real sem precisar de um caso especial "sem filtro" nas comparacoes de string.
-const ALL_TIME_FROM = "2000-01-01";
-// 9999 e nao 2099: o ERP tem vencimento digitado errado (ex.: ano 2245), e
-// com teto menor "Tudo" deixava a parcela fora de "Vence no periodo" mas
-// dentro de "A vencer" -- os dois nao batiam.
-const ALL_TIME_TO = "9999-12-31";
-
 // Segmentacao tonal: Financeiro (parcelas de BANCO_DADOS) sempre no cinza mais
 // claro, Agenda (scheduledVisits) no cinza um pouco mais escuro — mesma dupla
 // de tons em todo lugar que separa os dois dominios (totais, cards, tabela),
@@ -159,34 +158,8 @@ const TONE_AGENDA = "bg-gray-100/80 dark:bg-white/[0.07]";
 // independente de ter havido agendamento antes.
 const TONE_ATENDIMENTO = "bg-indigo-50/70 dark:bg-indigo-900/10";
 
-// Atalhos do filtro de periodo. "Mes atual" e o padrao pedido pelo gestor —
-// cobre a pergunta mais comum sem exigir configuracao. "Tudo" remove o filtro
-// de periodo pra mostrar o total geral, sem recorte de data.
-const RANGE_PRESETS: { key: PresetKey; label: string }[] = [
-  { key: "month-atual", label: "Mês atual" },
-  { key: "today", label: "Hoje" },
-  { key: "week", label: "7 dias" },
-  { key: "month30", label: "30 dias" },
-  { key: "all", label: "Tudo" },
-];
-
-const addDaysStr = (base: string, days: number): string => {
-  const [y, m, d] = base.split("-").map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  dt.setUTCDate(dt.getUTCDate() + days);
-  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
-};
-
-/** Primeiro dia do mes de uma data YYYY-MM-DD. */
-const monthStart = (base: string): string => `${base.slice(0, 7)}-01`;
-
-/** Ultimo dia do mes de uma data YYYY-MM-DD. Usa so getters UTC (ver CLAUDE.md
- * sobre nao misturar data local/UTC). */
-const monthEnd = (base: string): string => {
-  const [y, m] = base.split("-").map(Number);
-  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  return `${y}-${String(m).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-};
+// Atalhos do filtro de periodo: fonte unica em filters/periodo (os mesmos da
+// Atribuicao de Cobradores). "Mes atual" e o padrao pedido pelo gestor.
 
 /** dd/mm/aaaa a partir de uma string YYYY-MM-DD, sem passar por Date (ver CLAUDE.md). */
 const toBr = (iso: string): string => {
@@ -305,8 +278,8 @@ const CollectorsSummary: React.FC = () => {
   const { user: currentUser } = useAuth();
 
   const today = todayLocalStr();
-  const [dateFrom, setDateFrom] = useState(monthStart(today));
-  const [dateTo, setDateTo] = useState(monthEnd(today));
+  const [dateFrom, setDateFrom] = useState(inicioDoMes(today));
+  const [dateTo, setDateTo] = useState(fimDoMes(today));
 
   // Item 66, etapa 3: pagamento que o cliente fez na loja/banco, atribuido ao
   // cobrador (pedido dele ou excecao do gestor), credita no "Recebido no
@@ -455,23 +428,9 @@ const CollectorsSummary: React.FC = () => {
 
   const applyPreset = (key: PresetKey) => {
     setActivePreset(key);
-    if (key === "month-atual") {
-      setDateFrom(monthStart(today));
-      setDateTo(monthEnd(today));
-      return;
-    }
-    if (key === "all") {
-      setDateFrom(ALL_TIME_FROM);
-      setDateTo(ALL_TIME_TO);
-      return;
-    }
-    const daysByKey: Record<"today" | "week" | "month30", number> = {
-      today: 0,
-      week: 7,
-      month30: 30,
-    };
-    setDateFrom(today);
-    setDateTo(addDaysStr(today, daysByKey[key]));
+    const { de, ate } = periodoDoPreset(key, today);
+    setDateFrom(de);
+    setDateTo(ate);
   };
 
   const inPeriod = (dateStr: string | undefined | null): boolean =>
@@ -574,20 +533,11 @@ const CollectorsSummary: React.FC = () => {
         let aReceberValor = 0;
 
         myCollections.forEach((c) => {
-          if (!hasInstallmentBalance(c)) return;
-          const saldo =
-            (c.valor_original || 0) -
-            (c.valor_recebido || 0) -
-            (c.desconto || 0);
-
-          // data_vencimento vem de BANCO_DADOS (coluna text; ~29% das linhas
-          // em DD/MM/YYYY misturado com YYYY-MM-DD, ver filters/dates.ts) —
-          // nunca comparar a string crua com today/dateFrom/dateTo (CLAUDE.md).
-          const venc = toYYYYMMDD(c.data_vencimento);
-          const noPeriodo = !!venc && venc >= dateFrom && venc <= dateTo;
-          // Mesma regra de "vencido" usada em CollectorDashboard/CollectionTable/
-          // EnhancedStoreManagement (calculateOverdueDays > 0).
-          const vencida = calculateOverdueDays(c.data_vencimento) > 0;
+          // Saldo, vencida e "vence no periodo": mesma regra do card Valores
+          // da Atribuicao de Cobradores (filters/clientStatus).
+          const parcela = parcelaNoPeriodo(c, dateFrom, dateTo);
+          if (!parcela) return;
+          const { saldo, noPeriodo, vencida } = parcela;
 
           if (vencida) {
             // Pedido do usuario (2026-11-17): a coluna/card "Carteira" passa a
@@ -1122,7 +1072,7 @@ const CollectorsSummary: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {RANGE_PRESETS.map((preset) => (
+          {PERIODO_PRESETS.map((preset) => (
             <button
               key={preset.key}
               onClick={() => applyPreset(preset.key)}

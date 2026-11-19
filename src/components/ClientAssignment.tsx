@@ -33,11 +33,18 @@ import { countVendas, resolveSaleKey } from "../filters/sales";
 import {
   getClientPending,
   collectionsBalanceSplit,
+  parcelaNoPeriodo,
 } from "../filters/clientStatus";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { razaoSocialDistinta } from "../utils/clienteNome";
 import { abrirWhatsApp } from "../utils/whatsapp";
-import { parseAndNormalizeDate } from "../filters/dates";
+import { parseAndNormalizeDate, toYYYYMMDD } from "../filters/dates";
+import {
+  PERIODO_PRESETS,
+  PeriodoPreset,
+  periodoDoPreset,
+  presetDoPeriodo,
+} from "../filters/periodo";
 import { clientMatchesFilters, ClientFilters } from "../filters/predicates";
 import { computeClientFacets } from "../filters/facets";
 import FilterPanel from "./filters/FilterPanel";
@@ -192,6 +199,9 @@ const getSituacaoIndicator = (collections: Collection[]) => {
 // Conta a quantidade de vendas distintas de um cliente.
 // Parcelas sem venda_n são renegociadas e contam como UMA única venda
 // (mesma regra usada em getSalesByClient/getClientGroups no contexto).
+/** Atalhos de vencimento da Atribuicao: os do Resumo por Cobrador, sem "Tudo". */
+const PRESETS_VENCIMENTO = PERIODO_PRESETS.filter((p) => p.key !== "all");
+
 interface ClientAssignmentProps {
   onViewClient?: (clientIdentifier: string) => void;
   /** Filtro de cobrador inicial (ex.: clique na notificacao "sem cobrador"). */
@@ -297,6 +307,16 @@ export const ClientAssignment = React.memo(
     // fonte unica — nao ha estado proprio de "aging". Multi-select: varias faixas
     // contiguas viram um unico intervalo (ex.: 0-30 + 31-60 => 0-60).
     const filterAgings = dueToAgingSet(filterDateFrom, filterDateTo);
+    // Atalhos de periodo do vencimento: os mesmos do Resumo por Cobrador
+    // (filters/periodo), para o mesmo atalho recortar as mesmas datas nas duas
+    // telas. Tambem derivados das datas, sem estado proprio. Sem "Tudo": aqui
+    // sem filtro de vencimento ja e tudo (clicar no atalho aceso desliga).
+    const presetVencimento = presetDoPeriodo(
+      filterDateFrom,
+      filterDateTo,
+      todayLocalStr(),
+      PRESETS_VENCIMENTO.map((p) => p.key),
+    );
     // Filtro "Criado em": intervalo de datas sobre clientes.created_at (data em
     // que o cliente foi inserido pela primeira vez no banco).
     const [filterCreatedFrom, setFilterCreatedFrom] = useState<string>("");
@@ -512,6 +532,14 @@ export const ClientAssignment = React.memo(
               setFilterDateTo(dueTo);
             },
           });
+        });
+      } else if (presetVencimento) {
+        chips.push({
+          label: `Vencimento: ${PRESETS_VENCIMENTO.find((p) => p.key === presetVencimento)?.label}`,
+          onClear: () => {
+            setFilterDateFrom("");
+            setFilterDateTo("");
+          },
         });
       } else {
         if (filterDateFrom) {
@@ -1135,6 +1163,38 @@ export const ClientAssignment = React.memo(
       let vencido = 0;
       let aVencer = 0;
       let pago = 0;
+      // Com filtro de vencimento (datas, atalho de periodo ou faixa de
+      // atraso), o card soma SO as parcelas que vencem no periodo -- mesma
+      // regra do Resumo por Cobrador (parcelaNoPeriodo), para o mesmo mes
+      // dar o mesmo valor nas duas telas (2026-11-19). A lista continua
+      // mostrando o saldo inteiro de cada cliente.
+      if (filterDateFrom || filterDateTo) {
+        baseClients.forEach((c) => {
+          c.collections.forEach((t) => {
+            const venc = toYYYYMMDD(t.data_vencimento);
+            const venceNoPeriodo =
+              !!venc &&
+              (!filterDateFrom || venc >= filterDateFrom) &&
+              (!filterDateTo || venc <= filterDateTo);
+            if (venceNoPeriodo) pago += t.valor_recebido || 0;
+            const parcela = parcelaNoPeriodo(t, filterDateFrom, filterDateTo);
+            if (!parcela?.noPeriodo) return;
+            if (parcela.vencida) vencido += parcela.saldo;
+            else aVencer += parcela.saldo;
+          });
+        });
+        return {
+          total,
+          totalSales,
+          assigned,
+          unassigned: total - assigned,
+          assignmentRate,
+          vencido,
+          aVencer,
+          pago,
+          noPeriodo: true,
+        };
+      }
       baseClients.forEach((c) => {
         const saldo = collectionsBalanceSplit(
           c.documento || "",
@@ -1157,6 +1217,7 @@ export const ClientAssignment = React.memo(
         vencido,
         aVencer,
         pago,
+        noPeriodo: false,
       };
     }, [
       hasActiveFilters,
@@ -1165,6 +1226,8 @@ export const ClientAssignment = React.memo(
       filteredClients,
       clientsData,
       acordoAtivoOverdueMap,
+      filterDateFrom,
+      filterDateTo,
     ]);
 
     // Clique nos cards aplica/remove (toggle) o filtro correspondente.
@@ -1280,6 +1343,18 @@ export const ClientAssignment = React.memo(
     // Atalhos (pills): status de pagamento e atraso sao multi-select. As faixas de
     // atraso, por serem contiguas, viram um unico intervalo de vencimento (a
     // envoltoria das selecionadas — ex.: 0-30 + 31-60 => vencimento hoje-60..hoje).
+    const togglePresetVencimento = (key: PeriodoPreset) => {
+      if (presetVencimento === key) {
+        setFilterDateFrom("");
+        setFilterDateTo("");
+      } else {
+        const { de, ate } = periodoDoPreset(key, todayLocalStr());
+        setFilterDateFrom(de);
+        setFilterDateTo(ate);
+      }
+      setCurrentPage(1);
+    };
+
     const handlePillsChange = (patch: PillPatch) => {
       if ("paymentStatus" in patch) {
         const v = patch.paymentStatus;
@@ -1352,8 +1427,16 @@ export const ClientAssignment = React.memo(
             icon={HandCoins}
             title="Em aberto"
             value={formatCurrency(emAbertoTotal)}
-            caption="vencido + a vencer"
-            hint="Mesma regra das linhas da lista (com acordo ativo, valem as parcelas do acordo)"
+            caption={
+              mainStats.noPeriodo
+                ? "parcelas que vencem no período"
+                : "vencido + a vencer"
+            }
+            hint={
+              mainStats.noPeriodo
+                ? "Só as parcelas com vencimento no período filtrado — mesma conta do Resumo por Cobrador. Pago = o que já foi recebido dessas parcelas. A lista mostra o saldo inteiro de cada cliente."
+                : "Mesma regra das linhas da lista (com acordo ativo, valem as parcelas do acordo)"
+            }
             rows={[
               {
                 label: "Vencido",
@@ -1503,6 +1586,32 @@ export const ClientAssignment = React.memo(
           <div
             className={`${mobileFiltersOpen ? "block" : "hidden"} md:block space-y-3`}
           >
+            {/* Atalhos de período do vencimento (mesmos do Resumo por Cobrador) */}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">
+                Vencimento:
+              </span>
+              {PRESETS_VENCIMENTO.map((p) => (
+                <button
+                  key={p.key}
+                  type="button"
+                  onClick={() => togglePresetVencimento(p.key)}
+                  title={
+                    p.key === "week" || p.key === "month30"
+                      ? `Parcelas em aberto que vencem de hoje até daqui a ${p.key === "week" ? 7 : 30} dias`
+                      : undefined
+                  }
+                  className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
+                    presetVencimento === p.key
+                      ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                      : "bg-gray-50 dark:bg-dark-bg text-gray-600 dark:text-dark-text border-gray-100 dark:border-dark-border hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+
             {/* Atalhos rápidos: status de pagamento + faixa de atraso */}
             <FilterPills
               paymentStatus={filterPaymentStatuses}
