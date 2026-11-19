@@ -19,6 +19,7 @@ import {
 import { createPortal } from "react-dom";
 import { supabase } from "../../lib/supabase";
 import { useCollection } from "../../contexts/CollectionContext";
+import { CobradorOptions } from "../common/CobradorOptions";
 import {
   Collection,
   CollectorOverdueRange,
@@ -1124,14 +1125,22 @@ const CarteiraDistribuicao: React.FC = () => {
   const lojasComProblema = cobertura.filter((c) => c.problema).length;
   // Com problema, a tela ja abre filtrada neles; o gestor desmarca para ver tudo.
   const [soProblemas, setSoProblemas] = useState(true);
+  // Filtro por cobrador na cobertura (pedido 2026-11-19): so as lojas onde
+  // ele tem faixa (ativa ou inativa); as casas dos outros ficam apagadas.
+  const [cobradorCobertura, setCobradorCobertura] = useState("");
   const coberturaVisivel = useMemo(() => {
     const ordenada = [...cobertura].sort(
       (a, b) => Number(b.problema) - Number(a.problema),
     );
-    return soProblemas && lojasComProblema > 0
-      ? ordenada.filter((c) => c.problema)
+    const doCobrador = cobradorCobertura
+      ? ordenada.filter((c) =>
+          c.regras.some(({ c: cob }) => cob.id === cobradorCobertura),
+        )
       : ordenada;
-  }, [cobertura, soProblemas, lojasComProblema]);
+    return soProblemas && doCobrador.some((c) => c.problema)
+      ? doCobrador.filter((c) => c.problema)
+      : doCobrador;
+  }, [cobertura, soProblemas, cobradorCobertura]);
 
   const simular = async () => {
     setSimulando(true);
@@ -1644,6 +1653,19 @@ const CarteiraDistribuicao: React.FC = () => {
               cada casa, quem cobra e quantos clientes em aberto a loja tem ali.
             </p>
           </div>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <select
+            value={cobradorCobertura}
+            onChange={(e) => setCobradorCobertura(e.target.value)}
+            aria-label="Filtrar cobertura por cobrador"
+            className="px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-xs font-semibold text-gray-700 dark:text-dark-text"
+          >
+            <option value="">Cobrador: Todos</option>
+            <CobradorOptions
+              cobradores={cobradoresComRegra}
+              rotulo={(c) => `Cobrador: ${c.name}`}
+            />
+          </select>
           {lojasComProblema > 0 && (
             <div
               role="group"
@@ -1670,6 +1692,7 @@ const CarteiraDistribuicao: React.FC = () => {
               ))}
             </div>
           )}
+          </div>
         </div>
         {lojasComProblema > 0 && (
           <p className="-mt-1 mb-3 text-[11px] text-gray-500 dark:text-dark-text-secondary">
@@ -1767,6 +1790,9 @@ const CarteiraDistribuicao: React.FC = () => {
                           (col.fim < primeira || (ultimoTeto != null && col.ini > ultimoTeto));
                         const falha = donos.length === 0 && !fora;
                         const conflito = donos.length > 1;
+                        const apagada =
+                          !!cobradorCobertura &&
+                          !donos.some((d) => d.id === cobradorCobertura);
                         const fundo = conflito
                           ? "bg-red-50 dark:bg-red-900/15"
                           : falha
@@ -1777,7 +1803,7 @@ const CarteiraDistribuicao: React.FC = () => {
                         return (
                           <td
                             key={col.ini}
-                            className={`py-2 px-2 text-center border-b border-l border-gray-100 dark:border-dark-border ${fundo}`}
+                            className={`py-2 px-2 text-center border-b border-l border-gray-100 dark:border-dark-border ${fundo} ${apagada ? "opacity-40" : ""}`}
                             title={
                               dono
                                 ? `${dono.name}: ${q.doDono} na carteira, ${q.sem} sem cobrador, ${q.comOutro} com outro`
