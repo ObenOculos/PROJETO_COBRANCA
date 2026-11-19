@@ -1045,22 +1045,20 @@ const CarteiraDistribuicao: React.FC = () => {
     });
   }, [lojas, cobradores, collectorOverdueRanges]);
 
-  // Clientes SEM cobrador por loja, com o atraso de cada um -- para mostrar
-  // quantos estao em cada lacuna (pedido 2026-11-19). Mesma base do plano da
-  // distribuicao (plano_distribuicao_carteira): titulo com saldo, nao
-  // cancelado; cliente sem cobrador em nenhum titulo aberto; fora as
-  // situacoes de encerramento; loja = a da parcela aberta mais antiga
-  // (clientReferenceStore) e atraso = clientMaxOverdueDays (espelhos de
-  // cliente_loja_referencia / cliente_max_atraso_dias).
-  const semCobradorPorLoja = useMemo(() => {
+  // Clientes por loja, com atraso e cobrador de cada um -- para mostrar
+  // quantos ha em cada faixa e em cada lacuna (pedido 2026-11-19). Mesma base
+  // do plano da distribuicao (plano_distribuicao_carteira): titulo com saldo,
+  // nao cancelado; fora as situacoes de encerramento; loja = a da parcela
+  // aberta mais antiga (clientReferenceStore), atraso = clientMaxOverdueDays
+  // (espelhos de cliente_loja_referencia / cliente_max_atraso_dias) e
+  // cobrador = algum titulo aberto com cobrador (o plano pega o primeiro).
+  const clientesPorLoja = useMemo(() => {
     const porDoc = new Map<string, Collection[]>();
-    const comCobrador = new Set<string>();
     const encerrado = new Set<string>();
     collections.forEach((c) => {
       if (!c.documento) return;
       if ((c.status ?? "").trim().toLowerCase() === "cancelado") return;
       if (!hasInstallmentBalance(c)) return;
-      if (c.user_id) comCobrador.add(c.documento);
       if (c.situacao && ENCERRAMENTO_SITUACOES.includes(c.situacao)) {
         encerrado.add(c.documento);
       }
@@ -1068,26 +1066,43 @@ const CarteiraDistribuicao: React.FC = () => {
       if (lista) lista.push(c);
       else porDoc.set(c.documento, [c]);
     });
-    const m = new Map<string, number[]>();
+    const m = new Map<string, { atraso: number; dono: string | null }[]>();
     porDoc.forEach((titulos, documento) => {
-      if (comCobrador.has(documento) || encerrado.has(documento)) return;
+      if (encerrado.has(documento)) return;
       const group = {
         document: documento,
         sales: [{ installments: titulos } as SaleGroup],
       };
       const loja = clientReferenceStore(group);
       if (!loja) return;
-      const atraso = clientMaxOverdueDays(group, acordoAtivoOverdueMap);
+      const dono =
+        titulos
+          .map((t) => t.user_id)
+          .filter((u): u is string => !!u)
+          .sort()[0] ?? null;
+      const item = { atraso: clientMaxOverdueDays(group, acordoAtivoOverdueMap), dono };
       const l = m.get(loja);
-      if (l) l.push(atraso);
-      else m.set(loja, [atraso]);
+      if (l) l.push(item);
+      else m.set(loja, [item]);
     });
     return m;
   }, [collections, acordoAtivoOverdueMap]);
-  /** Quantos clientes sem cobrador da loja tem atraso entre ini e fim. */
+  /** Clientes da loja com atraso entre ini e fim: total, sem cobrador e com
+   * um cobrador especifico (o dono da faixa). */
+  const contaEntre = (loja: string, ini: number, fim: number, donoId?: string) => {
+    let total = 0;
+    let sem = 0;
+    let doDono = 0;
+    (clientesPorLoja.get(loja) ?? []).forEach((x) => {
+      if (x.atraso < ini || x.atraso > fim) return;
+      total++;
+      if (!x.dono) sem++;
+      else if (donoId && x.dono === donoId) doDono++;
+    });
+    return { total, sem, doDono, comOutro: total - sem - doDono };
+  };
   const semCobradorEntre = (loja: string, ini: number, fim: number) =>
-    (semCobradorPorLoja.get(loja) ?? []).filter((a) => a >= ini && a <= fim)
-      .length;
+    contaEntre(loja, ini, fim).sem;
   const qtdClientes = (n: number) => `${n} ${n === 1 ? "cliente" : "clientes"}`;
 
   const lojasComProblema = cobertura.filter((c) => c.problema).length;
@@ -1747,42 +1762,96 @@ const CarteiraDistribuicao: React.FC = () => {
                     ))}
                   </div>
                 )}
-                {(conflitos.length > 0 || buracos.length > 0 || foraInicio != null || foraFim != null) && (
-                  <div className="mt-1 flex flex-wrap gap-1.5">
-                    {conflitos.map((d) => (
-                      <span
-                        key={d}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800"
-                      >
-                        <AlertTriangle className="h-3 w-3" />
-                        Conflito {d}
-                      </span>
-                    ))}
-                    {buracos.map((b) => (
-                      <span
-                        key={`t${b.ini}`}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800"
-                      >
-                        Sem cobrador: {faixaTexto(b.ini, b.fim)} ·{" "}
-                        <strong>
-                          {qtdClientes(semCobradorEntre(loja.loja, b.ini, b.fim))}
-                        </strong>
-                      </span>
-                    ))}
-                    {foraInicio != null && (
-                      <span className="px-2 py-0.5 rounded-full text-[11px] text-gray-500 bg-gray-50 border border-gray-200 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text-secondary">
-                        Até {foraInicio} {foraInicio === 1 ? "dia" : "dias"}: ninguém cobra ·{" "}
-                        {qtdClientes(semCobradorEntre(loja.loja, 1, foraInicio))}
-                      </span>
-                    )}
-                    {foraFim != null && (
-                      <span className="px-2 py-0.5 rounded-full text-[11px] text-gray-500 bg-gray-50 border border-gray-200 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text-secondary">
-                        Acima de {foraFim} dias: ninguém cobra ·{" "}
-                        {qtdClientes(semCobradorEntre(loja.loja, foraFim + 1, Infinity))}
-                      </span>
-                    )}
-                  </div>
-                )}
+                {/* Um chip por trecho da regua, na ordem dos dias, com quantos
+                    clientes (em aberto) a loja tem ali -- pedido 2026-11-19.
+                    Faixa de cobrador: total e, se houver, quantos estao sem
+                    cobrador ou com outro. Lacuna/fora: quantos ninguem cobra. */}
+                {(() => {
+                  type Trecho =
+                    | { tipo: "faixa"; ini: number; fim: number; c: User; id: string }
+                    | { tipo: "buraco" | "fora"; ini: number; fim: number; id: string };
+                  const trechos: Trecho[] = [
+                    ...ativas.map(({ c, r }) => ({
+                      tipo: "faixa" as const,
+                      ini: r.minDias,
+                      fim: r.maxDias ?? Infinity,
+                      c,
+                      id: r.id,
+                    })),
+                    ...buracos.map((b) => ({
+                      tipo: "buraco" as const,
+                      ini: b.ini,
+                      fim: b.fim,
+                      id: `b${b.ini}`,
+                    })),
+                    ...(foraInicio != null
+                      ? [{ tipo: "fora" as const, ini: 1, fim: foraInicio, id: "fi" }]
+                      : []),
+                    ...(foraFim != null
+                      ? [{ tipo: "fora" as const, ini: foraFim + 1, fim: Infinity, id: "ff" }]
+                      : []),
+                  ].sort((a, b) => a.ini - b.ini);
+                  if (trechos.length === 0 && conflitos.length === 0) return null;
+                  return (
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {conflitos.map((d) => (
+                        <span
+                          key={d}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800"
+                        >
+                          <AlertTriangle className="h-3 w-3" />
+                          Conflito {d}
+                        </span>
+                      ))}
+                      {trechos.map((t) => {
+                        const faixa = faixaTexto(t.ini, t.fim === Infinity ? null : t.fim);
+                        if (t.tipo === "faixa") {
+                          const q = contaEntre(loja.loja, t.ini, t.fim, t.c.id);
+                          const extra = [
+                            q.sem > 0 ? `${q.sem} sem cobrador` : "",
+                            q.comOutro > 0 ? `${q.comOutro} com outro` : "",
+                          ].filter(Boolean);
+                          return (
+                            <span
+                              key={t.id}
+                              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] text-gray-700 bg-white border border-gray-200 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text"
+                              title={`${t.c.name}: ${faixa} — ${q.doDono} na carteira dele(a)`}
+                            >
+                              <span className={`h-2 w-2 rounded-sm ${corPorCobrador.get(t.c.id)}`} />
+                              {t.c.name.split(" ")[0]} · {faixa} ·{" "}
+                              <strong>{qtdClientes(q.total)}</strong>
+                              {extra.length > 0 && (
+                                <span className="text-amber-700 dark:text-amber-300">
+                                  ({extra.join(", ")})
+                                </span>
+                              )}
+                            </span>
+                          );
+                        }
+                        const q = contaEntre(loja.loja, t.ini, t.fim);
+                        return (
+                          <span
+                            key={t.id}
+                            className={
+                              t.tipo === "buraco"
+                                ? "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800"
+                                : "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] text-gray-500 bg-gray-50 border border-gray-200 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text-secondary"
+                            }
+                            title={
+                              q.total > q.sem
+                                ? `${q.total - q.sem} deles já estão com algum cobrador (carteira manual)`
+                                : undefined
+                            }
+                          >
+                            {t.tipo === "buraco" ? "Sem cobrador" : "Ninguém cobra"}: {faixa} ·{" "}
+                            <strong>{qtdClientes(q.sem)}</strong> sem cobrador
+                            {q.total > q.sem && ` · ${q.total - q.sem} com cobrador`}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
                 {regras.length > ativas.length && ativas.length > 0 && (
                   <p className="mt-1 text-[11px] text-gray-400">
                     Inativas aqui:{" "}
