@@ -197,6 +197,9 @@ const SortTh: React.FC<{
 
 const fmtNum = (n: number): string => n.toLocaleString("pt-BR");
 
+/** Externo trabalha por visita: sem linhas/coluna de acionamentos. */
+const semAcionamentos = (type: UserType): boolean => type === "collector";
+
 /** Acordos de um cobrador (ou soma de varios) para o card Acordos. */
 interface ResumoAcordos {
   ativosQtd: number;
@@ -756,9 +759,19 @@ const CollectorsSummary: React.FC = () => {
           aReceberQtd,
           aReceberValor,
           recebidoPeriodo,
-          clientesAtendidos: atend?.clientes ?? 0,
-          clientesConversaram: atend?.conversaram ?? 0,
-          acionamentosQtd: atend?.tentativas ?? 0,
+          // Externo trabalha por VISITA (card Agendamentos/Realizadas):
+          // "acionados/conversaram/acionamentos" nao faz sentido para ele
+          // (pedido do usuario 2026-11-19). Zerado aqui para nao somar na
+          // Visao geral nem pesar na ordenacao; a tela mostra "—".
+          clientesAtendidos: semAcionamentos(collector.type)
+            ? 0
+            : (atend?.clientes ?? 0),
+          clientesConversaram: semAcionamentos(collector.type)
+            ? 0
+            : (atend?.conversaram ?? 0),
+          acionamentosQtd: semAcionamentos(collector.type)
+            ? 0
+            : (atend?.tentativas ?? 0),
           agendadasQtd,
           agendadasValor,
           realizadasQtd,
@@ -1524,11 +1537,13 @@ const CollectorsSummary: React.FC = () => {
                         : { label: "Meta", value: "atingida", tone: "green" as const },
                     ]
                   : [{ label: "Meta do mês", value: "não definida" }]),
-                ...linhaAtendimentos(
-                  totals.clientesAtendidos,
-                  totals.clientesConversaram,
-                  totals.acionamentosQtd,
-                ),
+                ...(rows.some((r) => !semAcionamentos(r.type))
+                  ? linhaAtendimentos(
+                      totals.clientesAtendidos,
+                      totals.clientesConversaram,
+                      totals.acionamentosQtd,
+                    )
+                  : []),
               ]}
             />
             <SummaryCard
@@ -1666,11 +1681,13 @@ const CollectorsSummary: React.FC = () => {
                   caption={previstaPeriodHint}
                   rows={[
                     ...linhaMeta(row.id),
-                    ...linhaAtendimentos(
-                      row.clientesAtendidos,
-                      row.clientesConversaram,
-                      row.acionamentosQtd,
-                    ),
+                    ...(semAcionamentos(row.type)
+                      ? []
+                      : linhaAtendimentos(
+                          row.clientesAtendidos,
+                          row.clientesConversaram,
+                          row.acionamentosQtd,
+                        )),
                   ]}
                 />
                 <SummaryCard
@@ -2092,23 +2109,34 @@ const CollectorsSummary: React.FC = () => {
                     ))}
                   </td>
                   <td className="px-3 py-3 text-right whitespace-nowrap border-l border-gray-100 dark:border-dark-border/40">
-                    <div className="font-semibold text-blue-600 dark:text-blue-400">
-                      {atendimentosValor(row.clientesAtendidos)}
-                    </div>
-                    {(row.clientesAtendidos > 0 ||
-                      atendimentos === null ||
-                      atendimentosErro) && (
-                      <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
-                        {atendimentosSub(row.clientesConversaram)}
-                      </div>
-                    )}
-                    {row.acionamentosQtd > 0 && (
-                      <div
-                        className="text-[10px] text-gray-400 dark:text-dark-text-secondary"
-                        title="Total de registros no período, sem deduplicar por cliente"
+                    {semAcionamentos(row.type) ? (
+                      <span
+                        className="text-gray-300 dark:text-dark-text-secondary"
+                        title="Cobrador externo trabalha por visita — veja as colunas de visitas"
                       >
-                        {atendimentosValor(row.acionamentosQtd)} acionamentos
-                      </div>
+                        —
+                      </span>
+                    ) : (
+                      <>
+                        <div className="font-semibold text-blue-600 dark:text-blue-400">
+                          {atendimentosValor(row.clientesAtendidos)}
+                        </div>
+                        {(row.clientesAtendidos > 0 ||
+                          atendimentos === null ||
+                          atendimentosErro) && (
+                          <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
+                            {atendimentosSub(row.clientesConversaram)}
+                          </div>
+                        )}
+                        {row.acionamentosQtd > 0 && (
+                          <div
+                            className="text-[10px] text-gray-400 dark:text-dark-text-secondary"
+                            title="Total de registros no período, sem deduplicar por cliente"
+                          >
+                            {atendimentosValor(row.acionamentosQtd)} acionamentos
+                          </div>
+                        )}
+                      </>
                     )}
                   </td>
                   <td className="px-3 py-3 text-right whitespace-nowrap border-l border-gray-100 dark:border-dark-border/40">
