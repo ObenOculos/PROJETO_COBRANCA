@@ -20,17 +20,25 @@ import { createPortal } from "react-dom";
 import { supabase } from "../../lib/supabase";
 import { useCollection } from "../../contexts/CollectionContext";
 import {
+  Collection,
   CollectorOverdueRange,
   FilaConfigRegra,
   FilaOrdem,
+  SaleGroup,
   User,
   UserType,
   isCollectorType,
 } from "../../types";
 import {
+  ENCERRAMENTO_SITUACOES,
   USER_TYPE_LABELS,
   distribuicaoPerfisPayload,
 } from "../../config/profiles";
+import {
+  clientMaxOverdueDays,
+  clientReferenceStore,
+  hasInstallmentBalance,
+} from "../../filters/clientStatus";
 import {
   FILA_ORDEM_LABEL,
   FILA_VIRADA_HORA,
@@ -659,6 +667,8 @@ const CarteiraDistribuicao: React.FC = () => {
     definirRegraCarteiraAtiva,
     encerrarRegraCarteira,
     definirFilaCobranca,
+    collections,
+    acordoAtivoOverdueMap,
   } = useCollection();
 
   const [lojas, setLojas] = useState<LojaCarteira[]>([]);
@@ -715,6 +725,16 @@ const CarteiraDistribuicao: React.FC = () => {
   // as regras cobrem (p_retirar_de). Comeca vazio: a distribuicao nunca tira
   // de outra carteira sem essa escolha explicita.
   const [retirarDe, setRetirarDe] = useState<Set<string>>(new Set());
+  // Cobradores escolhidos para esta distribuicao (pedido 2026-11-19: antes
+  // "sincronizar" mexia em todo mundo de uma vez). null = todos. Vai para o
+  // banco em p_perfis.cobradores (migration 20261119000002): entra todo
+  // cliente que entra, sai ou troca envolvendo um escolhido. Nao muda a
+  // rotina automatica diaria, que continua com todos.
+  const [selecionados, setSelecionados] = useState<Set<string> | null>(null);
+  const perfisDaDistribuicao = () => ({
+    ...distribuicaoPerfisPayload(),
+    ...(selecionados ? { cobradores: Array.from(selecionados) } : {}),
+  });
 
   useEffect(() => {
     void (async () => {
@@ -1025,6 +1045,51 @@ const CarteiraDistribuicao: React.FC = () => {
     });
   }, [lojas, cobradores, collectorOverdueRanges]);
 
+  // Clientes SEM cobrador por loja, com o atraso de cada um -- para mostrar
+  // quantos estao em cada lacuna (pedido 2026-11-19). Mesma base do plano da
+  // distribuicao (plano_distribuicao_carteira): titulo com saldo, nao
+  // cancelado; cliente sem cobrador em nenhum titulo aberto; fora as
+  // situacoes de encerramento; loja = a da parcela aberta mais antiga
+  // (clientReferenceStore) e atraso = clientMaxOverdueDays (espelhos de
+  // cliente_loja_referencia / cliente_max_atraso_dias).
+  const semCobradorPorLoja = useMemo(() => {
+    const porDoc = new Map<string, Collection[]>();
+    const comCobrador = new Set<string>();
+    const encerrado = new Set<string>();
+    collections.forEach((c) => {
+      if (!c.documento) return;
+      if ((c.status ?? "").trim().toLowerCase() === "cancelado") return;
+      if (!hasInstallmentBalance(c)) return;
+      if (c.user_id) comCobrador.add(c.documento);
+      if (c.situacao && ENCERRAMENTO_SITUACOES.includes(c.situacao)) {
+        encerrado.add(c.documento);
+      }
+      const lista = porDoc.get(c.documento);
+      if (lista) lista.push(c);
+      else porDoc.set(c.documento, [c]);
+    });
+    const m = new Map<string, number[]>();
+    porDoc.forEach((titulos, documento) => {
+      if (comCobrador.has(documento) || encerrado.has(documento)) return;
+      const group = {
+        document: documento,
+        sales: [{ installments: titulos } as SaleGroup],
+      };
+      const loja = clientReferenceStore(group);
+      if (!loja) return;
+      const atraso = clientMaxOverdueDays(group, acordoAtivoOverdueMap);
+      const l = m.get(loja);
+      if (l) l.push(atraso);
+      else m.set(loja, [atraso]);
+    });
+    return m;
+  }, [collections, acordoAtivoOverdueMap]);
+  /** Quantos clientes sem cobrador da loja tem atraso entre ini e fim. */
+  const semCobradorEntre = (loja: string, ini: number, fim: number) =>
+    (semCobradorPorLoja.get(loja) ?? []).filter((a) => a >= ini && a <= fim)
+      .length;
+  const qtdClientes = (n: number) => `${n} ${n === 1 ? "cliente" : "clientes"}`;
+
   const lojasComProblema = cobertura.filter((c) => c.problema).length;
   // Com problema, a tela ja abre filtrada neles; o gestor desmarca para ver tudo.
   const [soProblemas, setSoProblemas] = useState(true);
@@ -1057,7 +1122,7 @@ const CarteiraDistribuicao: React.FC = () => {
     setConfirmAplicar(false);
     try {
       const { data, error } = await supabase.rpc("distribuicao_carteira_previa", {
-        p_perfis: distribuicaoPerfisPayload(),
+        p_perfis: perfisDaDistribuicao(),
         p_retirar_de: Array.from(retirarDe),
       });
       if (error) throw error;
@@ -1157,7 +1222,7 @@ const CarteiraDistribuicao: React.FC = () => {
     setErroDistribuicao("");
     try {
       const { data, error } = await supabase.rpc("aplicar_distribuicao_carteira", {
-        p_perfis: distribuicaoPerfisPayload(),
+        p_perfis: perfisDaDistribuicao(),
         p_retirar_de: Array.from(retirarDe),
       });
       if (error) throw error;
@@ -1468,6 +1533,26 @@ const CarteiraDistribuicao: React.FC = () => {
                             </button>
                           </div>
                         </div>
+                        {/* Atalho: a faixa cobre todo atraso (de 1 dia em diante,
+                            sem teto) nas lojas escolhidas. Conflito com outro
+                            cobrador na mesma loja continua barrado ao salvar. */}
+                        <label className="mt-2 inline-flex items-center gap-2 text-xs text-gray-700 dark:text-dark-text cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={r.min.trim() === "1" && r.max.trim() === ""}
+                            onChange={(e) =>
+                              setRascunho(
+                                chave,
+                                e.target.checked
+                                  ? { min: "1", max: "" }
+                                  : { min: "", max: "" },
+                                r,
+                              )
+                            }
+                            className="rounded border-gray-300"
+                          />
+                          Loja inteira (todos os atrasos, de 1 dia em diante)
+                        </label>
                         {erroRegra[chave] && (
                           <p className="mt-1.5 text-xs text-red-600">{erroRegra[chave]}</p>
                         )}
@@ -1627,6 +1712,9 @@ const CarteiraDistribuicao: React.FC = () => {
                     {regras.length === 0
                       ? "Nenhum cobrador nesta loja"
                       : "Só faixas inativas: ninguém recebe clientes aqui"}
+                    {" · "}
+                    {qtdClientes(semCobradorEntre(loja.loja, 1, Infinity))} sem
+                    cobrador
                   </div>
                 ) : (
                   <div className="relative h-6 rounded bg-gray-100 dark:bg-dark-bg overflow-hidden">
@@ -1654,7 +1742,7 @@ const CarteiraDistribuicao: React.FC = () => {
                           left: `${posEscala(b.ini)}%`,
                           width: `${Math.max(posEscala(b.fim) - posEscala(b.ini), 1)}%`,
                         }}
-                        title={`Sem cobrador: ${faixaTexto(b.ini, b.fim)}`}
+                        title={`Sem cobrador: ${faixaTexto(b.ini, b.fim)} · ${qtdClientes(semCobradorEntre(loja.loja, b.ini, b.fim))}`}
                       />
                     ))}
                   </div>
@@ -1675,17 +1763,22 @@ const CarteiraDistribuicao: React.FC = () => {
                         key={`t${b.ini}`}
                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800"
                       >
-                        Sem cobrador: {faixaTexto(b.ini, b.fim)}
+                        Sem cobrador: {faixaTexto(b.ini, b.fim)} ·{" "}
+                        <strong>
+                          {qtdClientes(semCobradorEntre(loja.loja, b.ini, b.fim))}
+                        </strong>
                       </span>
                     ))}
                     {foraInicio != null && (
                       <span className="px-2 py-0.5 rounded-full text-[11px] text-gray-500 bg-gray-50 border border-gray-200 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text-secondary">
-                        Até {foraInicio} {foraInicio === 1 ? "dia" : "dias"}: ninguém cobra
+                        Até {foraInicio} {foraInicio === 1 ? "dia" : "dias"}: ninguém cobra ·{" "}
+                        {qtdClientes(semCobradorEntre(loja.loja, 1, foraInicio))}
                       </span>
                     )}
                     {foraFim != null && (
                       <span className="px-2 py-0.5 rounded-full text-[11px] text-gray-500 bg-gray-50 border border-gray-200 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text-secondary">
-                        Acima de {foraFim} dias: ninguém cobra
+                        Acima de {foraFim} dias: ninguém cobra ·{" "}
+                        {qtdClientes(semCobradorEntre(loja.loja, foraFim + 1, Infinity))}
                       </span>
                     )}
                   </div>
@@ -1724,12 +1817,67 @@ const CarteiraDistribuicao: React.FC = () => {
           <button
             type="button"
             onClick={() => void simular()}
-            disabled={simulando || aplicando}
+            disabled={simulando || aplicando || selecionados?.size === 0}
             className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800 disabled:opacity-50 dark:bg-dark-bg dark:border dark:border-dark-border"
           >
             <Play className="h-4 w-4" />
             {simulando ? "Simulando…" : previa ? "Simular de novo" : "Simular distribuição"}
           </button>
+        </div>
+
+        <div className="mb-3">
+          <p className="text-xs font-semibold text-gray-600 dark:text-dark-text-secondary mb-1.5">
+            Distribuir para:
+          </p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                setSelecionados(null);
+                if (previa) setPreviaDesatualizada(true);
+              }}
+              className={`px-3 py-1 rounded-full text-xs font-medium border ${
+                selecionados === null
+                  ? "bg-blue-600 border-blue-600 text-white"
+                  : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text-secondary"
+              }`}
+            >
+              Todos
+            </button>
+            {cobradores.map((c) => {
+              const marcado = selecionados?.has(c.id) ?? false;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => {
+                    setSelecionados((prev) => {
+                      const next = new Set(prev ?? []);
+                      if (next.has(c.id)) next.delete(c.id);
+                      else next.add(c.id);
+                      return next.size === 0 ? null : next;
+                    });
+                    if (previa) setPreviaDesatualizada(true);
+                  }}
+                  title={USER_TYPE_LABELS[c.type]}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border ${
+                    marcado
+                      ? "bg-blue-600 border-blue-600 text-white"
+                      : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text-secondary"
+                  }`}
+                >
+                  {c.name}
+                </button>
+              );
+            })}
+          </div>
+          {selecionados && (
+            <p className="mt-1.5 text-[11px] text-gray-500 dark:text-dark-text-secondary">
+              Só entram os clientes que vão para, saem de ou trocam com os
+              escolhidos. A distribuição automática da manhã continua valendo
+              para todos.
+            </p>
+          )}
         </div>
 
         {lojasDesatualizadas.length > 0 && (
@@ -1958,6 +2106,10 @@ const CarteiraDistribuicao: React.FC = () => {
               {confirmAplicar && (
                 <span className="text-sm text-gray-700 dark:text-dark-text-secondary">
                   Isto muda o cobrador de {resumo.totalMudancas} cliente(s)
+                  {selecionados &&
+                    ` (só envolvendo: ${Array.from(selecionados)
+                      .map((id) => nomePorId.get(id) ?? id)
+                      .join(", ")})`}
                   {retirarDe.size > 0 &&
                     `, retirando clientes de: ${Array.from(retirarDe)
                       .map((id) => nomePorId.get(id) ?? id)
