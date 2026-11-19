@@ -1507,6 +1507,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
           {lotePendentes.length > 0 && loteFeitos.length > 0 && (
             <AgendaSection
               titulo={`Já registrados neste lote (${loteFeitos.length})`}
+              iniciarRecolhido
               accentBorderClass="border-l-green-400 dark:border-l-green-600"
               groups={loteFeitos}
               emptyMessage=""
@@ -1952,19 +1953,31 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
           {/* Nome + dias de atraso */}
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="font-bold text-sm text-gray-900 dark:text-dark-text truncate">
-                {group.client}
+              {/* Nome em destaque = fantasia (como o cobrador conhece a loja);
+                  embaixo, o nome de quem responde pela divida. Ciclone: nome
+                  ja e o fantasia, embaixo a razao social. SSOtica: o fantasia
+                  e o apelido ("Apelido / Nome Fantasia"), embaixo o nome da
+                  pessoa (2026-11-19). */}
+              <p
+                className="font-bold text-sm text-gray-900 dark:text-dark-text truncate"
+                title={group.apelido ? `Nome fantasia: ${group.apelido}` : group.client}
+              >
+                {group.apelido || group.client}
               </p>
-              {/* Apelido = "Apelido / Nome Fantasia" da SSOtica: como o
-                  cobrador conhece a loja (2026-11-19). */}
-              {group.apelido && (
-                <p
-                  className="text-[11px] font-medium text-blue-600 dark:text-blue-400 truncate"
-                  title={`Nome fantasia: ${group.apelido}`}
-                >
-                  {group.apelido}
-                </p>
-              )}
+              {[
+                group.apelido ? group.client : null,
+                group.razaoSocial ?? null,
+              ]
+                .filter((n): n is string => !!n)
+                .map((n) => (
+                  <p
+                    key={n}
+                    className="text-[11px] text-gray-500 dark:text-dark-text-secondary truncate"
+                    title={n}
+                  >
+                    {n}
+                  </p>
+                ))}
               {lojas.length > 0 && (
                 <p className="flex items-center gap-1 text-[11px] text-indigo-700 dark:text-indigo-300 truncate">
                   <Store className="w-3 h-3 shrink-0" />
@@ -2830,6 +2843,8 @@ interface AgendaSectionProps {
   esperaFila?: Map<string, EsperaFila>;
   /** So no lote da fila: botao "Depois" na linha. */
   onAdiar?: (group: ClientGroup) => void;
+  /** Sanfona: o bloco comeca fechado (ex.: "Ja registrados neste lote"). */
+  iniciarRecolhido?: boolean;
 }
 
 // Bloco de lista da Fila de Cobranca (compromissos, lote, ja registrados):
@@ -2857,22 +2872,48 @@ const AgendaSection: React.FC<AgendaSectionProps> = ({
   adiamentos,
   esperaFila,
   onAdiar,
+  iniciarRecolhido = false,
 }) => {
   const [page, setPage] = useState(1);
   useEffect(() => {
     setPage(1);
   }, [groups]);
+  // Sanfona (2026-11-19): tocar no titulo abre/fecha o bloco. Cada bloco e
+  // independente; "Ja registrados" comeca fechado.
+  const [aberto, setAberto] = useState(!iniciarRecolhido);
 
   const cabecalho = titulo ? (
-    <div className="px-4 md:px-6 pt-3 md:pt-4 pb-2">
-      <h3 className="font-bold text-sm md:text-base text-gray-900 dark:text-dark-text">{titulo}</h3>
-      {subtitulo && (
-        <p className="text-xs text-gray-500 dark:text-dark-text-secondary mt-0.5">
-          {subtitulo}
-        </p>
-      )}
-    </div>
+    <button
+      type="button"
+      onClick={() => setAberto((v) => !v)}
+      aria-expanded={aberto}
+      className={`w-full flex items-start justify-between gap-2 text-left px-4 md:px-6 pt-3 md:pt-4 ${aberto ? "pb-2" : "pb-3 md:pb-4"}`}
+    >
+      <span className="min-w-0">
+        <span className="block font-bold text-sm md:text-base text-gray-900 dark:text-dark-text">
+          {titulo}
+        </span>
+        {subtitulo && aberto && (
+          <span className="block text-xs text-gray-500 dark:text-dark-text-secondary mt-0.5">
+            {subtitulo}
+          </span>
+        )}
+      </span>
+      <ChevronDown
+        className={`w-4 h-4 mt-0.5 shrink-0 text-gray-400 transition-transform ${aberto ? "rotate-180" : ""}`}
+      />
+    </button>
   ) : null;
+
+  if (cabecalho && !aberto) {
+    return (
+      <div
+        className={`bg-white dark:bg-dark-bg rounded-2xl border border-gray-200 dark:border-dark-border border-l-4 ${accentBorderClass} shadow-sm`}
+      >
+        {cabecalho}
+      </div>
+    );
+  }
 
   if (groups.length === 0) {
     return (
