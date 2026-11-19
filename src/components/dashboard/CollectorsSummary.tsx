@@ -23,6 +23,8 @@ import {
   UserX,
   History,
   Shuffle,
+  Handshake,
+  CalendarCheck,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
@@ -50,6 +52,7 @@ import {
   URGENTE_SAIDA_CARTEIRA_DIAS,
 } from "../../filters/priority";
 import { supabase } from "../../lib/supabase";
+import { fetchAllRows } from "../../utils/fetchAllRows";
 import { inadimplenciaDe, formatarInadimplencia } from "../../filters/inadimplencia";
 import { Collection, CollectorOverdueRange, SaleGroup } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
@@ -194,6 +197,30 @@ const SortTh: React.FC<{
 
 const fmtNum = (n: number): string => n.toLocaleString("pt-BR");
 
+/** Acordos de um cobrador (ou soma de varios) para o card Acordos. */
+interface ResumoAcordos {
+  ativosQtd: number;
+  ativosValor: number;
+  feitosQtd: number;
+  feitosValor: number;
+  cumpridosQtd: number;
+  cumpridosValor: number;
+  quebradosQtd: number;
+  quebradosValor: number;
+  recebido: number;
+}
+const resumoAcordosVazio = (): ResumoAcordos => ({
+  ativosQtd: 0,
+  ativosValor: 0,
+  feitosQtd: 0,
+  feitosValor: 0,
+  cumpridosQtd: 0,
+  cumpridosValor: 0,
+  quebradosQtd: 0,
+  quebradosValor: 0,
+  recebido: 0,
+});
+
 /** % de inadimplencia a partir dos componentes somados (nunca a media dos
  * percentuais de cada cobrador -- ver CollectorRow.inadVenceu/inadNaoPago). */
 const pctInad = (venceu: number, naoPago: number): number =>
@@ -274,6 +301,7 @@ const CollectorsSummary: React.FC = () => {
     managerCollectorLinks,
     collectorOverdueRanges,
     acordoAtivoOverdueMap,
+    acordos,
   } = useCollection();
   const { user: currentUser } = useAuth();
 
@@ -445,6 +473,61 @@ const CollectorsSummary: React.FC = () => {
     dateFrom,
     dateTo,
   );
+
+  // Pagamentos de parcela de acordo no periodo, por cobrador. Nao vem de
+  // salePayments: registrar_pagamento_acordo grava so em acordo_pagamentos
+  // (ver "Recuperacao do Mes" no CollectorDashboard). Guarda o periodo da
+  // busca: ao trocar de periodo o valor so aparece quando a busca NOVA chega
+  // (mesmo cuidado do Meu desempenho, achado 2026-11-18).
+  const [acordoPagos, setAcordoPagos] = useState<{
+    periodo: string;
+    porCobrador: Map<string, number>;
+  } | null>(null);
+  const periodoAtual = `${dateFrom}|${dateTo}`;
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      try {
+        const linhas = await fetchAllRows<{
+          collector_id: string | null;
+          valor_pago: number | string;
+        }>(
+          (de, ate) =>
+            supabase
+              .from("acordo_pagamentos")
+              .select("collector_id, valor_pago")
+              .gte("data_pagamento", dateFrom)
+              .lte("data_pagamento", dateTo)
+              .order("id")
+              .range(de, ate),
+          () => cancelado,
+        );
+        const porCobrador = new Map<string, number>();
+        linhas.forEach((l) => {
+          if (!l.collector_id) return;
+          porCobrador.set(
+            l.collector_id,
+            (porCobrador.get(l.collector_id) ?? 0) + Number(l.valor_pago || 0),
+          );
+        });
+        if (!cancelado) {
+          setAcordoPagos({ periodo: `${dateFrom}|${dateTo}`, porCobrador });
+        }
+      } catch (err) {
+        console.error("Erro ao buscar pagamentos de acordo:", err);
+        if (!cancelado) {
+          setAcordoPagos({
+            periodo: `${dateFrom}|${dateTo}`,
+            porCobrador: new Map(),
+          });
+        }
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [dateFrom, dateTo]);
+  const acordoPagosProntos = acordoPagos?.periodo === periodoAtual;
 
   // Carteira automatica (item 55): clientes que sairam da faixa do cobrador
   // sem acao dele, no periodo. Numero no card/linha do cobrador (de
@@ -1012,6 +1095,134 @@ const CollectorsSummary: React.FC = () => {
     },
   ];
 
+  // Acordos por cobrador (dono do acordo, acordos.collector_id). "Ativos" e a
+  // situacao de AGORA (nao depende do periodo); feitos pela data de criacao e
+  // cumpridos/quebrados/cancelados pela data em que foram fechados, dentro do
+  // periodo. Valor = valor negociado (termo do acordo, imutavel).
+  const acordosPorCobrador = useMemo(() => {
+    const dataLocal = (iso?: string | null) =>
+      iso ? todayLocalStr(new Date(iso)) : "";
+    const noPeriodo = (d: string) => !!d && d >= dateFrom && d <= dateTo;
+    const map = new Map<string, ResumoAcordos>();
+    acordos.forEach((a) => {
+      if (!map.has(a.collectorId)) map.set(a.collectorId, resumoAcordosVazio());
+      const r = map.get(a.collectorId)!;
+      const valor = Number(a.valorNegociado || 0);
+      if (a.status === "ativo") {
+        r.ativosQtd++;
+        r.ativosValor += valor;
+      }
+      if (noPeriodo(dataLocal(a.createdAt))) {
+        r.feitosQtd++;
+        r.feitosValor += valor;
+      }
+      if (a.status !== "ativo" && noPeriodo(dataLocal(a.resolvedAt))) {
+        if (a.status === "cumprido") {
+          r.cumpridosQtd++;
+          r.cumpridosValor += valor;
+        } else {
+          r.quebradosQtd++;
+          r.quebradosValor += valor;
+        }
+      }
+    });
+    return map;
+  }, [acordos, dateFrom, dateTo]);
+
+  const somaAcordos = (ids: string[]): ResumoAcordos => {
+    const t = resumoAcordosVazio();
+    ids.forEach((id) => {
+      const r = acordosPorCobrador.get(id);
+      if (r) {
+        (Object.keys(t) as (keyof ResumoAcordos)[]).forEach((k) => {
+          t[k] += r[k];
+        });
+      }
+      t.recebido += acordoPagos?.porCobrador.get(id) ?? 0;
+    });
+    return t;
+  };
+
+  const qtdValor = (qtd: number, valor: number) =>
+    qtd > 0 ? `${fmtNum(qtd)} · ${formatCurrency(valor, false)}` : "0";
+
+  // Card Acordos (pedido do gestor 2026-11-19): acordos e o dinheiro que
+  // entrou neles. "Recebido em acordos" NAO esta somado no Desempenho desta
+  // tela (que vem de sale_payments + pago na loja) -- so informacao.
+  const cardAcordos = (r: ResumoAcordos) => (
+    <SummaryCard
+      icon={Handshake}
+      title="Acordos"
+      value={formatCurrency(r.ativosValor, false)}
+      valueTone="blue"
+      caption={`${fmtNum(r.ativosQtd)} ${r.ativosQtd === 1 ? "acordo ativo" : "acordos ativos"} agora`}
+      rows={[
+        {
+          label: "Feitos no período",
+          value: qtdValor(r.feitosQtd, r.feitosValor),
+        },
+        {
+          label: "Cumpridos",
+          value: qtdValor(r.cumpridosQtd, r.cumpridosValor),
+          tone: r.cumpridosQtd > 0 ? "green" : undefined,
+          hint: "Acordos quitados dentro do período",
+        },
+        {
+          label: "Quebrados/cancelados",
+          value: qtdValor(r.quebradosQtd, r.quebradosValor),
+          tone: r.quebradosQtd > 0 ? "red" : undefined,
+          hint: "Acordos fechados sem cumprir dentro do período",
+        },
+        {
+          label: "Recebido em acordos",
+          value: acordoPagosProntos ? formatCurrency(r.recebido, false) : "…",
+          loading: !acordoPagosProntos,
+          hint: "Parcelas de acordo pagas no período",
+        },
+      ]}
+    />
+  );
+
+  // Card Agendamentos: os mesmos numeros das colunas da Tabela (agendadas,
+  // realizadas, reagendadas, nao encontrado), por data efetiva no periodo.
+  // Valor = saldo do cliente gravado quando o agendamento foi feito.
+  const cardAgendamentos = (q: {
+    agendadasQtd: number;
+    agendadasValor: number;
+    realizadasQtd: number;
+    reagendadasQtd: number;
+    reagendadasValor: number;
+    naoEncontradoQtd: number;
+    naoEncontradoValor: number;
+    emAtrasoVisitas: number;
+  }) => (
+    <SummaryCard
+      icon={CalendarCheck}
+      title="Agendamentos"
+      value={fmtNum(q.agendadasQtd)}
+      valueTone="blue"
+      caption={`agendados no período · ${formatCurrency(q.agendadasValor, false)}`}
+      rows={[
+        { label: "Realizados", value: fmtNum(q.realizadasQtd) },
+        {
+          label: "Reagendados",
+          value: qtdValor(q.reagendadasQtd, q.reagendadasValor),
+          tone: q.reagendadasQtd > 0 ? "amber" : undefined,
+        },
+        {
+          label: "Não encontrado",
+          value: qtdValor(q.naoEncontradoQtd, q.naoEncontradoValor),
+        },
+        {
+          label: "Atrasados",
+          value: fmtNum(q.emAtrasoVisitas),
+          tone: q.emAtrasoVisitas > 0 ? "red" : undefined,
+          hint: "Agendamentos cuja data já passou sem registro (situação de agora, não do período escolhido)",
+        },
+      ]}
+    />
+  );
+
   return (
     <div className="space-y-4">
       <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-4 lg:p-5 space-y-3">
@@ -1243,7 +1454,7 @@ const CollectorsSummary: React.FC = () => {
           // Carteira e Vencido ja foram unidos num card so, mas o gestor
           // pediu mais destaque pro valor vencido -- separados de novo,
           // sem repetir "A vencer" nos dois (fica so dentro de Carteira).
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
             <SummaryCard
               icon={Gauge}
               title="Desempenho"
@@ -1312,12 +1523,6 @@ const CollectorsSummary: React.FC = () => {
                   tone: totals.semAgendamentoClientes > 0 ? "amber" : undefined,
                   hint: "Toda a carteira do período (vencida ou a vencer) sem próxima visita marcada — não é só quem está vencido",
                 },
-                {
-                  label: "Atrasados",
-                  value: fmtNum(totals.emAtrasoVisitas),
-                  tone: totals.emAtrasoVisitas > 0 ? "red" : undefined,
-                  hint: "Visitas agendadas cuja data já passou (situação de agora, não do período escolhido)",
-                },
               ]}
             />
             <SummaryCard
@@ -1338,6 +1543,8 @@ const CollectorsSummary: React.FC = () => {
                 },
               ]}
             />
+            {cardAcordos(somaAcordos(rows.map((r) => r.id)))}
+            {cardAgendamentos(totals)}
           </div>
         )}
       </div>
@@ -1477,12 +1684,6 @@ const CollectorsSummary: React.FC = () => {
                       tone: row.semAgendamentoClientes > 0 ? "amber" : undefined,
                       hint: "Toda a carteira do período (vencida ou a vencer) sem próxima visita marcada — não é só quem está vencido",
                     },
-                    {
-                      label: "Atrasados",
-                      value: fmtNum(row.emAtrasoVisitas),
-                      tone: row.emAtrasoVisitas > 0 ? "red" : undefined,
-                      hint: "Visitas agendadas cuja data já passou (situação de agora, não do período escolhido)",
-                    },
                   ]}
                 />
                 <SummaryCard
@@ -1503,6 +1704,10 @@ const CollectorsSummary: React.FC = () => {
                     },
                   ]}
                 />
+                {/* Externo nao faz acordo (perfis de carteira, config/profiles). */}
+                {isWalletCollectorType(row.type) &&
+                  cardAcordos(somaAcordos([row.id]))}
+                {cardAgendamentos(row)}
                 {carteiraAuto.regrasPor.has(row.id) &&
                   (() => {
                     const regras = carteiraAuto.regrasPor.get(row.id) ?? [];
