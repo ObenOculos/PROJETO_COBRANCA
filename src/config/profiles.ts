@@ -97,7 +97,7 @@ export function channelsForCollectorType(
 
 export const USER_TYPE_LABELS: Record<UserType, string> = {
   manager: "Gerente",
-  collector: "Cobrador",
+  collector: "Cobrador Externo",
   internal_collector: "Cobrança Interna",
   third_party_collector: "Cobrança Terceirizada",
   legal_collector: "Cobrança Jurídica",
