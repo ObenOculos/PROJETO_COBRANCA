@@ -1101,6 +1101,26 @@ const CarteiraDistribuicao: React.FC = () => {
     return { total, sem, doDono, comOutro: total - sem - doDono };
   };
 
+  // Colunas da tabela de cobertura (pedido 2026-11-19: faixas de atraso
+  // como colunas). Cortes = inicio de cada faixa ativa e o dia seguinte ao
+  // teto -- assim cada coluna fica inteira dentro ou fora de cada faixa.
+  const colunasCobertura = useMemo(() => {
+    const cortes = new Set<number>([1]);
+    cobertura.forEach(({ ativas }) =>
+      ativas.forEach(({ r }) => {
+        cortes.add(r.minDias);
+        if (r.maxDias != null) cortes.add(r.maxDias + 1);
+      }),
+    );
+    const lista = Array.from(cortes)
+      .filter((n) => n >= 1)
+      .sort((a, b) => a - b);
+    return lista.map((ini, i) => ({
+      ini,
+      fim: i + 1 < lista.length ? lista[i + 1] - 1 : Infinity,
+    }));
+  }, [cobertura]);
+
   const lojasComProblema = cobertura.filter((c) => c.problema).length;
   // Com problema, a tela ja abre filtrada neles; o gestor desmarca para ver tudo.
   const [soProblemas, setSoProblemas] = useState(true);
@@ -1620,8 +1640,8 @@ const CarteiraDistribuicao: React.FC = () => {
               2. Cobertura por loja
             </h3>
             <p className="text-xs text-gray-500 dark:text-dark-text-secondary mt-1">
-              Uma linha por trecho de atraso de cada loja, na ordem dos dias:
-              quem cobra e quantos clientes em aberto a loja tem ali.
+              Uma linha por loja e uma coluna por faixa de dias de atraso: em
+              cada casa, quem cobra e quantos clientes em aberto a loja tem ali.
             </p>
           </div>
           {lojasComProblema > 0 && (
@@ -1667,166 +1687,152 @@ const CarteiraDistribuicao: React.FC = () => {
           </p>
         )}
 
-        {/* Tabela (pedido 2026-11-19: barra + chips ficaram dificeis de ler).
-            Cada loja: um trecho por linha, na ordem dos dias -- faixa de
-            cobrador, lacuna entre faixas (falha) e antes/depois das faixas
-            (so informacao). Clientes = em aberto na loja com aquele atraso
-            (mesma base do plano da distribuicao, ver clientesPorLoja). */}
-        {coberturaVisivel.length > 0 && (
+        {/* Tabela loja x faixa (pedido 2026-11-19: primeiro barra + chips,
+            depois um trecho por linha; o usuario preferiu as faixas como
+            colunas). Casa: dono da faixa naquela loja e clientes em aberto
+            com aquele atraso (mesma base do plano, ver clientesPorLoja).
+            Amarelo = lacuna entre faixas ou loja sem cobrador (falha);
+            cinza = antes da 1a / depois da ultima faixa (so informacao);
+            vermelho = dois cobradores na mesma faixa. */}
+        {coberturaVisivel.length > 0 && colunasCobertura.length > 0 && (
           <div className="overflow-x-auto -mx-1">
-            <table className="w-full min-w-[640px] text-sm">
+            <table className="w-full text-sm border-separate border-spacing-0">
               <thead>
-                <tr className="text-left text-[11px] uppercase tracking-wide text-gray-500 dark:text-dark-text-secondary border-b border-gray-200 dark:border-dark-border">
-                  <th className="py-2 px-2 font-semibold">Loja</th>
-                  <th className="py-2 px-2 font-semibold">Atraso</th>
-                  <th className="py-2 px-2 font-semibold">Quem cobra</th>
-                  <th className="py-2 px-2 font-semibold text-right">Clientes</th>
-                  <th className="py-2 px-2 font-semibold text-right">Na carteira dele(a)</th>
-                  <th className="py-2 px-2 font-semibold text-right">Sem cobrador</th>
-                  <th className="py-2 px-2 font-semibold text-right">Com outro</th>
+                <tr className="text-[11px] text-gray-500 dark:text-dark-text-secondary">
+                  <th className="sticky left-0 z-10 bg-white dark:bg-dark-bg-secondary py-2 px-2 text-left font-semibold border-b border-gray-200 dark:border-dark-border">
+                    Loja
+                  </th>
+                  {colunasCobertura.map((col) => (
+                    <th
+                      key={col.ini}
+                      className="py-2 px-2 text-center font-semibold whitespace-nowrap border-b border-gray-200 dark:border-dark-border"
+                    >
+                      {col.fim === Infinity ? `${col.ini}+` : `${col.ini} a ${col.fim}`}
+                      <div className="font-normal text-[10px] text-gray-400">dias</div>
+                    </th>
+                  ))}
                 </tr>
               </thead>
-              {coberturaVisivel.map(
-                ({ loja, regras, ativas, buracos, conflitos, foraInicio, foraFim, problema }) => {
-                  type Linha = {
-                    id: string;
-                    ini: number;
-                    fim: number;
-                    tipo: "faixa" | "buraco" | "fora" | "nenhum";
-                    c?: User;
-                  };
-                  const linhas: Linha[] =
-                    ativas.length === 0
-                      ? [{ id: "nenhum", ini: 1, fim: Infinity, tipo: "nenhum" }]
-                      : [
-                          ...ativas.map(({ c, r }) => ({
-                            id: r.id,
-                            ini: r.minDias,
-                            fim: r.maxDias ?? Infinity,
-                            tipo: "faixa" as const,
-                            c,
-                          })),
-                          ...buracos.map((bu) => ({
-                            id: `b${bu.ini}`,
-                            ini: bu.ini,
-                            fim: bu.fim,
-                            tipo: "buraco" as const,
-                          })),
-                          ...(foraInicio != null
-                            ? [{ id: "fi", ini: 1, fim: foraInicio, tipo: "fora" as const }]
-                            : []),
-                          ...(foraFim != null
-                            ? [{ id: "ff", ini: foraFim + 1, fim: Infinity, tipo: "fora" as const }]
-                            : []),
-                        ].sort((x, y) => x.ini - y.ini);
+              <tbody>
+                {coberturaVisivel.map(({ loja, regras, ativas, problema }) => {
+                  const primeira = ativas.length
+                    ? Math.min(...ativas.map(({ r }) => r.minDias))
+                    : null;
+                  const ultimoTeto = ativas.some(({ r }) => r.maxDias == null)
+                    ? Infinity
+                    : ativas.length
+                      ? Math.max(...ativas.map(({ r }) => r.maxDias ?? 0))
+                      : null;
                   const inativas = regras.filter(({ r }) => !r.ativa);
-                  const extras = conflitos.length + (inativas.length > 0 ? 1 : 0);
-                  const num = (n: number, destaque?: string) => (
-                    <span className={n > 0 && destaque ? destaque : n === 0 ? "text-gray-300 dark:text-dark-text-secondary" : ""}>
-                      {n.toLocaleString("pt-BR")}
-                    </span>
-                  );
                   return (
-                    <tbody
-                      key={loja.loja}
-                      className="border-b border-gray-200 dark:border-dark-border"
-                    >
-                      {linhas.map((l, i) => {
-                        const q = contaEntre(loja.loja, l.ini, l.fim, l.c?.id);
-                        const faixa = faixaTexto(l.ini, l.fim === Infinity ? null : l.fim);
-                        const fundo =
-                          l.tipo === "buraco" || l.tipo === "nenhum"
-                            ? "bg-amber-50/70 dark:bg-amber-900/10"
-                            : l.tipo === "fora"
-                              ? "bg-gray-50/70 dark:bg-dark-bg/40"
-                              : "";
-                        return (
-                          <tr key={l.id} className={fundo}>
-                            {i === 0 && (
-                              <td
-                                rowSpan={linhas.length + extras}
-                                className="py-2 px-2 align-top bg-white dark:bg-dark-bg-secondary"
-                              >
-                                <div className="font-semibold text-gray-900 dark:text-dark-text flex items-center gap-1.5">
-                                  {problema && (
-                                    <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
-                                  )}
-                                  {loja.loja}
-                                </div>
-                                <div className="text-[11px] text-gray-500">
-                                  {loja.clientes_em_aberto.toLocaleString("pt-BR")} em aberto
-                                </div>
-                              </td>
-                            )}
-                            <td className="py-1.5 px-2 whitespace-nowrap text-gray-700 dark:text-dark-text">
-                              {faixa}
-                            </td>
-                            <td className="py-1.5 px-2">
-                              {l.tipo === "faixa" && l.c ? (
-                                <span className="inline-flex items-center gap-1.5 text-gray-900 dark:text-dark-text">
-                                  <span className={`h-2.5 w-2.5 rounded-sm shrink-0 ${corPorCobrador.get(l.c.id)}`} />
-                                  {l.c.name}
-                                </span>
-                              ) : l.tipo === "buraco" ? (
-                                <span className="font-semibold text-amber-700 dark:text-amber-300">
-                                  Sem cobrador (falha)
-                                </span>
-                              ) : l.tipo === "nenhum" ? (
-                                <span className="font-semibold text-amber-700 dark:text-amber-300">
-                                  {regras.length === 0
-                                    ? "Nenhum cobrador nesta loja"
-                                    : "Só faixas inativas"}
-                                </span>
-                              ) : (
-                                <span className="text-gray-500 dark:text-dark-text-secondary">
-                                  Ninguém cobra
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-1.5 px-2 text-right font-semibold">{num(q.total)}</td>
-                            <td className="py-1.5 px-2 text-right">
-                              {l.tipo === "faixa" ? num(q.doDono) : <span className="text-gray-300">—</span>}
-                            </td>
-                            <td className="py-1.5 px-2 text-right">
-                              {num(q.sem, "font-semibold text-amber-700 dark:text-amber-300")}
-                            </td>
-                            <td
-                              className="py-1.5 px-2 text-right"
-                              title={
-                                l.tipo === "faixa"
-                                  ? "Na carteira de outro cobrador"
-                                  : "Já com algum cobrador (carteira manual)"
-                              }
-                            >
-                              {num(l.tipo === "faixa" ? q.comOutro : q.total - q.sem)}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      {conflitos.map((d) => (
-                        <tr key={`c-${d}`} className="bg-red-50/70 dark:bg-red-900/10">
-                          <td colSpan={6} className="py-1.5 px-2 text-xs font-medium text-red-700 dark:text-red-300">
-                            <span className="inline-flex items-center gap-1">
-                              <AlertTriangle className="h-3 w-3" />
-                              Conflito {d}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                      {inativas.length > 0 && (
-                        <tr>
-                          <td colSpan={6} className="py-1 px-2 text-[11px] text-gray-400">
-                            Inativas aqui:{" "}
-                            {inativas
+                    <tr key={loja.loja} className="align-top">
+                      <td className="sticky left-0 z-10 bg-white dark:bg-dark-bg-secondary py-2 px-2 border-b border-gray-100 dark:border-dark-border min-w-[140px]">
+                        <div className="font-semibold text-gray-900 dark:text-dark-text flex items-center gap-1.5">
+                          {problema && (
+                            <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                          )}
+                          {loja.loja}
+                        </div>
+                        <div className="text-[11px] text-gray-500">
+                          {loja.clientes_em_aberto.toLocaleString("pt-BR")} em aberto
+                        </div>
+                        {inativas.length > 0 && (
+                          <div
+                            className="text-[10px] text-gray-400"
+                            title={inativas
                               .map(({ c, r }) => `${c.name} (${faixaTexto(r.minDias, r.maxDias)})`)
                               .join(", ")}
+                          >
+                            {inativas.length} {inativas.length === 1 ? "faixa inativa" : "faixas inativas"}
+                          </div>
+                        )}
+                      </td>
+                      {colunasCobertura.map((col) => {
+                        const donos = Array.from(
+                          new Map(
+                            ativas
+                              .filter(
+                                ({ r }) =>
+                                  r.minDias <= col.ini &&
+                                  (r.maxDias ?? Infinity) >= col.fim,
+                              )
+                              .map(({ c }) => [c.id, c]),
+                          ).values(),
+                        );
+                        const dono = donos.length === 1 ? donos[0] : undefined;
+                        const q = contaEntre(loja.loja, col.ini, col.fim, dono?.id);
+                        const fora =
+                          donos.length === 0 &&
+                          primeira != null &&
+                          (col.fim < primeira || (ultimoTeto != null && col.ini > ultimoTeto));
+                        const falha = donos.length === 0 && !fora;
+                        const conflito = donos.length > 1;
+                        const fundo = conflito
+                          ? "bg-red-50 dark:bg-red-900/15"
+                          : falha
+                            ? "bg-amber-50 dark:bg-amber-900/15"
+                            : fora
+                              ? "bg-gray-50 dark:bg-dark-bg/40"
+                              : "";
+                        return (
+                          <td
+                            key={col.ini}
+                            className={`py-2 px-2 text-center border-b border-l border-gray-100 dark:border-dark-border ${fundo}`}
+                            title={
+                              dono
+                                ? `${dono.name}: ${q.doDono} na carteira, ${q.sem} sem cobrador, ${q.comOutro} com outro`
+                                : conflito
+                                  ? `Conflito: ${donos.map((d) => d.name).join(" e ")}`
+                                  : `${q.sem} sem cobrador, ${q.total - q.sem} com algum cobrador (carteira manual)`
+                            }
+                          >
+                            <div className="text-[11px] whitespace-nowrap">
+                              {dono ? (
+                                <span className="inline-flex items-center gap-1 text-gray-700 dark:text-dark-text">
+                                  <span className={`h-2 w-2 rounded-sm shrink-0 ${corPorCobrador.get(dono.id)}`} />
+                                  {dono.name.split(" ")[0]}
+                                </span>
+                              ) : conflito ? (
+                                <span className="font-semibold text-red-700 dark:text-red-300">
+                                  {donos.map((d) => d.name.split(" ")[0]).join(" e ")}
+                                </span>
+                              ) : falha ? (
+                                <span className="font-semibold text-amber-700 dark:text-amber-300">
+                                  sem cobrador
+                                </span>
+                              ) : (
+                                <span className="text-gray-400">ninguém cobra</span>
+                              )}
+                            </div>
+                            <div
+                              className={`text-base font-bold leading-tight ${
+                                q.total === 0 ? "text-gray-300 dark:text-dark-text-secondary" : "text-gray-900 dark:text-dark-text"
+                              }`}
+                            >
+                              {q.total.toLocaleString("pt-BR")}
+                            </div>
+                            {dono && q.sem > 0 && (
+                              <div className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 whitespace-nowrap">
+                                {q.sem} sem cobrador
+                              </div>
+                            )}
+                            {dono && q.comOutro > 0 && (
+                              <div className="text-[10px] text-gray-500 whitespace-nowrap">
+                                {q.comOutro} com outro
+                              </div>
+                            )}
+                            {!dono && q.total - q.sem > 0 && (
+                              <div className="text-[10px] text-gray-500 whitespace-nowrap">
+                                {q.total - q.sem} com cobrador
+                              </div>
+                            )}
                           </td>
-                        </tr>
-                      )}
-                    </tbody>
+                        );
+                      })}
+                    </tr>
                   );
-                },
-              )}
+                })}
+              </tbody>
             </table>
           </div>
         )}
