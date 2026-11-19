@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { CobradorOptions } from "./common/CobradorOptions";
 import {
   Search,
   Users,
@@ -1461,11 +1462,10 @@ export const ClientAssignment = React.memo(
                   className="w-full sm:w-[195px] pl-3 pr-8 py-2 bg-gray-50 dark:bg-dark-bg border border-gray-100 dark:border-dark-border rounded-xl text-xs font-semibold text-gray-600 dark:text-dark-text tracking-wide focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer appearance-none"
                 >
                   <option value="">Cobrador: Todos</option>
-                  {collectors.map((collector) => (
-                    <option key={collector.id} value={collector.id}>
-                      Cobrador: {collector.name}
-                    </option>
-                  ))}
+                  <CobradorOptions
+                    cobradores={collectors}
+                    rotulo={(c) => `Cobrador: ${c.name}`}
+                  />
                 </select>
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
                   <Users className="h-3.5 w-3.5" />

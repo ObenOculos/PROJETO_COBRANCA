@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { CobradorOptions } from "../common/CobradorOptions";
 import * as XLSX from "xlsx";
 import {
   Download,
@@ -266,11 +267,7 @@ const AssignmentReportModal: React.FC<AssignmentReportModalProps> = ({
               className="px-3 py-2 rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-sm"
             >
               <option value="">Todos os cobradores</option>
-              {collectorOptions.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name}
-                </option>
-              ))}
+              <CobradorOptions cobradores={collectorOptions} />
             </select>
           </div>
           <button

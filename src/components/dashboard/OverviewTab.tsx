@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
+import { CobradorOptions } from "../common/CobradorOptions";
 import {
   DollarSign,
   TrendingUp,
@@ -56,7 +57,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
     null,
   );
   const [selectedCollector, setSelectedCollector] = useState<string>("all");
-  const { getClientGroups } = useCollection();
+  const { getClientGroups, users } = useCollection();
   const [schedulesPage, setSchedulesPage] = useState(1);
   const [clientsPage, setClientsPage] = useState(1);
 
@@ -1090,14 +1091,13 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               className="px-3 py-1.5 border border-gray-300 dark:border-dark-border rounded-lg text-sm bg-white dark:bg-dark-bg-secondary text-gray-900 dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-0 flex-1 sm:flex-none sm:min-w-[150px] transition-colors duration-300"
             >
               <option value="all">Todos os Cobradores</option>
-              {performance.map((collector) => (
-                <option
-                  key={collector.collectorId}
-                  value={collector.collectorId}
-                >
-                  {collector.collectorName}
-                </option>
-              ))}
+              <CobradorOptions
+                cobradores={performance.map((p) => ({
+                  id: p.collectorId,
+                  name: p.collectorName,
+                  type: users.find((u) => u.id === p.collectorId)?.type,
+                }))}
+              />
             </select>
           </div>
         </div>

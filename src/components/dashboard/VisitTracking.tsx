@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { CobradorOptions } from "../common/CobradorOptions";
 import {
   Calendar,
   CalendarClock,
@@ -1128,11 +1129,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                       className="w-full px-4 py-2 bg-gray-100 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl text-sm font-medium dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
                     >
                       <option value="all">Todos os Cobradores</option>
-                      {visibleCollectors.map((collector) => (
-                        <option key={collector.id} value={collector.id}>
-                          {collector.name}
-                        </option>
-                      ))}
+                      <CobradorOptions cobradores={visibleCollectors} />
                     </select>
                   </div>
 

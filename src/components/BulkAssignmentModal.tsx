@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { CobradorOptions } from "./common/CobradorOptions";
 import {
   Users,
   UserPlus,
@@ -33,7 +34,7 @@ interface Props {
   onClose: () => void;
   selectedClients: Set<string>;
   clientsData: ClientWithCollections[];
-  collectors: { id: string; name: string }[];
+  collectors: { id: string; name: string; type?: UserType }[];
   onComplete?: () => void;
 }
 
@@ -441,11 +442,10 @@ const BulkAssignmentModal: React.FC<Props> = ({
                   className="w-full px-4 py-3 text-xs font-black border border-gray-200 dark:border-dark-border rounded-2xl bg-gray-50 dark:bg-dark-bg focus:outline-none focus:ring-2 focus:ring-blue-500 tracking-wide"
                 >
                   <option value="">SELECIONE UM COBRADOR...</option>
-                  {collectors.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name.toUpperCase()}
-                    </option>
-                  ))}
+                  <CobradorOptions
+                    cobradores={collectors}
+                    rotulo={(c) => c.name.toUpperCase()}
+                  />
                 </select>
               </div>
             )}

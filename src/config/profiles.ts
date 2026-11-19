@@ -103,6 +103,47 @@ export const USER_TYPE_LABELS: Record<UserType, string> = {
   legal_collector: "Cobrança Jurídica",
 };
 
+/**
+ * Grupos das listas de cobradores (dropdowns), na ordem em que aparecem.
+ * Nomes curtos que diferenciam Externo de Interno -- USER_TYPE_LABELS chama o
+ * externo so de "Cobrador" (decisao do usuario 2026-11-19).
+ */
+export const GRUPOS_COBRADOR: readonly { type: UserType; label: string }[] = [
+  { type: "collector", label: "Externo" },
+  { type: "internal_collector", label: "Interno" },
+  { type: "third_party_collector", label: "Terceirizado" },
+  { type: "legal_collector", label: "Jurídico" },
+  { type: "manager", label: "Gestor" },
+];
+
+/**
+ * Separa uma lista de usuarios pelos grupos de GRUPOS_COBRADOR, nome em ordem
+ * alfabetica dentro de cada grupo. Grupo vazio fica de fora. Usuario sem tipo
+ * conhecido vai para "Outros", no fim.
+ */
+export function agruparPorPerfil<T extends { name: string }>(
+  itens: readonly T[],
+  tipoDe: (item: T) => UserType | null | undefined,
+): { label: string; itens: T[] }[] {
+  const porTipo = new Map<string, T[]>();
+  itens.forEach((item) => {
+    const tipo = tipoDe(item) ?? "";
+    const chave = GRUPOS_COBRADOR.some((g) => g.type === tipo) ? tipo : "";
+    if (!porTipo.has(chave)) porTipo.set(chave, []);
+    porTipo.get(chave)!.push(item);
+  });
+  const grupos = [
+    ...GRUPOS_COBRADOR.map((g) => ({ label: g.label, itens: porTipo.get(g.type) ?? [] })),
+    { label: "Outros", itens: porTipo.get("") ?? [] },
+  ];
+  return grupos
+    .filter((g) => g.itens.length > 0)
+    .map((g) => ({
+      label: g.label,
+      itens: [...g.itens].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
+    }));
+}
+
 /** Como a atribuicao a um perfil resolve a situacao de cada cliente. */
 export interface AssignmentSituacaoRule {
   /**

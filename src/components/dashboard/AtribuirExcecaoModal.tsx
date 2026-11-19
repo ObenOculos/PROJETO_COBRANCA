@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { CobradorOptions } from "../common/CobradorOptions";
 import { AlertTriangle, CheckCircle2, ShieldCheck, X } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { formatCurrency, formatDate } from "../../utils/formatters";
@@ -196,11 +197,7 @@ const AtribuirExcecaoModal: React.FC<Props> = ({
                   className="mt-1 w-full rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg px-3 py-2 text-sm text-gray-900 dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-teal-500"
                 >
                   <option value="">Escolha o cobrador…</option>
-                  {cobradores.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
+                  <CobradorOptions cobradores={cobradores} />
                 </select>
               </label>
 
