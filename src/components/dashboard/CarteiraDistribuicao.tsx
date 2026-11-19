@@ -98,7 +98,6 @@ const ACAO_LABEL: Record<AcaoDistribuicao, string> = {
 const DIAS_DADOS_ANTIGOS = 2;
 
 // Marcas da regua da cobertura por loja (dias de atraso).
-const MARCAS_ESCALA = [30, 60, 90, 180, 365, 730];
 
 const BLOQUEIO_LABEL = {
   acordo_ativo: "acordo ativo",
@@ -1101,9 +1100,6 @@ const CarteiraDistribuicao: React.FC = () => {
     });
     return { total, sem, doDono, comOutro: total - sem - doDono };
   };
-  const semCobradorEntre = (loja: string, ini: number, fim: number) =>
-    contaEntre(loja, ini, fim).sem;
-  const qtdClientes = (n: number) => `${n} ${n === 1 ? "cliente" : "clientes"}`;
 
   const lojasComProblema = cobertura.filter((c) => c.problema).length;
   // Com problema, a tela ja abre filtrada neles; o gestor desmarca para ver tudo.
@@ -1116,19 +1112,6 @@ const CarteiraDistribuicao: React.FC = () => {
       ? ordenada.filter((c) => c.problema)
       : ordenada;
   }, [cobertura, soProblemas, lojasComProblema]);
-
-  // Escala do grafico: ate o maior teto definido + folga (min. 180 dias).
-  const escalaMax = useMemo(() => {
-    const tetos = collectorOverdueRanges
-      .map((r) => r.maxDias ?? r.minDias)
-      .filter((n) => Number.isFinite(n));
-    return Math.max(180, ...tetos.map((t) => t + 30));
-  }, [collectorOverdueRanges]);
-
-  // Escala comprimida (raiz quadrada): com teto perto de 1000 dias, uma
-  // escala linear espremia "3 a 60" e "61 a 90" num canto da barra.
-  const posEscala = (dias: number) =>
-    (Math.sqrt(Math.min(Math.max(dias, 0), escalaMax)) / Math.sqrt(escalaMax)) * 100;
 
   const simular = async () => {
     setSimulando(true);
@@ -1637,8 +1620,8 @@ const CarteiraDistribuicao: React.FC = () => {
               2. Cobertura por loja
             </h3>
             <p className="text-xs text-gray-500 dark:text-dark-text-secondary mt-1">
-              Uma barra por loja, de 0 a {escalaMax} dias de atraso (os
-              primeiros dias ocupam mais espaço). Cada cor é um cobrador.
+              Uma linha por trecho de atraso de cada loja, na ordem dos dias:
+              quem cobra e quantos clientes em aberto a loja tem ali.
             </p>
           </div>
           {lojasComProblema > 0 && (
@@ -1677,31 +1660,6 @@ const CarteiraDistribuicao: React.FC = () => {
           </p>
         )}
 
-        {/* Legenda */}
-        {cobradoresComRegra.length > 0 && (
-          <div className="flex flex-wrap gap-x-4 gap-y-1 mb-3 text-xs text-gray-700 dark:text-dark-text-secondary">
-            {cobradoresComRegra.map((c) => (
-              <span key={c.id} className="inline-flex items-center gap-1.5">
-                <span className={`h-2.5 w-2.5 rounded-sm ${corPorCobrador.get(c.id)}`} />
-                {c.name}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Regua (mesma escala das barras) */}
-        <div className="relative h-4 mb-1 text-[10px] text-gray-400 select-none" aria-hidden>
-          {MARCAS_ESCALA.filter((d) => d < escalaMax).map((d) => (
-            <span
-              key={d}
-              className="absolute -translate-x-1/2 border-l border-gray-300 dark:border-dark-border pl-0.5"
-              style={{ left: `${posEscala(d)}%` }}
-            >
-              {d}
-            </span>
-          ))}
-        </div>
-
         {lojasComProblema === 0 && lojas.length > 0 && (
           <p className="mb-3 p-2.5 rounded-lg bg-green-50 text-green-800 text-xs dark:bg-green-900/20 dark:text-green-300 flex items-center gap-1.5">
             <CheckCircle className="h-3.5 w-3.5 shrink-0" />
@@ -1709,165 +1667,172 @@ const CarteiraDistribuicao: React.FC = () => {
           </p>
         )}
 
-        <div className="space-y-3">
-          {coberturaVisivel.map(
-            ({ loja, regras, ativas, buracos, conflitos, foraInicio, foraFim, problema }) => (
-              <div key={loja.loja}>
-                <div className="flex flex-wrap items-baseline justify-between gap-2 mb-1">
-                  <span className="font-semibold text-sm text-gray-900 dark:text-dark-text flex items-center gap-1.5">
-                    {problema && <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />}
-                    {loja.loja}
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    {loja.clientes_em_aberto} clientes em aberto
-                  </span>
-                </div>
-                {ativas.length === 0 ? (
-                  <div className="h-6 rounded bg-amber-50 dark:bg-amber-900/20 border border-dashed border-amber-300 text-[11px] text-amber-700 dark:text-amber-300 flex items-center px-2">
-                    {regras.length === 0
-                      ? "Nenhum cobrador nesta loja"
-                      : "Só faixas inativas: ninguém recebe clientes aqui"}
-                    {" · "}
-                    {qtdClientes(semCobradorEntre(loja.loja, 1, Infinity))} sem
-                    cobrador
-                  </div>
-                ) : (
-                  <div className="relative h-6 rounded bg-gray-100 dark:bg-dark-bg overflow-hidden">
-                    {ativas.map(({ c, r }) => {
-                      const left = posEscala(r.minDias);
-                      const width = Math.max(posEscala(r.maxDias ?? escalaMax) - left, 1);
-                      return (
-                        <div
-                          key={r.id}
-                          className={`absolute top-0 h-6 ${corPorCobrador.get(c.id)} border-r border-white/70 dark:border-dark-bg flex items-center overflow-hidden`}
-                          style={{ left: `${left}%`, width: `${width}%` }}
-                          title={`${c.name}: ${faixaTexto(r.minDias, r.maxDias)}`}
-                        >
-                          <span className="px-1.5 text-[11px] font-semibold text-white truncate">
-                            {c.name.split(" ")[0]} · {faixaCurta(r)}
-                          </span>
-                        </div>
-                      );
-                    })}
-                    {buracos.map((b) => (
-                      <div
-                        key={`b${b.ini}`}
-                        className="absolute top-0 h-6 bg-amber-200/70 dark:bg-amber-800/50 border-x border-dashed border-amber-500"
-                        style={{
-                          left: `${posEscala(b.ini)}%`,
-                          width: `${Math.max(posEscala(b.fim) - posEscala(b.ini), 1)}%`,
-                        }}
-                        title={`Sem cobrador: ${faixaTexto(b.ini, b.fim)} · ${qtdClientes(semCobradorEntre(loja.loja, b.ini, b.fim))}`}
-                      />
-                    ))}
-                  </div>
-                )}
-                {/* Um chip por trecho da regua, na ordem dos dias, com quantos
-                    clientes (em aberto) a loja tem ali -- pedido 2026-11-19.
-                    Faixa de cobrador: total e, se houver, quantos estao sem
-                    cobrador ou com outro. Lacuna/fora: quantos ninguem cobra. */}
-                {(() => {
-                  type Trecho =
-                    | { tipo: "faixa"; ini: number; fim: number; c: User; id: string }
-                    | { tipo: "buraco" | "fora"; ini: number; fim: number; id: string };
-                  const trechos: Trecho[] = [
-                    ...ativas.map(({ c, r }) => ({
-                      tipo: "faixa" as const,
-                      ini: r.minDias,
-                      fim: r.maxDias ?? Infinity,
-                      c,
-                      id: r.id,
-                    })),
-                    ...buracos.map((b) => ({
-                      tipo: "buraco" as const,
-                      ini: b.ini,
-                      fim: b.fim,
-                      id: `b${b.ini}`,
-                    })),
-                    ...(foraInicio != null
-                      ? [{ tipo: "fora" as const, ini: 1, fim: foraInicio, id: "fi" }]
-                      : []),
-                    ...(foraFim != null
-                      ? [{ tipo: "fora" as const, ini: foraFim + 1, fim: Infinity, id: "ff" }]
-                      : []),
-                  ].sort((a, b) => a.ini - b.ini);
-                  if (trechos.length === 0 && conflitos.length === 0) return null;
+        {/* Tabela (pedido 2026-11-19: barra + chips ficaram dificeis de ler).
+            Cada loja: um trecho por linha, na ordem dos dias -- faixa de
+            cobrador, lacuna entre faixas (falha) e antes/depois das faixas
+            (so informacao). Clientes = em aberto na loja com aquele atraso
+            (mesma base do plano da distribuicao, ver clientesPorLoja). */}
+        {coberturaVisivel.length > 0 && (
+          <div className="overflow-x-auto -mx-1">
+            <table className="w-full min-w-[640px] text-sm">
+              <thead>
+                <tr className="text-left text-[11px] uppercase tracking-wide text-gray-500 dark:text-dark-text-secondary border-b border-gray-200 dark:border-dark-border">
+                  <th className="py-2 px-2 font-semibold">Loja</th>
+                  <th className="py-2 px-2 font-semibold">Atraso</th>
+                  <th className="py-2 px-2 font-semibold">Quem cobra</th>
+                  <th className="py-2 px-2 font-semibold text-right">Clientes</th>
+                  <th className="py-2 px-2 font-semibold text-right">Na carteira dele(a)</th>
+                  <th className="py-2 px-2 font-semibold text-right">Sem cobrador</th>
+                  <th className="py-2 px-2 font-semibold text-right">Com outro</th>
+                </tr>
+              </thead>
+              {coberturaVisivel.map(
+                ({ loja, regras, ativas, buracos, conflitos, foraInicio, foraFim, problema }) => {
+                  type Linha = {
+                    id: string;
+                    ini: number;
+                    fim: number;
+                    tipo: "faixa" | "buraco" | "fora" | "nenhum";
+                    c?: User;
+                  };
+                  const linhas: Linha[] =
+                    ativas.length === 0
+                      ? [{ id: "nenhum", ini: 1, fim: Infinity, tipo: "nenhum" }]
+                      : [
+                          ...ativas.map(({ c, r }) => ({
+                            id: r.id,
+                            ini: r.minDias,
+                            fim: r.maxDias ?? Infinity,
+                            tipo: "faixa" as const,
+                            c,
+                          })),
+                          ...buracos.map((bu) => ({
+                            id: `b${bu.ini}`,
+                            ini: bu.ini,
+                            fim: bu.fim,
+                            tipo: "buraco" as const,
+                          })),
+                          ...(foraInicio != null
+                            ? [{ id: "fi", ini: 1, fim: foraInicio, tipo: "fora" as const }]
+                            : []),
+                          ...(foraFim != null
+                            ? [{ id: "ff", ini: foraFim + 1, fim: Infinity, tipo: "fora" as const }]
+                            : []),
+                        ].sort((x, y) => x.ini - y.ini);
+                  const inativas = regras.filter(({ r }) => !r.ativa);
+                  const extras = conflitos.length + (inativas.length > 0 ? 1 : 0);
+                  const num = (n: number, destaque?: string) => (
+                    <span className={n > 0 && destaque ? destaque : n === 0 ? "text-gray-300 dark:text-dark-text-secondary" : ""}>
+                      {n.toLocaleString("pt-BR")}
+                    </span>
+                  );
                   return (
-                    <div className="mt-1 flex flex-wrap gap-1.5">
-                      {conflitos.map((d) => (
-                        <span
-                          key={d}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800"
-                        >
-                          <AlertTriangle className="h-3 w-3" />
-                          Conflito {d}
-                        </span>
-                      ))}
-                      {trechos.map((t) => {
-                        const faixa = faixaTexto(t.ini, t.fim === Infinity ? null : t.fim);
-                        if (t.tipo === "faixa") {
-                          const q = contaEntre(loja.loja, t.ini, t.fim, t.c.id);
-                          const extra = [
-                            q.sem > 0 ? `${q.sem} sem cobrador` : "",
-                            q.comOutro > 0 ? `${q.comOutro} com outro` : "",
-                          ].filter(Boolean);
-                          return (
-                            <span
-                              key={t.id}
-                              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] text-gray-700 bg-white border border-gray-200 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text"
-                              title={`${t.c.name}: ${faixa} — ${q.doDono} na carteira dele(a)`}
-                            >
-                              <span className={`h-2 w-2 rounded-sm ${corPorCobrador.get(t.c.id)}`} />
-                              {t.c.name.split(" ")[0]} · {faixa} ·{" "}
-                              <strong>{qtdClientes(q.total)}</strong>
-                              {extra.length > 0 && (
-                                <span className="text-amber-700 dark:text-amber-300">
-                                  ({extra.join(", ")})
+                    <tbody
+                      key={loja.loja}
+                      className="border-b border-gray-200 dark:border-dark-border"
+                    >
+                      {linhas.map((l, i) => {
+                        const q = contaEntre(loja.loja, l.ini, l.fim, l.c?.id);
+                        const faixa = faixaTexto(l.ini, l.fim === Infinity ? null : l.fim);
+                        const fundo =
+                          l.tipo === "buraco" || l.tipo === "nenhum"
+                            ? "bg-amber-50/70 dark:bg-amber-900/10"
+                            : l.tipo === "fora"
+                              ? "bg-gray-50/70 dark:bg-dark-bg/40"
+                              : "";
+                        return (
+                          <tr key={l.id} className={fundo}>
+                            {i === 0 && (
+                              <td
+                                rowSpan={linhas.length + extras}
+                                className="py-2 px-2 align-top bg-white dark:bg-dark-bg-secondary"
+                              >
+                                <div className="font-semibold text-gray-900 dark:text-dark-text flex items-center gap-1.5">
+                                  {problema && (
+                                    <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                                  )}
+                                  {loja.loja}
+                                </div>
+                                <div className="text-[11px] text-gray-500">
+                                  {loja.clientes_em_aberto.toLocaleString("pt-BR")} em aberto
+                                </div>
+                              </td>
+                            )}
+                            <td className="py-1.5 px-2 whitespace-nowrap text-gray-700 dark:text-dark-text">
+                              {faixa}
+                            </td>
+                            <td className="py-1.5 px-2">
+                              {l.tipo === "faixa" && l.c ? (
+                                <span className="inline-flex items-center gap-1.5 text-gray-900 dark:text-dark-text">
+                                  <span className={`h-2.5 w-2.5 rounded-sm shrink-0 ${corPorCobrador.get(l.c.id)}`} />
+                                  {l.c.name}
+                                </span>
+                              ) : l.tipo === "buraco" ? (
+                                <span className="font-semibold text-amber-700 dark:text-amber-300">
+                                  Sem cobrador (falha)
+                                </span>
+                              ) : l.tipo === "nenhum" ? (
+                                <span className="font-semibold text-amber-700 dark:text-amber-300">
+                                  {regras.length === 0
+                                    ? "Nenhum cobrador nesta loja"
+                                    : "Só faixas inativas"}
+                                </span>
+                              ) : (
+                                <span className="text-gray-500 dark:text-dark-text-secondary">
+                                  Ninguém cobra
                                 </span>
                               )}
-                            </span>
-                          );
-                        }
-                        const q = contaEntre(loja.loja, t.ini, t.fim);
-                        return (
-                          <span
-                            key={t.id}
-                            className={
-                              t.tipo === "buraco"
-                                ? "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800"
-                                : "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] text-gray-500 bg-gray-50 border border-gray-200 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text-secondary"
-                            }
-                            title={
-                              q.total > q.sem
-                                ? `${q.total - q.sem} deles já estão com algum cobrador (carteira manual)`
-                                : undefined
-                            }
-                          >
-                            {t.tipo === "buraco" ? "Sem cobrador" : "Ninguém cobra"}: {faixa} ·{" "}
-                            <strong>{qtdClientes(q.sem)}</strong> sem cobrador
-                            {q.total > q.sem && ` · ${q.total - q.sem} com cobrador`}
-                          </span>
+                            </td>
+                            <td className="py-1.5 px-2 text-right font-semibold">{num(q.total)}</td>
+                            <td className="py-1.5 px-2 text-right">
+                              {l.tipo === "faixa" ? num(q.doDono) : <span className="text-gray-300">—</span>}
+                            </td>
+                            <td className="py-1.5 px-2 text-right">
+                              {num(q.sem, "font-semibold text-amber-700 dark:text-amber-300")}
+                            </td>
+                            <td
+                              className="py-1.5 px-2 text-right"
+                              title={
+                                l.tipo === "faixa"
+                                  ? "Na carteira de outro cobrador"
+                                  : "Já com algum cobrador (carteira manual)"
+                              }
+                            >
+                              {num(l.tipo === "faixa" ? q.comOutro : q.total - q.sem)}
+                            </td>
+                          </tr>
                         );
                       })}
-                    </div>
+                      {conflitos.map((d) => (
+                        <tr key={`c-${d}`} className="bg-red-50/70 dark:bg-red-900/10">
+                          <td colSpan={6} className="py-1.5 px-2 text-xs font-medium text-red-700 dark:text-red-300">
+                            <span className="inline-flex items-center gap-1">
+                              <AlertTriangle className="h-3 w-3" />
+                              Conflito {d}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                      {inativas.length > 0 && (
+                        <tr>
+                          <td colSpan={6} className="py-1 px-2 text-[11px] text-gray-400">
+                            Inativas aqui:{" "}
+                            {inativas
+                              .map(({ c, r }) => `${c.name} (${faixaTexto(r.minDias, r.maxDias)})`)
+                              .join(", ")}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
                   );
-                })()}
-                {regras.length > ativas.length && ativas.length > 0 && (
-                  <p className="mt-1 text-[11px] text-gray-400">
-                    Inativas aqui:{" "}
-                    {regras
-                      .filter(({ r }) => !r.ativa)
-                      .map(({ c, r }) => `${c.name} (${faixaTexto(r.minDias, r.maxDias)})`)
-                      .join(", ")}
-                  </p>
-                )}
-              </div>
-            ),
-          )}
-          {lojas.length === 0 && !lojasErro && (
-            <p className="text-sm text-gray-500">Carregando lojas…</p>
-          )}
-        </div>
+                },
+              )}
+            </table>
+          </div>
+        )}
+        {lojas.length === 0 && !lojasErro && (
+          <p className="text-sm text-gray-500">Carregando lojas…</p>
+        )}
       </div>
 
       {/* 3. Simular e aplicar */}
