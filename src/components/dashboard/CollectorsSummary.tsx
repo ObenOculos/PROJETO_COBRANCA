@@ -362,8 +362,9 @@ const CollectorsSummary: React.FC = () => {
     };
   }, []);
   /** Recebido em "…" ate o pago na loja chegar (1a entrada na aba). */
+  // Recebido so aparece com as duas buscas prontas (pago na loja e acordo).
   const fmtRecebido = (v: number): string =>
-    atribuicoesProntas ? formatCurrency(v, false) : "…";
+    atribuicoesProntas && acordoPagosProntos ? formatCurrency(v, false) : "…";
   const [activePreset, setActivePreset] = useState<PresetKey | "">(
     "month-atual",
   );
@@ -474,60 +475,78 @@ const CollectorsSummary: React.FC = () => {
     dateTo,
   );
 
-  // Pagamentos de parcela de acordo no periodo, por cobrador. Nao vem de
+  // Pagamentos de parcela de acordo (acordo_pagamentos). Nao vem de
   // salePayments: registrar_pagamento_acordo grava so em acordo_pagamentos
-  // (ver "Recuperacao do Mes" no CollectorDashboard). Guarda o periodo da
-  // busca: ao trocar de periodo o valor so aparece quando a busca NOVA chega
-  // (mesmo cuidado do Meu desempenho, achado 2026-11-18).
+  // (ver "Recuperacao do Mes" no CollectorDashboard). Entram no Desempenho e
+  // na meta desta tela, como ja entravam no Meu desempenho (2026-11-19).
+  // Sem duplicidade: (a) nao ha sale_payment para o mesmo dinheiro; (b) a
+  // parcela da SSOtica paga na loja vira acordo_pagamentos UMA vez (espelho
+  // da importacao, recebido_espelhado); (c) o titulo do acordo pago no ERP
+  // nao pode virar "pago na loja" (atribuicao_bloqueio_parcela, migration
+  // 20261119000001). Estorno e linha negativa: a soma ja desconta.
+  // Busca periodo + mes atual (meta e sempre do mes) e guarda o intervalo:
+  // ao trocar de periodo o valor so aparece quando a busca NOVA chega (mesmo
+  // cuidado do Meu desempenho, achado 2026-11-18).
+  const buscaAcordoDe =
+    dateFrom < inicioDoMes(today) ? dateFrom : inicioDoMes(today);
+  const buscaAcordoAte = dateTo > fimDoMes(today) ? dateTo : fimDoMes(today);
   const [acordoPagos, setAcordoPagos] = useState<{
     periodo: string;
-    porCobrador: Map<string, number>;
+    linhas: { collectorId: string; valor: number; data: string }[];
   } | null>(null);
-  const periodoAtual = `${dateFrom}|${dateTo}`;
+  const periodoAtual = `${buscaAcordoDe}|${buscaAcordoAte}`;
   useEffect(() => {
     let cancelado = false;
+    const periodo = `${buscaAcordoDe}|${buscaAcordoAte}`;
     (async () => {
       try {
-        const linhas = await fetchAllRows<{
+        const brutas = await fetchAllRows<{
           collector_id: string | null;
           valor_pago: number | string;
+          data_pagamento: string;
         }>(
           (de, ate) =>
             supabase
               .from("acordo_pagamentos")
-              .select("collector_id, valor_pago")
-              .gte("data_pagamento", dateFrom)
-              .lte("data_pagamento", dateTo)
+              .select("collector_id, valor_pago, data_pagamento")
+              .gte("data_pagamento", buscaAcordoDe)
+              .lte("data_pagamento", buscaAcordoAte)
               .order("id")
               .range(de, ate),
           () => cancelado,
         );
-        const porCobrador = new Map<string, number>();
-        linhas.forEach((l) => {
-          if (!l.collector_id) return;
-          porCobrador.set(
-            l.collector_id,
-            (porCobrador.get(l.collector_id) ?? 0) + Number(l.valor_pago || 0),
-          );
-        });
-        if (!cancelado) {
-          setAcordoPagos({ periodo: `${dateFrom}|${dateTo}`, porCobrador });
-        }
+        // data_pagamento e sempre YYYY-MM-DD (coluna date).
+        const linhas = brutas
+          .filter((l) => !!l.collector_id)
+          .map((l) => ({
+            collectorId: l.collector_id as string,
+            valor: Number(l.valor_pago || 0),
+            data: l.data_pagamento,
+          }));
+        if (!cancelado) setAcordoPagos({ periodo, linhas });
       } catch (err) {
         console.error("Erro ao buscar pagamentos de acordo:", err);
-        if (!cancelado) {
-          setAcordoPagos({
-            periodo: `${dateFrom}|${dateTo}`,
-            porCobrador: new Map(),
-          });
-        }
+        if (!cancelado) setAcordoPagos({ periodo, linhas: [] });
       }
     })();
     return () => {
       cancelado = true;
     };
-  }, [dateFrom, dateTo]);
+  }, [buscaAcordoDe, buscaAcordoAte]);
   const acordoPagosProntos = acordoPagos?.periodo === periodoAtual;
+  /** Recebido em acordo por cobrador no intervalo [de, ate]. */
+  const acordoRecebido = (
+    collectorId: string,
+    de: string,
+    ate: string,
+  ): number =>
+    (acordoPagosProntos ? acordoPagos!.linhas : []).reduce(
+      (sum, l) =>
+        l.collectorId === collectorId && l.data >= de && l.data <= ate
+          ? sum + l.valor
+          : sum,
+      0,
+    );
 
   // Carteira automatica (item 55): clientes que sairam da faixa do cobrador
   // sem acao dele, no periodo. Numero no card/linha do cobrador (de
@@ -656,7 +675,8 @@ const CollectorsSummary: React.FC = () => {
             .filter(
               (a) => a.collectorId === collector.id && inPeriod(a.data),
             )
-            .reduce((sum, a) => sum + a.valor, 0);
+            .reduce((sum, a) => sum + a.valor, 0) +
+          acordoRecebido(collector.id, dateFrom, dateTo);
 
         const myVisits = scheduledVisits.filter(
           (v) => v.collectorId === collector.id,
@@ -773,6 +793,8 @@ const CollectorsSummary: React.FC = () => {
     today,
     sortKey,
     sortDir,
+    acordoPagos,
+    acordoPagosProntos,
   ]);
 
   // Colapsa "Visao geral" sozinha na TRANSICAO pra 1 cobrador so (nao soca o
@@ -887,7 +909,11 @@ const CollectorsSummary: React.FC = () => {
           (a) =>
             teamCollectorIds.has(a.collectorId) && a.data.startsWith(mesAtual),
         )
-        .reduce((sum, a) => sum + a.valor, 0);
+        .reduce((sum, a) => sum + a.valor, 0) +
+      Array.from(teamCollectorIds).reduce(
+        (sum, id) => sum + acordoRecebido(id, inicioDoMes(today), fimDoMes(today)),
+        0,
+      );
 
     if (targetValue <= 0) return null;
 
@@ -898,6 +924,8 @@ const CollectorsSummary: React.FC = () => {
       progress: Math.min((actualValue / targetValue) * 100, 100),
       remaining: Math.max(0, targetValue - actualValue),
     };
+    // acordoRecebido le acordoPagos/acordoPagosProntos, que estao nas deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     currentUser,
     managerCollectorLinks,
@@ -905,6 +933,8 @@ const CollectorsSummary: React.FC = () => {
     salePayments,
     atribuicoesAprovadas,
     today,
+    acordoPagos,
+    acordoPagosProntos,
   ]);
 
   // Meta do MES ATUAL de cada cobrador, mesma base da meta da equipe acima
@@ -936,11 +966,22 @@ const CollectorsSummary: React.FC = () => {
         metaDoMes(monthlyGoals, row.id, mesAtual)?.payments_goal || 0,
       );
       if (meta <= 0) return;
-      const recebido = recebidoMes.get(row.id) ?? 0;
+      const recebido =
+        (recebidoMes.get(row.id) ?? 0) +
+        acordoRecebido(row.id, inicioDoMes(today), fimDoMes(today));
       mapa.set(row.id, { meta, recebido, pct: (recebido / meta) * 100 });
     });
     return mapa;
-  }, [rows, monthlyGoals, salePayments, atribuicoesAprovadas, today]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    rows,
+    monthlyGoals,
+    salePayments,
+    atribuicoesAprovadas,
+    today,
+    acordoPagos,
+    acordoPagosProntos,
+  ]);
 
   // Meta do mes somada dos cobradores VISIVEIS agora (mesma populacao de
   // `totals`, nao so a equipe vinculada ao gestor como em teamGoal) -- card
@@ -1138,7 +1179,7 @@ const CollectorsSummary: React.FC = () => {
           t[k] += r[k];
         });
       }
-      t.recebido += acordoPagos?.porCobrador.get(id) ?? 0;
+      t.recebido += acordoRecebido(id, dateFrom, dateTo);
     });
     return t;
   };
@@ -1147,8 +1188,8 @@ const CollectorsSummary: React.FC = () => {
     qtd > 0 ? `${fmtNum(qtd)} · ${formatCurrency(valor, false)}` : "0";
 
   // Card Acordos (pedido do gestor 2026-11-19): acordos e o dinheiro que
-  // entrou neles. "Recebido em acordos" NAO esta somado no Desempenho desta
-  // tela (que vem de sale_payments + pago na loja) -- so informacao.
+  // entrou neles. "Recebido em acordos" ja esta DENTRO do Desempenho (parte
+  // dele, nao soma de novo).
   const cardAcordos = (r: ResumoAcordos) => (
     <SummaryCard
       icon={Handshake}
@@ -1177,7 +1218,7 @@ const CollectorsSummary: React.FC = () => {
           label: "Recebido em acordos",
           value: acordoPagosProntos ? formatCurrency(r.recebido, false) : "…",
           loading: !acordoPagosProntos,
-          hint: "Parcelas de acordo pagas no período",
+          hint: "Parcelas de acordo pagas no período (no app ou na loja) — já está somado no Desempenho",
         },
       ]}
     />
@@ -1459,7 +1500,7 @@ const CollectorsSummary: React.FC = () => {
               icon={Gauge}
               title="Desempenho"
               value={fmtRecebido(totals.recebidoPeriodo)}
-              valueLoading={!atribuicoesProntas}
+              valueLoading={!atribuicoesProntas || !acordoPagosProntos}
               valueTone="green"
               caption={previstaPeriodHint}
               rows={[
@@ -1620,7 +1661,7 @@ const CollectorsSummary: React.FC = () => {
                   icon={Gauge}
                   title="Desempenho"
                   value={fmtRecebido(row.recebidoPeriodo)}
-                  valueLoading={!atribuicoesProntas}
+                  valueLoading={!atribuicoesProntas || !acordoPagosProntos}
                   valueTone="green"
                   caption={previstaPeriodHint}
                   rows={[
