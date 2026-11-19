@@ -125,6 +125,9 @@ interface LinhaCliente {
   appValor: number;
   appLancamentos: number;
   appCedrus: number;
+  /** Juros lancados no app junto com os pagamentos (fora do appValor: a base
+   * so guarda o principal). Contam no Desempenho/Resumo por Cobrador. */
+  appJuros: number;
   /** Pago na loja aprovado somado ao app (aprovado conta como registrado). */
   lojaAprovado: number;
   loja: LojaDoc | undefined;
@@ -296,7 +299,8 @@ const Diferenca: React.FC<{ valor: number }> = ({ valor }) => {
 };
 
 const ConferenciaRecebimentos: React.FC = () => {
-  const { users, getClientGroups, clientesRegistry } = useCollection();
+  const { users, getClientGroups, clientesRegistry, salePayments } =
+    useCollection();
   /** Código do cliente no Ciclone (cadastro), quando houver. */
   const codigoDe = (documento: string): string =>
     clientesRegistry.get(documento)?.codigo_cliente_erp?.trim() ?? "";
@@ -592,6 +596,22 @@ const ConferenciaRecebimentos: React.FC = () => {
     return m;
   }, [users]);
 
+  // Juros lancados no app no mes, por cobrador + cliente (2026-11-19: a
+  // Conferencia mostra o principal, como a base; o Desempenho soma os juros
+  // e a diferenca entre as telas confundia). salePayments ja vem com o juros
+  // negativo dos estornos (jurosDosEstornos).
+  const jurosPorCobradorDoc = useMemo(() => {
+    const { inicio, fim } = limitesDoMes(mes);
+    const m = new Map<string, number>();
+    salePayments.forEach((p) => {
+      const juros = Number(p.jurosAmount) || 0;
+      if (!juros || p.paymentDate < inicio || p.paymentDate > fim) return;
+      const k = `${p.collectorId ?? ""}|${soDigitos(p.clientDocument)}`;
+      m.set(k, (m.get(k) ?? 0) + juros);
+    });
+    return m;
+  }, [salePayments, mes]);
+
   const grupos = useMemo<GrupoCobrador[]>(() => {
     if (!linhas) return [];
     const porCobrador = new Map<string, GrupoCobrador>();
@@ -675,6 +695,7 @@ const ConferenciaRecebimentos: React.FC = () => {
         appValor,
         appLancamentos: l.app_lancamentos,
         appCedrus: num(l.app_cedrus),
+        appJuros: jurosPorCobradorDoc.get(`${l.cobrador_id ?? ""}|${doc}`) ?? 0,
         lojaAprovado,
         loja,
         situacao,
@@ -689,7 +710,7 @@ const ConferenciaRecebimentos: React.FC = () => {
         if (!a.id !== !b.id) return a.id ? -1 : 1;
         return a.nome.localeCompare(b.nome, "pt-BR");
       });
-  }, [linhas, nomePorId, marcacoesPorDoc, visao, lojaPorDoc]);
+  }, [linhas, nomePorId, marcacoesPorDoc, visao, lojaPorDoc, jurosPorCobradorDoc]);
 
   // Cobrador escolhido que sumiu (troca de mes/visao) volta para "Todos".
   const cobradorAtual =
@@ -725,6 +746,7 @@ const ConferenciaRecebimentos: React.FC = () => {
       app: 0,
       cedrus: 0,
       loja: 0,
+      juros: 0,
       comConversa: 0,
       porGrupo: {
         acao: 0,
@@ -749,6 +771,7 @@ const ConferenciaRecebimentos: React.FC = () => {
       r.app += c.appValor;
       r.cedrus += c.appCedrus;
       r.loja += c.lojaAprovado;
+      r.juros += c.appJuros;
       const grupo = grupoDe(c);
       r.porGrupo[grupo]++;
       // Sub-chips de situacao contam so dentro do grupo escolhido.
@@ -1092,6 +1115,14 @@ const ConferenciaRecebimentos: React.FC = () => {
                   title="Pagos na loja depois da cobrança, aprovados em Correções: contam como registrados pelo cobrador."
                 >
                   {formatCurrency(resumo.loja)} pago na loja (aprovado)
+                </div>
+              )}
+              {Math.abs(resumo.juros) > 0.005 && (
+                <div
+                  className="text-[11px] text-indigo-600 dark:text-indigo-400"
+                  title="Juros que o cobrador recebeu junto com as parcelas. Ficam fora do total acima porque a base só guarda o principal, mas contam no Desempenho do Resumo por Cobrador."
+                >
+                  + {formatCurrency(resumo.juros)} de juros (contam no Desempenho)
                 </div>
               )}
             </div>
