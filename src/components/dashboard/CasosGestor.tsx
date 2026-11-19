@@ -194,6 +194,18 @@ const CasosGestor: React.FC = () => {
                   label: "Mandados para o SPC",
                   value: String(decididos.filter((c) => c.status === "spc").length),
                 },
+                // Fechados pelo sistema (2026-11-19): cliente trocou de
+                // cobrador ou o atual ainda nao tinha 5 tentativas sem retorno.
+                ...(decididos.some((c) => c.status === "encerrado")
+                  ? [
+                      {
+                        label: "Encerrados automaticamente",
+                        value: String(
+                          decididos.filter((c) => c.status === "encerrado").length,
+                        ),
+                      },
+                    ]
+                  : []),
               ]}
               compact
               onClick={() => setSecao("decididos")}
@@ -343,18 +355,26 @@ const CasosGestor: React.FC = () => {
                         className={`font-semibold ${
                           c.status === "spc"
                             ? "text-red-600 dark:text-red-400"
-                            : "text-teal-600 dark:text-teal-400"
+                            : c.status === "encerrado"
+                              ? "text-gray-500 dark:text-dark-text-secondary"
+                              : "text-teal-600 dark:text-teal-400"
                         }`}
                       >
-                        {c.status === "spc" ? "SPC" : "Mantido"}
+                        {c.status === "spc"
+                          ? "SPC"
+                          : c.status === "encerrado"
+                            ? "Encerrado"
+                            : "Mantido"}
                       </span>{" "}
                       · {c.cliente_nome ?? c.documento} ·{" "}
                       {MOTIVO_CASO_LABEL[c.motivo] ?? c.motivo} ·{" "}
-                      {nomePorId.get(c.collector_id) ?? "cobrador"} · decidido
-                      por{" "}
-                      {c.decidido_por
-                        ? (nomePorId.get(c.decidido_por) ?? "gestor")
-                        : "gestor"}{" "}
+                      {nomePorId.get(c.collector_id) ?? "cobrador"} ·{" "}
+                      {c.status === "encerrado" ? "encerrado pelo sistema" : "decidido por"}{" "}
+                      {c.status === "encerrado"
+                        ? ""
+                        : c.decidido_por
+                          ? (nomePorId.get(c.decidido_por) ?? "gestor")
+                          : "gestor"}{" "}
                       em {dataBR(c.decidido_em)}
                       {c.observacao_gestor && ` — ${c.observacao_gestor}`}
                     </li>

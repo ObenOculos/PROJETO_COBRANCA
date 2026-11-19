@@ -25,6 +25,13 @@ export const LIMITE_TENTATIVAS_SEM_RETORNO = 5;
  */
 export const ESCADA_SEM_RETORNO_DIAS: readonly number[] = [15, 15, 30, 30];
 
+/** Escada do cliente com acordo quebrado (sem acordo ativo): mais curta,
+ * tratativa mais urgente (decisao do usuario 2026-11-19). Espelho em SQL:
+ * fila_espera_cobrador (migration 20261119000005). A contagem e so das
+ * tentativas do cobrador ATUAL do cliente ("ao trocar, a responsabilidade
+ * passa para o novo cobrador"). */
+export const ESCADA_ACORDO_QUEBRADO_DIAS: readonly number[] = [3, 3, 7, 7];
+
 /** Texto do selo da fila: por que o cliente voltou / onde esta. */
 export const textoEsperaFila = (
   tentativas: number,
