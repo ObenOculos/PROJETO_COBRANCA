@@ -1101,8 +1101,10 @@ const ConferenciaRecebimentos: React.FC = () => {
               <div className="text-[11px] sm:text-xs font-semibold text-gray-500 dark:text-dark-text-secondary">
                 Registrado no app
               </div>
+              {/* Total com os juros: o mesmo valor do Desempenho no Resumo
+                  por Cobrador. A diferenca ao lado usa so o principal. */}
               <div className="mt-0.5 text-base sm:text-xl font-bold text-gray-900 dark:text-dark-text">
-                {formatCurrency(resumo.app)}
+                {formatCurrency(resumo.app + resumo.juros)}
               </div>
               {resumo.cedrus !== 0 && (
                 <div className="text-[11px] text-gray-400 dark:text-dark-text-secondary">
@@ -1120,9 +1122,9 @@ const ConferenciaRecebimentos: React.FC = () => {
               {Math.abs(resumo.juros) > 0.005 && (
                 <div
                   className="text-[11px] text-indigo-600 dark:text-indigo-400"
-                  title="Juros que o cobrador recebeu junto com as parcelas. Ficam fora do total acima porque a base só guarda o principal, mas contam no Desempenho do Resumo por Cobrador."
+                  title="Juros que o cobrador recebeu junto com as parcelas: entram no total (como no Desempenho do Resumo por Cobrador), mas ficam fora da diferença, porque a base só guarda o principal."
                 >
-                  + {formatCurrency(resumo.juros)} de juros (contam no Desempenho)
+                  {formatCurrency(resumo.juros)} de juros (fora da diferença)
                 </div>
               )}
             </div>
@@ -1130,6 +1132,11 @@ const ConferenciaRecebimentos: React.FC = () => {
               <div className="text-[11px] sm:text-xs font-semibold text-gray-500 dark:text-dark-text-secondary">
                 Diferença (app − base)
               </div>
+              {Math.abs(resumo.juros) > 0.005 && (
+                <div className="text-[11px] text-gray-400 dark:text-dark-text-secondary">
+                  sem os juros
+                </div>
+              )}
               <div className="mt-0.5 text-base sm:text-xl font-bold">
                 <Diferenca valor={resumo.app - resumo.base} />
               </div>
