@@ -16,6 +16,9 @@ import {
   Store,
   Copy,
   Check,
+  AlertCircle,
+  Clock,
+  Percent,
 } from "lucide-react";
 import {
   ClientGroup,
@@ -623,6 +626,73 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     isAtenderOpen ||
     isAcordoOpen;
 
+  // Acoes da Ficha: no computador ficam no cabecalho; no celular, numa barra
+  // fixa embaixo (perto do polegar). Mesmas condicoes nos dois.
+  const mostrarAtender = podeAtender && hasRealPendingValue;
+  const mostrarReceber =
+    (isCollectorType(userType) || souGestor) && hasRealPendingValue;
+  const abrirReceber = () => {
+    if (getAcordoAtivoDoCliente(clientGroup.document)) {
+      setShowAcordoAtivoConfirm(true);
+    } else {
+      setIsGeneralPaymentModalOpen(true);
+    }
+  };
+  const mostrarAcordo = podeAtender && (!!acordoAtivo || hasRealPendingValue);
+  const abrirAcordo = () => {
+    if (acordoAtivo) setAcordoDetalheId(acordoAtivo.id);
+    else setIsAcordoOpen(true);
+  };
+  const mostrarMenuMais =
+    (isCollectorType(userType) || souGestor) &&
+    clientSales.some((sale) => sale.totalReceived > 0);
+  const itensMenuMais = (
+    <>
+      <button
+        id="edit-payments"
+        name="editPayments"
+        type="button"
+        onClick={() => {
+          setMenuMaisAberto(false);
+          handleEditPaymentClick();
+        }}
+        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left"
+      >
+        <Edit className="h-4 w-4 text-gray-500" />
+        {souGestor ? "Corrigir pagamento" : "Pedir correção de pagamento"}
+      </button>
+      {souGestor && (
+        <button
+          type="button"
+          onClick={() => {
+            setMenuMaisAberto(false);
+            setIsExcecaoOpen(true);
+          }}
+          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left"
+          title="Exceção: o cobrador conversou com o cliente, mas a conversa não ficou registrada como efetiva. Atribui o pago na loja direto, com motivo."
+        >
+          <Store className="h-4 w-4 text-gray-500" />
+          Atribuir pago na loja (exceção)
+        </button>
+      )}
+      {!souGestor && (
+        <button
+          type="button"
+          onClick={() => {
+            setMenuMaisAberto(false);
+            setIsAtribuirOpen(true);
+          }}
+          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left"
+          title="O cliente pagou na loja ou no banco depois que você cobrou: peça ao gestor para registrar o pagamento no seu nome"
+        >
+          <Store className="h-4 w-4 text-gray-500" />
+          Cliente pagou na loja
+        </button>
+      )}
+    </>
+  );
+  const temEncargo = !!encargoFicha && encargoFicha.encargo > 0.009;
+
   return (
     <>
       <div
@@ -683,7 +753,55 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
             {/* 2. Situacao (mesma regra da carteira: vencido x a vencer; com
                 acordo ativo, as parcelas do acordo) + 3. acoes, lado a lado
                 no computador. So mostra o que tem valor. */}
-            <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            {/* Celular: selos so com icone + valor (mesmo desenho do cartao da
+                carteira) e a conta dos juros numa linha curta. */}
+            {(saldoCliente.vencido > 0.01 || acordoAtivo) && (
+              <div className="sm:hidden mt-2">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {saldoCliente.vencido > 0.01 && (
+                    <span
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700"
+                      title={temEncargo ? "Cobrar hoje: vencido + multa + juros" : "Vencido"}
+                    >
+                      <AlertCircle className="h-3 w-3" />
+                      {formatCurrency(
+                        saldoCliente.vencido +
+                          (temEncargo ? encargoFicha!.encargo : 0),
+                      )}
+                      {temEncargo && (
+                        <Percent
+                          className="h-3 w-3 text-amber-600"
+                          aria-label="com multa e juros de hoje"
+                        />
+                      )}
+                    </span>
+                  )}
+                  {saldoCliente.vencido > 0.01 && atrasoCliente > 0 && (
+                    <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-red-50 text-red-600">
+                      {atrasoCliente}d
+                    </span>
+                  )}
+                  {acordoAtivo && (
+                    <span
+                      className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200"
+                      title="Em acordo: valores e atraso seguem as parcelas do acordo"
+                      aria-label="Em acordo"
+                    >
+                      <Handshake className="h-3.5 w-3.5" />
+                    </span>
+                  )}
+                </div>
+                {temEncargo && (
+                  <p className="mt-1 text-[11px] text-amber-800">
+                    {formatCurrency(saldoCliente.vencido)} + multa{" "}
+                    {formatCurrency(encargoFicha!.multa)} + juros{" "}
+                    {formatCurrency(encargoFicha!.juros)}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="hidden sm:flex mt-3 flex-row items-center justify-between gap-3">
               {/* So o que pede atencao: valor vencido (com o atraso) e acordo
                   ativo. Em dia / a vencer nao aparece (pedido do usuario). */}
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
@@ -716,7 +834,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
               {/* Atender e Receber pagamento sao o dia a dia; Acordo ao lado;
                   Editar pagamentos (rara, pede autorizacao) no menu. */}
               <div className="flex flex-wrap items-center gap-2 shrink-0">
-                {podeAtender && hasRealPendingValue && (
+                {mostrarAtender && (
                   <button
                     type="button"
                     onClick={() => setIsAtenderOpen(true)}
@@ -727,118 +845,59 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                     Atender
                   </button>
                 )}
-                {(isCollectorType(userType) || souGestor) &&
-                  hasRealPendingValue && (
+                {mostrarReceber && (
+                  <button
+                    id="distribute-payment"
+                    name="distributePayment"
+                    type="button"
+                    onClick={abrirReceber}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium shadow-sm"
+                    title="Lançar o valor recebido; o sistema distribui entre as parcelas"
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    Receber pagamento
+                  </button>
+                )}
+                {mostrarAcordo && (
+                  <button
+                    type="button"
+                    onClick={abrirAcordo}
+                    className="flex items-center gap-1.5 px-3 py-1.5 border border-amber-300 text-amber-800 bg-white rounded-lg hover:bg-amber-50 text-sm font-medium"
+                    title={
+                      acordoAtivo
+                        ? "Ver o acordo ativo, registrar pagamento de parcela"
+                        : "Negociar a dívida em parcelas"
+                    }
+                  >
+                    <Handshake className="h-4 w-4" />
+                    {acordoAtivo ? "Ver acordo" : "Fazer acordo"}
+                  </button>
+                )}
+                {mostrarMenuMais && (
+                  <div className="relative">
                     <button
-                      id="distribute-payment"
-                      name="distributePayment"
                       type="button"
-                      onClick={() => {
-                        if (getAcordoAtivoDoCliente(clientGroup.document)) {
-                          setShowAcordoAtivoConfirm(true);
-                        } else {
-                          setIsGeneralPaymentModalOpen(true);
-                        }
-                      }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium shadow-sm"
-                      title="Lançar o valor recebido; o sistema distribui entre as parcelas"
+                      onClick={() => setMenuMaisAberto((v) => !v)}
+                      className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
+                      title="Mais ações"
+                      aria-label="Mais ações"
+                      aria-expanded={menuMaisAberto}
                     >
-                      <CreditCard className="h-4 w-4" />
-                      Receber pagamento
+                      <MoreHorizontal className="h-4 w-4" />
                     </button>
-                  )}
-                {podeAtender &&
-                  (acordoAtivo ? (
-                    <button
-                      type="button"
-                      onClick={() => setAcordoDetalheId(acordoAtivo.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 border border-amber-300 text-amber-800 bg-white rounded-lg hover:bg-amber-50 text-sm font-medium"
-                      title="Ver o acordo ativo, registrar pagamento de parcela"
-                    >
-                      <Handshake className="h-4 w-4" />
-                      Ver acordo
-                    </button>
-                  ) : (
-                    hasRealPendingValue && (
-                      <button
-                        type="button"
-                        onClick={() => setIsAcordoOpen(true)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 border border-amber-300 text-amber-800 bg-white rounded-lg hover:bg-amber-50 text-sm font-medium"
-                        title="Negociar a dívida em parcelas"
-                      >
-                        <Handshake className="h-4 w-4" />
-                        Fazer acordo
-                      </button>
-                    )
-                  ))}
-                {(isCollectorType(userType) || souGestor) &&
-                  clientSales.some((sale) => sale.totalReceived > 0) && (
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setMenuMaisAberto((v) => !v)}
-                        className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
-                        title="Mais ações"
-                        aria-label="Mais ações"
-                        aria-expanded={menuMaisAberto}
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                      </button>
-                      {menuMaisAberto && (
-                        <>
-                          <div
-                            className="fixed inset-0 z-10"
-                            onClick={() => setMenuMaisAberto(false)}
-                          />
-                          <div className="absolute right-0 mt-1 z-20 w-56 bg-white border border-gray-200 rounded-xl shadow-lg py-1">
-                            <button
-                              id="edit-payments"
-                              name="editPayments"
-                              type="button"
-                              onClick={() => {
-                                setMenuMaisAberto(false);
-                                handleEditPaymentClick();
-                              }}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left"
-                            >
-                              <Edit className="h-4 w-4 text-gray-500" />
-                              {souGestor
-                                ? "Corrigir pagamento"
-                                : "Pedir correção de pagamento"}
-                            </button>
-                            {souGestor && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setMenuMaisAberto(false);
-                                  setIsExcecaoOpen(true);
-                                }}
-                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left"
-                                title="Exceção: o cobrador conversou com o cliente, mas a conversa não ficou registrada como efetiva. Atribui o pago na loja direto, com motivo."
-                              >
-                                <Store className="h-4 w-4 text-gray-500" />
-                                Atribuir pago na loja (exceção)
-                              </button>
-                            )}
-                            {!souGestor && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setMenuMaisAberto(false);
-                                  setIsAtribuirOpen(true);
-                                }}
-                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left"
-                                title="O cliente pagou na loja ou no banco depois que você cobrou: peça ao gestor para registrar o pagamento no seu nome"
-                              >
-                                <Store className="h-4 w-4 text-gray-500" />
-                                Cliente pagou na loja
-                              </button>
-                            )}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )}
+                    {menuMaisAberto && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-10"
+                          onClick={() => setMenuMaisAberto(false)}
+                        />
+                        <div className="absolute right-0 mt-1 z-20 w-56 bg-white border border-gray-200 rounded-xl shadow-lg py-1">
+                          {itensMenuMais}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -846,7 +905,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 pode cobrar so o vencido. */}
             {encargoFicha && encargoFicha.encargo > 0.009 && (
               <div
-                className="mt-2 flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs text-amber-900"
+                className="hidden sm:flex mt-2 items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs text-amber-900"
                 title="Este cliente tem multa e juros de atraso: cobre o valor de hoje, não só o vencido. Mesma conta do Ciclone (Prev. Baixa); o valor sobe a cada dia de atraso."
               >
                 <AlertTriangle className="h-4 w-4 flex-shrink-0" />
@@ -1312,22 +1371,44 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                       {resumo.vencido > 0.01 && (
                                         <span className="inline-flex items-center gap-1 rounded-md bg-red-100 px-1.5 py-0.5 font-semibold text-red-700">
                                           <AlertTriangle className="h-3 w-3" />
-                                          Em atraso{" "}
+                                          <span className="hidden sm:inline">
+                                            Em atraso
+                                          </span>{" "}
                                           {formatCurrency(resumo.vencido)} ·{" "}
-                                          {resumo.maiorAtraso} dia
-                                          {resumo.maiorAtraso !== 1 ? "s" : ""}
+                                          <span className="sm:hidden">
+                                            {resumo.maiorAtraso}d
+                                          </span>
+                                          <span className="hidden sm:inline">
+                                            {resumo.maiorAtraso} dia
+                                            {resumo.maiorAtraso !== 1 ? "s" : ""}
+                                          </span>
                                         </span>
                                       )}
                                       {resumo.aVencer > 0.01 && (
-                                        <span className="inline-flex items-center rounded-md bg-gray-100 px-1.5 py-0.5 font-medium text-gray-600">
-                                          A vencer{" "}
+                                        <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 font-medium text-gray-600">
+                                          <Clock className="h-3 w-3 sm:hidden" />
+                                          <span className="hidden sm:inline">
+                                            A vencer
+                                          </span>{" "}
                                           {formatCurrency(resumo.aVencer)}
-                                          {resumo.proximoVencimento &&
-                                            ` · próx. ${formatDate(resumo.proximoVencimento)}`}
+                                          {resumo.proximoVencimento && (
+                                            <span className="hidden sm:inline">
+                                              {` · próx. ${formatDate(resumo.proximoVencimento)}`}
+                                            </span>
+                                          )}
                                         </span>
                                       )}
                                     </div>
                                   )}
+                                {temSelos && (
+                                  <p className="sm:hidden mt-1 text-[11px] text-gray-500">
+                                    Pago{" "}
+                                    <span className="text-green-600 font-medium">
+                                      {formatCurrency(saleBalance.totalPaid)}
+                                    </span>{" "}
+                                    de {formatCurrency(sale.totalValue)}
+                                  </p>
+                                )}
                                 {(() => {
                                   const lojasVenda =
                                     lojasCliente.length > 1
@@ -1362,8 +1443,11 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                               </div>
                             </div>
 
-                            {/* Right: Valores */}
-                            <div className="text-right flex-shrink-0">
+                            {/* Right: Valores. No celular, com selos, some:
+                                os selos e o "Pago X de Y" ja dizem tudo. */}
+                            <div
+                              className={`text-right flex-shrink-0 ${temSelos ? "hidden sm:block" : ""}`}
+                            >
                               <div className="text-sm font-semibold text-gray-900">
                                 {formatCurrency(sale.totalValue)}
                               </div>
@@ -1588,8 +1672,12 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                             className="mt-0.5 rounded bg-amber-50 px-1 text-[10px] font-semibold text-amber-800"
                                             title={`Multa ${encargo.percentualMulta}% = ${formatCurrency(encargo.multa)} + juros ${encargo.percentualJurosDia}% ao dia × ${encargo.dias} dias = ${formatCurrency(encargo.juros)}`}
                                           >
-                                            + {formatCurrency(encargo.encargo)}{" "}
-                                            multa/juros · hoje{" "}
+                                            <span className="hidden sm:inline">
+                                              + {formatCurrency(encargo.encargo)}{" "}
+                                              multa/juros ·{" "}
+                                            </span>
+                                            <Percent className="sm:hidden inline h-3 w-3 -mt-0.5 mr-0.5" />
+                                            hoje{" "}
                                             {formatCurrency(encargo.totalHoje)}
                                           </div>
                                         )}
@@ -1627,6 +1715,72 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                     );
                   })}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Celular: acoes numa barra fixa embaixo. O menu "Mais" abre para
+              cima. */}
+          {(mostrarAtender || mostrarReceber || mostrarAcordo || mostrarMenuMais) && (
+            <div className="sm:hidden shrink-0 border-t border-gray-200 bg-white px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] flex items-center gap-2">
+              {mostrarAcordo && (
+                <button
+                  type="button"
+                  onClick={abrirAcordo}
+                  className="flex items-center justify-center w-11 h-11 rounded-xl border border-amber-300 text-amber-700 bg-white shrink-0"
+                  title={acordoAtivo ? "Ver acordo" : "Fazer acordo"}
+                  aria-label={acordoAtivo ? "Ver acordo" : "Fazer acordo"}
+                >
+                  <Handshake className="h-5 w-5" />
+                </button>
+              )}
+              {mostrarMenuMais && (
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setMenuMaisAberto((v) => !v)}
+                    className="flex items-center justify-center w-11 h-11 rounded-xl border border-gray-200 text-gray-600"
+                    aria-label="Mais ações"
+                    aria-expanded={menuMaisAberto}
+                  >
+                    <MoreHorizontal className="h-5 w-5" />
+                  </button>
+                  {menuMaisAberto && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={() => setMenuMaisAberto(false)}
+                      />
+                      <div className="absolute left-0 bottom-full mb-2 z-20 w-60 bg-white border border-gray-200 rounded-xl shadow-lg py-1">
+                        {itensMenuMais}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+              <div className="flex-1 flex items-center justify-end gap-2 min-w-0">
+                {mostrarReceber && (
+                  <button
+                    type="button"
+                    onClick={abrirReceber}
+                    className="flex-1 h-11 inline-flex items-center justify-center gap-1.5 bg-emerald-600 text-white rounded-xl text-sm font-semibold active:bg-emerald-700"
+                    title="Lançar o valor recebido; o sistema distribui entre as parcelas"
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    Receber
+                  </button>
+                )}
+                {mostrarAtender && (
+                  <button
+                    type="button"
+                    onClick={() => setIsAtenderOpen(true)}
+                    className="flex-1 h-11 inline-flex items-center justify-center gap-1.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold active:bg-indigo-700"
+                    title="Registrar contato e agendar o próximo"
+                  >
+                    <PhoneCall className="h-4 w-4" />
+                    Atender
+                  </button>
+                )}
               </div>
             </div>
           )}
