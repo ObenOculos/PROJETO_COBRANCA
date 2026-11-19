@@ -197,8 +197,28 @@ const SortTh: React.FC<{
 
 const fmtNum = (n: number): string => n.toLocaleString("pt-BR");
 
-/** Externo trabalha por visita: sem linhas/coluna de acionamentos. */
-const semAcionamentos = (type: UserType): boolean => type === "collector";
+/** Textos de atendimento por perfil. Externo trabalha por visita
+ * (pedido do usuario 2026-11-19: "acionamentos/conversaram" nao faz sentido
+ * para ele); os demais por ligacao/WhatsApp. Mesmo numero, nome certo. */
+const atendimentoTexto = (visita: boolean) =>
+  visita
+    ? {
+        clientes: "Clientes visitados",
+        conversou: "encontrado",
+        conversaram: "encontrados",
+        registros: "Visitas",
+        registrosMin: "visitas",
+        registrosHint: "Total de visitas concluídas no período (realizada, não encontrado ou reagendada)",
+      }
+    : {
+        clientes: "Clientes acionados",
+        conversou: "conversou",
+        conversaram: "conversaram",
+        registros: "Acionamentos",
+        registrosMin: "acionamentos",
+        registrosHint: "Total de registros no período, sem deduplicar por cliente",
+      };
+const ehExterno = (type: UserType): boolean => type === "collector";
 
 /** Acordos de um cobrador (ou soma de varios) para o card Acordos. */
 interface ResumoAcordos {
@@ -759,19 +779,12 @@ const CollectorsSummary: React.FC = () => {
           aReceberQtd,
           aReceberValor,
           recebidoPeriodo,
-          // Externo trabalha por VISITA (card Agendamentos/Realizadas):
-          // "acionados/conversaram/acionamentos" nao faz sentido para ele
-          // (pedido do usuario 2026-11-19). Zerado aqui para nao somar na
-          // Visao geral nem pesar na ordenacao; a tela mostra "—".
-          clientesAtendidos: semAcionamentos(collector.type)
-            ? 0
-            : (atend?.clientes ?? 0),
-          clientesConversaram: semAcionamentos(collector.type)
-            ? 0
-            : (atend?.conversaram ?? 0),
-          acionamentosQtd: semAcionamentos(collector.type)
-            ? 0
-            : (atend?.tentativas ?? 0),
+          // Para o externo estes numeros vem das VISITAS (atendimentos_periodo
+          // conta visita presencial concluida; "realizada" = conversou) e a
+          // tela os chama de visitados/encontrados/visitas (atendimentoTexto).
+          clientesAtendidos: atend?.clientes ?? 0,
+          clientesConversaram: atend?.conversaram ?? 0,
+          acionamentosQtd: atend?.tentativas ?? 0,
           agendadasQtd,
           agendadasValor,
           realizadasQtd,
@@ -1117,12 +1130,14 @@ const CollectorsSummary: React.FC = () => {
   // nao mostra 0, que pareceria "nao atendeu ninguem".
   const atendimentosValor = (n: number): string =>
     atendimentosErro ? "erro" : atendimentos === null ? "…" : String(n);
-  const atendimentosSub = (conversaram: number): string =>
-    atendimentosErro
+  const atendimentosSub = (conversaram: number, visita = false): string => {
+    const t = atendimentoTexto(visita);
+    return atendimentosErro
       ? "falha ao carregar"
       : atendimentos === null
         ? "carregando"
-        : `${conversaram} ${conversaram === 1 ? "conversou" : "conversaram"}`;
+        : `${conversaram} ${conversaram === 1 ? t.conversou : t.conversaram}`;
+  };
 
   // Linhas "Clientes acionados"/"Acionamentos" no card Desempenho (pedido do
   // usuario 2026-11-18: cobrador reclamava de nao ter como ver "quantos
@@ -1134,20 +1149,24 @@ const CollectorsSummary: React.FC = () => {
     clientesAtendidos: number,
     clientesConversaram: number,
     acionamentosQtd: number,
-  ) => [
-    {
-      label: "Clientes acionados",
-      value: atendimentosValor(clientesAtendidos),
-      hint: atendimentosSub(clientesConversaram),
-      loading: atendimentos === null && !atendimentosErro,
-    },
-    {
-      label: "Acionamentos",
-      value: atendimentosValor(acionamentosQtd),
-      hint: "Total de registros no período, sem deduplicar por cliente",
-      loading: atendimentos === null && !atendimentosErro,
-    },
-  ];
+    visita = false,
+  ) => {
+    const t = atendimentoTexto(visita);
+    return [
+      {
+        label: t.clientes,
+        value: atendimentosValor(clientesAtendidos),
+        hint: atendimentosSub(clientesConversaram, visita),
+        loading: atendimentos === null && !atendimentosErro,
+      },
+      {
+        label: t.registros,
+        value: atendimentosValor(acionamentosQtd),
+        hint: t.registrosHint,
+        loading: atendimentos === null && !atendimentosErro,
+      },
+    ];
+  };
 
   // Acordos por cobrador (dono do acordo, acordos.collector_id). "Ativos" e a
   // situacao de AGORA (nao depende do periodo); feitos pela data de criacao e
@@ -1537,13 +1556,12 @@ const CollectorsSummary: React.FC = () => {
                         : { label: "Meta", value: "atingida", tone: "green" as const },
                     ]
                   : [{ label: "Meta do mês", value: "não definida" }]),
-                ...(rows.some((r) => !semAcionamentos(r.type))
-                  ? linhaAtendimentos(
-                      totals.clientesAtendidos,
-                      totals.clientesConversaram,
-                      totals.acionamentosQtd,
-                    )
-                  : []),
+                ...linhaAtendimentos(
+                  totals.clientesAtendidos,
+                  totals.clientesConversaram,
+                  totals.acionamentosQtd,
+                  rows.length > 0 && rows.every((r) => ehExterno(r.type)),
+                ),
               ]}
             />
             <SummaryCard
@@ -1681,13 +1699,12 @@ const CollectorsSummary: React.FC = () => {
                   caption={previstaPeriodHint}
                   rows={[
                     ...linhaMeta(row.id),
-                    ...(semAcionamentos(row.type)
-                      ? []
-                      : linhaAtendimentos(
-                          row.clientesAtendidos,
-                          row.clientesConversaram,
-                          row.acionamentosQtd,
-                        )),
+                    ...linhaAtendimentos(
+                      row.clientesAtendidos,
+                      row.clientesConversaram,
+                      row.acionamentosQtd,
+                      ehExterno(row.type),
+                    ),
                   ]}
                 />
                 <SummaryCard
@@ -2109,34 +2126,27 @@ const CollectorsSummary: React.FC = () => {
                     ))}
                   </td>
                   <td className="px-3 py-3 text-right whitespace-nowrap border-l border-gray-100 dark:border-dark-border/40">
-                    {semAcionamentos(row.type) ? (
-                      <span
-                        className="text-gray-300 dark:text-dark-text-secondary"
-                        title="Cobrador externo trabalha por visita — veja as colunas de visitas"
+                    <div
+                      className="font-semibold text-blue-600 dark:text-blue-400"
+                      title={atendimentoTexto(ehExterno(row.type)).clientes}
+                    >
+                      {atendimentosValor(row.clientesAtendidos)}
+                    </div>
+                    {(row.clientesAtendidos > 0 ||
+                      atendimentos === null ||
+                      atendimentosErro) && (
+                      <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
+                        {atendimentosSub(row.clientesConversaram, ehExterno(row.type))}
+                      </div>
+                    )}
+                    {row.acionamentosQtd > 0 && (
+                      <div
+                        className="text-[10px] text-gray-400 dark:text-dark-text-secondary"
+                        title={atendimentoTexto(ehExterno(row.type)).registrosHint}
                       >
-                        —
-                      </span>
-                    ) : (
-                      <>
-                        <div className="font-semibold text-blue-600 dark:text-blue-400">
-                          {atendimentosValor(row.clientesAtendidos)}
-                        </div>
-                        {(row.clientesAtendidos > 0 ||
-                          atendimentos === null ||
-                          atendimentosErro) && (
-                          <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
-                            {atendimentosSub(row.clientesConversaram)}
-                          </div>
-                        )}
-                        {row.acionamentosQtd > 0 && (
-                          <div
-                            className="text-[10px] text-gray-400 dark:text-dark-text-secondary"
-                            title="Total de registros no período, sem deduplicar por cliente"
-                          >
-                            {atendimentosValor(row.acionamentosQtd)} acionamentos
-                          </div>
-                        )}
-                      </>
+                        {atendimentosValor(row.acionamentosQtd)}{" "}
+                        {atendimentoTexto(ehExterno(row.type)).registrosMin}
+                      </div>
                     )}
                   </td>
                   <td className="px-3 py-3 text-right whitespace-nowrap border-l border-gray-100 dark:border-dark-border/40">
