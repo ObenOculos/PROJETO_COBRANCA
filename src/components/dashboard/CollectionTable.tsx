@@ -40,7 +40,11 @@ import {
   calculateOverdueDays,
 } from "../../utils/formatters";
 import { seloForaDaCobranca } from "../../types/status";
-import { getClientPaymentStatus } from "../../filters/clientStatus";
+import {
+  clientBalanceSplit,
+  getClientPaymentStatus,
+} from "../../filters/clientStatus";
+import { SaldoAberto } from "../common/SaldoAberto";
 import { countVendas, resolveSaleKey } from "../../filters/sales";
 import ClientDetailModal from "./ClientDetailModal";
 import ConfirmationModal from "../common/ConfirmationModal";
@@ -76,8 +80,13 @@ export const CollectionTable = React.forwardRef<
     },
     ref,
   ) => {
-    const { getClientGroups, loading, cancelarVendas, cancelarClientes } =
-      useCollection();
+    const {
+      getClientGroups,
+      loading,
+      cancelarVendas,
+      cancelarClientes,
+      acordoAtivoOverdueMap,
+    } = useCollection();
     const [currentAddresses, setCurrentAddresses] = useState<Map<string, any>>(
       new Map(),
     );
@@ -946,13 +955,10 @@ export const CollectionTable = React.forwardRef<
                           {formatCurrency(clientGroup.totalDiscount)}
                         </span>
                       )}
-                      {!!clientGroup.pendingValue &&
-                        clientGroup.pendingValue > 0.01 && (
-                          <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-2xl bg-red-100 text-red-800">
-                            <AlertCircle className="h-3 w-3 mr-1" />
-                            {formatCurrency(clientGroup.pendingValue)}
-                          </span>
-                        )}
+                      {/* Vencido x a vencer (padrao, ver SaldoAberto). */}
+                      <SaldoAberto
+                        saldo={clientBalanceSplit(clientGroup, acordoAtivoOverdueMap)}
+                      />
                     </div>
                   </div>
                 </div>
@@ -1497,16 +1503,10 @@ export const CollectionTable = React.forwardRef<
                                 {formatCurrency(clientGroup.totalDiscount)}
                               </span>
                             )}
-                          {!!clientGroup.pendingValue &&
-                            clientGroup.pendingValue > 0 && (
-                              <span
-                                title="Em aberto"
-                                className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400 border border-red-200/20"
-                              >
-                                <AlertCircle className="h-3 w-3 mr-1.5" />
-                                {formatCurrency(clientGroup.pendingValue)}
-                              </span>
-                            )}
+                          {/* Vencido x a vencer (padrao, ver SaldoAberto). */}
+                          <SaldoAberto
+                            saldo={clientBalanceSplit(clientGroup, acordoAtivoOverdueMap)}
+                          />
                         </div>
                       </div>
                     </div>
@@ -1684,19 +1684,39 @@ export const CollectionTable = React.forwardRef<
                                     </span>
                                   </div>
                                 )}
-                                {sale.pendingValue > 0 && (
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-sm text-gray-600 dark:text-dark-text-secondary">
-                                      Valor Pendente
-                                    </span>
-                                    <span className="font-semibold text-red-600 dark:text-red-400">
-                                      {formatCurrency(
-                                        sale.pendingValue,
-                                        !isMobile,
+                                {/* Saldo da venda em vencido x a vencer (padrao,
+                                    ver SaldoAberto): parcelas da propria venda,
+                                    sem o acordo (que e do cliente todo). */}
+                                {(() => {
+                                  const sv = clientBalanceSplit({
+                                    document: clientGroup.document,
+                                    sales: [sale],
+                                  });
+                                  return (
+                                    <>
+                                      {sv.vencido > 0.01 && (
+                                        <div className="flex justify-between items-center">
+                                          <span className="text-sm text-gray-600 dark:text-dark-text-secondary">
+                                            Vencido
+                                          </span>
+                                          <span className="font-semibold text-red-600 dark:text-red-400">
+                                            {formatCurrency(sv.vencido, !isMobile)}
+                                          </span>
+                                        </div>
                                       )}
-                                    </span>
-                                  </div>
-                                )}
+                                      {sv.aVencer > 0.01 && (
+                                        <div className="flex justify-between items-center">
+                                          <span className="text-sm text-gray-600 dark:text-dark-text-secondary">
+                                            A vencer
+                                          </span>
+                                          <span className="font-semibold text-gray-700 dark:text-dark-text">
+                                            {formatCurrency(sv.aVencer, !isMobile)}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </>
+                                  );
+                                })()}
                               </div>
 
                               {/* Actions */}

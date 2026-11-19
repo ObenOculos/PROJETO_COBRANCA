@@ -18,6 +18,8 @@ import {
   ArrowUpDown,
 } from "lucide-react";
 import { ClientGroup, FilterOptions } from "../../types";
+import { clientBalanceSplit } from "../../filters/clientStatus";
+import { SaldoAberto } from "../common/SaldoAberto";
 import { formatCurrency } from "../../utils/formatters";
 import { useCollection } from "../../contexts/CollectionContext";
 import { resolveSaleKey } from "../../filters/sales";
@@ -29,7 +31,8 @@ interface RouteMapProps {
 }
 
 const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
-  const { getVisitsByCollector, getFilteredCollections } = useCollection();
+  const { getVisitsByCollector, getFilteredCollections, acordoAtivoOverdueMap } =
+    useCollection();
   const { user } = useAuth();
 
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
@@ -1038,9 +1041,11 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                               </div>
                             </div>
                             <div className="text-right ml-2">
-                              <div className="font-semibold text-gray-900 text-sm sm:text-base">
-                                {formatCurrency(client.pendingValue)}
-                              </div>
+                              {/* Vencido x a vencer (padrao, ver SaldoAberto). */}
+                              <SaldoAberto
+                                variante="linhas"
+                                saldo={clientBalanceSplit(client, acordoAtivoOverdueMap)}
+                              />
                               <div className="text-xs text-gray-500">
                                 {client.sales.length} venda
                                 {client.sales.length !== 1 ? "s" : ""}
@@ -1234,9 +1239,11 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                               </div>
                             </div>
                             <div className="text-right ml-2">
-                              <div className="font-semibold text-gray-900 text-sm sm:text-base">
-                                {formatCurrency(client.pendingValue)}
-                              </div>
+                              {/* Vencido x a vencer (padrao, ver SaldoAberto). */}
+                              <SaldoAberto
+                                variante="linhas"
+                                saldo={clientBalanceSplit(client, acordoAtivoOverdueMap)}
+                              />
                               <div className="text-xs text-gray-500">
                                 {client.sales.length} venda
                                 {client.sales.length !== 1 ? "s" : ""}
@@ -1351,9 +1358,11 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                               </div>
                             </div>
                             <div className="text-right ml-2">
-                              <div className="font-semibold text-gray-900 text-sm sm:text-base">
-                                {formatCurrency(client.pendingValue)}
-                              </div>
+                              {/* Vencido x a vencer (padrao, ver SaldoAberto). */}
+                              <SaldoAberto
+                                variante="linhas"
+                                saldo={clientBalanceSplit(client, acordoAtivoOverdueMap)}
+                              />
                               <div className="text-xs text-gray-500">
                                 {client.sales.length} venda
                                 {client.sales.length !== 1 ? "s" : ""}
@@ -1475,9 +1484,11 @@ const RouteMap: React.FC<RouteMapProps> = ({ clientGroups }) => {
                               </div>
                             </div>
                             <div className="text-right ml-2">
-                              <div className="font-semibold text-gray-900 text-sm sm:text-base">
-                                {formatCurrency(client.pendingValue)}
-                              </div>
+                              {/* Vencido x a vencer (padrao, ver SaldoAberto). */}
+                              <SaldoAberto
+                                variante="linhas"
+                                saldo={clientBalanceSplit(client, acordoAtivoOverdueMap)}
+                              />
                               <div className="text-xs text-gray-500">
                                 {client.sales.length} venda
                                 {client.sales.length !== 1 ? "s" : ""}

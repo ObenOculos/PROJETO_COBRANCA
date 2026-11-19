@@ -198,7 +198,7 @@ const InstallmentStatusDot: React.FC<{ situacao: SituacaoParcela }> = ({
   />
 );
 
-type AbaVendas = "todos" | "aberto" | "pagos";
+type AbaVendas = "todos" | "atraso" | "aVencer" | "aberto" | "pagos";
 
 const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   clientGroup,
@@ -407,11 +407,13 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     );
   }, [saldoPorVenda]);
 
-  // Abas da lista de vendas. "Em aberto" = venda com saldo (mesma conta do
-  // "Falta" do cabecalho da venda), mais atrasada primeiro; "Pagos" = sem
-  // saldo. Venda toda fora da cobranca (cancelada/agrupada/renegociada no
-  // ERP) so aparece em "Todos". Sem escolha do usuario, abre em "Em aberto"
-  // quando ha divida.
+  // Abas da lista de vendas (2026-11-19: mesma separacao vencido x a vencer
+  // da carteira, item 34). "Em atraso" = venda com alguma parcela vencida
+  // (mais atrasada primeiro); "A vencer" = venda com saldo e nada vencido;
+  // "Pagos" = sem saldo. Com acordo ativo o atraso segue o acordo, entao as
+  // vendas com saldo ficam juntas em "Em aberto". Venda toda fora da cobranca
+  // (cancelada/agrupada/renegociada no ERP) so aparece em "Todos". Sem
+  // escolha do usuario, abre na primeira aba com venda.
   // Aberta numa venda especifica: aba "Todos" (a venda pode estar paga).
   const [abaVendas, setAbaVendas] = useState<AbaVendas | null>(
     vendaInicial != null ? "todos" : null,
@@ -494,13 +496,30 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     const abertas = classificadas
       .filter((c) => c.aberto)
       .sort((a, b) => b.maiorAtraso - a.maiorAtraso);
+    const vencida = (c: (typeof classificadas)[number]) =>
+      (resumoPorVenda.get(c.sale.saleNumber)?.vencido ?? 0) > 0.01;
     return {
       todos: clientSales,
+      atraso: abertas.filter((c) => vencida(c)).map((c) => c.sale),
+      aVencer: abertas.filter((c) => !vencida(c)).map((c) => c.sale),
       aberto: abertas.map((c) => c.sale),
       pagos: classificadas.filter((c) => !c.fora && !c.aberto).map((c) => c.sale),
       emAtraso: abertas.filter((c) => c.maiorAtraso > 0).length,
     };
   }, [clientSales, saldoPorVenda, resumoPorVenda]);
+  // Abas na tela: com acordo ativo, "Em aberto" (sem separar atraso).
+  const abasVendas: readonly (readonly [AbaVendas, string, number])[] = acordoAtivo
+    ? [
+        ["todos", "Todos", vendasPorAba.todos.length],
+        ["aberto", "Em aberto", vendasPorAba.aberto.length],
+        ["pagos", "Pagos", vendasPorAba.pagos.length],
+      ]
+    : [
+        ["todos", "Todos", vendasPorAba.todos.length],
+        ["atraso", "Em atraso", vendasPorAba.atraso.length],
+        ["aVencer", "A vencer", vendasPorAba.aVencer.length],
+        ["pagos", "Pagos", vendasPorAba.pagos.length],
+      ];
 
   // As vendas com parcela em atraso ja vem abertas. Cada uma abre UMA vez,
   // quando aparece (as vendas podem chegar depois da primeira renderizacao);
@@ -520,8 +539,18 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     novas.forEach((n) => vendasAutoAbertas.current.add(n));
     setExpandedSales((atual) => new Set([...atual, ...novas]));
   }, [clientSales, resumoPorVenda, acordoAtivo, vendaInicial]);
+  const abaPadrao: AbaVendas = acordoAtivo
+    ? vendasPorAba.aberto.length > 0
+      ? "aberto"
+      : "todos"
+    : vendasPorAba.atraso.length > 0
+      ? "atraso"
+      : vendasPorAba.aVencer.length > 0
+        ? "aVencer"
+        : "todos";
+  // Aba escolhida que nao existe neste modo (acordo ativo x sem acordo): padrao.
   const abaEfetiva: AbaVendas =
-    abaVendas ?? (vendasPorAba.aberto.length > 0 ? "aberto" : "todos");
+    abaVendas && abasVendas.some(([a]) => a === abaVendas) ? abaVendas : abaPadrao;
   const vendasVisiveis = vendasPorAba[abaEfetiva];
 
   const handleGeneralPaymentSuccess = async () => {
@@ -1136,18 +1165,13 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           ) : (
             <div className="flex-1 min-h-0 overflow-y-auto">
               <div className="px-4 lg:px-6 py-4">
-                {/* Abas: Todos | Em aberto | Pagos */}
+                {/* Abas: Todos | Em atraso | A vencer | Pagos (com acordo
+                    ativo: Todos | Em aberto | Pagos) */}
                 <div
                   role="tablist"
                   className="mb-3 flex gap-1 p-1 bg-gray-100 rounded-xl text-xs"
                 >
-                  {(
-                    [
-                      ["todos", "Todos", vendasPorAba.todos.length],
-                      ["aberto", "Em aberto", vendasPorAba.aberto.length],
-                      ["pagos", "Pagos", vendasPorAba.pagos.length],
-                    ] as const
-                  ).map(([aba, rotulo, total]) => (
+                  {abasVendas.map(([aba, rotulo, total]) => (
                     <button
                       key={aba}
                       type="button"
@@ -1160,7 +1184,9 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                           : "text-gray-500 hover:text-gray-700"
                       }`}
                     >
-                      {rotulo} ({total})
+                      <span className={aba === "atraso" && total > 0 ? "text-red-600" : undefined}>
+                        {rotulo} ({total})
+                      </span>
                       {aba === "aberto" && vendasPorAba.emAtraso > 0 && (
                         <span className="ml-1 text-red-600">
                           · {vendasPorAba.emAtraso} em atraso
@@ -1173,7 +1199,11 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 <div className="space-y-3">
                   {vendasVisiveis.length === 0 && (
                     <p className="py-6 text-center text-xs text-gray-400">
-                      {abaEfetiva === "aberto"
+                      {abaEfetiva === "atraso"
+                        ? "Nenhuma venda em atraso."
+                        : abaEfetiva === "aVencer"
+                          ? "Nenhuma venda só a vencer."
+                          : abaEfetiva === "aberto"
                         ? "Nenhuma venda com saldo em aberto."
                         : abaEfetiva === "pagos"
                           ? "Nenhuma venda quitada."
@@ -1343,13 +1373,38 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                                   {formatCurrency(saleBalance.totalPaid)}
                                 </span>
                               </div>
-                              {saleBalance.remainingBalance > 0.01 && (
-                                <div className="text-xs text-gray-500">
-                                  Falta{" "}
-                                  <span className="font-medium text-red-600">
-                                    {formatCurrency(saleBalance.remainingBalance)}
-                                  </span>
-                                </div>
+                              {/* Saldo separado em vencido x a vencer (mesma
+                                  regra dos selos e da carteira). Com acordo
+                                  ativo ou sem o resumo, o "Falta" de antes. */}
+                              {resumo &&
+                              (resumo.vencido > 0.01 || resumo.aVencer > 0.01) ? (
+                                <>
+                                  {resumo.vencido > 0.01 && (
+                                    <div className="text-xs text-gray-500">
+                                      Vencido{" "}
+                                      <span className="font-medium text-red-600">
+                                        {formatCurrency(resumo.vencido)}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {resumo.aVencer > 0.01 && (
+                                    <div className="text-xs text-gray-500">
+                                      A vencer{" "}
+                                      <span className="font-medium text-gray-700">
+                                        {formatCurrency(resumo.aVencer)}
+                                      </span>
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                saleBalance.remainingBalance > 0.01 && (
+                                  <div className="text-xs text-gray-500">
+                                    Falta{" "}
+                                    <span className="font-medium text-red-600">
+                                      {formatCurrency(saleBalance.remainingBalance)}
+                                    </span>
+                                  </div>
+                                )
                               )}
                             </div>
                           </div>

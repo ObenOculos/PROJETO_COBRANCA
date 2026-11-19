@@ -12,6 +12,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { formatCurrency } from "../../utils/formatters";
+import { collectionsBalanceSplit } from "../../filters/clientStatus";
+import { Collection } from "../../types";
 import { useCollection } from "../../contexts/CollectionContext";
 import { resolveSaleKey, valorRecebidoTotal } from "../../filters/sales";
 import { metasPorMes } from "../../filters/metas";
@@ -55,8 +57,13 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
   onClose,
   collector,
 }) => {
-  const { monthlyGoals, salePayments, scheduledVisits, collections } =
-    useCollection();
+  const {
+    monthlyGoals,
+    salePayments,
+    scheduledVisits,
+    collections,
+    acordoAtivoOverdueMap,
+  } = useCollection();
 
   // Carteira (interno/terceirizado/jurídico) cumpre CONTATO, não visita --
   // rótulo "Visitas" seria enganoso nessa tela, que mostra o % direto pro
@@ -201,31 +208,33 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
     }
   };
 
+  // Clientes com saldo, separado em vencido x a vencer (padrao do projeto,
+  // collectionsBalanceSplit: desconta desconto, ignora quitada/cancelada e
+  // segue o acordo ativo). Antes somava valor_original - valor_recebido num
+  // "Valor" unico, sem desconto. Mais vencido primeiro.
   const pendingClients = useMemo(() => {
     if (!collector) return [];
-    const filtered = collections.filter((c) => {
-      // Carteira inteira do cobrador, sem filtro de periodo: no Resumo por
-      // Cobrador o modal mostra sempre o total dele (reuniao 16/11, itens 4/32).
-      if (c.user_id !== collector.collectorId || !c.documento) return false;
-      return c.valor_original - c.valor_recebido > 0.01;
+    // Carteira inteira do cobrador, sem filtro de periodo: no Resumo por
+    // Cobrador o modal mostra sempre o total dele (reuniao 16/11, itens 4/32).
+    const porCliente = new Map<string, Collection[]>();
+    collections.forEach((c) => {
+      if (c.user_id !== collector.collectorId || !c.documento) return;
+      const l = porCliente.get(c.documento);
+      if (l) l.push(c);
+      else porCliente.set(c.documento, [c]);
     });
-
-    const clientMap = new Map();
-    filtered.forEach((c) => {
-      if (!clientMap.has(c.documento)) {
-        clientMap.set(c.documento, {
-          documento: c.documento,
-          cliente: c.cliente || c.apelido || "-",
-          valorPendente: 0,
-        });
-      }
-      const entry = clientMap.get(c.documento);
-      entry.valorPendente += c.valor_original - c.valor_recebido;
-    });
-    return Array.from(clientMap.values()).sort(
-      (a, b) => b.valorPendente - a.valorPendente,
-    );
-  }, [collector, collections]);
+    return Array.from(porCliente.entries())
+      .map(([documento, titulos]) => ({
+        documento,
+        cliente: titulos[0].cliente || titulos[0].apelido || "-",
+        saldo: collectionsBalanceSplit(documento, titulos, acordoAtivoOverdueMap),
+      }))
+      .filter((c) => c.saldo.vencido + c.saldo.aVencer > 0.01)
+      .sort(
+        (a, b) =>
+          b.saldo.vencido - a.saldo.vencido || b.saldo.aVencer - a.saldo.aVencer,
+      );
+  }, [collector, collections, acordoAtivoOverdueMap]);
 
   const performanceHistory = useMemo(() => {
     if (!collector) return [];
@@ -741,7 +750,10 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                               Cliente
                             </th>
                             <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-400 tracking-wide">
-                              Valor
+                              Vencido
+                            </th>
+                            <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-400 tracking-wide">
+                              A vencer
                             </th>
                           </tr>
                         </thead>
@@ -765,8 +777,15 @@ const CollectorPerformanceModal: React.FC<CollectorPerformanceModalProps> = ({
                                   </p>
                                 </td>
                                 <td className="px-4 py-3 text-right">
-                                  <p className="text-xs font-bold text-amber-600 dark:text-amber-400">
-                                    {formatCurrency(c.valorPendente)}
+                                  <p
+                                    className={`text-xs font-bold ${c.saldo.vencido > 0.01 ? "text-red-600 dark:text-red-400" : "text-gray-300 dark:text-dark-text-secondary"}`}
+                                  >
+                                    {formatCurrency(c.saldo.vencido)}
+                                  </p>
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  <p className="text-xs font-semibold text-gray-600 dark:text-dark-text-secondary">
+                                    {formatCurrency(c.saldo.aVencer)}
                                   </p>
                                 </td>
                               </tr>

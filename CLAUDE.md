@@ -79,6 +79,12 @@ contagem do arquivo que você mexeu (compare com `git show HEAD:<arquivo>`).
 - **Regra de negócio em um lugar só.** Antes de escrever uma regra ("atrasada",
   "status do cliente", "data efetiva"), procure em `src/config/` e `src/filters/`.
   Visita atrasada = `isVisitOverdue` / `visitOverdueDays` de `config/visitStatus`.
+- **Saldo em aberto sempre em Vencido × A vencer.** Nada de um "Em aberto",
+  "Falta" ou "Pendente" único em vermelho: faz parecer atrasado o que ainda vai
+  vencer. Conta: `clientBalanceSplit` / `collectionsBalanceSplit` (cliente, já
+  segue acordo ativo) ou `parcelaNoPeriodo` (recorte por vencimento), em
+  `filters/clientStatus`. Na tela: `components/common/SaldoAberto` (chips ou
+  linhas). Exceção: o valor congelado do agendamento (`total_pending_value`).
 - **Datas de calendário são strings `YYYY-MM-DD` no fuso local.** Use
   `todayLocalStr()`. Nunca `toISOString().split("T")[0]`, `getUTC*` ou
   `new Date("YYYY-MM-DD")` (é meia-noite UTC = 21h da véspera em Brasília).
