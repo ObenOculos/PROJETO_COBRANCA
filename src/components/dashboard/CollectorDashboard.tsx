@@ -1955,6 +1955,16 @@ const ClientQueueRow: React.FC<ClientQueueRowProps> = ({
               <p className="font-bold text-sm text-gray-900 dark:text-dark-text truncate">
                 {group.client}
               </p>
+              {/* Apelido = "Apelido / Nome Fantasia" da SSOtica: como o
+                  cobrador conhece a loja (2026-11-19). */}
+              {group.apelido && (
+                <p
+                  className="text-[11px] font-medium text-blue-600 dark:text-blue-400 truncate"
+                  title={`Nome fantasia: ${group.apelido}`}
+                >
+                  {group.apelido}
+                </p>
+              )}
               {lojas.length > 0 && (
                 <p className="flex items-center gap-1 text-[11px] text-indigo-700 dark:text-indigo-300 truncate">
                   <Store className="w-3 h-3 shrink-0" />
