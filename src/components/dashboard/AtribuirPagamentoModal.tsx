@@ -1,6 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { invalidarHistoricoCliente } from "../../utils/cacheHistoricoCliente";
-import { CheckCircle2, ChevronDown, ChevronRight, Send, X } from "lucide-react";
+import {
+  CalendarCheck,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  Inbox,
+  MessageSquare,
+  Send,
+  X,
+} from "lucide-react";
 import { ClientGroup } from "../../types";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 import { round2 } from "../../filters/clientStatus";
@@ -173,25 +182,50 @@ const AtribuirPagamentoModal: React.FC<Props> = ({ clientGroup, onClose }) => {
         ) : (
           <>
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
-              <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
-                Marque o que o cliente pagou na loja ou no banco depois que você
-                cobrou. O gestor confere e, se aprovar, o pagamento fica
-                registrado no seu nome. Não muda a parcela e não entra no seu
-                caixa.
-              </p>
+              {parcelas !== null && grupos.length > 0 && (
+                <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
+                  Marque o que o cliente pagou na loja ou no banco depois que
+                  você cobrou. O gestor confere e, se aprovar, o pagamento fica
+                  registrado no seu nome. Não muda a parcela e não entra no seu
+                  caixa.
+                </p>
+              )}
 
               {parcelas === null ? (
                 <div className="py-6 text-center text-sm text-gray-500">
                   Carregando…
                 </div>
               ) : grupos.length === 0 ? (
-                <div className="py-4 text-center text-sm text-gray-500 dark:text-dark-text-secondary">
-                  Nenhum pagamento da loja pode ser pedido para este cliente
-                  {outras.length > 0 ? " — o motivo de cada parcela está abaixo." : "."}
-                  <br />
-                  Vale para pagamento dos últimos 30 dias, com uma conversa sua
-                  registrada no Atender (promessa, contato realizado, acordo…)
-                  até 30 dias antes dele.
+                <div className="rounded-xl border border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-bg/40 p-4">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-dark-text">
+                    <Inbox className="h-4 w-4 text-gray-400" />
+                    Nenhum pagamento para pedir neste cliente
+                  </div>
+                  <p className="mt-2 text-xs text-gray-600 dark:text-dark-text-secondary">
+                    Para pedir, o pagamento precisa:
+                  </p>
+                  <ul className="mt-1.5 space-y-1.5 text-xs text-gray-600 dark:text-dark-text-secondary">
+                    <li className="flex items-start gap-2">
+                      <CalendarCheck className="h-3.5 w-3.5 mt-0.5 shrink-0 text-teal-600" />
+                      <span>
+                        ter sido feito <strong>na loja ou no banco</strong> nos{" "}
+                        <strong>últimos 30 dias</strong>;
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <MessageSquare className="h-3.5 w-3.5 mt-0.5 shrink-0 text-teal-600" />
+                      <span>
+                        ter uma <strong>conversa sua registrada no Atender</strong>{" "}
+                        (promessa, contato realizado, acordo…) até 30 dias antes
+                        dele.
+                      </span>
+                    </li>
+                  </ul>
+                  {outras.length > 0 && (
+                    <p className="mt-3 text-[11px] text-gray-500 dark:text-dark-text-secondary">
+                      Veja abaixo por que cada parcela paga não entra.
+                    </p>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -374,7 +408,7 @@ const AtribuirPagamentoModal: React.FC<Props> = ({ clientGroup, onClose }) => {
                 onClick={onClose}
                 className="rounded-lg border border-gray-200 dark:border-dark-border px-4 py-2 text-sm font-medium text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-bg"
               >
-                Cancelar
+                {grupos.length > 0 ? "Cancelar" : "Fechar"}
               </button>
               {grupos.length > 0 && (
                 <button
