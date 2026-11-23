@@ -667,7 +667,7 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [user?.id]);
+  }, [user?.id, versaoRegistros]);
 
   const lastContacts = useMemo(() => {
     const map: Record<string, UltimoContato> = {};
@@ -4465,7 +4465,13 @@ const CollectorDashboard: React.FC<CollectorDashboardProps> = ({
       {selectedAcordoId && (
         <AcordoDetailModal
           acordoId={selectedAcordoId}
-          onClose={() => setSelectedAcordoId(null)}
+          onClose={() => {
+            setSelectedAcordoId(null);
+            // Pode ter recebido parcela do acordo: Meu desempenho e a
+            // Recuperacao do Mes releem acordo_pagamentos (2026-11-23 -- o
+            // valor so aparecia depois de recarregar a pagina).
+            setVersaoRegistros((v) => v + 1);
+          }}
         />
       )}
     </div>
