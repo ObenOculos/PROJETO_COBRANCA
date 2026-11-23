@@ -58,6 +58,7 @@ import LogContactModal from "./LogContactModal";
 import AcordoModal from "./AcordoModal";
 import AcordoDetailModal from "./AcordoDetailModal";
 import LinhaDoTempoCliente from "./LinhaDoTempoCliente";
+import SeloChequeFicha from "./SeloChequeFicha";
 import { USER_TYPE_LABELS, isWalletCollectorType } from "../../config/profiles";
 
 interface ClientDetailModalProps {
@@ -748,6 +749,12 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   </span>
                 )}
               </div>
+              {/* Item 87: condicao de cheque (fica so com o gestor). */}
+              <SeloChequeFicha
+                documento={clientGroup.document}
+                souGestor={souGestor}
+                onMudouCarteira={() => void refreshCollections()}
+              />
             </div>
 
             {/* 2. Situacao (mesma regra da carteira: vencido x a vencer; com

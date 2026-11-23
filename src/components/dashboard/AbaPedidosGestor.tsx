@@ -4,18 +4,21 @@ import PedidosCorrecao from "./PedidosCorrecao";
 import PedidosAtribuicao from "./PedidosAtribuicao";
 import PedidosDesconto from "./PedidosDesconto";
 import CasosGestor from "./CasosGestor";
+import PainelCheques from "./PainelCheques";
 
 // Aba "Correções" do gestor: pedidos de correção de pagamento (item 62) e
 // pagos na loja depois da cobrança (item 66), pedidos de desconto (item 71)
-// e clientes reincidentes (item 83). Cada um carrega só quando aparece.
+// clientes reincidentes (item 83) e clientes em condição de cheque (item 87).
+// Cada um carrega só quando aparece.
 
-type Visao = "correcoes" | "loja" | "descontos" | "reincidentes";
+type Visao = "correcoes" | "loja" | "descontos" | "reincidentes" | "cheques";
 
 const VISOES: { key: Visao; label: string }[] = [
   { key: "correcoes", label: "Correções de pagamento" },
   { key: "loja", label: "Pagos na loja" },
   { key: "descontos", label: "Descontos" },
   { key: "reincidentes", label: "Reincidentes" },
+  { key: "cheques", label: "Cheques" },
 ];
 
 const AbaPedidosGestor: React.FC = () => {
@@ -27,7 +30,8 @@ const AbaPedidosGestor: React.FC = () => {
       localStorage.removeItem("correcoesVisao");
       return pedida === "loja" ||
         pedida === "descontos" ||
-        pedida === "reincidentes"
+        pedida === "reincidentes" ||
+        pedida === "cheques"
         ? pedida
         : "correcoes";
     } catch {
@@ -39,7 +43,7 @@ const AbaPedidosGestor: React.FC = () => {
       <div className="flex flex-wrap items-center justify-between gap-2">
       <div
         role="tablist"
-        className="inline-flex rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg-secondary p-1"
+        className="inline-flex flex-wrap rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg-secondary p-1"
       >
         {VISOES.map((v) => (
           <button
@@ -86,6 +90,8 @@ const AbaPedidosGestor: React.FC = () => {
         <PedidosAtribuicao />
       ) : visao === "descontos" ? (
         <PedidosDesconto />
+      ) : visao === "cheques" ? (
+        <PainelCheques />
       ) : (
         <CasosGestor />
       )}

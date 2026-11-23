@@ -91,6 +91,8 @@ const MOTIVO_CARTEIRA_AUTOMATICO: Record<string, string> = {
   cobrador_inativado: "cobrador inativado",
   distribuicao_automatica: "carteira automática",
   fora_da_faixa_sem_acao: "carteira automática — fora da faixa",
+  // Item 87: cheque em carteira no Ciclone ou "Paga em cheque" do gestor.
+  condicao_cheque: "condição de cheque — fica só com o gestor",
   "heranca: parcela sem cobrador": "parcela nova herdou o cobrador do cliente",
 };
 

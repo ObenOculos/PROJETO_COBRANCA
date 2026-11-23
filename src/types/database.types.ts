@@ -688,6 +688,7 @@ export type Database = {
           situacao: string | null;
           status: string | null;
           tipo_de_cobranca: string | null;
+          tipo_titulo_erp: number | null;
           user_id: string | null;
           valor_original: number | null;
           valor_reajustado: number | null;
@@ -728,6 +729,7 @@ export type Database = {
           situacao?: string | null;
           status?: string | null;
           tipo_de_cobranca?: string | null;
+          tipo_titulo_erp?: number | null;
           user_id?: string | null;
           valor_original?: number | null;
           valor_reajustado?: number | null;
@@ -768,6 +770,7 @@ export type Database = {
           situacao?: string | null;
           status?: string | null;
           tipo_de_cobranca?: string | null;
+          tipo_titulo_erp?: number | null;
           user_id?: string | null;
           valor_original?: number | null;
           valor_reajustado?: number | null;
@@ -984,6 +987,33 @@ export type Database = {
         };
         Relationships: [];
       };
+      cheque_marcacoes: {
+        Row: {
+          criado_em: string;
+          documento: string;
+          id: string;
+          marcado: boolean;
+          motivo: string;
+          usuario_id: string;
+        };
+        Insert: {
+          criado_em?: string;
+          documento: string;
+          id?: string;
+          marcado: boolean;
+          motivo: string;
+          usuario_id: string;
+        };
+        Update: {
+          criado_em?: string;
+          documento?: string;
+          id?: string;
+          marcado?: boolean;
+          motivo?: string;
+          usuario_id?: string;
+        };
+        Relationships: [];
+      };
       clientes: {
         Row: {
           apelido: string | null;
@@ -1007,6 +1037,7 @@ export type Database = {
           regiao: string | null;
           reincidencia_reset_at: string | null;
           telefone: string | null;
+          ultima_baixa_cheque_erp: string | null;
           vendedor_responsavel: string | null;
         };
         Insert: {
@@ -1031,6 +1062,7 @@ export type Database = {
           regiao?: string | null;
           reincidencia_reset_at?: string | null;
           telefone?: string | null;
+          ultima_baixa_cheque_erp?: string | null;
           vendedor_responsavel?: string | null;
         };
         Update: {
@@ -1055,6 +1087,7 @@ export type Database = {
           regiao?: string | null;
           reincidencia_reset_at?: string | null;
           telefone?: string | null;
+          ultima_baixa_cheque_erp?: string | null;
           vendedor_responsavel?: string | null;
         };
         Relationships: [];
@@ -2996,6 +3029,10 @@ export type Database = {
           ultima_baixa: string;
         }[];
       };
+      marcar_paga_em_cheque: {
+        Args: { p_documento: string; p_marcar: boolean; p_motivo: string };
+        Returns: Json;
+      };
       marcar_acordos_quebrados: { Args: never; Returns: number };
       pagos_na_loja_pediveis: {
         Args: never;
@@ -3014,6 +3051,34 @@ export type Database = {
           valor: number;
           venda: number;
           data_pagamento: string;
+        }[];
+      };
+      condicao_cheque_cliente: {
+        Args: { p_documento: string };
+        Returns: Json;
+      };
+      painel_cheques: {
+        Args: { p_dias_conferir?: number; p_meses_sugestao?: number };
+        Returns: {
+          a_vencer: number;
+          cheque_venc_mais_antigo: string | null;
+          cheques_qtd: number;
+          cheques_valor: number;
+          cliente: string;
+          cobrador_atual: string | null;
+          codigo_cliente_erp: string | null;
+          dias_cheque_vencido: number | null;
+          documento: string;
+          grupo: string;
+          loja: string | null;
+          marcado_em: string | null;
+          marcado_por: string | null;
+          motivo: string | null;
+          paga_em_cheque: boolean;
+          saiu_de: string | null;
+          saiu_em: string | null;
+          ultima_baixa_cheque: string | null;
+          vencido: number;
         }[];
       };
       parcelas_para_atribuicao: {

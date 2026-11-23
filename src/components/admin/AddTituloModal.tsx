@@ -492,6 +492,7 @@ const formFields: Record<
   parcela: { label: "Parcela", type: "number" },
   telefone: { label: "Telefone", type: "text" },
   tipo_de_cobranca: { label: "Tipo de Cobrança", type: "text" },
+  tipo_titulo_erp: { label: "Tipo do Título (Ciclone)", type: "number" },
   user_id: { label: "ID do Usuário (Cobrador)", type: "text" },
   valor_reajustado: {
     label: "Valor Reajustado",
