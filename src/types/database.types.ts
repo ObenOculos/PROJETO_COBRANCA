@@ -2997,6 +2997,25 @@ export type Database = {
         }[];
       };
       marcar_acordos_quebrados: { Args: never; Returns: number };
+      pagos_na_loja_pediveis: {
+        Args: never;
+        Returns: {
+          cliente: string;
+          descricao: string;
+          documento: string;
+          em_analise: boolean;
+          id_parcela: number;
+          loja: string;
+          na_carteira: boolean;
+          parcela: number;
+          prazo: string;
+          ultimo_contato_em: string;
+          ultimo_resultado: string;
+          valor: number;
+          venda: number;
+          data_pagamento: string;
+        }[];
+      };
       parcelas_para_atribuicao: {
         Args: { p_documento: string };
         Returns: {

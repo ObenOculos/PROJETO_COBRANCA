@@ -47,6 +47,12 @@ import {
 import FilterBar from "../common/FilterBar";
 import { CollectionTable, CollectionTableRef } from "./CollectionTable";
 import RouteMap from "./RouteMap";
+import PagosNaLojaLista from "./PagosNaLojaLista";
+import AtribuirPagamentoModal from "./AtribuirPagamentoModal";
+import {
+  listarPagosNaLojaPediveis,
+  PagoNaLojaPedivel,
+} from "../../services/atribuicoesPagamento";
 import VisitScheduler from "./VisitScheduler";
 import RadialApprovalChart from "./RadialApprovalChart";
 import TabTransition from "../common/TabTransition";
@@ -198,7 +204,8 @@ type SituacaoCarteira =
   | "paraHoje"
   | "atendidosHoje"
   | "semAtendimento"
-  | "quitados";
+  | "quitados"
+  | "pagouNaLoja";
 type FaixaCarteira = "todas" | "critical" | "high" | "medium" | "low" | "emDia";
 
 // Colunas ordenaveis, compartilhadas pela tabela da Carteira completa e
@@ -431,6 +438,15 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   const [situacaoCarteira, setSituacaoCarteira] =
     useState<SituacaoCarteira>("todos");
   const [faixaCarteira, setFaixaCarteira] = useState<FaixaCarteira>("todas");
+  // Filtro "Pagou na loja" (2026-11-23): o que o cobrador ainda pode pedir
+  // ao gestor. Lido so com a Carteira completa aberta (e de novo ao fechar o
+  // pedido); vem dos contatos dele, inclui cliente que saiu da carteira.
+  const [pagosLoja, setPagosLoja] = useState<PagoNaLojaPedivel[]>([]);
+  const [pedidoLoja, setPedidoLoja] = useState<{
+    document: string;
+    client: string;
+  } | null>(null);
+  const [versaoPagosLoja, setVersaoPagosLoja] = useState(0);
   // Modo foco: oculta os cards de desempenho (Recuperação do Mês, Total de
   // Clientes etc.) pra sobrar só a lista de trabalho. Preferencia pessoal de
   // tela, guardada no navegador -- nao sincroniza entre dispositivos.
@@ -1133,6 +1149,8 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
       if (s === "paraHoje") return motivoParaHojeDe(g.document) !== null;
       // Quitados tem lista propria (quitadosNaCarteira); quem deve nunca e.
       if (s === "quitados") return false;
+      // Lista propria (pagosLoja), fora da carteira.
+      if (s === "pagouNaLoja") return false;
       const dias = diasDesdeAtendimento(g.document);
       if (s === "atendidosHoje") return dias !== null && dias <= 0;
       return dias === null || dias > SEM_CONTATO_DIAS;
@@ -1205,6 +1223,40 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
   useEffect(() => {
     setCurrentPage(1);
   }, [walletFilters, walletTab, sortKey, sortDir, situacaoCarteira, faixaCarteira]);
+
+  useEffect(() => {
+    if (walletTab !== "carteira") return;
+    let cancelado = false;
+    listarPagosNaLojaPediveis()
+      .then((r) => {
+        if (!cancelado) setPagosLoja(r);
+      })
+      .catch((e) => {
+        // Sem a lista o chip so nao aparece; a carteira segue normal.
+        console.error("Erro ao carregar pagos na loja:", e);
+        if (!cancelado) setPagosLoja([]);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [walletTab, versaoPagosLoja]);
+
+  // Busca da carteira vale tambem para a lista do pago na loja.
+  const pagosLojaFiltrados = useMemo(() => {
+    const termo = (walletFilters.search || "").trim().toLowerCase();
+    if (!termo) return pagosLoja;
+    const digitos = termo.replace(/\D/g, "");
+    return pagosLoja.filter(
+      (p) =>
+        (p.cliente ?? "").toLowerCase().includes(termo) ||
+        (digitos.length > 0 &&
+          p.documento.replace(/\D/g, "").includes(digitos)),
+    );
+  }, [pagosLoja, walletFilters.search]);
+  const clientesPagosLoja = useMemo(
+    () => new Set(pagosLojaFiltrados.map((p) => p.documento)).size,
+    [pagosLojaFiltrados],
+  );
 
   // Carteira completa: diretório com todo mundo em aberto, não só o lote
   // da fila — é a visão de consulta.
@@ -1555,11 +1607,18 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
                 // Sem busca: quem quitou nos ultimos QUITADO_VISIVEL_DIAS
                 // dias. Com busca: qualquer quitado que a busca achou.
                 { key: "quitados", label: "Quitados" },
+                // Pagou na loja/banco depois de conversa dele: pedir ao
+                // gestor. Conta clientes (some quando nao ha nenhum).
+                { key: "pagouNaLoja", label: "Pagou na loja" },
               ].map((o) => ({
                 ...o,
-                count: contagemCarteira.situacao.get(o.key) ?? 0,
+                count:
+                  o.key === "pagouNaLoja"
+                    ? clientesPagosLoja
+                    : (contagemCarteira.situacao.get(o.key) ?? 0),
               }))}
             />
+            {situacaoCarteira !== "pagouNaLoja" && (
             <CarteiraChips
               valor={faixaCarteira}
               onChange={(v) => setFaixaCarteira(v as FaixaCarteira)}
@@ -1577,8 +1636,16 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
                 count: contagemCarteira.faixa.get(o.key) ?? 0,
               }))}
             />
+            )}
           </div>
 
+          {situacaoCarteira === "pagouNaLoja" ? (
+            <PagosNaLojaLista
+              itens={pagosLojaFiltrados}
+              onPedir={(document, client) => setPedidoLoja({ document, client })}
+            />
+          ) : (
+          <>
           {(["card", "row"] as const).map((layout) => {
             const linhas = paginatedClients.map((group) => (
               <ClientQueueRow
@@ -1650,7 +1717,18 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
               onChange={setCurrentPage}
             />
           )}
+          </>
+          )}
         </div>
+      )}
+      {pedidoLoja && (
+        <AtribuirPagamentoModal
+          clientGroup={pedidoLoja}
+          onClose={() => {
+            setPedidoLoja(null);
+            setVersaoPagosLoja((v) => v + 1);
+          }}
+        />
       )}
     </div>
   );

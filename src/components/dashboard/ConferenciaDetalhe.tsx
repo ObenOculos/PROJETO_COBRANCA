@@ -202,7 +202,7 @@ const PainelMarcacao: React.FC<{
       {acao === "conferido" && podePedir > 0.009 && (
         <div className="text-[11px] font-medium text-amber-700 dark:text-amber-400">
           O cobrador ainda pode pedir {formatCurrency(podePedir)} como pago na
-          loja (até 30 dias do pagamento). Se o pedido vier e for aprovado
+          loja (até o dia 5 do mês seguinte ao pagamento). Se o pedido vier e for aprovado
           depois, ele soma ao app desta linha.
         </div>
       )}

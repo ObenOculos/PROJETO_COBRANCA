@@ -170,7 +170,8 @@ export interface ConversaConferencia {
   contatos: number;
   ultimo_contato_em: string | null;
   ultimo_resultado: string | null;
-  /** Ainda dá para o cobrador pedir (sem bloqueio, sem pedido, até 30 dias). */
+  /** Ainda dá para o cobrador pedir (sem bloqueio, sem pedido, até o dia 5
+   * do mês seguinte ao pagamento). */
   pode_pedir: boolean;
   pedido_lote: string | null;
   pedido_decisao: "aberto" | "aprovado" | "recusado" | null;
@@ -190,6 +191,43 @@ export const carregarConversasConferencia = async (
       .order("cobrador_id")
       .range(from, to)
       .returns<ConversaConferencia[]>(),
+  );
+
+// ---------------------------------------------------------------------------
+// Cobrador: o que ainda dá para pedir (2026-11-23, migration 20261123000001)
+// ---------------------------------------------------------------------------
+
+/** Parcela paga pelo ERP que o cobrador logado ainda pode pedir (ou já pediu
+ * e está em análise). Vem dos contatos dele, não da carteira: `na_carteira`
+ * false = o cliente já saiu da carteira dele. */
+export interface PagoNaLojaPedivel {
+  documento: string;
+  cliente: string | null;
+  loja: string | null;
+  id_parcela: number;
+  venda: number | null;
+  parcela: number | null;
+  valor: number | string;
+  data_pagamento: string; // YYYY-MM-DD
+  /** Último dia para pedir (dia 5 do mês seguinte ao pagamento). */
+  prazo: string; // YYYY-MM-DD
+  ultimo_contato_em: string | null;
+  ultimo_resultado: string | null;
+  na_carteira: boolean;
+  em_analise: boolean;
+  descricao: string | null;
+}
+
+export const listarPagosNaLojaPediveis = async (): Promise<
+  PagoNaLojaPedivel[]
+> =>
+  fetchAllRows<PagoNaLojaPedivel>((from, to) =>
+    supabase
+      .rpc("pagos_na_loja_pediveis")
+      // Ordem unica para a paginacao (CLAUDE.md).
+      .order("id_parcela")
+      .range(from, to)
+      .returns<PagoNaLojaPedivel[]>(),
   );
 
 // ---------------------------------------------------------------------------

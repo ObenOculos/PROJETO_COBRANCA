@@ -31,7 +31,9 @@ import { ultimaConversa } from "../../utils/ultimaConversa";
 // nos 30 dias antes do pagamento, sem lancamento do app, fora de acordo).
 
 interface Props {
-  clientGroup: ClientGroup;
+  /** Só documento e nome: abre também para cliente que já saiu da carteira
+   * (filtro "Pagou na loja" da Carteira completa). */
+  clientGroup: Pick<ClientGroup, "document" | "client">;
   onClose: () => void;
 }
 
@@ -208,8 +210,9 @@ const AtribuirPagamentoModal: React.FC<Props> = ({ clientGroup, onClose }) => {
                     <li className="flex items-start gap-2">
                       <CalendarCheck className="h-3.5 w-3.5 mt-0.5 shrink-0 text-teal-600" />
                       <span>
-                        ter sido feito <strong>na loja ou no banco</strong> nos{" "}
-                        <strong>últimos 30 dias</strong>;
+                        ter sido feito <strong>na loja ou no banco</strong>{" "}
+                        <strong>neste mês</strong> (o do mês anterior pode ser
+                        pedido até o dia 5);
                       </span>
                     </li>
                     <li className="flex items-start gap-2">
