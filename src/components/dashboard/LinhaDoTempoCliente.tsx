@@ -85,6 +85,15 @@ const CANAL: Record<string, string> = {
 
 const POR_PAGINA = 30;
 
+// Motivos de atribuicoes_historico gravados pelo proprio banco (gatilhos e
+// rotinas), sem um gestor apertando botao. Texto vai no titulo do evento.
+const MOTIVO_CARTEIRA_AUTOMATICO: Record<string, string> = {
+  cobrador_inativado: "cobrador inativado",
+  distribuicao_automatica: "carteira automática",
+  fora_da_faixa_sem_acao: "carteira automática — fora da faixa",
+  "heranca: parcela sem cobrador": "parcela nova herdou o cobrador do cliente",
+};
+
 type CarteiraRow = Database["public"]["Tables"]["atribuicoes_historico"]["Row"];
 type RecebimentoRow =
   Database["public"]["Tables"]["recebimentos_historico"]["Row"];
@@ -613,6 +622,9 @@ const LinhaDoTempoCliente: React.FC<Props> = ({
         titulo = `Transferido de ${anterior} para ${novo}`;
       }
       const quem = nome(row.gerente_id || null);
+      // Movimentos que o proprio sistema faz (gatilhos/rotinas do banco).
+      const automatico = MOTIVO_CARTEIRA_AUTOMATICO[motivo];
+      if (automatico) titulo = `${titulo} (${automatico})`;
       lista.push({
         chave: `carteira-${row.id}`,
         ordem: instante(row.assigned_at),
@@ -620,11 +632,14 @@ const LinhaDoTempoCliente: React.FC<Props> = ({
         categoria: "carteira",
         icone,
         titulo,
-        autor:
-          quem ??
-          (motivo.endsWith("sem_registro")
-            ? "sem registro de quem fez (caminho antigo)"
-            : "sem registro de quem fez"),
+        autor: automatico
+          ? quem && motivo === "cobrador_inativado"
+            ? `automático do sistema, quando ${quem} inativou o cobrador`
+            : "automático do sistema"
+          : (quem ??
+            (motivo.endsWith("sem_registro")
+              ? "sem registro de quem fez (caminho antigo)"
+              : "sem registro de quem fez")),
       });
     });
 
