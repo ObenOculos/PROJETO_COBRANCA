@@ -11,6 +11,9 @@ import {
   ParcelaAtribuivel,
   pedirAtribuicaoPagamento,
 } from "../../services/atribuicoesPagamento";
+import { ModelosMensagem } from "../common/ModelosMensagem";
+import { MODELOS_PEDIDO_COBRADOR } from "../../config/mensagensAtribuicao";
+import { ultimaConversa } from "../../utils/ultimaConversa";
 
 // Item 66: o cobrador pede ao gestor que a baixa do ERP (cliente pagou na
 // loja/banco depois da tratativa) conte no desempenho dele. Nao e pagamento:
@@ -264,6 +267,17 @@ const AtribuirPagamentoModal: React.FC<Props> = ({ clientGroup, onClose }) => {
                   <span className="text-xs font-semibold text-gray-700 dark:text-dark-text">
                     Como foi a cobrança (obrigatório)
                   </span>
+                  <div className="mt-1">
+                    <ModelosMensagem
+                      modelos={MODELOS_PEDIDO_COBRADOR}
+                      data={ultimaConversa(
+                        selecionadas.length
+                          ? selecionadas
+                          : grupos.flatMap(([, ps]) => ps),
+                      )}
+                      onEscolher={setObservacao}
+                    />
+                  </div>
                   <textarea
                     value={observacao}
                     onChange={(e) => setObservacao(e.target.value)}

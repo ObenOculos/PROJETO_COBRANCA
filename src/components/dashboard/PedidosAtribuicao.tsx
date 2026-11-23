@@ -13,6 +13,8 @@ import { formatCurrency, formatDate } from "../../utils/formatters";
 import { round2 } from "../../filters/clientStatus";
 import { ATTEMPT_RESULT_LABELS } from "../../config/collectionAttempts";
 import SummaryCard from "../common/SummaryCard";
+import { ModelosMensagem } from "../common/ModelosMensagem";
+import { MODELOS_RECUSA_GESTOR } from "../../config/mensagensAtribuicao";
 import {
   AtribuicaoPagamento,
   carregarPainelAtribuicao,
@@ -374,6 +376,14 @@ const PedidosAtribuicao: React.FC = () => {
                                   ? "Resposta ao cobrador (opcional)"
                                   : "Motivo da recusa (obrigatório)"}
                               </span>
+                              {acao === "recusar" && (
+                                <div className="mt-1">
+                                  <ModelosMensagem
+                                    modelos={MODELOS_RECUSA_GESTOR}
+                                    onEscolher={setResposta}
+                                  />
+                                </div>
+                              )}
                               <input
                                 type="text"
                                 value={resposta}

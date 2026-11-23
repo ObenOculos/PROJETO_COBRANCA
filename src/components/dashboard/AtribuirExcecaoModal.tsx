@@ -10,6 +10,9 @@ import {
   listarParcelasExcecao,
   ParcelaAtribuivel,
 } from "../../services/atribuicoesPagamento";
+import { ModelosMensagem } from "../common/ModelosMensagem";
+import { MODELOS_EXCECAO_GESTOR } from "../../config/mensagensAtribuicao";
+import { ultimaConversa } from "../../utils/ultimaConversa";
 
 // Pago na loja -- exceção do gestor (2026-11-17, decisão do usuário). O padrão
 // continua: o cobrador pede (com conversa efetiva nos 30 dias antes do
@@ -99,6 +102,9 @@ const AtribuirExcecaoModal: React.FC<Props> = ({
   const selecionadas = livres.filter((p) => marcadas.has(p.id_parcela));
   const total = round2(selecionadas.reduce((s, p) => s + Number(p.valor), 0));
   const nomeCobrador = cobradores.find((c) => c.id === cobradorId)?.name ?? "";
+  // Data dos modelos: última conversa registrada das parcelas marcadas (ou
+  // das livres, antes de marcar). Na exceção costuma não haver: vira [data].
+  const dataConversa = ultimaConversa(selecionadas.length ? selecionadas : livres);
   const podeGravar =
     !!cobradorId && selecionadas.length > 0 && motivo.trim().length > 0 && !salvando;
 
@@ -270,6 +276,14 @@ const AtribuirExcecaoModal: React.FC<Props> = ({
                   <span className="text-xs font-semibold text-gray-700 dark:text-dark-text">
                     Motivo da exceção (obrigatório)
                   </span>
+                  <div className="mt-1">
+                    <ModelosMensagem
+                      modelos={MODELOS_EXCECAO_GESTOR}
+                      cobrador={nomeCobrador}
+                      data={dataConversa}
+                      onEscolher={setMotivo}
+                    />
+                  </div>
                   <textarea
                     value={motivo}
                     onChange={(e) => setMotivo(e.target.value)}
