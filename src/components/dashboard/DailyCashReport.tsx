@@ -32,9 +32,11 @@ import ClientDetailModal from "./ClientDetailModal";
 import SummaryCard from "../common/SummaryCard";
 import Pagination from "../common/Pagination";
 import {
+  formaAcordo,
   formaPagamentoGrupo,
   formaPagamentoRotulo,
 } from "../../config/formasPagamento";
+import { fetchAllRows } from "../../utils/fetchAllRows";
 import { ClientGroup } from "../../types";
 
 interface DailyCashReportProps {
@@ -267,6 +269,100 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
               solicitado_por_id: r.solicitado_por_id as string,
             })),
         );
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Parcelas de acordo recebidas (2026-11-23): registrar_pagamento_acordo
+  // grava só em acordo_pagamentos, nunca em sale_payments -- sem isto o
+  // Caixa não mostrava dinheiro de acordo (Meu desempenho, Resumo e
+  // Conferência já mostravam). Decisões do usuário: forma "Acordo — <forma
+  // combinada>" (o app não grava a forma ao receber; entrada = Pix); parcela
+  // que a LOJA recebeu (espelho da SSÓtica) em linha à parte "Acordo pago na
+  // loja"; soma por parcela e dia (correção técnica que se anula no mesmo dia
+  // some; o que sobra negativo é estorno); juros/multa na coluna de juros.
+  // Busca uma vez, como as atribuições.
+  const [acordoPagamentos, setAcordoPagamentos] = useState<
+    {
+      parcelaId: string;
+      numero: number;
+      numeroParcelas: number;
+      acordoId: string;
+      documento: string;
+      cliente: string | null;
+      forma: string | null;
+      titulos: number[];
+      valor: number;
+      encargos: number;
+      data: string;
+      collectorId: string | null;
+      notes: string | null;
+      registradoPorId: string | null;
+    }[]
+  >([]);
+  useEffect(() => {
+    let cancelled = false;
+    type Linha = {
+      acordo_parcela_id: string;
+      valor_pago: number | string;
+      valor_encargos: number | string | null;
+      data_pagamento: string;
+      collector_id: string | null;
+      notes: string | null;
+      registrado_por_id: string | null;
+      acordo_parcelas: {
+        numero: number;
+        acordo_id: string;
+        acordos: {
+          client_document: string;
+          client_name: string | null;
+          forma_pagamento_parcelas: string | null;
+          numero_parcelas: number;
+          acordo_titulos: { collection_id: number }[];
+        };
+      };
+    };
+    (async () => {
+      try {
+        const linhas = await fetchAllRows<Linha>(
+          (de, ate) =>
+            supabase
+              .from("acordo_pagamentos")
+              .select(
+                "acordo_parcela_id, valor_pago, valor_encargos, data_pagamento, collector_id, notes, registrado_por_id, acordo_parcelas!inner(numero, acordo_id, acordos!inner(client_document, client_name, forma_pagamento_parcelas, numero_parcelas, acordo_titulos(collection_id)))",
+              )
+              .order("id")
+              .range(de, ate)
+              .returns<Linha[]>(),
+          () => cancelled,
+        );
+        if (cancelled) return;
+        setAcordoPagamentos(
+          linhas.map((l) => ({
+            parcelaId: l.acordo_parcela_id,
+            numero: l.acordo_parcelas.numero,
+            numeroParcelas: l.acordo_parcelas.acordos.numero_parcelas,
+            acordoId: l.acordo_parcelas.acordo_id,
+            documento: l.acordo_parcelas.acordos.client_document,
+            cliente: l.acordo_parcelas.acordos.client_name,
+            forma: l.acordo_parcelas.acordos.forma_pagamento_parcelas,
+            titulos: (l.acordo_parcelas.acordos.acordo_titulos ?? []).map(
+              (t) => Number(t.collection_id),
+            ),
+            valor: Number(l.valor_pago) || 0,
+            encargos: Number(l.valor_encargos) || 0,
+            data: String(l.data_pagamento).slice(0, 10),
+            collectorId: l.collector_id,
+            notes: l.notes,
+            registradoPorId: l.registrado_por_id,
+          })),
+        );
+      } catch (err) {
+        // Sem esta fonte o Caixa segue com os demais pagamentos.
+        console.error("Erro ao buscar pagamentos de acordo:", err);
       }
     })();
     return () => {
@@ -648,6 +744,148 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
       });
     });
 
+    // Parcelas de acordo: uma linha por parcela x dia x cobrador x origem
+    // (cobrador recebeu / loja recebeu). Lançamentos que se anulam no mesmo
+    // dia somem; saldo negativo vira estorno.
+    const acordoPorChave = new Map<
+      string,
+      {
+        documento: string;
+        cliente: string | null;
+        collectorId: string;
+        acordoId: string;
+        numero: number;
+        numeroParcelas: number;
+        forma: string;
+        titulos: number[];
+        valor: number;
+        encargos: number;
+        data: string;
+      }
+    >();
+    acordoPagamentos.forEach((p) => {
+      const emIntervalo =
+        dateRangeMode === "single"
+          ? p.data === selectedDate
+          : p.data >= selectedDate && p.data <= endDate;
+      if (!emIntervalo) return;
+      const collectorId = p.collectorId || "unknown";
+      if (excludedCollectorIds.size > 0 && excludedCollectorIds.has(collectorId))
+        return;
+      if (excludedStores.size > 0) {
+        const loja = rowsOf(p.documento)[0]?.nome_da_loja;
+        if (loja && excludedStores.has(loja)) return;
+      }
+      // Espelho da importação da SSÓtica: a loja recebeu (migration
+      // 20261113000001, registrar_pagamento_acordo_interno sem autor).
+      const pagoNaLoja =
+        !p.registradoPorId && (p.notes ?? "").startsWith("SSÓtica:");
+      const forma = pagoNaLoja
+        ? "acordo_pago_loja"
+        : formaAcordo(
+            (p.notes ?? "").startsWith("Entrada via Pix") ? "Pix" : p.forma,
+          );
+      const chave = `${p.parcelaId}|${p.data}|${collectorId}|${pagoNaLoja ? "loja" : "cob"}`;
+      const atual = acordoPorChave.get(chave) ?? {
+        documento: p.documento,
+        cliente: p.cliente,
+        collectorId,
+        acordoId: p.acordoId,
+        numero: p.numero,
+        numeroParcelas: p.numeroParcelas,
+        forma,
+        titulos: p.titulos,
+        valor: 0,
+        encargos: 0,
+        data: p.data,
+      };
+      atual.valor += p.valor;
+      atual.encargos += p.encargos;
+      acordoPorChave.set(chave, atual);
+    });
+    acordoPorChave.forEach((info, chave) => {
+      const valor = Math.round(info.valor * 100) / 100;
+      if (Math.abs(valor) < 0.005) return;
+      const encargos = Math.round(info.encargos * 100) / 100;
+      const collectorId = info.collectorId;
+      if (!collectorMap.has(collectorId)) {
+        collectorMap.set(collectorId, {
+          collectorId,
+          collectorName:
+            users.find((u) => u.id === collectorId)?.name || "Não atribuído",
+          receivedAmount: 0,
+          transactionCount: 0,
+          jurosAmount: 0,
+          discountAmount: 0,
+          clients: new Set(),
+          saleNumbers: new Set(),
+        });
+      }
+      const clientRows = rowsOf(info.documento);
+      const collectorData = collectorMap.get(collectorId)!;
+      collectorData.receivedAmount += valor;
+      collectorData.transactionCount += 1;
+      collectorData.jurosAmount += encargos;
+      collectorData.clients.add(
+        info.cliente || clientRows[0]?.cliente || info.documento,
+      );
+      // Vendas dos títulos do acordo (para a coluna Venda).
+      const vendas = new Set<string>();
+      info.titulos.forEach((id) => {
+        const row = clientRows.find((c) => c.id_parcela === id);
+        const venda = row ? resolveSaleKey(row) : null;
+        if (venda) vendas.add(String(venda));
+      });
+      vendas.forEach((v) => collectorData.saleNumbers.add(v));
+
+      const totalDebtValue = clientRows.reduce(
+        (sum, c) => sum + (c.valor_original || 0),
+        0,
+      );
+      const totalAlreadyPaidValue = clientRows.reduce(
+        (sum, c) => sum + (c.valor_recebido || 0),
+        0,
+      );
+      const totalDiscountValue = clientRows.reduce(
+        (sum, c) => sum + (c.desconto || 0),
+        0,
+      );
+      const key = `acordo:${chave}`;
+      salesPaymentMap.set(key, {
+        saleKey: key,
+        client: info.cliente || clientRows[0]?.cliente || info.documento,
+        clientDocument: info.documento,
+        saleNumber: Array.from(vendas).join(", "),
+        store: clientRows[0]?.nome_da_loja || "",
+        // Principal da parcela do acordo: o pendente da linha fica 0.
+        totalOriginalValue: valor - encargos,
+        totalReceivedValue: valor,
+        totalPaidOnDebt: totalAlreadyPaidValue,
+        totalPendingValue: 0,
+        paymentDiscount: 0,
+        paymentJuros: encargos,
+        debtKey: `${info.documento}|acordo:${info.acordoId}`,
+        totalDebt: totalDebtValue,
+        remainingDebt: Math.max(
+          0,
+          totalDebtValue - (totalAlreadyPaidValue + totalDiscountValue),
+        ),
+        receivedDate: info.data,
+        collectorId,
+        collector: collectorData.collectorName,
+        // Saldo negativo no dia = estorno (mesmo grupo dos outros estornos).
+        paymentMethod: valor < 0 ? "Estorno" : info.forma,
+        installments: [
+          {
+            collectionId: `acordo ${info.numero}/${info.numeroParcelas}`,
+            originalValue: valor - encargos,
+            receivedValue: valor,
+            pendingValue: 0,
+          },
+        ],
+      });
+    });
+
     // Do maior recebido para o menor (tela e exportações usam essa ordem).
     const collectorSummary = Array.from(collectorMap.values())
       .map((c) => ({
@@ -826,6 +1064,7 @@ const DailyCashReport: React.FC<DailyCashReportProps> = ({ collections }) => {
     salePayments,
     collectionsByDoc,
     atribuicoesAprovadas,
+    acordoPagamentos,
     dfSelectedDate,
     dfEndDate,
     dfDateRangeMode,
