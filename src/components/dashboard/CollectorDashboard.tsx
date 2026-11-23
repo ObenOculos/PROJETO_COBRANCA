@@ -1619,105 +1619,107 @@ const InternalCollectorWallet: React.FC<InternalCollectorWalletProps> = ({
               }))}
             />
             {situacaoCarteira !== "pagouNaLoja" && (
-            <CarteiraChips
-              valor={faixaCarteira}
-              onChange={(v) => setFaixaCarteira(v as FaixaCarteira)}
-              total={walletFilteredGroups.length + quitadosNaCarteira.length}
-              todosKey="todas"
-              todosLabel="Todas as faixas"
-              opcoes={[
-                { key: "critical", label: "Crítico +90d" },
-                { key: "high", label: "60-90d" },
-                { key: "medium", label: "30-60d" },
-                { key: "low", label: "Até 30d" },
-                { key: "emDia", label: "Em dia" },
-              ].map((o) => ({
-                ...o,
-                count: contagemCarteira.faixa.get(o.key) ?? 0,
-              }))}
-            />
+              <CarteiraChips
+                valor={faixaCarteira}
+                onChange={(v) => setFaixaCarteira(v as FaixaCarteira)}
+                total={walletFilteredGroups.length + quitadosNaCarteira.length}
+                todosKey="todas"
+                todosLabel="Todas as faixas"
+                opcoes={[
+                  { key: "critical", label: "Crítico +90d" },
+                  { key: "high", label: "60-90d" },
+                  { key: "medium", label: "30-60d" },
+                  { key: "low", label: "Até 30d" },
+                  { key: "emDia", label: "Em dia" },
+                ].map((o) => ({
+                  ...o,
+                  count: contagemCarteira.faixa.get(o.key) ?? 0,
+                }))}
+              />
             )}
           </div>
 
           {situacaoCarteira === "pagouNaLoja" ? (
             <PagosNaLojaLista
               itens={pagosLojaFiltrados}
-              onPedir={(document, client) => setPedidoLoja({ document, client })}
+              onPedir={(document, client) =>
+                setPedidoLoja({ document, client })
+              }
             />
           ) : (
-          <>
-          {(["card", "row"] as const).map((layout) => {
-            const linhas = paginatedClients.map((group) => (
-              <ClientQueueRow
-                key={group.clientId}
-                layout={layout}
-                group={group}
-                lastContact={lastContacts[group.document]}
-                acordoAtivo={!!getAcordoAtivoDoCliente(group.document)}
-                copiedDoc={copiedDoc}
-                copyDocument={copyDocument}
-                user={user}
-                onOpenDetail={onOpenDetail}
-                onOpenLog={onOpenLog}
-                onOpenAcordo={onOpenAcordo}
-                urgenteInfo={urgenteInfoByDocument.get(group.document)}
-                scheduledContact={scheduledContactByDocument.get(group.document)}
-                aposContato={aposContato}
-                quitadoEm={
-                  quitadoEmPorDocumento.has(group.document)
-                    ? (quitadoEmPorDocumento.get(group.document) ?? null)
-                    : undefined
-                }
-                contatosNaoCarregados={
-                  quitadoEmPorDocumento.has(group.document) &&
-                  !quitadoRecente(group.document)
-                }
-              />
-            ));
-            const vazio = (
-              <p className="px-6 py-12 text-center text-sm text-gray-500">
-                Nenhum cliente encontrado.
-              </p>
-            );
-            return layout === "card" ? (
-              <div
-                key="card"
-                className="md:hidden divide-y divide-gray-100 dark:divide-dark-border"
-              >
-                {linhas.length > 0 ? linhas : vazio}
-              </div>
-            ) : (
-              <div key="row" className="hidden md:block overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <WalletTableHead
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                    onSort={toggleSort}
+            <>
+              {(["card", "row"] as const).map((layout) => {
+                const linhas = paginatedClients.map((group) => (
+                  <ClientQueueRow
+                    key={group.clientId}
+                    layout={layout}
+                    group={group}
+                    lastContact={lastContacts[group.document]}
+                    acordoAtivo={!!getAcordoAtivoDoCliente(group.document)}
+                    copiedDoc={copiedDoc}
+                    copyDocument={copyDocument}
+                    user={user}
+                    onOpenDetail={onOpenDetail}
+                    onOpenLog={onOpenLog}
+                    onOpenAcordo={onOpenAcordo}
+                    urgenteInfo={urgenteInfoByDocument.get(group.document)}
+                    scheduledContact={scheduledContactByDocument.get(group.document)}
+                    aposContato={aposContato}
+                    quitadoEm={
+                      quitadoEmPorDocumento.has(group.document)
+                        ? (quitadoEmPorDocumento.get(group.document) ?? null)
+                        : undefined
+                    }
+                    contatosNaoCarregados={
+                      quitadoEmPorDocumento.has(group.document) &&
+                      !quitadoRecente(group.document)
+                    }
                   />
-                  <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
-                    {linhas.length > 0 ? (
-                      linhas
-                    ) : (
-                      <tr>
-                        <td colSpan={6}>{vazio}</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            );
-          })}
+                ));
+                const vazio = (
+                  <p className="px-6 py-12 text-center text-sm text-gray-500">
+                    Nenhum cliente encontrado.
+                  </p>
+                );
+                return layout === "card" ? (
+                  <div
+                    key="card"
+                    className="md:hidden divide-y divide-gray-100 dark:divide-dark-border"
+                  >
+                    {linhas.length > 0 ? linhas : vazio}
+                  </div>
+                ) : (
+                  <div key="row" className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <WalletTableHead
+                        sortKey={sortKey}
+                        sortDir={sortDir}
+                        onSort={toggleSort}
+                      />
+                      <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
+                        {linhas.length > 0 ? (
+                          linhas
+                        ) : (
+                          <tr>
+                            <td colSpan={6}>{vazio}</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })}
 
-          {totalPages > 1 && (
-            <Paginacao
-              page={currentPage}
-              totalPages={totalPages}
-              mostrando={paginatedClients.length}
-              total={carteiraFiltrada.length}
-              onChange={setCurrentPage}
-            />
-          )}
-          </>
+              {totalPages > 1 && (
+                <Paginacao
+                  page={currentPage}
+                  totalPages={totalPages}
+                  mostrando={paginatedClients.length}
+                  total={carteiraFiltrada.length}
+                  onChange={setCurrentPage}
+                />
+              )}
+            </>
           )}
         </div>
       )}
