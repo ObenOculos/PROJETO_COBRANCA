@@ -157,6 +157,26 @@ class SupabaseRestClient:
             return []
         return json.loads(payload)
 
+    def rpc(self, funcao: str, args: dict | None = None):
+        """POST /rest/v1/rpc/<funcao> (o `request` codifica a barra do nome)."""
+        request = Request(
+            f"{self.base_url}/rpc/{quote(funcao, safe='')}",
+            data=json.dumps(args or {}).encode("utf-8"),
+            headers={
+                "apikey": self.key,
+                "Authorization": f"Bearer {self.key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urlopen(request, timeout=120) as response:
+                payload = response.read()
+        except (HTTPError, URLError) as exc:
+            detalhe = exc.read().decode("utf-8", errors="replace") if isinstance(exc, HTTPError) else str(exc)
+            raise RuntimeError(f"Falha na API do Supabase (rpc {funcao}): {detalhe}") from exc
+        return json.loads(payload) if payload else None
+
 
 def conectar_cobranca() -> SupabaseRestClient:
     env = dotenv_values(COBRANCA_ENV_PATH)
@@ -183,6 +203,28 @@ def conectar_cobranca() -> SupabaseRestClient:
 # seguem contando como recebido por enquanto -- pendencia em docs/PROGRESSO.md.
 FORMA_RENEGOCIACAO = 100
 FORMA_DESCONTO = 14
+# Item 87 (2026-11-23): baixa paga em CHEQUE -- so alimenta as sugestoes do
+# painel "Cheques" do gestor (clientes.ultima_baixa_cheque_erp).
+FORMA_CHEQUE = 2
+
+# Ultima baixa ATIVA paga em cheque, por cliente do Ciclone.
+QUERY_ULTIMA_BAIXA_CHEQUE = """
+SELECT tb.pgcln_codigo, MAX(b.fncrb_databaixa) AS data_baixa
+FROM fn_crtitulobaixado tb
+JOIN fn_crbaixa b
+  ON b.pgemp_codigo = tb.pgemp_codigo
+ AND b.pgfll_codigo = tb.pgfll_codigo
+ AND b.fncrb_numerobaixa = tb.fncrb_numerobaixa
+JOIN fn_crbaixaformapagamento bfp
+  ON bfp.pgemp_codigo = b.pgemp_codigo
+ AND bfp.pgfll_codigo = b.pgfll_codigo
+ AND bfp.fncrb_numerobaixa = b.fncrb_numerobaixa
+WHERE b.fncrb_situacao = 'B'
+  AND bfp.fnfpt_codigo = %(forma_cheque)s
+  AND tb.pgemp_codigo = ANY(%(empresas)s)
+  AND tb.pgcln_codigo >= 100000
+GROUP BY tb.pgcln_codigo
+"""
 
 QUERY_TITULOS = """
 WITH formas_por_baixa AS (
@@ -218,6 +260,7 @@ SELECT
     t.fncrt_situacao,
     t.fncrt_percentualmulta,
     t.fncrt_percentualjurodia,
+    t.fntti_codigo,
     v.pgview_cpfcnpj,
     v.pgview_nome,
     v.pgview_nomefantasia,
@@ -370,6 +413,16 @@ def extrair_renegociacoes(conn) -> list[dict]:
     return list(cabecalhos.values())
 
 
+def extrair_ultima_baixa_cheque(conn) -> dict:
+    """{pgcln_codigo (str): date} da ultima baixa paga em cheque."""
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(QUERY_ULTIMA_BAIXA_CHEQUE, {
+            "empresas": list(EMPRESAS),
+            "forma_cheque": FORMA_CHEQUE,
+        })
+        return {str(r["pgcln_codigo"]): r["data_baixa"] for r in cur.fetchall()}
+
+
 def extrair_titulos(conn, limit: Optional[int] = None):
     sql = QUERY_TITULOS
     if limit:
@@ -516,6 +569,10 @@ def transformar(row: dict, hoje: date) -> Optional[LinhaTransformada]:
         "status": status,
         "cliente": nome,
         "documento": documento,
+        # Item 87: 2/3/5 = cheque em maos (carteira/custodia/deposito) -> o
+        # cliente fica fora da carteira dos cobradores (regra no banco,
+        # clientes_condicao_cheque). Sai do lote se a coluna ainda nao existir.
+        "tipo_titulo_erp": row["fntti_codigo"],
         "endereco": row["pgview_endereco"],
         "numero": row["pgview_numero"],
         "bairro": row["pgview_bairro"],
@@ -543,6 +600,8 @@ def transformar(row: dict, hoje: date) -> Optional[LinhaTransformada]:
         # CPF/CNPJ pode ter mais de um codigo -- juntados em
         # juntar_codigos_cliente na hora de agrupar por documento.
         "codigo_cliente_erp": str(row["pgcln_codigo"]) if row["pgcln_codigo"] is not None else None,
+        # Preenchido no main (junta todos os codigos do documento).
+        "ultima_baixa_cheque_erp": None,
     }
 
     return LinhaTransformada(banco_dados=banco_dados, cliente=cliente)
@@ -595,11 +654,15 @@ CAMPOS_ERP = (
     "regiao",
     "observacao_erp",
     "codigo_cliente_erp",
+    "ultima_baixa_cheque_erp",
 )
 
 # Colunas de CAMPOS_ERP que vieram em migration posterior a 20261106000011:
 # se ainda nao existirem no app, saem do upsert sem derrubar o resto.
-CAMPOS_ERP_OPCIONAIS = {"codigo_cliente_erp": "20261109000001"}
+CAMPOS_ERP_OPCIONAIS = {
+    "codigo_cliente_erp": "20261109000001",
+    "ultima_baixa_cheque_erp": "20261123000002",
+}
 
 
 def juntar_codigos_cliente(codigos: set) -> Optional[str]:
@@ -610,9 +673,9 @@ def juntar_codigos_cliente(codigos: set) -> Optional[str]:
     return ", ".join(validos) or None
 
 
-def coluna_existe(sb: SupabaseRestClient, coluna: str) -> bool:
+def coluna_existe(sb: SupabaseRestClient, coluna: str, tabela: str = "clientes") -> bool:
     try:
-        sb.request("GET", "clientes", params={"select": coluna, "limit": "1"})
+        sb.request("GET", tabela, params={"select": coluna, "limit": "1"})
         return True
     except RuntimeError:
         return False
@@ -929,6 +992,8 @@ def main() -> None:
         linhas_erp = extrair_titulos(conn_erp, limit=args.limit)
         logger.info("Extraindo renegociacoes...")
         renegociacoes = extrair_renegociacoes(conn_erp)
+        logger.info("Extraindo ultima baixa em cheque por cliente...")
+        ultima_cheque = extrair_ultima_baixa_cheque(conn_erp)
     finally:
         conn_erp.close()
     logger.info("%d titulos extraidos do Ciclone", len(linhas_erp))
@@ -1039,13 +1104,28 @@ def main() -> None:
     # O ultimo titulo lido de cada documento define o cadastro; o codigo do
     # Ciclone, porem, junta todos os codigos daquele CPF/CNPJ.
     for doc, cliente in clientes_por_documento.items():
+        datas_cheque = [
+            ultima_cheque[c] for c in codigos_por_documento.get(doc, set())
+            if c and ultima_cheque.get(c)
+        ]
         clientes_por_documento[doc] = {
             **cliente,
             "codigo_cliente_erp": juntar_codigos_cliente(codigos_por_documento.get(doc, set())),
+            "ultima_baixa_cheque_erp": max(datas_cheque).isoformat() if datas_cheque else None,
         }
 
     logger.info("Gravando %d clientes...", len(clientes_por_documento))
     upsert_clientes(sb, clientes_por_documento)
+
+    # Item 87: tipo_titulo_erp veio na migration 20261123000002 -- se ainda
+    # nao foi aplicada, os titulos seguem sem ele (nada para).
+    if linhas_banco_dados and not coluna_existe(sb, "tipo_titulo_erp", "BANCO_DADOS"):
+        logger.warning(
+            "BANCO_DADOS sem a coluna tipo_titulo_erp (migration 20261123000002 nao "
+            "aplicada?) -- seguindo sem ela."
+        )
+        for linha in linhas_banco_dados:
+            linha.pop("tipo_titulo_erp", None)
 
     colunas_banco_dados = (
         [c for c in linhas_banco_dados[0] if c != "id_parcela"] if linhas_banco_dados else []
@@ -1067,6 +1147,15 @@ def main() -> None:
         )
     logger.info("Gravando %d linhas em BANCO_DADOS...", len(alteradas))
     upsert_banco_dados(sb, alteradas)
+
+    # Item 87: cheque em carteira que chegou nesta rodada tira o cliente do
+    # cobrador agora, sem esperar a rotina das 7h. Falha nao derruba o sync
+    # (a rotina das 7h faz o mesmo).
+    try:
+        retirados = sb.rpc("retirar_clientes_cheque_da_carteira")
+        logger.info("Condicao de cheque: %s cliente(s) retirado(s) de cobrador", retirados)
+    except RuntimeError as exc:
+        logger.error("Falha ao retirar clientes em condicao de cheque: %s", exc)
 
     # Depois do BANCO_DADOS: os itens tem FK para ele. Falha aqui nao desfaz
     # nem invalida a carga dos titulos -- loga e segue (proxima rodada refaz,
