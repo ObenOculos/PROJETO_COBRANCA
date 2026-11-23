@@ -830,8 +830,31 @@ COLUNAS_PROTEGIDAS = (
 )
 
 
+def carregar_parcelas_pagas_no_app(sb: SupabaseRestClient) -> set:
+    """id_parcela com pagamento lancado PELO APP (recebimentos_historico com
+    origem app/acordo) -- as unicas que a protecao abaixo segura."""
+    ids: set = set()
+    inicio = 0
+    while True:
+        resp = sb.request(
+            "GET",
+            "recebimentos_historico",
+            params={
+                "select": "id,id_parcela",
+                "origem": "in.(app,acordo)",
+                "order": "id",
+                "offset": inicio,
+                "limit": 1000,
+            },
+        )
+        ids.update(r["id_parcela"] for r in resp if r.get("id_parcela") is not None)
+        if len(resp) < 1000:
+            return ids
+        inicio += 1000
+
+
 def proteger_e_filtrar_alteradas(
-    atuais: dict, linhas: list[dict]
+    atuais: dict, linhas: list[dict], pagas_no_app: Optional[set] = None
 ) -> tuple[list[dict], list[dict]]:
     """Decide o que de fato grava em BANCO_DADOS nesta rodada.
 
@@ -859,6 +882,13 @@ def proteger_e_filtrar_alteradas(
     cada rodada disparava um evento realtime por linha para cada tela aberta
     (item 65).
 
+    So protege parcela com pagamento lancado pelo app (`pagas_no_app`, item
+    87, 2026-11-23). Caso real: o financeiro baixou um cheque no cliente
+    errado e estornou no Ciclone -- o recebido tinha vindo do PROPRIO ERP,
+    entao o estorno precisa valer no app (sem isso o titulo ficava com o
+    recebido falso para sempre). `pagas_no_app=None` (falha ao carregar) =
+    protege tudo, como antes.
+
     Devolve (linhas_para_gravar, titulos_protegidos_para_log).
     """
     if not linhas:
@@ -869,7 +899,11 @@ def proteger_e_filtrar_alteradas(
     for linha in linhas:
         atual = atuais.get(linha["id_parcela"])
         linha_final = linha
-        if atual is not None and linha["status"] not in STATUS_SEMPRE_VALE:
+        if (
+            atual is not None
+            and linha["status"] not in STATUS_SEMPRE_VALE
+            and (pagas_no_app is None or linha["id_parcela"] in pagas_no_app)
+        ):
             recebido_atual = como_decimal(atual.get("valor_recebido"))
             recebido_novo = como_decimal(linha["valor_recebido"])
             if recebido_novo + Decimal("0.01") < recebido_atual:
@@ -1138,7 +1172,18 @@ def main() -> None:
             "protecao contra regressao de pagamento do app.", exc,
         )
         atuais_banco_dados = {}
-    alteradas, protegidos = proteger_e_filtrar_alteradas(atuais_banco_dados, linhas_banco_dados)
+    try:
+        pagas_no_app = carregar_parcelas_pagas_no_app(sb)
+        logger.info("%d parcela(s) com pagamento lancado pelo app (protegidas)", len(pagas_no_app))
+    except RuntimeError as exc:
+        logger.error(
+            "Nao foi possivel ler os pagamentos do app (%s); protegendo TODAS as "
+            "parcelas contra reducao de recebido nesta rodada.", exc,
+        )
+        pagas_no_app = None
+    alteradas, protegidos = proteger_e_filtrar_alteradas(
+        atuais_banco_dados, linhas_banco_dados, pagas_no_app
+    )
     if protegidos:
         logger.warning(
             "%d titulo(s) com pagamento do app protegido contra esta rodada do Ciclone "
