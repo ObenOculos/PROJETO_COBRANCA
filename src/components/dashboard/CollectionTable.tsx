@@ -14,8 +14,6 @@ import {
   MapPin,
   User,
   Loader2,
-  ChevronLeft,
-  ChevronRight,
   DollarSign,
   TrendingUp,
   TrendingDown,
@@ -23,7 +21,7 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  EyeIcon,
+  MoreHorizontal,
   Trash2,
   FileDown,
   XCircle,
@@ -124,6 +122,7 @@ export const CollectionTable = React.forwardRef<
       null,
     );
     const [isDeleteMode, setIsDeleteMode] = useState(false);
+    const [menuCabecalhoAberto, setMenuCabecalhoAberto] = useState(false);
     const [selectedClients, setSelectedClients] = useState<Set<string>>(
       new Set(),
     );
@@ -641,12 +640,12 @@ export const CollectionTable = React.forwardRef<
         total={totalItems}
         perPage={itemsPerPage}
         onChange={setCurrentPage}
+        perPageOptions={[10, 20, 50, 100]}
+        onPerPageChange={(n) => {
+          setItemsPerPage(n);
+          setCurrentPage(1);
+        }}
         className="mt-4 px-1 py-3"
-        totais={`${totalClientes.toLocaleString("pt-BR")} ${
-          totalClientes === 1 ? "cliente" : "clientes"
-        } · ${totalVendas.toLocaleString("pt-BR")} ${
-          totalVendas === 1 ? "venda" : "vendas"
-        }`}
       />
     );
 
@@ -992,6 +991,49 @@ export const CollectionTable = React.forwardRef<
       );
     }
 
+    // Ordenar por cliente / valor / cidade: no topo (computador) ou numa
+    // linha aberta pelo botao ⇅ (celular).
+    const botoesOrdenar = (
+      <>
+        <button
+          onClick={() => handleSort("cliente")}
+          className={`p-2 rounded-2xl transition-colors ${
+            sortField === "cliente"
+              ? "bg-blue-600 text-white"
+              : "text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:text-dark-text-secondary dark:hover:text-dark-text dark:hover:bg-dark-bg-tertiary"
+          }
+                                      `}
+          title="Ordenar por Cliente"
+        >
+          <User className="h-4 w-4" />
+        </button>
+        <button
+          onClick={() => handleSort("valor")}
+          className={`p-2 rounded-2xl transition-colors ${
+            sortField === "valor"
+              ? "bg-blue-600 text-white"
+              : "text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:text-dark-text-secondary dark:hover:text-dark-text dark:hover:bg-dark-bg-tertiary"
+          }
+                                      `}
+          title="Ordenar por Valor"
+        >
+          <DollarSign className="h-4 w-4" />
+        </button>
+        <button
+          onClick={() => handleSort("cidade")}
+          className={`p-2 rounded-2xl transition-colors ${
+            sortField === "cidade"
+              ? "bg-blue-600 text-white"
+              : "text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:text-dark-text-secondary dark:hover:text-dark-text dark:hover:bg-dark-bg-tertiary"
+          }
+                                      `}
+          title="Ordenar por Cidade"
+        >
+          <MapPin className="h-4 w-4" />
+        </button>
+      </>
+    );
+
     // Fallback to simple list view
     return (
       <>
@@ -1046,7 +1088,6 @@ export const CollectionTable = React.forwardRef<
               ) : (
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <DollarSign className="h-5 w-5 text-blue-600" />
                     <div>
                       <h2 className="text-lg font-semibold text-gray-900 dark:text-dark-text">
                         {userType === "manager"
@@ -1054,29 +1095,77 @@ export const CollectionTable = React.forwardRef<
                           : "Minha Carteira"}
                       </h2>
                       <p className="text-sm text-gray-600 dark:text-dark-text-secondary mt-0.5">
-                        {totalClientes} cliente
-                        {totalClientes !== 1 ? "s" : ""} • {totalVendas} venda
+                        {totalClientes.toLocaleString("pt-BR")} cliente
+                        {totalClientes !== 1 ? "s" : ""} ·{" "}
+                        {totalVendas.toLocaleString("pt-BR")} venda
                         {totalVendas !== 1 ? "s" : ""}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    {!isMobile && (
+                      <div className="flex items-center gap-1 mr-1">
+                        {botoesOrdenar}
+                      </div>
+                    )}
+                    {isMobile && (
+                      <button
+                        onClick={() => setShowSortOptions(!showSortOptions)}
+                        className={`flex items-center justify-center w-9 h-9 rounded-xl border transition-colors ${
+                          showSortOptions
+                            ? "bg-blue-600 border-blue-600 text-white"
+                            : "border-gray-200 dark:border-dark-border text-gray-600 dark:text-dark-text-secondary hover:bg-gray-50 dark:hover:bg-dark-bg-tertiary"
+                        }`}
+                        title="Ordenar"
+                        aria-label="Ordenar"
+                        aria-expanded={showSortOptions}
+                      >
+                        <ArrowUpDown className="h-4 w-4" />
+                      </button>
+                    )}
                     {userType === "manager" && (
                       <div className="flex items-center gap-2">
                         <button
                           onClick={handleExportXLSX}
-                          className="flex items-center gap-2 p-2 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-all duration-200"
+                          className="flex items-center justify-center w-9 h-9 rounded-xl border border-gray-200 dark:border-dark-border text-gray-600 dark:text-dark-text-secondary hover:bg-gray-50 dark:hover:bg-dark-bg-tertiary transition-colors"
                           title="Exportar para Excel"
+                          aria-label="Exportar para Excel"
                         >
                           <FileDown className="h-4 w-4" />
                         </button>
-                        <button
-                          onClick={() => setShowActivationModal(true)}
-                          className="flex items-center gap-2 p-2 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-all duration-200"
-                          title="Ativar modo de exclusão em massa"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {/* Acao rara e destrutiva: no menu, nao a vista. */}
+                        <div className="relative">
+                          <button
+                            onClick={() => setMenuCabecalhoAberto((v) => !v)}
+                            className="flex items-center justify-center w-9 h-9 rounded-xl border border-gray-200 dark:border-dark-border text-gray-600 dark:text-dark-text-secondary hover:bg-gray-50 dark:hover:bg-dark-bg-tertiary transition-colors"
+                            title="Mais ações"
+                            aria-label="Mais ações"
+                            aria-expanded={menuCabecalhoAberto}
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </button>
+                          {menuCabecalhoAberto && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-10"
+                                onClick={() => setMenuCabecalhoAberto(false)}
+                              />
+                              <div className="absolute right-0 mt-1 z-20 w-60 bg-white dark:bg-dark-bg-secondary border border-gray-200 dark:border-dark-border rounded-xl shadow-lg py-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setMenuCabecalhoAberto(false);
+                                    setShowActivationModal(true);
+                                  }}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 text-left"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                  Cancelar vendas em massa
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </div>
                     )}
                     {userType !== "manager" && (
@@ -1097,112 +1186,11 @@ export const CollectionTable = React.forwardRef<
                   </div>
                 </div>
               )}
-              {/* Controls Row: ordenação (esquerda) · exibição + paginação (direita) */}
-              <div className="flex justify-between sm:flex-row items-start sm:items-center gap-2 sm:gap-1">
-                {/* Sorting */}
-                <div className="flex items-center gap-1">
-                  {isMobile ? (
-                    <button
-                      onClick={() => setShowSortOptions(!showSortOptions)}
-                      className={`p-2 rounded-2xl transition-colors ${
-                        showSortOptions
-                          ? "bg-blue-600 text-white"
-                          : "text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:text-dark-text-secondary dark:hover:text-dark-text dark:hover:bg-dark-bg-tertiary"
-                      }`}
-                      title="Opções de Ordenação"
-                    >
-                      <ArrowUpDown className="h-4 w-4" />
-                    </button>
-                  ) : null}
-                  {(showSortOptions || !isMobile) && (
-                    <>
-                      <button
-                        onClick={() => handleSort("cliente")}
-                        className={`p-2 rounded-2xl transition-colors ${
-                          sortField === "cliente"
-                            ? "bg-blue-600 text-white"
-                            : "text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:text-dark-text-secondary dark:hover:text-dark-text dark:hover:bg-dark-bg-tertiary"
-                        }
-                                                    `}
-                        title="Ordenar por Cliente"
-                      >
-                        <User className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleSort("valor")}
-                        className={`p-2 rounded-2xl transition-colors ${
-                          sortField === "valor"
-                            ? "bg-blue-600 text-white"
-                            : "text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:text-dark-text-secondary dark:hover:text-dark-text dark:hover:bg-dark-bg-tertiary"
-                        }
-                                                    `}
-                        title="Ordenar por Valor"
-                      >
-                        <DollarSign className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleSort("cidade")}
-                        className={`p-2 rounded-2xl transition-colors ${
-                          sortField === "cidade"
-                            ? "bg-blue-600 text-white"
-                            : "text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:text-dark-text-secondary dark:hover:text-dark-text dark:hover:bg-dark-bg-tertiary"
-                        }
-                                                    `}
-                        title="Ordenar por Cidade"
-                      >
-                        <MapPin className="h-4 w-4" />
-                      </button>
-                    </>
-                  )}
-                </div>
-
-                {/* Exibição + Paginação */}
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1 text-sm text-gray-500 dark:text-dark-text-secondary rounded-2xl border border-gray-200 dark:border-dark-border py-1 px-2">
-                    <EyeIcon className="h-4 w-4 text-gray-450 dark:text-dark-text-secondary" />
-                    <select
-                      id="items-per-page"
-                      name="itemsPerPage"
-                      aria-label="Itens por página"
-                      value={itemsPerPage}
-                      onChange={(e) => {
-                        setItemsPerPage(Number(e.target.value));
-                        setCurrentPage(1);
-                      }}
-                      className="text-sm border-0 bg-transparent focus:ring-0 text-gray-600 dark:text-dark-text bg-white dark:bg-dark-bg-secondary"
-                    >
-                      <option value={10}>10</option>
-                      <option value={20}>20</option>
-                      <option value={50}>50</option>
-                      <option value={100}>100</option>
-                    </select>
-                  </div>
-                  {totalPages > 1 && (
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() =>
-                          setCurrentPage(Math.max(1, currentPage - 1))
-                        }
-                        disabled={currentPage === 1}
-                        className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
-                        title="Página anterior"
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() =>
-                          setCurrentPage(Math.min(totalPages, currentPage + 1))
-                        }
-                        disabled={currentPage === totalPages}
-                        className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
-                        title="Próxima página"
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>{" "}
+              {/* Ordenacao. "Por pagina" e paginas ficam so na paginacao de
+                  baixo (common/Pagination). */}
+              {isMobile && showSortOptions && (
+                <div className="flex items-center gap-1">{botoesOrdenar}</div>
+              )}
               {/* Expanded Filters (Conditional) */}
               {userType !== "manager" && showFilters && (
                 <div className="flex items-center gap-3 py-2 border-t border-gray-100 dark:border-dark-border">
@@ -1379,7 +1367,9 @@ export const CollectionTable = React.forwardRef<
                     </div>
 
                   </div>
-                  {userType === "manager" && (
+                  {/* So no modo de cancelamento em massa (24/11): fora dele o
+                      card fica limpo -- acao rara e sem volta. */}
+                  {userType === "manager" && isDeleteMode && (
                     <button
                       onClick={async (e) => {
                         e.stopPropagation(); // Prevent opening client detail modal
