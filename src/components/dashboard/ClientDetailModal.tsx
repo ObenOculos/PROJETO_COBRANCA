@@ -203,7 +203,6 @@ const InstallmentStatusDot: React.FC<{ situacao: SituacaoParcela }> = ({
   />
 );
 
-type AbaVendas = "todos" | "atraso" | "aVencer" | "aberto" | "pagos";
 
 const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   clientGroup,
@@ -419,16 +418,13 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     );
   }, [saldoPorVenda]);
 
-  // Abas da lista de vendas (2026-11-19: mesma separacao vencido x a vencer
-  // da carteira, item 34). "Em atraso" = venda com alguma parcela vencida
-  // (mais atrasada primeiro); "A vencer" = venda com saldo e nada vencido;
-  // "Pagos" = sem saldo. Com acordo ativo o atraso segue o acordo, entao as
-  // vendas com saldo ficam juntas em "Em aberto". Venda toda fora da cobranca
-  // (cancelada/agrupada/renegociada no ERP) so aparece em "Todos". Sem
-  // escolha do usuario, abre na primeira aba com venda.
-  // Aberta numa venda especifica: aba "Todos" (a venda pode estar paga).
-  const [abaVendas, setAbaVendas] = useState<AbaVendas | null>(
-    vendaInicial != null ? "todos" : null,
+  // Lista de vendas (24/11): sem abas. Em aberto sempre a vista (mais
+  // atrasada primeiro; com acordo ativo o atraso segue o acordo); quitadas e
+  // fora da cobranca (cancelada/agrupada/renegociada no ERP) num bloco
+  // recolhido no fim. Abre sozinho se nao ha nada em aberto ou se a Ficha
+  // foi aberta numa venda encerrada (vendaInicial).
+  const [encerradasEscolha, setEncerradasEscolha] = useState<boolean | null>(
+    null,
   );
   // ...e rola ate ela.
   useEffect(() => {
@@ -508,31 +504,11 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     const abertas = classificadas
       .filter((c) => c.aberto)
       .sort((a, b) => b.maiorAtraso - a.maiorAtraso);
-    const vencida = (c: (typeof classificadas)[number]) =>
-      (resumoPorVenda.get(c.sale.saleNumber)?.vencido ?? 0) > 0.01;
     return {
-      todos: clientSales,
-      atraso: abertas.filter((c) => vencida(c)).map((c) => c.sale),
-      aVencer: abertas.filter((c) => !vencida(c)).map((c) => c.sale),
       aberto: abertas.map((c) => c.sale),
-      pagos: classificadas.filter((c) => !c.fora && !c.aberto).map((c) => c.sale),
-      emAtraso: abertas.filter((c) => c.maiorAtraso > 0).length,
+      encerradas: classificadas.filter((c) => !c.aberto).map((c) => c.sale),
     };
   }, [clientSales, saldoPorVenda, resumoPorVenda]);
-  // Abas na tela: com acordo ativo, "Em aberto" (sem separar atraso).
-  const abasVendas: readonly (readonly [AbaVendas, string, number])[] = acordoAtivo
-    ? [
-        ["todos", "Todos", vendasPorAba.todos.length],
-        ["aberto", "Em aberto", vendasPorAba.aberto.length],
-        ["pagos", "Pagos", vendasPorAba.pagos.length],
-      ]
-    : [
-        ["todos", "Todos", vendasPorAba.todos.length],
-        ["atraso", "Em atraso", vendasPorAba.atraso.length],
-        ["aVencer", "A vencer", vendasPorAba.aVencer.length],
-        ["pagos", "Pagos", vendasPorAba.pagos.length],
-      ];
-
   // As vendas com parcela em atraso ja vem abertas. Cada uma abre UMA vez,
   // quando aparece (as vendas podem chegar depois da primeira renderizacao);
   // fechada pelo cobrador, nao reabre. Aberta numa venda especifica
@@ -551,19 +527,14 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     novas.forEach((n) => vendasAutoAbertas.current.add(n));
     setExpandedSales((atual) => new Set([...atual, ...novas]));
   }, [clientSales, resumoPorVenda, acordoAtivo, vendaInicial]);
-  const abaPadrao: AbaVendas = acordoAtivo
-    ? vendasPorAba.aberto.length > 0
-      ? "aberto"
-      : "todos"
-    : vendasPorAba.atraso.length > 0
-      ? "atraso"
-      : vendasPorAba.aVencer.length > 0
-        ? "aVencer"
-        : "todos";
-  // Aba escolhida que nao existe neste modo (acordo ativo x sem acordo): padrao.
-  const abaEfetiva: AbaVendas =
-    abaVendas && abasVendas.some(([a]) => a === abaVendas) ? abaVendas : abaPadrao;
-  const vendasVisiveis = vendasPorAba[abaEfetiva];
+  const encerradasAbertas =
+    encerradasEscolha ??
+    (vendasPorAba.aberto.length === 0 ||
+      (vendaInicial != null &&
+        vendasPorAba.encerradas.some((v) => v.saleNumber === vendaInicial)));
+  const vendasVisiveis = encerradasAbertas
+    ? [...vendasPorAba.aberto, ...vendasPorAba.encerradas]
+    : vendasPorAba.aberto;
 
   const handleGeneralPaymentSuccess = async () => {
     // Sem recarregar aqui: o Receber pagamento ja recarrega os dados uma vez
@@ -720,6 +691,23 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     </>
   );
   const temEncargo = !!encargoFicha && encargoFicha.encargo > 0.009;
+  const botaoEncerradas =
+    vendasPorAba.encerradas.length > 0 ? (
+      <button
+        type="button"
+        onClick={() => setEncerradasEscolha(!encerradasAbertas)}
+        aria-expanded={encerradasAbertas}
+        className="w-full flex items-center gap-1.5 pt-2 pb-1 text-xs font-medium text-gray-500 hover:text-gray-800"
+      >
+        {encerradasAbertas ? (
+          <ChevronDown className="h-3.5 w-3.5" />
+        ) : (
+          <ChevronRight className="h-3.5 w-3.5" />
+        )}
+        Quitadas e canceladas ({vendasPorAba.encerradas.length})
+        <span className="flex-1 h-px bg-gray-200 ml-1" aria-hidden />
+      </button>
+    ) : null;
   // Gestor: em nome de quem fica o registro. Sem cobrador de carteira nao ha
   // escolha (fica no nome dele) -- nada a mostrar.
   const mostrarLancarComo =
@@ -1288,52 +1276,13 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           ) : (
             <div className="flex-1 min-h-0 overflow-y-auto">
               <div className="px-4 lg:px-6 py-4">
-                {/* Abas: Todos | Em atraso | A vencer | Pagos (com acordo
-                    ativo: Todos | Em aberto | Pagos) */}
-                <div
-                  role="tablist"
-                  className="mb-3 flex gap-1 p-1 bg-gray-100 rounded-xl text-xs"
-                >
-                  {abasVendas.map(([aba, rotulo, total]) => (
-                    <button
-                      key={aba}
-                      type="button"
-                      role="tab"
-                      aria-selected={abaEfetiva === aba}
-                      onClick={() => setAbaVendas(aba)}
-                      className={`flex-1 px-2 py-1.5 rounded-lg font-semibold transition-colors ${
-                        abaEfetiva === aba
-                          ? "bg-white text-gray-900 shadow-sm"
-                          : "text-gray-500 hover:text-gray-700"
-                      }`}
-                    >
-                      <span className={aba === "atraso" && total > 0 ? "text-red-600" : undefined}>
-                        {rotulo} ({total})
-                      </span>
-                      {aba === "aberto" && vendasPorAba.emAtraso > 0 && (
-                        <span className="ml-1 text-red-600">
-                          · {vendasPorAba.emAtraso} em atraso
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-
                 <div className="space-y-3">
-                  {vendasVisiveis.length === 0 && (
+                  {clientSales.length === 0 && (
                     <p className="py-6 text-center text-xs text-gray-400">
-                      {abaEfetiva === "atraso"
-                        ? "Nenhuma venda em atraso."
-                        : abaEfetiva === "aVencer"
-                          ? "Nenhuma venda só a vencer."
-                          : abaEfetiva === "aberto"
-                        ? "Nenhuma venda com saldo em aberto."
-                        : abaEfetiva === "pagos"
-                          ? "Nenhuma venda quitada."
-                          : "Nenhuma venda."}
+                      Nenhuma venda.
                     </p>
                   )}
-                  {vendasVisiveis.map((sale) => {
+                  {vendasVisiveis.map((sale, idx) => {
                     const saleBalance = saldoDaVenda(sale.saleNumber);
                     const saleSeloFora = seloForaDaCobranca(
                       sale.installments.map((i) => i.status),
@@ -1369,6 +1318,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                       (resumo.vencido > 0.01 || resumo.aVencer > 0.01);
 
                     return (
+                      <React.Fragment key={sale.saleNumber}>
+                      {idx === vendasPorAba.aberto.length && botaoEncerradas}
                       <div
                         key={sale.saleNumber}
                         id={`ficha-venda-${sale.saleNumber}`}
@@ -1776,8 +1727,10 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                           </div>
                         )}
                       </div>
+                      </React.Fragment>
                     );
                   })}
+                  {!encerradasAbertas && botaoEncerradas}
                 </div>
               </div>
             </div>
