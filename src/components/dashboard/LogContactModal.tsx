@@ -12,6 +12,7 @@ import {
   ArrowRight,
   Phone,
   AlertTriangle,
+  Ban,
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
@@ -234,6 +235,11 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
   // submit logo depois de entrar na etapa 2.
   const step2EnteredAt = useRef(0);
   const [mode, setMode] = useState<"contato" | "sem_contato">("contato");
+  // "Nao fiz contato" com agendamento: remarcar (padrao) ou cancelar --
+  // antes so havia remarcar ali e o cancelar ficava num link do cabecalho.
+  const [semContatoAcao, setSemContatoAcao] = useState<
+    "remarcar" | "cancelar"
+  >("remarcar");
   const [loading, setLoading] = useState(false);
   // Tres opcoes (pedido do gestor, 2026-11-18): Sem retorno / Com retorno /
   // Precisa de acao -- o detalhe (telefone errado, caixa postal, mensagem
@@ -403,6 +409,11 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
   // Remarcacao sem contato mantem o canal do agendamento (rescheduleVisit
   // nao troca canal).
   const remarcaSemContato = mode === "sem_contato" && !!linkedVisit;
+  const podeCancelarAgendamento = !!linkedVisit && !!onCancelarAgendamento;
+  const cancelaAgendamento =
+    remarcaSemContato &&
+    podeCancelarAgendamento &&
+    semContatoAcao === "cancelar";
   // Observacao do agendamento so quando nasce um agendamento NOVO -- na
   // remarcacao as notas sao o historico montado por buildRescheduleNotes.
   const criaAgendamentoNovo =
@@ -711,6 +722,10 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
+    if (cancelaAgendamento && linkedVisit) {
+      onCancelarAgendamento?.(linkedVisit);
+      return;
+    }
     if (step === 1 && !skipStep2) {
       goToStep2();
       return;
@@ -1178,6 +1193,45 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
                   {skipStep2 && previewBox}
                 </>
               ) : linkedVisit ? (
+                <div className="space-y-3">
+                {podeCancelarAgendamento && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-400">
+                      O que fazer com o agendamento de{" "}
+                      {formatDateBR(linkedVisit.scheduledDate)}?
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSemContatoAcao("remarcar");
+                          setError("");
+                        }}
+                        className={toggleClass(semContatoAcao === "remarcar")}
+                      >
+                        Remarcar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSemContatoAcao("cancelar");
+                          setError("");
+                        }}
+                        className={toggleClass(semContatoAcao === "cancelar")}
+                      >
+                        Cancelar agendamento
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {cancelaAgendamento ? (
+                  <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
+                    Use quando não precisa mais falar com o cliente (ex.:
+                    assunto resolvido). Na próxima tela você informa o motivo;
+                    o agendamento sai da agenda e nenhuma tentativa de contato
+                    é registrada.
+                  </p>
+                ) : (
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-gray-400">
                     Motivo da remarcação
@@ -1198,6 +1252,8 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
                     não houve contato com o cliente. Na próxima etapa você
                     escolhe a nova data.
                   </p>
+                </div>
+                )}
                 </div>
               ) : (
                 <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
@@ -1352,10 +1408,19 @@ const LogContactModal: React.FC<LogContactModalProps> = ({
                   mode !== "sem_contato" &&
                   (!opcao || (opcao === "acao" && !acao) || !notes.trim()))
               }
-              className="flex-1 px-4 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-none transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              className={`flex-1 px-4 py-3 text-white font-bold rounded-xl shadow-lg dark:shadow-none transition-all disabled:opacity-50 flex items-center justify-center gap-2 ${
+                cancelaAgendamento
+                  ? "bg-red-600 hover:bg-red-700 shadow-red-200"
+                  : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200"
+              }`}
             >
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : cancelaAgendamento ? (
+                <>
+                  <Ban className="w-4 h-4" />
+                  Cancelar agendamento
+                </>
               ) : step === 1 && !skipStep2 ? (
                 <>
                   Avançar

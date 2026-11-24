@@ -23,6 +23,7 @@ import {
 import {
   ClientGroup,
   Collection,
+  ScheduledVisit,
   UserType,
   isCollectorType,
 } from "../../types";
@@ -55,6 +56,7 @@ import CorrigirPagamentoModal from "./CorrigirPagamentoModal";
 import AtribuirPagamentoModal from "./AtribuirPagamentoModal";
 import AtribuirExcecaoModal from "./AtribuirExcecaoModal";
 import LogContactModal from "./LogContactModal";
+import CancelContactModal from "./CancelContactModal";
 import AcordoModal from "./AcordoModal";
 import AcordoDetailModal from "./AcordoDetailModal";
 import LinhaDoTempoCliente from "./LinhaDoTempoCliente";
@@ -374,6 +376,10 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   const acordoMexeuRef = React.useRef(false);
   const fecharFicha = () => onClose(acordoMexeuRef.current);
   const [isAtenderOpen, setIsAtenderOpen] = useState(false);
+  // Cancelar o contato agendado a partir do Atender da Ficha (antes so o
+  // Atender da lista do cobrador oferecia, ver CollectorDashboard).
+  const [cancelarContato, setCancelarContato] =
+    useState<ScheduledVisit | null>(null);
   // Pagamento aberto depois do Atender: o contato ja foi registrado la.
   const [pagamentoSemContato, setPagamentoSemContato] = useState(false);
   const abrirRegistroDePagamento = () => {
@@ -1855,9 +1861,20 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           client={clienteCompleto}
           linkedVisit={contatoAgendadoDoResponsavel}
           emNomeDe={emNomeDe}
+          onCancelarAgendamento={(visita) => {
+            setIsAtenderOpen(false);
+            setCancelarContato(visita);
+          }}
           onClose={() => setIsAtenderOpen(false)}
           onSuccess={() => setIsAtenderOpen(false)}
           onRegistrarPagamento={abrirRegistroDePagamento}
+        />
+      )}
+      {cancelarContato && (
+        <CancelContactModal
+          visit={cancelarContato}
+          onClose={() => setCancelarContato(null)}
+          onSuccess={() => setCancelarContato(null)}
         />
       )}
       {isAcordoOpen && (
