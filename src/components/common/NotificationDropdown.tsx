@@ -30,7 +30,7 @@ const NotificationDropdown: React.FC = () => {
   // detalhe da venda foi aposentada -- unificacao, etapa 2).
   const [fichaAberta, setFichaAberta] = useState<{
     grupo: ClientGroup;
-    venda: number;
+    venda?: number;
   } | null>(null);
   const { user } = useAuth();
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -65,6 +65,16 @@ const NotificationDropdown: React.FC = () => {
   // Function to handle notification click
   const handleNotificationClick = useCallback(
     (notification: Notification) => {
+      // Decisao de pedido de desconto: abre a Ficha do cliente.
+      if (notification.relatedId?.startsWith("cliente-")) {
+        const documento = notification.relatedId.slice("cliente-".length);
+        const grupo = getClientGroups().find((g) => g.document === documento);
+        markAsRead(notification.id);
+        handleCloseDropdown();
+        if (grupo) setFichaAberta({ grupo });
+        return;
+      }
+
       const saleInfo = extractSaleInfoFromNotification(notification);
 
       if (saleInfo && collections) {

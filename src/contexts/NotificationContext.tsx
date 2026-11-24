@@ -13,10 +13,16 @@ import { useAuth } from "./AuthContext";
 import { UserType } from "../types";
 import { todayLocalStr } from "../config/visitStatus";
 import {
+  DIAS_DECISAO_DESCONTO,
   NotificacaoDestino,
   NotificacaoGerada,
   gerarNotificacoes,
+  notificacoesDecisoesDesconto,
 } from "../config/notificationRules";
+import {
+  DecisaoDescontoMinha,
+  listarMinhasDecisoesDesconto,
+} from "../services/pedidosDesconto";
 
 export interface Notification {
   id: string;
@@ -121,6 +127,40 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   });
   // Hora em que cada notificacao apareceu pela primeira vez nesta sessao.
   const vistaEm = useRef(new Map<string, Date>());
+  // Decisoes do gestor sobre pedidos de desconto do cobrador (2026-11-24).
+  const [decisoesDesconto, setDecisoesDesconto] = useState<
+    DecisaoDescontoMinha[]
+  >([]);
+
+  useEffect(() => {
+    const userId = user?.id;
+    if (!userId || user?.type === "manager") {
+      setDecisoesDesconto([]);
+      return;
+    }
+    let cancelado = false;
+    const carregar = () => {
+      if (document.visibilityState === "hidden") return;
+      const desde = new Date(
+        Date.now() - DIAS_DECISAO_DESCONTO * 86400000,
+      ).toISOString();
+      listarMinhasDecisoesDesconto(userId, desde)
+        .then((d) => {
+          if (!cancelado) setDecisoesDesconto(d);
+        })
+        .catch((e) =>
+          console.error("Erro ao carregar decisões de desconto:", e),
+        );
+    };
+    carregar();
+    const timer = window.setInterval(carregar, 2 * 60 * 1000);
+    document.addEventListener("visibilitychange", carregar);
+    return () => {
+      cancelado = true;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", carregar);
+    };
+  }, [user?.id, user?.type]);
 
   // Versao antiga guardava dispensas para sempre, sem separar por usuario.
   useEffect(() => {
@@ -182,10 +222,14 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   const notifications = useMemo(() => {
     if (!user) return [];
 
-    const automaticas: Notification[] = geradas
+    const automaticas: Notification[] = [
+      ...geradas,
+      ...notificacoesDecisoesDesconto(decisoesDesconto),
+    ]
       .filter((n) => !estado.dispensadas[n.id])
-      .map((n) => {
-        if (!vistaEm.current.has(n.id)) vistaEm.current.set(n.id, new Date());
+      .map(({ quando, ...n }) => {
+        if (!vistaEm.current.has(n.id))
+          vistaEm.current.set(n.id, quando ? new Date(quando) : new Date());
         return {
           ...n,
           timestamp: vistaEm.current.get(n.id)!,
@@ -201,7 +245,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
           n.targetUserType === user.type,
       )
       .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-  }, [geradas, manuais, estado, user]);
+  }, [geradas, decisoesDesconto, manuais, estado, user]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 

@@ -171,6 +171,51 @@ export const listarPedidosDescontoGestor = async (
   }));
 };
 
+/** Decisao do gestor sobre um pedido do cobrador (para o sino dele). */
+export interface DecisaoDescontoMinha {
+  id: string;
+  tipo: PedidoDesconto["tipo"];
+  documento: string;
+  cliente: string | null;
+  decisao: "aprovado" | "recusado";
+  desconto_aprovado: number | null;
+  desconto_percentual_aprovado: number | null;
+  valido_ate: string | null;
+  resposta: string | null;
+  decidido_em: string;
+}
+
+/** Pedidos do usuario logado decididos desde `desde` (ISO). A RLS ja limita
+ * ao solicitante; o filtro por id deixa explicito. */
+export const listarMinhasDecisoesDesconto = async (
+  userId: string,
+  desde: string,
+): Promise<DecisaoDescontoMinha[]> => {
+  const { data, error } = await supabase
+    .from("pedidos_desconto")
+    .select(
+      "id, tipo, documento, cliente, decisao, desconto_aprovado, desconto_percentual_aprovado, valido_ate, resposta, decidido_em",
+    )
+    .eq("solicitado_por_id", userId)
+    .gte("decidido_em", desde)
+    .order("decidido_em", { ascending: false })
+    .order("id")
+    .limit(50);
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    ...r,
+    tipo: r.tipo as PedidoDesconto["tipo"],
+    decisao: r.decisao as DecisaoDescontoMinha["decisao"],
+    desconto_aprovado:
+      r.desconto_aprovado == null ? null : num(r.desconto_aprovado),
+    desconto_percentual_aprovado:
+      r.desconto_percentual_aprovado == null
+        ? null
+        : num(r.desconto_percentual_aprovado),
+    decidido_em: r.decidido_em as string,
+  }));
+};
+
 // ---------------------------------------------------------------------------
 // Acordo
 // ---------------------------------------------------------------------------

@@ -11,6 +11,7 @@ import {
 } from "../types";
 import { isVisitOpen, isVisitOverdue, todayLocalStr } from "./visitStatus";
 import { isAjusteOuEstorno, valorRecebidoTotal } from "../filters/sales";
+import type { DecisaoDescontoMinha } from "../services/pedidosDesconto";
 
 // ---------------------------------------------------------------------------
 // Regras das notificacoes automaticas
@@ -50,7 +51,53 @@ export interface NotificacaoGerada {
   relatedId?: string;
   targetUserType?: UserType | "all";
   destino?: NotificacaoDestino;
+  /** Quando aconteceu (ISO). Sem isto vale a hora em que apareceu. */
+  quando?: string;
 }
+
+/** Dias em que a decisao do gestor sobre um pedido de desconto aparece no
+ * sino do cobrador (= validade da liberacao). */
+export const DIAS_DECISAO_DESCONTO = 3;
+
+const dataCurta = (ymd: string | null) =>
+  ymd ? ymd.slice(0, 10).split("-").reverse().slice(0, 2).join("/") : "";
+
+const pctCurto = (v: number | null) =>
+  v == null ? "" : `${String(v).replace(".", ",")}%`;
+
+/**
+ * Sino do cobrador (2026-11-24): o gestor decidiu um pedido de desconto dele
+ * (acordo ou Receber pagamento). Um aviso por pedido; clicar abre a Ficha do
+ * cliente (relatedId "cliente-<documento>").
+ */
+export const notificacoesDecisoesDesconto = (
+  decisoes: DecisaoDescontoMinha[],
+): NotificacaoGerada[] =>
+  decisoes.map((d) => {
+    const cliente = d.cliente ?? d.documento;
+    const acordo = d.tipo === "acordo";
+    const aprovado = d.decisao === "aprovado";
+    const resposta = d.resposta ? ` “${d.resposta}”` : "";
+    return {
+      id: `pedido-desconto|${d.id}`,
+      type: "payment",
+      title: aprovado
+        ? acordo
+          ? "Desconto do acordo liberado"
+          : "Desconto liberado"
+        : acordo
+          ? "Desconto do acordo recusado"
+          : "Desconto recusado",
+      message: aprovado
+        ? acordo
+          ? `O gestor liberou até ${pctCurto(d.desconto_percentual_aprovado)} de desconto no acordo de ${cliente}, até ${dataCurta(d.valido_ate)}. Toque para abrir a ficha e refazer o acordo.${resposta}`
+          : `O gestor liberou ${formatCurrency(d.desconto_aprovado ?? 0)} de desconto para ${cliente}, até ${dataCurta(d.valido_ate)}. Toque para abrir a ficha e receber.${resposta}`
+        : `O gestor recusou o pedido de desconto${acordo ? " do acordo" : ""} de ${cliente}.${resposta}`,
+      priority: aprovado ? "high" : "medium",
+      relatedId: `cliente-${d.documento}`,
+      quando: d.decidido_em,
+    };
+  });
 
 const plural = (n: number, um: string, varios: string) =>
   `${n.toLocaleString("pt-BR")} ${n === 1 ? um : varios}`;
