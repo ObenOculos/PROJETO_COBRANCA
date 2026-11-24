@@ -1718,18 +1718,24 @@ export type Database = {
         Row: {
           created_at: string;
           created_by: string | null;
+          excluida_em: string | null;
+          excluida_por: string | null;
           id: string;
           nome: string;
         };
         Insert: {
           created_at?: string;
           created_by?: string | null;
+          excluida_em?: string | null;
+          excluida_por?: string | null;
           id?: string;
           nome: string;
         };
         Update: {
           created_at?: string;
           created_by?: string | null;
+          excluida_em?: string | null;
+          excluida_por?: string | null;
           id?: string;
           nome?: string;
         };
@@ -3201,6 +3207,7 @@ export type Database = {
         Args: { p_id_parcela: number; p_valor: number };
         Returns: undefined;
       };
+      excluir_marca: { Args: { p_marca_id: string }; Returns: undefined };
       executar_distribuicao_automatica: { Args: never; Returns: Json };
       faixa_cobre_cliente: {
         Args: {

@@ -2427,7 +2427,12 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       // todo para o Termo antigo achar o registro vigente na data do acordo.
       const [marcasRes, credMarcaRes, credLojaRes, lojaMarcaRes] =
         await Promise.all([
-          supabase.from("marcas").select("id, nome").order("nome").order("id"),
+          supabase
+            .from("marcas")
+            .select("id, nome")
+            .is("excluida_em", null)
+            .order("nome")
+            .order("id"),
           supabase
             .from("marca_credor")
             .select("*")
@@ -2502,6 +2507,17 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     });
     if (rpcError) {
       console.error("Erro ao salvar dados da marca:", rpcError);
+      throw rpcError;
+    }
+    await fetchCadastroCredor();
+  };
+
+  const excluirMarca = async (marcaId: string): Promise<void> => {
+    const { error: rpcError } = await supabase.rpc("excluir_marca", {
+      p_marca_id: marcaId,
+    });
+    if (rpcError) {
+      console.error("Erro ao apagar marca:", rpcError);
       throw rpcError;
     }
     await fetchCadastroCredor();
@@ -5593,6 +5609,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     fetchCadastroCredor,
     criarMarca,
     definirCredorMarca,
+    excluirMarca,
     definirMarcaDaLoja,
     definirCredorAcordoLoja,
     enviarLogo,

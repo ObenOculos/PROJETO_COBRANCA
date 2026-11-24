@@ -10,6 +10,7 @@ import {
   ImageOff,
   AlertCircle,
   QrCode,
+  Trash2,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { supabase } from "../../lib/supabase";
@@ -352,6 +353,7 @@ const MarcasLojasConfig: React.FC = () => {
     cadastroCredor,
     criarMarca,
     definirCredorMarca,
+    excluirMarca,
     definirMarcaDaLoja,
     definirCredorAcordoLoja,
     enviarLogo,
@@ -402,9 +404,28 @@ const MarcasLojasConfig: React.FC = () => {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
 
+  // Confirmação de apagar na própria tela (nada de window.confirm).
+  const [confirmarApagar, setConfirmarApagar] = useState(false);
+
+  const apagarMarca = async () => {
+    if (!marcaAberta) return;
+    setErro("");
+    setSalvando(true);
+    try {
+      await excluirMarca(marcaAberta.id);
+      setMarcaAberta(null);
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Erro ao apagar a marca.");
+    } finally {
+      setSalvando(false);
+      setConfirmarApagar(false);
+    }
+  };
+
   const abrirMarca = (m: Marca) => {
     const c = credorMarcaVigente(credoresMarca, m.id);
     setErro("");
+    setConfirmarApagar(false);
     setMarcaAberta(m);
     setMarcaDados(dadosDe(c));
     setMarcaLogo({ path: c?.logoPath ?? "", preview: c?.logoUrl ?? null, arquivo: null });
@@ -725,12 +746,56 @@ const MarcasLojasConfig: React.FC = () => {
           subtitulo={`Marca · ${lojasPorMarca.get(marcaAberta.id)?.length ?? 0} lojas seguem estes dados`}
           onFechar={fecharModal}
           rodape={
-            <BotoesRodape
-              salvando={salvando}
-              onCancelar={fecharModal}
-              onSalvar={() => void salvarMarca()}
-              rotulo="Salvar marca"
-            />
+            confirmarApagar ? (
+              <div className="w-full flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm font-bold text-red-600">
+                  Apagar a marca "{marcaAberta.nome}"?
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={salvando}
+                    onClick={() => setConfirmarApagar(false)}
+                    className="px-4 py-2 text-sm font-bold rounded-xl text-gray-600 dark:text-dark-text-secondary hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary"
+                  >
+                    Não
+                  </button>
+                  <button
+                    type="button"
+                    disabled={salvando}
+                    onClick={() => void apagarMarca()}
+                    className="px-4 py-2 bg-red-600 text-white text-sm font-bold rounded-xl hover:bg-red-700 disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Sim, apagar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {(lojasPorMarca.get(marcaAberta.id)?.length ?? 0) === 0 ? (
+                  <button
+                    type="button"
+                    disabled={salvando}
+                    onClick={() => setConfirmarApagar(true)}
+                    className="px-3 py-2 text-xs font-bold rounded-xl text-gray-500 hover:text-red-600 flex items-center gap-1 disabled:opacity-50"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Apagar marca
+                  </button>
+                ) : (
+                  <span className="text-[11px] text-gray-400">
+                    Para apagar, mova as lojas desta marca para outra.
+                  </span>
+                )}
+                <BotoesRodape
+                  salvando={salvando}
+                  onCancelar={fecharModal}
+                  onSalvar={() => void salvarMarca()}
+                  rotulo="Salvar marca"
+                />
+              </>
+            )
           }
         >
           <div className="space-y-4">

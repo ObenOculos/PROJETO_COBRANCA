@@ -548,6 +548,8 @@ export interface CollectionContextType {
     /** Caminho no bucket (ja enviado) ou "" sem logo. */
     logoPath: string;
   }) => Promise<void>;
+  /** Exclusao logica; so marca sem loja vinculada. */
+  excluirMarca: (marcaId: string) => Promise<void>;
   /** marcaId null = loja sem marca. */
   definirMarcaDaLoja: (nomeDaLoja: string, marcaId: string | null) => Promise<void>;
   definirCredorAcordoLoja: (params: {
