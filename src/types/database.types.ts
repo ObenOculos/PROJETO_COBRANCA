@@ -2965,6 +2965,10 @@ export type Database = {
         Args: { p_perfis: Json; p_retirar_de?: string[] };
         Returns: Json;
       };
+      definir_cobertura_loja: {
+        Args: { p_loja: string; p_faixas: Json };
+        Returns: number;
+      };
       encerrar_regra_carteira: {
         Args: { p_regra_id: string };
         Returns: undefined;

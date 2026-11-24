@@ -832,6 +832,27 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   };
 
   // Encerra UMA regra (vigente_ate = hoje), sem apagar historico.
+  // Faixas de UMA loja numa transacao (migration 20261124000005): tira a
+  // loja das regras compartilhadas e grava as novas so desta loja.
+  const definirCoberturaLoja: CollectionContextType["definirCoberturaLoja"] = async (
+    loja,
+    faixas,
+  ) => {
+    const { error: rpcError } = await supabase.rpc("definir_cobertura_loja", {
+      p_loja: loja,
+      p_faixas: faixas.map((f) => ({
+        collector_id: f.collectorId,
+        min_dias: f.minDias,
+        max_dias: f.maxDias,
+      })),
+    });
+    if (rpcError) {
+      console.error("Erro ao definir a cobertura da loja:", rpcError);
+      throw new Error(rpcError.message);
+    }
+    await fetchCollectorOverdueRanges();
+  };
+
   const encerrarRegraCarteira = async (regraId: string) => {
     const { error: rpcError } = await supabase.rpc("encerrar_regra_carteira", {
       p_regra_id: regraId,
@@ -5354,6 +5375,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     vincularCobradorAGerente,
     desvincularCobrador,
     encerrarRegraCarteira,
+    definirCoberturaLoja,
     refreshData,
     refreshCollections,
     updateCollection,

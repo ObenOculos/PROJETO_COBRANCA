@@ -21,6 +21,7 @@ import { createPortal } from "react-dom";
 import { supabase } from "../../lib/supabase";
 import { useCollection } from "../../contexts/CollectionContext";
 import { CobradorOptions } from "../common/CobradorOptions";
+import EditorCoberturaLoja from "./EditorCoberturaLoja";
 import {
   CollectorOverdueRange,
   FilaConfigRegra,
@@ -682,6 +683,7 @@ const CarteiraDistribuicao: React.FC = () => {
     definirRegraCarteiraAtiva,
     encerrarRegraCarteira,
     definirFilaCobranca,
+    definirCoberturaLoja,
   } = useCollection();
 
   const [lojas, setLojas] = useState<LojaCarteira[]>([]);
@@ -1161,6 +1163,8 @@ const CarteiraDistribuicao: React.FC = () => {
   // de leitura). Uma faixa pode cobrir so parte de uma coluna: a casa conta
   // cliente a cliente (contaColuna).
   const [inicioColunas, setInicioColunas] = useState(0);
+  // Etapa 2 (24/11): loja aberta no editor de cobertura (uma por vez).
+  const [lojaEditando, setLojaEditando] = useState<string | null>(null);
   const maxInicioColunas = COLUNAS_COBERTURA.length - COLUNAS_VISIVEIS;
   const colunasCobertura = useMemo(() => {
     const janela = COLUNAS_COBERTURA.slice(
@@ -2098,13 +2102,29 @@ const CarteiraDistribuicao: React.FC = () => {
                   const unicoDaLoja =
                     cobradoresDaLoja.length === 1 ? cobradoresDaLoja[0] : null;
                   return (
-                    <tr key={loja.loja} className="group align-middle">
+                    <React.Fragment key={loja.loja}>
+                    <tr className="group align-middle">
                       <td className="sticky left-0 z-10 bg-white group-even:bg-gray-50 dark:bg-dark-bg-secondary dark:group-even:bg-dark-bg h-[60px] py-1.5 px-2 border-b border-gray-100 dark:border-dark-border">
                         <div className="font-semibold text-gray-900 dark:text-dark-text flex items-center gap-1.5">
                           {temFalha(loja.loja) && (
                             <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
                           )}
-                          {loja.loja}
+                          <span className="min-w-0">{loja.loja}</span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setLojaEditando((v) => (v === loja.loja ? null : loja.loja))
+                            }
+                            className={`shrink-0 p-1 rounded-md ${
+                              lojaEditando === loja.loja
+                                ? "bg-blue-600 text-white"
+                                : "text-gray-400 hover:text-blue-700 hover:bg-blue-50"
+                            }`}
+                            title="Editar quem cobra esta loja"
+                            aria-label={`Editar quem cobra ${loja.loja}`}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
                         </div>
                         <div className="text-[11px] text-gray-500 flex flex-wrap items-center gap-x-1.5">
                           <span>{loja.clientes_em_aberto.toLocaleString("pt-BR")} em aberto</span>
@@ -2240,6 +2260,28 @@ const CarteiraDistribuicao: React.FC = () => {
                         );
                       })}
                     </tr>
+                    {lojaEditando === loja.loja && (
+                      <tr>
+                        <td
+                          colSpan={colunasCobertura.length + 1}
+                          className="p-2 border-b border-gray-100 dark:border-dark-border"
+                        >
+                          <EditorCoberturaLoja
+                            loja={loja.loja}
+                            faixasAtuais={ativas.map(({ c, r }) => ({
+                              collectorId: c.id,
+                              minDias: r.minDias,
+                              maxDias: r.maxDias ?? null,
+                            }))}
+                            inativas={inativas.length}
+                            cobradores={cobradores}
+                            onSalvar={(faixas) => definirCoberturaLoja(loja.loja, faixas)}
+                            onFechar={() => setLojaEditando(null)}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
                   );
                 })}
               </tbody>

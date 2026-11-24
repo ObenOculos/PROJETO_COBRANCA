@@ -472,6 +472,12 @@ export interface CollectionContextType {
   desvincularCobrador: (collectorId: string) => Promise<void>;
   /** Encerra UMA regra da carteira (vigente_ate = hoje). Só gestor. */
   encerrarRegraCarteira: (regraId: string) => Promise<void>;
+  /** Etapa 2 da Distribuicao (24/11): define as faixas de UMA loja numa
+   * transacao (definir_cobertura_loja). Lista vazia = loja sem regra. */
+  definirCoberturaLoja: (
+    loja: string,
+    faixas: { collectorId: string; minDias: number; maxDias: number | null }[],
+  ) => Promise<void>;
   refreshData: () => Promise<void>;
   refreshCollections: () => Promise<void>;
   updateCollection: (id: number, updates: Partial<Collection>) => Promise<void>;
