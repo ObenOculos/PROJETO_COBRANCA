@@ -29,6 +29,14 @@ import { metaDoMes } from "../../filters/metas";
 import FaixaEquipeModal from "./FaixaEquipeModal";
 import MonthlyGoalEditModal from "./MonthlyGoalEditModal";
 import RedefinirSenhaModal from "./RedefinirSenhaModal";
+import {
+  ConfigHeader,
+  cfgBtnPrimary,
+  cfgBtnSecondary,
+  cfgCard,
+  cfgInput,
+  cfgLabel,
+} from "../common/ConfigUi";
 
 const TYPE_BADGE_CLASS: Record<UserRoleType, string> = {
   manager:
@@ -52,8 +60,7 @@ const TYPE_ORDER: UserRoleType[] = [
   "legal_collector",
 ];
 
-const inputClass =
-  "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text";
+const inputClass = cfgInput;
 
 const iconButtonClass =
   "p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors dark:text-dark-text-secondary dark:hover:bg-dark-bg dark:hover:text-dark-text";
@@ -325,30 +332,31 @@ const UserManagement: React.FC<UserManagementProps> = ({
     "inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors dark:bg-dark-bg dark:text-dark-text";
 
   return (
-    <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-4 sm:p-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
-        <div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-dark-text">
-            Usuários
-          </h2>
-          <p className="text-sm text-gray-600 dark:text-dark-text-secondary mt-1">
+    <div className="space-y-4">
+      <ConfigHeader
+        titulo="Usuários"
+        descricao={
+          <>
             {users.length - inactiveCount} ativo
             {users.length - inactiveCount !== 1 ? "s" : ""}
-            {inactiveCount > 0 && ` · ${inactiveCount} inativo${inactiveCount !== 1 ? "s" : ""}`}
-            . Clique na faixa, no gestor ou na meta para editar (a faixa
-            abre a Distribuição da carteira).
-          </p>
-        </div>
+            {inactiveCount > 0 &&
+              ` · ${inactiveCount} inativo${inactiveCount !== 1 ? "s" : ""}`}
+            . Clique na faixa, no gestor ou na meta para editar (a faixa abre
+            a Distribuição da carteira).
+          </>
+        }
+      >
         <button
+          type="button"
           onClick={() => handleOpenModal()}
-          className="w-full sm:w-auto flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+          className={`${cfgBtnPrimary} w-full sm:w-auto`}
         >
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Usuário
+          <Plus className="h-4 w-4" />
+          Novo usuário
         </button>
-      </div>
+      </ConfigHeader>
 
+      <div className={cfgCard}>
       {/* Busca e filtros */}
       <div className="space-y-3 mb-4">
         <div className="flex flex-col sm:flex-row gap-3">
@@ -610,6 +618,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
           </p>
         </div>
       )}
+      </div>
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -626,7 +635,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
                 </div>
               )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-1">
+                <label className={cfgLabel}>
                   Nome
                 </label>
                 <input
@@ -640,7 +649,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-1">
+                <label className={cfgLabel}>
                   Login
                 </label>
                 <input
@@ -656,7 +665,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
               {!editingUser && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-1">
+                    <label className={cfgLabel}>
                       Senha
                     </label>
                     <input
@@ -670,7 +679,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-1">
+                    <label className={cfgLabel}>
                       Confirmar senha
                     </label>
                     <input
@@ -690,7 +699,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
                 </div>
               )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-1">
+                <label className={cfgLabel}>
                   Perfil
                 </label>
                 <select
@@ -715,14 +724,14 @@ const UserManagement: React.FC<UserManagementProps> = ({
                   type="button"
                   onClick={handleCloseModal}
                   disabled={isSaving}
-                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text-secondary"
+                  className={cfgBtnSecondary}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  className={cfgBtnPrimary}
                 >
                   {isSaving ? "Salvando..." : editingUser ? "Atualizar" : "Criar"}
                 </button>
@@ -757,7 +766,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
               <button
                 type="button"
                 onClick={handleCloseDeleteModal}
-                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text-secondary"
+                className={cfgBtnSecondary}
                 disabled={isDeleting}
               >
                 Cancelar
@@ -765,7 +774,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
               <button
                 type="button"
                 onClick={handleConfirmDelete}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                className={`${cfgBtnPrimary} !bg-red-600 hover:!bg-red-700`}
                 disabled={isDeleting}
               >
                 {isDeleting ? "Excluindo..." : "Excluir"}

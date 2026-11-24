@@ -19,6 +19,12 @@ import {
 } from "lucide-react"; // Importar ícones
 import AddTituloModal from "./AddTituloModal";
 import {
+  ConfigHeader,
+  ConfigSecao,
+  cfgBtnPrimary,
+  cfgBtnSecondary,
+} from "../common/ConfigUi";
+import {
   CLIENTE_IMPORT_FIELDS,
   importClientesCadastro,
 } from "../../services/clientesImportService";
@@ -1042,105 +1048,94 @@ const DatabaseUpload: React.FC = () => {
     });
 
   return (
-    <div className="bg-white rounded-2xl sm:rounded-2xl shadow-sm p-4 sm:p-6 border border-gray-200 space-y-6">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-        <h2 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center-title">
-          Upload de Dados do Banco
-        </h2>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          <div className="grid grid-cols-2 gap-2 order-last sm:order-first">
-            <button
-              onClick={handleDownloadExcel}
-              disabled={loading}
-              className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-            >
-              <Download className="h-5 w-5 mr-2" />
-              <span>Baixar Banco de Dados</span>
-            </button>
-            <div className="relative" ref={templateMenuRef}>
-              <button
-                type="button"
-                onClick={() => setTemplateMenuOpen((open) => !open)}
-                disabled={loading}
-                aria-haspopup="menu"
-                aria-expanded={templateMenuOpen}
-                className="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-              >
-                <FileText className="h-5 w-5 mr-2" />
-                <span>Baixar Modelo CSV</span>
-                <ChevronDown
-                  className={`h-4 w-4 ml-2 transition-transform ${
-                    templateMenuOpen ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
-
-              {templateMenuOpen && (
-                <div
-                  role="menu"
-                  className="absolute right-0 z-30 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden"
-                >
-                  <p className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500 bg-gray-50 border-b border-gray-200">
-                    Escolha o modelo
-                  </p>
-                  {UPLOAD_TEMPLATES.map((template) => (
-                    <button
-                      key={template.id}
-                      type="button"
-                      role="menuitem"
-                      onClick={() => handleDownloadTemplate(template)}
-                      className="w-full text-left px-4 py-3 hover:bg-indigo-50 focus:bg-indigo-50 focus:outline-none border-b border-gray-100 last:border-b-0"
-                    >
-                      <span className="flex items-center text-sm font-medium text-gray-800">
-                        <Download className="h-4 w-4 mr-2 text-indigo-600 shrink-0" />
-                        {template.label}
-                      </span>
-                      <span className="block mt-1 text-xs text-gray-500">
-                        {template.description}
-                      </span>
-                      <span className="block mt-1 text-[11px] text-gray-400">
-                        {template.headers.length} coluna(s) ·{" "}
-                        {template.fileName}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-          <button
-            onClick={() => setShowAddTituloModal(true)}
-            className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 order-first sm:order-last"
-          >
-            <PlusCircle className="h-5 w-5 mr-2" />
-            <span>Adicionar Título</span>
-          </button>
-        </div>
-      </div>
-      <p className="text-sm text-gray-600 mt-1 hidden sm:block">
-        Utilize esta seção para atualizar informações existentes ou adicionar
-        novos registros à tabela BANCO_DADOS.
-      </p>
-
-      {/* Botão de teste de conexão */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h3 className="text-sm font-medium text-yellow-800 flex items-center">
-          <Info className="h-4 w-4 mr-2" />
-          🔧 Debug e Teste
-        </h3>
+    <div className="space-y-6">
+      <ConfigHeader
+        titulo="Upload de Dados"
+        descricao="Atualize registros existentes ou adicione novos à tabela BANCO_DADOS."
+      >
         <button
+          type="button"
           onClick={testSupabaseConnection}
           disabled={loading}
-          className="inline-flex items-center justify-center px-3 py-2 border border-yellow-300 text-sm font-medium rounded-md text-yellow-700 bg-yellow-50 hover:bg-yellow-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 disabled:opacity-50 w-full sm:w-auto"
+          className={cfgBtnSecondary}
+          title="Testa a conexão com o banco"
         >
-          <RefreshCcw className="h-4 w-4 mr-2" /> Testar Conexão com Supabase
+          <RefreshCcw className="h-4 w-4" />
+          Testar conexão
         </button>
-      </div>
+        <button
+          type="button"
+          onClick={handleDownloadExcel}
+          disabled={loading}
+          className={cfgBtnSecondary}
+        >
+          <Download className="h-4 w-4" />
+          Baixar banco de dados
+        </button>
+        <div className="relative" ref={templateMenuRef}>
+          <button
+            type="button"
+            onClick={() => setTemplateMenuOpen((open) => !open)}
+            disabled={loading}
+            aria-haspopup="menu"
+            aria-expanded={templateMenuOpen}
+            className={cfgBtnSecondary}
+          >
+            <FileText className="h-4 w-4" />
+            Modelo CSV
+            <ChevronDown
+              className={`h-4 w-4 transition-transform ${
+                templateMenuOpen ? "rotate-180" : ""
+              }`}
+            />
+          </button>
+
+          {templateMenuOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 z-30 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden"
+            >
+              <p className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500 bg-gray-50 border-b border-gray-200">
+                Escolha o modelo
+              </p>
+              {UPLOAD_TEMPLATES.map((template) => (
+                <button
+                  key={template.id}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => handleDownloadTemplate(template)}
+                  className="w-full text-left px-4 py-3 hover:bg-indigo-50 focus:bg-indigo-50 focus:outline-none border-b border-gray-100 last:border-b-0"
+                >
+                  <span className="flex items-center text-sm font-medium text-gray-800">
+                    <Download className="h-4 w-4 mr-2 text-indigo-600 shrink-0" />
+                    {template.label}
+                  </span>
+                  <span className="block mt-1 text-xs text-gray-500">
+                    {template.description}
+                  </span>
+                  <span className="block mt-1 text-[11px] text-gray-400">
+                    {template.headers.length} coluna(s) ·{" "}
+                    {template.fileName}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowAddTituloModal(true)}
+          className={cfgBtnPrimary}
+        >
+          <PlusCircle className="h-4 w-4" />
+          Adicionar título
+        </button>
+      </ConfigHeader>
 
       {/* Status do upload */}
       {uploadStatus && (
         <div
-          className={`p-4 rounded-2xl flex items-center ${
+          className={`p-3 rounded-xl text-sm flex items-center ${
             uploadStatus.includes("❌")
               ? "bg-red-50 text-red-700"
               : uploadStatus.includes("✅")
@@ -1166,30 +1161,26 @@ const DatabaseUpload: React.FC = () => {
 
       {/* Debug info */}
       {debugInfo && (
-        <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4">
-          <h4 className="text-sm font-medium text-gray-800 mb-2 flex items-center">
-            <FileText className="h-4 w-4 mr-2" />
-            🐛 Informações de Debug:
+        <div className="bg-gray-50 dark:bg-dark-bg-tertiary border border-gray-200 dark:border-dark-border rounded-2xl p-4">
+          <h4 className="text-sm font-bold text-gray-700 dark:text-dark-text mb-2 flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Diagnóstico da conexão
           </h4>
-          <pre className="text-xs text-gray-600 whitespace-pre-wrap bg-gray-100 p-3 rounded-md overflow-auto max-h-40">
+          <pre className="text-xs text-gray-600 dark:text-dark-text-secondary whitespace-pre-wrap bg-white dark:bg-dark-bg p-3 rounded-lg overflow-auto max-h-40">
             {debugInfo}
           </pre>
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Card: Contas a receber SSOtica */}
-        <div className="flex flex-col bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden transition-all hover:shadow-xl">
-          <div className="p-6">
-            <div className="flex items-center gap-3">
-              <div className="bg-blue-100 p-3 rounded-full">
-                <UploadCloud className="h-6 w-6 text-blue-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-800">
-                Contas a Receber SSÓtica
-              </h3>
-            </div>
-            <p className="text-gray-500 mt-3 text-sm">
+        <ConfigSecao
+          icone={UploadCloud}
+          titulo="Contas a receber SSÓtica"
+          className="flex flex-col"
+        >
+          <div className="text-xs text-gray-500 dark:text-dark-text-secondary space-y-2">
+            <p>
               Envie as planilhas{" "}
               <code className="text-xs bg-gray-100 px-1 py-0.5 rounded">
                 BD_Contasareceber_*.xlsx
@@ -1198,15 +1189,15 @@ const DatabaseUpload: React.FC = () => {
               atualizadas, e as que estão canceladas, em acordo ou com pagamento
               do app ainda não baixado na loja não são tocadas.
             </p>
-            <p className="text-gray-400 mt-2 text-xs">
+            <p className="text-gray-400">
               A atualização já roda sozinha todo dia às 6h; use aqui só para
               repetir fora do horário. A Focco Brasil vem do Ciclone e a Exxlab
               não entra no app.
             </p>
           </div>
 
-          <div className="px-6 pb-6 mt-auto">
-            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-4">
+          <div className="mt-auto">
+            <div className="bg-gray-50 dark:bg-dark-bg-tertiary p-4 rounded-xl border border-gray-200 dark:border-dark-border space-y-4">
               <FileDropzone
                 id="ssoticaFileInput"
                 accept=".xlsx"
@@ -1228,12 +1219,12 @@ const DatabaseUpload: React.FC = () => {
               <button
                 onClick={handleUploadSsotica}
                 disabled={loading || ssoticaFiles.length === 0}
-                className="w-full inline-flex justify-center items-center px-4 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                className={`${cfgBtnPrimary} w-full`}
               >
                 {loading ? (
-                  <RefreshCcw className="h-5 w-5 mr-2 animate-spin" />
+                  <RefreshCcw className="h-4 w-4 animate-spin" />
                 ) : (
-                  <UploadCloud className="h-5 w-5 mr-2" />
+                  <UploadCloud className="h-4 w-4" />
                 )}
                 {loading
                   ? "Processando..."
@@ -1243,20 +1234,16 @@ const DatabaseUpload: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </ConfigSecao>
 
         {/* Card: Atualizar Cadastro de Clientes */}
-        <div className="flex flex-col bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden transition-all hover:shadow-xl">
-          <div className="p-6">
-            <div className="flex items-center gap-3">
-              <div className="bg-purple-100 p-3 rounded-full">
-                <User className="h-6 w-6 text-purple-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-800">
-                Atualizar Cadastro de Clientes
-              </h3>
-            </div>
-            <p className="text-gray-500 mt-3 text-sm">
+        <ConfigSecao
+          icone={User}
+          titulo="Atualizar cadastro de clientes"
+          className="flex flex-col"
+        >
+          <div className="text-xs text-gray-500 dark:text-dark-text-secondary">
+            <p>
               Envie o relatório de clientes (xlsx ou csv) com a coluna{" "}
               <code className="text-xs bg-gray-100 px-1 py-0.5 rounded">
                 documento
@@ -1278,8 +1265,8 @@ const DatabaseUpload: React.FC = () => {
             </div>
           </div>
 
-          <div className="px-6 pb-6 mt-auto">
-            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-4">
+          <div className="mt-auto">
+            <div className="bg-gray-50 dark:bg-dark-bg-tertiary p-4 rounded-xl border border-gray-200 dark:border-dark-border space-y-4">
               <FileDropzone
                 id="clientesFileInput"
                 accept=".xlsx,.csv"
@@ -1302,12 +1289,12 @@ const DatabaseUpload: React.FC = () => {
               <button
                 onClick={handleUploadClientes}
                 disabled={loading || clientesFiles.length === 0}
-                className="w-full inline-flex justify-center items-center px-4 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                className={`${cfgBtnPrimary} w-full`}
               >
                 {loading ? (
-                  <RefreshCcw className="h-5 w-5 mr-2 animate-spin" />
+                  <RefreshCcw className="h-4 w-4 animate-spin" />
                 ) : (
-                  <UploadCloud className="h-5 w-5 mr-2" />
+                  <UploadCloud className="h-4 w-4" />
                 )}
                 {loading
                   ? "Processando..."
@@ -1317,7 +1304,7 @@ const DatabaseUpload: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </ConfigSecao>
       </div>
 
       {/* Modal de Resultados */}

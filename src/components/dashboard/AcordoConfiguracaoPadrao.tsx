@@ -2,6 +2,13 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Save, Percent, Building2, CheckCircle2, AlertCircle } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import MarcasLojasConfig from "./MarcasLojasConfig";
+import {
+  ConfigHeader,
+  ConfigSecao,
+  cfgBtnPrimary,
+  cfgInput,
+  cfgLabel,
+} from "../common/ConfigUi";
 import type { AcordoConfiguracaoPadrao as Config } from "../../types";
 
 // Tela do gestor (Etapa 3a da iniciativa "Termo de Acordo automatico", ver
@@ -35,12 +42,6 @@ const formDe = (c: Config | null): Form => ({
   empresaChavePix: c?.empresaChavePix ?? "",
 });
 
-const inputCls =
-  "w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 dark:bg-dark-bg-tertiary dark:border-dark-border dark:text-dark-text";
-
-const cardCls =
-  "bg-white dark:bg-dark-bg-secondary border border-gray-200 dark:border-dark-border rounded-2xl p-5";
-
 /** Campo numerico com unidade a direita ("%", "% a.m.", "dias"). */
 const CampoNumero: React.FC<{
   label: string;
@@ -52,7 +53,7 @@ const CampoNumero: React.FC<{
   min?: number;
 }> = ({ label, unidade, dica, value, onChange, step = "0.01", min = 0 }) => (
   <div>
-    <label className="block text-xs font-bold text-gray-500 dark:text-dark-text-secondary mb-1">
+    <label className={cfgLabel}>
       {label}
     </label>
     <div className="relative">
@@ -63,7 +64,7 @@ const CampoNumero: React.FC<{
         min={min}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`${inputCls} pr-14`}
+        className={`${cfgInput} pr-14`}
       />
       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">
         {unidade}
@@ -81,7 +82,7 @@ const CampoTexto: React.FC<{
   placeholder?: string;
 }> = ({ label, value, onChange, className = "", placeholder }) => (
   <div className={className}>
-    <label className="block text-xs font-bold text-gray-500 dark:text-dark-text-secondary mb-1">
+    <label className={cfgLabel}>
       {label}
     </label>
     <input
@@ -89,7 +90,7 @@ const CampoTexto: React.FC<{
       value={value}
       placeholder={placeholder}
       onChange={(e) => onChange(e.target.value)}
-      className={inputCls}
+      className={cfgInput}
     />
   </div>
 );
@@ -173,44 +174,36 @@ const AcordoConfiguracaoPadrao: React.FC = () => {
   };
 
   return (
-    <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-6">
+    <div className="space-y-6">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-dark-text">
-              Configuração de acordos
-            </h2>
-            <p className="text-sm text-gray-500 dark:text-dark-text-secondary mt-1 max-w-2xl">
-              Ponto de partida do acordo novo — o cobrador ainda pode ajustar
-              multa, juros e desconto na negociação.
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            {alterado && !loading && (
-              <span className="text-xs font-medium text-amber-600">
-                Alterações não salvas
-              </span>
+        <ConfigHeader
+          titulo="Acordos"
+          descricao="Ponto de partida do acordo novo — o cobrador ainda pode ajustar multa, juros e desconto na negociação."
+        >
+          {alterado && !loading && (
+            <span className="text-xs font-medium text-amber-600">
+              Alterações não salvas
+            </span>
+          )}
+          {!alterado && savedAt && !loading && (
+            <span className="flex items-center gap-1.5 text-sm text-green-600 font-medium">
+              <CheckCircle2 className="w-4 h-4" />
+              Salvo
+            </span>
+          )}
+          <button
+            type="submit"
+            disabled={loading || !alterado}
+            className={cfgBtnPrimary}
+          >
+            {loading ? (
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <Save className="w-4 h-4" />
             )}
-            {!alterado && savedAt && !loading && (
-              <span className="flex items-center gap-1.5 text-sm text-green-600 font-medium">
-                <CheckCircle2 className="w-4 h-4" />
-                Salvo
-              </span>
-            )}
-            <button
-              type="submit"
-              disabled={loading || !alterado}
-              className="px-5 py-2.5 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {loading ? (
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <Save className="w-4 h-4" />
-              )}
-              Salvar
-            </button>
-          </div>
-        </div>
+            Salvar
+          </button>
+        </ConfigHeader>
 
         {error && (
           <div className="p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl flex items-center gap-2">
@@ -220,11 +213,7 @@ const AcordoConfiguracaoPadrao: React.FC = () => {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <section className={`${cardCls} space-y-4`}>
-            <h3 className="flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-dark-text">
-              <Percent className="w-4 h-4 text-indigo-500" />
-              Regras do acordo
-            </h3>
+          <ConfigSecao icone={Percent} titulo="Regras do acordo">
             <div className="grid grid-cols-2 gap-x-4 gap-y-3">
               <CampoNumero
                 label="Multa"
@@ -264,18 +253,13 @@ const AcordoConfiguracaoPadrao: React.FC = () => {
                 onChange={set("diasEntreParcelas")}
               />
             </div>
-          </section>
+          </ConfigSecao>
 
-          <section className={`${cardCls} space-y-4`}>
-            <div>
-              <h3 className="flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-dark-text">
-                <Building2 className="w-4 h-4 text-indigo-500" />
-                Empresa padrão
-              </h3>
-              <p className="mt-1 text-xs text-gray-500 dark:text-dark-text-secondary">
-                Credor, Pix e logo das lojas sem marca ou de marca sem dados.
-              </p>
-            </div>
+          <ConfigSecao
+            icone={Building2}
+            titulo="Empresa padrão"
+            descricao="Credor, Pix e logo das lojas sem marca ou de marca sem dados."
+          >
             <div className="grid grid-cols-2 gap-x-4 gap-y-3">
               <CampoTexto
                 label="Nome da empresa"
@@ -300,7 +284,7 @@ const AcordoConfiguracaoPadrao: React.FC = () => {
                 onChange={set("empresaEndereco")}
               />
             </div>
-          </section>
+          </ConfigSecao>
         </div>
       </form>
 
