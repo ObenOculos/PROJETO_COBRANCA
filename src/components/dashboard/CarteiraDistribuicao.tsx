@@ -21,25 +21,17 @@ import { supabase } from "../../lib/supabase";
 import { useCollection } from "../../contexts/CollectionContext";
 import { CobradorOptions } from "../common/CobradorOptions";
 import {
-  Collection,
   CollectorOverdueRange,
   FilaConfigRegra,
   FilaOrdem,
-  SaleGroup,
   User,
   UserType,
   isCollectorType,
 } from "../../types";
 import {
-  ENCERRAMENTO_SITUACOES,
   USER_TYPE_LABELS,
   distribuicaoPerfisPayload,
 } from "../../config/profiles";
-import {
-  clientMaxOverdueDays,
-  clientReferenceStore,
-  hasInstallmentBalance,
-} from "../../filters/clientStatus";
 import {
   FILA_ORDEM_LABEL,
   FILA_VIRADA_HORA,
@@ -119,6 +111,10 @@ const SEGMENT_COLORS = [
 
 const inputClass =
   "w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text";
+// Rodada automatica diaria (pg_cron 10:00 UTC = 7h, migration
+// 20261116000001): usa as regras salvas. "Aplicar" so adianta.
+const HORA_DISTRIBUICAO_AUTOMATICA = "7h";
+
 const cardClass =
   "bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-4 sm:p-6";
 
@@ -667,8 +663,6 @@ const CarteiraDistribuicao: React.FC = () => {
     definirRegraCarteiraAtiva,
     encerrarRegraCarteira,
     definirFilaCobranca,
-    collections,
-    acordoAtivoOverdueMap,
   } = useCollection();
 
   const [lojas, setLojas] = useState<LojaCarteira[]>([]);
@@ -712,6 +706,35 @@ const CarteiraDistribuicao: React.FC = () => {
     const n = carteiraPorCobrador.get(collectorId) ?? 0;
     return n === 0 ? " · nenhum cliente" : n === 1 ? " · 1 cliente" : ` · ${n} clientes`;
   };
+
+  // Ultima rodada da distribuicao automatica (resumo do topo).
+  const [ultimaRodada, setUltimaRodada] = useState<{
+    em: string;
+    atribuidos: number;
+    retirados: number;
+    erro: string | null;
+  } | null>(null);
+  useEffect(() => {
+    void (async () => {
+      const { data, error } = await supabase
+        .from("distribuicao_execucoes")
+        .select("executado_em, resultado, erro")
+        .order("executado_em", { ascending: false })
+        .limit(1);
+      if (error || !data?.[0]) return;
+      const r = (data[0].resultado ?? {}) as {
+        clientes_atribuidos?: number;
+        clientes_retirados?: number;
+      };
+      setUltimaRodada({
+        em: data[0].executado_em,
+        atribuidos: r.clientes_atribuidos ?? 0,
+        retirados: r.clientes_retirados ?? 0,
+        erro: data[0].erro,
+      });
+    })();
+  }, []);
+  const secaoSimularRef = useRef<HTMLDivElement>(null);
 
   const [previa, setPrevia] = useState<Previa | null>(null);
   const [previaDesatualizada, setPreviaDesatualizada] = useState(false);
@@ -1058,41 +1081,36 @@ const CarteiraDistribuicao: React.FC = () => {
   // aberta mais antiga (clientReferenceStore), atraso = clientMaxOverdueDays
   // (espelhos de cliente_loja_referencia / cliente_max_atraso_dias) e
   // cobrador = algum titulo aberto com cobrador (o plano pega o primeiro).
+  // 24/11: vem do banco (carteira_mapa, migration 20261124000002). Antes
+  // era calculado sobre as parcelas do navegador, que o gestor nao carrega
+  // inteiras (item 8) -- todas as casas da cobertura apareciam com 0.
+  const [mapaCarteira, setMapaCarteira] = useState<
+    { loja: string; atraso: number; cobrador_id: string | null; clientes: number }[] | null
+  >(null);
+  const [mapaErro, setMapaErro] = useState(false);
+  const carregarMapa = React.useCallback(async () => {
+    const { data, error } = await supabase.rpc("carteira_mapa");
+    if (error) {
+      console.warn("Mapa da carteira indisponível:", error.message);
+      setMapaErro(true);
+      return;
+    }
+    setMapaErro(false);
+    setMapaCarteira(data ?? []);
+  }, []);
+  useEffect(() => {
+    void carregarMapa();
+  }, [carregarMapa]);
   const clientesPorLoja = useMemo(() => {
-    const porDoc = new Map<string, Collection[]>();
-    const encerrado = new Set<string>();
-    collections.forEach((c) => {
-      if (!c.documento) return;
-      if ((c.status ?? "").trim().toLowerCase() === "cancelado") return;
-      if (!hasInstallmentBalance(c)) return;
-      if (c.situacao && ENCERRAMENTO_SITUACOES.includes(c.situacao)) {
-        encerrado.add(c.documento);
-      }
-      const lista = porDoc.get(c.documento);
-      if (lista) lista.push(c);
-      else porDoc.set(c.documento, [c]);
-    });
-    const m = new Map<string, { atraso: number; dono: string | null }[]>();
-    porDoc.forEach((titulos, documento) => {
-      if (encerrado.has(documento)) return;
-      const group = {
-        document: documento,
-        sales: [{ installments: titulos } as SaleGroup],
-      };
-      const loja = clientReferenceStore(group);
-      if (!loja) return;
-      const dono =
-        titulos
-          .map((t) => t.user_id)
-          .filter((u): u is string => !!u)
-          .sort()[0] ?? null;
-      const item = { atraso: clientMaxOverdueDays(group, acordoAtivoOverdueMap), dono };
-      const l = m.get(loja);
+    const m = new Map<string, { atraso: number; dono: string | null; n: number }[]>();
+    (mapaCarteira ?? []).forEach((x) => {
+      const item = { atraso: x.atraso, dono: x.cobrador_id, n: x.clientes };
+      const l = m.get(x.loja);
       if (l) l.push(item);
-      else m.set(loja, [item]);
-    });
+      else m.set(x.loja, [item]);
+    })
     return m;
-  }, [collections, acordoAtivoOverdueMap]);
+  }, [mapaCarteira]);
   /** Clientes da loja com atraso entre ini e fim: total, sem cobrador e com
    * um cobrador especifico (o dono da faixa). */
   const contaEntre = (loja: string, ini: number, fim: number, donoId?: string) => {
@@ -1101,9 +1119,9 @@ const CarteiraDistribuicao: React.FC = () => {
     let doDono = 0;
     (clientesPorLoja.get(loja) ?? []).forEach((x) => {
       if (x.atraso < ini || x.atraso > fim) return;
-      total++;
-      if (!x.dono) sem++;
-      else if (donoId && x.dono === donoId) doDono++;
+      total += x.n;
+      if (!x.dono) sem += x.n;
+      else if (donoId && x.dono === donoId) doDono += x.n;
     });
     return { total, sem, doDono, comOutro: total - sem - doDono };
   };
@@ -1129,6 +1147,30 @@ const CarteiraDistribuicao: React.FC = () => {
   }, [cobertura]);
 
   const lojasComProblema = cobertura.filter((c) => c.problema).length;
+  // Resumo do topo: mesma base da tabela de cobertura (clientesPorLoja).
+  const totaisCarteira = useMemo(() => {
+    let emAberto = 0;
+    let semCobrador = 0;
+    clientesPorLoja.forEach((lista) =>
+      lista.forEach((x) => {
+        emAberto += x.n;
+        if (!x.dono) semCobrador += x.n;
+      }),
+    );
+    return { emAberto, semCobrador, carregado: mapaCarteira !== null };
+  }, [clientesPorLoja, mapaCarteira]);
+  // Regra salva depois da ultima rodada: ainda nao chegou nos clientes.
+  const regraDepoisDaRodada = useMemo(() => {
+    if (!ultimaRodada) return false;
+    const corte = new Date(ultimaRodada.em).getTime();
+    return collectorOverdueRanges.some(
+      (r) => new Date(r.vigenteDesde).getTime() > corte,
+    );
+  }, [collectorOverdueRanges, ultimaRodada]);
+  const verOQueMuda = () => {
+    secaoSimularRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (!simulando && !aplicando) void simular();
+  };
   // Com problema, a tela ja abre filtrada neles; o gestor desmarca para ver tudo.
   const [soProblemas, setSoProblemas] = useState(true);
   // Filtro por cobrador na cobertura (pedido 2026-11-19): so as lojas onde
@@ -1266,7 +1308,7 @@ const CarteiraDistribuicao: React.FC = () => {
       setConfirmAplicar(false);
       // A nova simulacao limpa o resultado: a mensagem vem depois dela
       // (antes sumia e o gestor ficava sem retorno).
-      await simular();
+      await Promise.all([simular(), carregarMapa()]);
       setResultado(
         `Distribuição aplicada: ${r.clientes_atribuidos} cliente(s) atribuído(s) e ${r.clientes_retirados} sem cobrador agora. As outras telas mostram a mudança na próxima consulta.`,
       );
@@ -1289,9 +1331,95 @@ const CarteiraDistribuicao: React.FC = () => {
           Distribuição da carteira
         </h2>
         <p className="text-sm text-gray-600 dark:text-dark-text-secondary mt-1">
-          Defina a faixa de atraso e as lojas de cada cobrador, confira a
-          cobertura e distribua. Nada muda sem você simular e confirmar.
+          Quem cobra cada loja e em que faixa de atraso. As regras salvas valem
+          na distribuição automática de todo dia às {HORA_DISTRIBUICAO_AUTOMATICA};
+          "Aplicar" só adianta.
         </p>
+        {/* Resumo (24/11): a pergunta principal -- esta todo mundo coberto? */}
+        <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
+          <div className="rounded-xl bg-gray-50 dark:bg-dark-bg px-3 py-2">
+            <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
+              Em aberto
+            </div>
+            <div className="text-lg sm:text-xl font-semibold tabular-nums text-gray-900 dark:text-dark-text">
+              {totaisCarteira.carregado
+                ? totaisCarteira.emAberto.toLocaleString("pt-BR")
+                : mapaErro
+                  ? "—"
+                  : "…"}
+            </div>
+          </div>
+          <div
+            className={`rounded-xl px-3 py-2 ${
+              totaisCarteira.semCobrador > 0
+                ? "bg-amber-50 dark:bg-amber-900/20"
+                : "bg-gray-50 dark:bg-dark-bg"
+            }`}
+            title="Clientes em aberto sem nenhum cobrador"
+          >
+            <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
+              Sem cobrador
+            </div>
+            <div
+              className={`text-lg sm:text-xl font-semibold tabular-nums ${
+                totaisCarteira.semCobrador > 0
+                  ? "text-amber-700 dark:text-amber-300"
+                  : "text-gray-900 dark:text-dark-text"
+              }`}
+            >
+              {totaisCarteira.carregado
+                ? totaisCarteira.semCobrador.toLocaleString("pt-BR")
+                : mapaErro
+                  ? "—"
+                  : "…"}
+            </div>
+          </div>
+          <div
+            className={`rounded-xl px-3 py-2 ${
+              lojasComProblema > 0
+                ? "bg-red-50 dark:bg-red-900/20"
+                : "bg-gray-50 dark:bg-dark-bg"
+            }`}
+            title="Lojas com trecho de atraso sem cobrador, conflito ou sem faixa"
+          >
+            <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
+              Lojas com falha
+            </div>
+            <div
+              className={`text-lg sm:text-xl font-semibold tabular-nums ${
+                lojasComProblema > 0
+                  ? "text-red-600 dark:text-red-300"
+                  : "text-gray-900 dark:text-dark-text"
+              }`}
+            >
+              {lojasComProblema}
+            </div>
+          </div>
+        </div>
+        {ultimaRodada && (
+          <p className="mt-2 text-xs text-gray-500 dark:text-dark-text-secondary">
+            Distribuição automática:{" "}
+            {new Date(ultimaRodada.em).toLocaleString("pt-BR", {
+              day: "2-digit",
+              month: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+            {ultimaRodada.erro ? (
+              <span className="text-red-600"> · falhou: {ultimaRodada.erro}</span>
+            ) : (
+              <>
+                {" "}
+                · {ultimaRodada.atribuidos} cliente
+                {ultimaRodada.atribuidos !== 1 ? "s" : ""} atribuído
+                {ultimaRodada.atribuidos !== 1 ? "s" : ""}
+                {ultimaRodada.retirados > 0 &&
+                  `, ${ultimaRodada.retirados} sem cobrador`}
+              </>
+            )}{" "}
+            · próxima às {HORA_DISTRIBUICAO_AUTOMATICA}
+          </p>
+        )}
         <details className="mt-2 group">
           <summary className="cursor-pointer text-xs font-semibold text-blue-700 dark:text-blue-300 select-none">
             Como funciona
@@ -1876,7 +2004,7 @@ const CarteiraDistribuicao: React.FC = () => {
       </div>
 
       {/* 3. Simular e aplicar */}
-      <div className={cardClass}>
+      <div ref={secaoSimularRef} className={`${cardClass} scroll-mt-4`}>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
           <div>
             <h3 className="font-bold text-gray-900 dark:text-dark-text flex items-center gap-2">
@@ -2229,6 +2357,39 @@ const CarteiraDistribuicao: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Barra fixa (24/11): o efeito das regras salvas sempre a vista --
+          valem na rodada automatica; "Ver o que muda" simula e leva a
+          aplicacao. Some enquanto a simulacao esta aberta na tela. */}
+      {!previa && (
+        <div className="sticky bottom-0 z-20 -mx-1 sm:mx-0">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-2xl border border-gray-200 dark:border-dark-border bg-white/95 dark:bg-dark-bg-secondary/95 backdrop-blur px-4 py-3 shadow-lg">
+            <p className="text-sm text-gray-700 dark:text-dark-text">
+              {regraDepoisDaRodada ? (
+                <>
+                  <span className="font-semibold">Há regra alterada</span>{" "}
+                  depois da última rodada: entra amanhã às{" "}
+                  {HORA_DISTRIBUICAO_AUTOMATICA}.
+                </>
+              ) : (
+                <>
+                  As regras salvas entram na distribuição de amanhã às{" "}
+                  {HORA_DISTRIBUICAO_AUTOMATICA}.
+                </>
+              )}
+            </p>
+            <button
+              type="button"
+              onClick={verOQueMuda}
+              disabled={simulando || aplicando || selecionados?.size === 0}
+              className="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"
+            >
+              <Play className="h-4 w-4" />
+              {simulando ? "Simulando…" : "Ver o que muda / aplicar agora"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

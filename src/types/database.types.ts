@@ -2626,6 +2626,15 @@ export type Database = {
           saidas_sem_acao: number;
         }[];
       };
+      carteira_mapa: {
+        Args: never;
+        Returns: {
+          loja: string;
+          atraso: number;
+          cobrador_id: string | null;
+          clientes: number;
+        }[];
+      };
       carteira_por_cobrador: {
         Args: never;
         Returns: {
