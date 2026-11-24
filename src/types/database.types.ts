@@ -2601,7 +2601,7 @@ export type Database = {
           p_motivo: string;
           p_usuario_id: string;
         };
-        Returns: number;
+        Returns: Json;
       };
       cancelar_parcelas_ssotica: { Args: { p_itens: Json }; Returns: Json };
       cancelar_vendas: {
@@ -2937,6 +2937,29 @@ export type Database = {
         Args: { p_collector_id: string };
         Returns: undefined;
       };
+      divergencias_cancelamento: {
+        Args: never;
+        Returns: {
+          venda_cancelada_id: number;
+          documento: string;
+          cliente: string | null;
+          chave_venda: number;
+          parcelas: number;
+          valor_em_aberto: number;
+          motivo: string;
+          cancelado_em: string;
+          cancelado_por: string | null;
+          erp: string | null;
+          status_erp: string | null;
+          em_aberto_desde: string | null;
+          conferido_em: string | null;
+          confirmado_em: string | null;
+          reaberta_em: string | null;
+          reaberta_por: string | null;
+          reaberta_motivo: string | null;
+          pode_reabrir: boolean;
+        }[];
+      };
       distribuicao_carteira_previa: {
         Args: { p_perfis: Json; p_retirar_de?: string[] };
         Returns: Json;
@@ -3194,6 +3217,10 @@ export type Database = {
           p_sale_number?: number;
         };
         Returns: undefined;
+      };
+      reabrir_venda_cancelada: {
+        Args: { p_venda_cancelada_id: number; p_motivo: string };
+        Returns: number;
       };
       reagendar_visita: {
         Args: {

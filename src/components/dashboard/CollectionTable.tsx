@@ -124,6 +124,9 @@ export const CollectionTable = React.forwardRef<
     );
     const [isDeleteMode, setIsDeleteMode] = useState(false);
     const [menuCabecalhoAberto, setMenuCabecalhoAberto] = useState(false);
+    const [avisoCancelamento, setAvisoCancelamento] = useState<string | null>(
+      null,
+    );
     const [selectedClients, setSelectedClients] = useState<Set<string>>(
       new Set(),
     );
@@ -318,7 +321,22 @@ export const CollectionTable = React.forwardRef<
         return;
       }
       try {
-        await cancelarClientes(Array.from(selectedClients), bulkMotivo.trim());
+        const { pulados } = await cancelarClientes(
+          Array.from(selectedClients),
+          bulkMotivo.trim(),
+        );
+        // Item 89: cliente com acordo ativo nao e cancelado -- avisa quem.
+        if (pulados.length > 0) {
+          const nomes = pulados.map(
+            (doc) =>
+              clientGroups.find((g) => g.document === doc)?.client ?? doc,
+          );
+          setAvisoCancelamento(
+            `${pulados.length} cliente${pulados.length !== 1 ? "s" : ""} com acordo ativo não ${pulados.length !== 1 ? "foram cancelados" : "foi cancelado"} (cancele o acordo antes): ${nomes.join(", ")}.`,
+          );
+        } else {
+          setAvisoCancelamento(null);
+        }
         setSelectedClients(new Set());
         setIsDeleteMode(false);
       } catch (error) {
@@ -335,8 +353,13 @@ export const CollectionTable = React.forwardRef<
       <div className="space-y-3">
         <p>
           As vendas ativas de {selectedClients.size} cliente(s) ficam como{" "}
-          <strong>Canceladas</strong> (canceladas no ERP) e saem da cobrança.
-          Pagamentos recebidos, visitas realizadas e histórico são mantidos.
+          <strong>Canceladas</strong> e saem da cobrança. Pagamentos
+          recebidos, visitas realizadas e histórico são mantidos.
+        </p>
+        <p className="text-xs text-gray-500">
+          Cancele também no ERP. Enquanto o ERP não cancelar, a venda segue
+          cancelada aqui e aparece em Pedidos › Divergências. Cliente com acordo
+          ativo não é cancelado (cancele o acordo antes).
         </p>
         <label className="block text-sm font-semibold text-gray-700">
           Motivo do cancelamento <span className="text-red-600">*</span>
@@ -1039,6 +1062,19 @@ export const CollectionTable = React.forwardRef<
     return (
       <>
         <div className="rounded-2xl">
+          {avisoCancelamento && (
+            <div className="mb-3 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              <span className="flex-1">{avisoCancelamento}</span>
+              <button
+                type="button"
+                onClick={() => setAvisoCancelamento(null)}
+                className="text-xs font-medium text-amber-800 underline"
+              >
+                Fechar
+              </button>
+            </div>
+          )}
           {/* Header Minimalista Refatorado */}
           <div className="bg-white dark:bg-dark-bg-secondary border border-gray-150 dark:border-dark-border p-4 rounded-2xl mb-4">
             <div className="flex flex-col gap-3">

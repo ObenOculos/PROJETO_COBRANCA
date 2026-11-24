@@ -5,13 +5,21 @@ import PedidosAtribuicao from "./PedidosAtribuicao";
 import PedidosDesconto from "./PedidosDesconto";
 import CasosGestor from "./CasosGestor";
 import PainelCheques from "./PainelCheques";
+import PainelDivergencias from "./PainelDivergencias";
 
 // Aba "Correções" do gestor: pedidos de correção de pagamento (item 62) e
 // pagos na loja depois da cobrança (item 66), pedidos de desconto (item 71)
-// clientes reincidentes (item 83) e clientes em condição de cheque (item 87).
+// clientes reincidentes (item 83), clientes em condição de cheque (item 87)
+// e divergências app × ERP (item 89).
 // Cada um carrega só quando aparece.
 
-type Visao = "correcoes" | "loja" | "descontos" | "reincidentes" | "cheques";
+type Visao =
+  | "correcoes"
+  | "loja"
+  | "descontos"
+  | "reincidentes"
+  | "cheques"
+  | "divergencias";
 
 const VISOES: { key: Visao; label: string }[] = [
   { key: "correcoes", label: "Correções de pagamento" },
@@ -19,6 +27,7 @@ const VISOES: { key: Visao; label: string }[] = [
   { key: "descontos", label: "Descontos" },
   { key: "reincidentes", label: "Reincidentes" },
   { key: "cheques", label: "Cheques" },
+  { key: "divergencias", label: "Divergências" },
 ];
 
 const AbaPedidosGestor: React.FC = () => {
@@ -31,7 +40,8 @@ const AbaPedidosGestor: React.FC = () => {
       return pedida === "loja" ||
         pedida === "descontos" ||
         pedida === "reincidentes" ||
-        pedida === "cheques"
+        pedida === "cheques" ||
+        pedida === "divergencias"
         ? pedida
         : "correcoes";
     } catch {
@@ -92,6 +102,8 @@ const AbaPedidosGestor: React.FC = () => {
         <PedidosDesconto />
       ) : visao === "cheques" ? (
         <PainelCheques />
+      ) : visao === "divergencias" ? (
+        <PainelDivergencias />
       ) : (
         <CasosGestor />
       )}

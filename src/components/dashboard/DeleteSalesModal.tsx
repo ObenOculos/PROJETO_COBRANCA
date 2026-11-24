@@ -91,6 +91,10 @@ const DeleteSalesModal: React.FC<DeleteSalesModalProps> = ({
             ). As parcelas ficam como <strong>Canceladas</strong> e saem da
             cobrança; pagamentos já recebidos, visitas e histórico são mantidos.
           </p>
+          <p className="text-xs text-gray-500 mb-4">
+            Cancele também no ERP. Enquanto o ERP não cancelar, a venda segue
+            cancelada aqui e aparece em Pedidos › Divergências.
+          </p>
 
           {hasMultipleSales && (
             <div className="mb-4">

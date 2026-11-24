@@ -32,6 +32,12 @@ pendente/recebido) nunca BAIXA valor_recebido do que ja esta gravado; so
 cancelamento/agrupamento/renegociacao (decisao explicita do ERP) tem
 prioridade sobre o que o app registrou.
 
+Venda cancelada no app vale ate o ERP confirmar (item 89, 2026-11-24): o
+gestor cancela no app; se o Ciclone ainda mostra o titulo aberto, esta rodada
+nao desfaz o status (antes a venda voltava a cobranca sem aviso). O que o
+ERP mostra para essas parcelas vai para `registrar_conferencia_cancelamento`
+-- o painel de divergencias do gestor le dali. Ver `segurar_canceladas_no_app`.
+
 Idempotencia: id_parcela nao existe no Ciclone e BANCO_DADOS.id_parcela e
 bigint sem identity, entao cada fncrt_uuid precisa de um id_parcela estavel
 entre rodadas. Isso mora na tabela auxiliar `ciclone_titulo_map`
@@ -853,6 +859,55 @@ def carregar_parcelas_pagas_no_app(sb: SupabaseRestClient) -> set:
         inicio += 1000
 
 
+def carregar_canceladas_no_app(sb: SupabaseRestClient) -> set:
+    """id_parcela de vendas canceladas no app (pelo gestor), nao reabertas e
+    sem confirmacao do ERP -- RPC `parcelas_canceladas_no_app` (item 89)."""
+    resp = sb.rpc("parcelas_canceladas_no_app") or []
+    return {r["id_parcela"] for r in resp if r.get("id_parcela") is not None}
+
+
+def segurar_canceladas_no_app(
+    atuais: dict, linhas: list[dict], canceladas_no_app: Optional[set]
+) -> list[dict]:
+    """Item 89: parcela cancelada no app continua cancelada enquanto o Ciclone
+    nao cancelar tambem -- as COLUNAS_PROTEGIDAS (status, recebido...) ficam
+    como estao no app; o resto (endereco, vencimento, juros) segue o ERP.
+    Quando o Ciclone mostra "cancelado", grava normalmente (confirmou).
+
+    `canceladas_no_app=None` (falha ao ler): segura toda parcela que esta
+    "Cancelado" (C maiusculo -- so o app e a SSOtica gravam assim; o Ciclone
+    grava "cancelado").
+
+    Devolve o que o ERP mostra para essas parcelas, para o painel de
+    divergencias: [{"id_parcela", "status_erp": em_aberto|pago|cancelado}].
+    Altera `linhas` no lugar."""
+    observacoes = []
+    for i, linha in enumerate(linhas):
+        idp = linha["id_parcela"]
+        atual = atuais.get(idp)
+        if canceladas_no_app is None:
+            segura = atual is not None and (atual.get("status") or "") == "Cancelado"
+        else:
+            segura = idp in canceladas_no_app
+        if not segura:
+            continue
+        status_erp = linha["status"]
+        observacoes.append({
+            "id_parcela": idp,
+            "status_erp": (
+                "cancelado" if status_erp == "cancelado"
+                else "pago" if status_erp == "recebido"
+                else "em_aberto"
+            ),
+        })
+        if status_erp != "cancelado" and atual is not None:
+            linha_final = dict(linha)
+            for col in COLUNAS_PROTEGIDAS:
+                linha_final[col] = atual.get(col)
+            linhas[i] = linha_final
+    return observacoes
+
+
 def proteger_e_filtrar_alteradas(
     atuais: dict, linhas: list[dict], pagas_no_app: Optional[set] = None
 ) -> tuple[list[dict], list[dict]]:
@@ -1181,6 +1236,24 @@ def main() -> None:
             "parcelas contra reducao de recebido nesta rodada.", exc,
         )
         pagas_no_app = None
+    try:
+        canceladas_no_app = carregar_canceladas_no_app(sb)
+        logger.info("%d parcela(s) canceladas no app aguardando o Ciclone", len(canceladas_no_app))
+    except RuntimeError as exc:
+        logger.error(
+            "Nao foi possivel ler as vendas canceladas no app (%s); segurando toda "
+            "parcela com status 'Cancelado' nesta rodada.", exc,
+        )
+        canceladas_no_app = None
+    conferencia_cancelamento = segurar_canceladas_no_app(
+        atuais_banco_dados, linhas_banco_dados, canceladas_no_app
+    )
+    em_aberto_no_erp = sum(1 for o in conferencia_cancelamento if o["status_erp"] != "cancelado")
+    if em_aberto_no_erp:
+        logger.warning(
+            "%d parcela(s) cancelada(s) no app seguem abertas/pagas no Ciclone "
+            "(mantidas canceladas; ver painel de divergencias)", em_aberto_no_erp,
+        )
     alteradas, protegidos = proteger_e_filtrar_alteradas(
         atuais_banco_dados, linhas_banco_dados, pagas_no_app
     )
@@ -1192,6 +1265,18 @@ def main() -> None:
         )
     logger.info("Gravando %d linhas em BANCO_DADOS...", len(alteradas))
     upsert_banco_dados(sb, alteradas)
+
+    # Item 89: o que o Ciclone mostra para as vendas canceladas no app
+    # (confirma ou mantem a divergencia). Falha nao derruba o sync.
+    if conferencia_cancelamento:
+        try:
+            n = sb.rpc(
+                "registrar_conferencia_cancelamento",
+                {"p_erp": "ciclone", "p_itens": conferencia_cancelamento},
+            )
+            logger.info("Conferencia de cancelamento: %s venda(s) atualizada(s)", n)
+        except RuntimeError as exc:
+            logger.error("Falha ao registrar a conferencia de cancelamento: %s", exc)
 
     # Item 87: cheque em carteira que chegou nesta rodada tira o cliente do
     # cobrador agora, sem esperar a rotina das 7h. Falha nao derruba o sync

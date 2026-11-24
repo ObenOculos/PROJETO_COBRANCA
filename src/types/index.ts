@@ -733,11 +733,12 @@ export interface CollectionContextType {
     saleNumbers: number[],
     motivo: string,
   ) => Promise<void>;
-  /** Cancela todas as vendas ativas dos clientes, com motivo. */
+  /** Cancela todas as vendas ativas dos clientes, com motivo. Cliente com
+   * acordo ativo e pulado (item 89): volta em `pulados`. */
   cancelarClientes: (
     clientDocuments: string[],
     motivo: string,
-  ) => Promise<void>;
+  ) => Promise<{ pulados: string[] }>;
   // NOVOS CAMPOS PARA OTIMIZAÇÃO:
   prefetchClientsData: (clientDocuments: string[]) => Promise<void>;
   clientDataCache: Map<string, any>;

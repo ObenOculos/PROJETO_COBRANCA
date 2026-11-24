@@ -2491,19 +2491,22 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     if (!user?.id) {
       throw new Error("Usuário não autenticado.");
     }
-    if (clientDocuments.length === 0) return;
+    if (clientDocuments.length === 0) return { pulados: [] };
     setGlobalLoading(
       true,
       `Cancelando as vendas de ${clientDocuments.length} cliente(s)...`,
     );
     try {
-      const { error } = await supabase.rpc("cancelar_clientes", {
+      const { data, error } = await supabase.rpc("cancelar_clientes", {
         p_documentos: clientDocuments,
         p_motivo: motivo,
         p_usuario_id: user.id,
       });
       if (error) throw new Error(`Erro ao cancelar clientes: ${error.message}`);
       await refreshData();
+      // Item 89: cliente com acordo ativo e pulado pelo banco.
+      const pulados = (data as { pulados?: string[] } | null)?.pulados ?? [];
+      return { pulados };
     } catch (err) {
       console.error("Erro ao cancelar clientes:", err);
       setError(

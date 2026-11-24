@@ -22,6 +22,14 @@ Senhas e chaves: **só** no `.env` da raiz (fora do git) — `VITE_SUPABASE_URL`
 | `BI_ContasReceber_Focco` | 19h | `focco/contas_receber_bi.py` | Planilha mestre `_CONTAS A RECEBER OBEN.xlsx` (Dropbox, com senha) → layout fixo do Power BI | Power BI `Focco Brasil\Contas a Receber` | `focco/saida/excel_extractor.log` |
 | `BI_DRE_Mensal` | dia 6, 10h | `atualizar_dre.py` | DRE da Focco (`focco/dre`, PostgreSQL do Ciclone) e DRE das óticas (`ssotica/dre_ssotica.py`, SSÓtica com Chrome), até o mês anterior | Power BI `Focco Brasil\DRE`, `Focco Brasil\Vendas\fVendas`, `Oticas Luana\DRE\<ano>` | `focco/saida/dre_focco.log`, `ssotica/saida/dre_ssotica.log` |
 
+O que o sync/importação **não** desfaz no app (o ERP só vence quando confirma):
+
+- Pagamento lançado pelo app ainda sem baixa no ERP (item 82; Ciclone e SSÓtica).
+- Venda cancelada no app pelo gestor (item 89): o status fica "Cancelado" até o ERP
+  cancelar também. O Ciclone informa a cada rodada o que mostra para essas parcelas
+  (`registrar_conferencia_cancelamento`) e o gestor vê em **Pedidos › Divergências**.
+  A SSÓtica já ignorava parcela cancelada no app; a conferência dela ainda não existe.
+
 Rodar à mão (mesmos comandos das tarefas), a partir da raiz do repositório:
 
 ```bash
