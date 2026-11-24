@@ -22,6 +22,7 @@ import { supabase } from "../../lib/supabase";
 import { useCollection } from "../../contexts/CollectionContext";
 import { CobradorOptions } from "../common/CobradorOptions";
 import EditorCoberturaLoja from "./EditorCoberturaLoja";
+import { nomeCurtoLoja } from "../../config/lojas";
 import {
   CollectorOverdueRange,
   FilaConfigRegra,
@@ -2105,17 +2106,33 @@ const CarteiraDistribuicao: React.FC = () => {
                     <React.Fragment key={loja.loja}>
                     <tr className="group align-middle">
                       <td className="sticky left-0 z-10 bg-white group-even:bg-gray-50 dark:bg-dark-bg-secondary dark:group-even:bg-dark-bg h-[60px] py-1.5 px-2 border-b border-gray-100 dark:border-dark-border">
-                        <div className="font-semibold text-gray-900 dark:text-dark-text flex items-center gap-1.5">
+                        {/* Celula da loja em 3 linhas (24/11): nome + ✎,
+                            cobrador, em atraso x a vencer. Faixas inativas
+                            no title do nome. */}
+                        <div className="flex items-center gap-1.5 min-w-0">
                           {temFalha(loja.loja) && (
                             <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
                           )}
-                          <span className="min-w-0">{loja.loja}</span>
+                          <span
+                            className="min-w-0 truncate text-sm font-semibold leading-tight text-gray-900 dark:text-dark-text"
+                            title={
+                              loja.loja +
+                              (inativas.length > 0
+                                ? `
+${inativas.length} faixa(s) inativa(s): ${inativas
+                                    .map(({ c, r }) => `${c.name} (${faixaTexto(r.minDias, r.maxDias)})`)
+                                    .join(", ")}`
+                                : "")
+                            }
+                          >
+                            {nomeCurtoLoja(loja.loja)}
+                          </span>
                           <button
                             type="button"
                             onClick={() =>
                               setLojaEditando((v) => (v === loja.loja ? null : loja.loja))
                             }
-                            className={`shrink-0 p-1 rounded-md ${
+                            className={`ml-auto shrink-0 p-1 rounded-md ${
                               lojaEditando === loja.loja
                                 ? "bg-blue-600 text-white"
                                 : "text-gray-400 hover:text-blue-700 hover:bg-blue-50"
@@ -2126,45 +2143,39 @@ const CarteiraDistribuicao: React.FC = () => {
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
                         </div>
-                        <div className="text-[11px] text-gray-500 flex flex-wrap items-center gap-x-1.5">
-                          {/* Em atraso x a vencer (padrao: nunca um "em aberto"
-                              unico); mesma base da tabela (carteira_mapa). */}
-                          {(() => {
-                            let atraso = 0;
-                            let aVencer = 0;
-                            (clientesPorLoja.get(loja.loja) ?? []).forEach((x) => {
-                              if (x.atraso > 0) atraso += x.n;
-                              else aVencer += x.n;
-                            });
-                            return (
-                              <span>
-                                <span className="text-red-600 dark:text-red-400">
-                                  {atraso.toLocaleString("pt-BR")} em atraso
-                                </span>
-                                {aVencer > 0 && (
-                                  <span> · {aVencer.toLocaleString("pt-BR")} a vencer</span>
-                                )}
+                        <div className="text-[11px] leading-tight text-gray-700 dark:text-dark-text truncate">
+                          {cobradoresDaLoja.length === 0 ? (
+                            <span className="text-gray-400">sem cobrador por regra</span>
+                          ) : (
+                            cobradoresDaLoja.map((c, k) => (
+                              <span key={c.id} className="inline-flex items-center gap-1">
+                                {k > 0 && <span className="text-gray-300 mx-0.5">·</span>}
+                                <span className={`h-2 w-2 rounded-sm shrink-0 ${corPorCobrador.get(c.id)}`} />
+                                {c.name.split(" ")[0]}
                               </span>
-                            );
-                          })()}
-                          {cobradoresDaLoja.map((c) => (
-                            <span key={c.id} className="inline-flex items-center gap-1 text-gray-700 dark:text-dark-text">
-                              <span className="text-gray-300">·</span>
-                              <span className={`h-2 w-2 rounded-sm shrink-0 ${corPorCobrador.get(c.id)}`} />
-                              {c.name.split(" ")[0]}
-                            </span>
-                          ))}
+                            ))
+                          )}
                         </div>
-                        {inativas.length > 0 && (
-                          <div
-                            className="text-[10px] text-gray-400"
-                            title={inativas
-                              .map(({ c, r }) => `${c.name} (${faixaTexto(r.minDias, r.maxDias)})`)
-                              .join(", ")}
-                          >
-                            {inativas.length} {inativas.length === 1 ? "faixa inativa" : "faixas inativas"}
-                          </div>
-                        )}
+                        {/* Em atraso x a vencer (padrao: nunca um "em aberto"
+                            unico); mesma base da tabela (carteira_mapa). */}
+                        {(() => {
+                          let atraso = 0;
+                          let aVencer = 0;
+                          (clientesPorLoja.get(loja.loja) ?? []).forEach((x) => {
+                            if (x.atraso > 0) atraso += x.n;
+                            else aVencer += x.n;
+                          });
+                          return (
+                            <div className="text-[11px] leading-tight text-gray-500 tabular-nums truncate">
+                              <span className="text-red-600 dark:text-red-400">
+                                {atraso.toLocaleString("pt-BR")} em atraso
+                              </span>
+                              {aVencer > 0 && (
+                                <span> · {aVencer.toLocaleString("pt-BR")} a vencer</span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
                       {colunasCobertura.map((col) => {
                         // Cobradores com faixa ativa que toca esta coluna.
