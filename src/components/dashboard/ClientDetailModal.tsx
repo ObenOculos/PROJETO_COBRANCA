@@ -16,7 +16,7 @@ import {
   Store,
   Copy,
   Check,
-  AlertCircle,
+  Banknote,
   Clock,
   Percent,
 } from "lucide-react";
@@ -58,7 +58,8 @@ import LogContactModal from "./LogContactModal";
 import AcordoModal from "./AcordoModal";
 import AcordoDetailModal from "./AcordoDetailModal";
 import LinhaDoTempoCliente from "./LinhaDoTempoCliente";
-import SeloChequeFicha from "./SeloChequeFicha";
+import { PainelChequeFicha, SeloCheque } from "./SeloChequeFicha";
+import { useCondicaoCheque } from "../../hooks/useCondicaoCheque";
 import { USER_TYPE_LABELS, isWalletCollectorType } from "../../config/profiles";
 
 interface ClientDetailModalProps {
@@ -303,6 +304,13 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
         )
       : null;
   const [menuMaisAberto, setMenuMaisAberto] = useState(false);
+  // Item 87: condicao de cheque -- selo ao lado do nome (detalhe ao clicar);
+  // marcar/desmarcar no menu "Mais acoes" do gestor.
+  const cheque = useCondicaoCheque(clientGroup.document);
+  const [chequeDetalheAberto, setChequeDetalheAberto] = useState(false);
+  const [chequeFormAberto, setChequeFormAberto] = useState(false);
+  // Celular: a conta "vencido + multa + juros" fica recolhida.
+  const [contaEncargoAberta, setContaEncargoAberta] = useState(false);
   // Numero do titulo/venda copiado (para buscar no Ciclone/SSOtica).
   const [numeroCopiado, setNumeroCopiado] = useState<number | null>(null);
   const copiarNumero = (numero: number) => {
@@ -644,25 +652,44 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     if (acordoAtivo) setAcordoDetalheId(acordoAtivo.id);
     else setIsAcordoOpen(true);
   };
+  const temRecebido = clientSales.some((sale) => sale.totalReceived > 0);
+  // Gestor sempre tem o menu (marcar/desmarcar "Paga em cheque").
   const mostrarMenuMais =
-    (isCollectorType(userType) || souGestor) &&
-    clientSales.some((sale) => sale.totalReceived > 0);
+    souGestor || (isCollectorType(userType) && temRecebido);
   const itensMenuMais = (
     <>
-      <button
-        id="edit-payments"
-        name="editPayments"
-        type="button"
-        onClick={() => {
-          setMenuMaisAberto(false);
-          handleEditPaymentClick();
-        }}
-        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left"
-      >
-        <Edit className="h-4 w-4 text-gray-500" />
-        {souGestor ? "Corrigir pagamento" : "Pedir correção de pagamento"}
-      </button>
+      {temRecebido && (
+        <button
+          id="edit-payments"
+          name="editPayments"
+          type="button"
+          onClick={() => {
+            setMenuMaisAberto(false);
+            handleEditPaymentClick();
+          }}
+          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left"
+        >
+          <Edit className="h-4 w-4 text-gray-500" />
+          {souGestor ? "Corrigir pagamento" : "Pedir correção de pagamento"}
+        </button>
+      )}
       {souGestor && (
+        <button
+          type="button"
+          onClick={() => {
+            setMenuMaisAberto(false);
+            setChequeFormAberto(true);
+          }}
+          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left"
+          title="Cliente em condição de cheque fica só com o gestor (sai da carteira do cobrador)"
+        >
+          <Banknote className="h-4 w-4 text-gray-500" />
+          {cheque.cond?.paga_em_cheque
+            ? 'Desmarcar "Paga em cheque"'
+            : 'Marcar "Paga em cheque"'}
+        </button>
+      )}
+      {souGestor && temRecebido && (
         <button
           type="button"
           onClick={() => {
@@ -693,6 +720,47 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     </>
   );
   const temEncargo = !!encargoFicha && encargoFicha.encargo > 0.009;
+  // Gestor: em nome de quem fica o registro. Sem cobrador de carteira nao ha
+  // escolha (fica no nome dele) -- nada a mostrar.
+  const mostrarLancarComo =
+    souGestor && !!cobradorDaCarteira && (hasRealPendingValue || !!acordoAtivo);
+  // Perfil entre parenteses so se o nome ainda nao o traz
+  // ("Jose - Cobranca Interna (Cobranca Interna)").
+  const perfilCobradorCarteira = cobradorDaCarteira
+    ? USER_TYPE_LABELS[cobradorDaCarteira.type] ?? "cobrador"
+    : "";
+  const rotuloCobradorCarteira = cobradorDaCarteira
+    ? cobradorDaCarteira.name
+        .toLowerCase()
+        .includes(perfilCobradorCarteira.toLowerCase())
+      ? cobradorDaCarteira.name
+      : `${cobradorDaCarteira.name} (${perfilCobradorCarteira})`
+    : "";
+  const seletorLancarComo = mostrarLancarComo ? (
+    <label className="flex w-full sm:w-auto flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500 min-w-0">
+      <span>Lançar como</span>
+      <select
+        value={emNomeDoCobrador ? "cobrador" : "eu"}
+        onChange={(e) => setEmNomeDoCobrador(e.target.value === "cobrador")}
+        className="flex-1 sm:flex-none min-w-0 px-2 py-1.5 sm:py-1 rounded-lg border border-gray-200 bg-white text-sm sm:text-xs text-gray-800"
+        title={
+          emNomeDoCobrador
+            ? `Conta para o cobrador e o próximo contato vai para a agenda dele; fica registrado que foi você.${
+                !acordoEmNomeDe
+                  ? " Acordo de cobrador de visita fica no seu nome."
+                  : ""
+              }`
+            : "Conta para você e o próximo contato fica na sua agenda."
+        }
+      >
+        <option value="cobrador">{rotuloCobradorCarteira}</option>
+        <option value="eu">Eu ({user?.name ?? "gestor"})</option>
+      </select>
+      {emNomeDoCobrador && !acordoEmNomeDe && (
+        <span className="text-gray-400">· acordo fica no seu nome</span>
+      )}
+    </label>
+  ) : null;
 
   return (
     <>
@@ -707,23 +775,41 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
         {/* Celular: tela cheia. Computador: janela de ate 90% da altura. Uma
             area de rolagem so (o conteudo da aba), o resto fica fixo. */}
         <div className="bg-white sm:rounded-2xl max-w-6xl w-full h-full sm:h-auto sm:max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
-          {/* Cabecalho: quem e, como falar, situacao e acoes -- em 3 linhas */}
-          <div className="relative px-4 lg:px-6 pt-4 pb-3 border-b border-gray-200 shrink-0">
+          {/* Cabecalho em 3 faixas (24/11): quem e, situacao, acoes. Pouca
+              cor: vermelho so no que esta vencido; o resto em cinza. */}
+          <div className="relative px-4 lg:px-6 pt-4 sm:pt-5 pb-4 border-b border-gray-200 shrink-0">
             <button
               id="close-modal"
               name="closeModal"
               onClick={fecharFicha}
-              className="absolute top-3 right-3 p-2 text-gray-500 hover:text-gray-800 rounded-full hover:bg-gray-100 transition-colors"
+              className="absolute top-3 right-3 p-2 text-gray-400 hover:text-gray-800 rounded-full hover:bg-gray-100 transition-colors"
               aria-label="Fechar modal"
             >
               <X className="h-5 w-5" />
             </button>
 
-            {/* 1. Quem e */}
+            {/* 1. Quem e: nome + condicoes (selos), depois uma linha so de
+                dados (loja, documento, codigo, carteira). */}
             <div className="pr-10 min-w-0">
-              <h2 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
-                {clientGroup.client}
-              </h2>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <h2 className="text-base sm:text-xl font-semibold tracking-tight text-gray-900 truncate max-w-full">
+                  {clientGroup.client}
+                </h2>
+                {acordoAtivo && (
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200"
+                    title="Em acordo: valores e atraso seguem as parcelas do acordo, não o vencimento original dos títulos"
+                  >
+                    <Handshake className="h-3.5 w-3.5" />
+                    Em acordo
+                  </span>
+                )}
+                <SeloCheque
+                  cond={cheque.cond}
+                  aberto={chequeDetalheAberto}
+                  onAlternar={() => setChequeDetalheAberto((v) => !v)}
+                />
+              </div>
               {razaoSocial && (
                 <p
                   className="text-xs text-gray-500 truncate"
@@ -732,257 +818,228 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   {razaoSocial}
                 </p>
               )}
-              {lojasCliente.length > 0 && (
-                <p className="text-sm text-indigo-700 font-medium truncate">
-                  <span className="font-normal text-gray-500">
-                    Loja{lojasCliente.length > 1 ? "s" : ""}:{" "}
-                  </span>
-                  {lojasCliente.join(" | ")}
-                </p>
-              )}
-              {/* Documento e codigo numa linha so */}
-              <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+              <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-gray-500">
+                {lojasCliente.length > 0 && (
+                  <>
+                    <span className="text-gray-700">
+                      {lojasCliente.join(" | ")}
+                    </span>
+                    <span aria-hidden className="text-gray-300">·</span>
+                  </>
+                )}
                 <span className="tabular-nums">{clientGroup.document}</span>
                 {codigoErp && (
-                  <span title="Código do cliente no Ciclone">
-                    Cód. {codigoErp}
-                  </span>
+                  <>
+                    <span aria-hidden className="text-gray-300">·</span>
+                    <span title="Código do cliente no Ciclone">
+                      Cód. {codigoErp}
+                    </span>
+                  </>
+                )}
+                {/* Cobrador ja sabe que o cliente e dele: so o gestor ve. Com
+                    "Lancar como" o nome ja esta la -- nao repete. */}
+                {souGestor && cobradorDaCarteira && !mostrarLancarComo && (
+                  <>
+                    <span aria-hidden className="text-gray-300">·</span>
+                    <span title="Cobrador da carteira deste cliente">
+                      Carteira:{" "}
+                      <span className="text-gray-700">
+                        {cobradorDaCarteira.name}
+                      </span>
+                    </span>
+                  </>
                 )}
               </div>
-              {/* Item 87: condicao de cheque (fica so com o gestor). */}
-              <SeloChequeFicha
+              <PainelChequeFicha
                 documento={clientGroup.document}
-                souGestor={souGestor}
+                cond={cheque.cond}
+                detalheAberto={chequeDetalheAberto}
+                formAberto={chequeFormAberto}
+                onFecharForm={() => setChequeFormAberto(false)}
+                onRecarregar={cheque.recarregar}
                 onMudouCarteira={() => void refreshCollections()}
               />
             </div>
 
-            {/* 2. Situacao (mesma regra da carteira: vencido x a vencer; com
-                acordo ativo, as parcelas do acordo) + 3. acoes, lado a lado
-                no computador. So mostra o que tem valor. */}
-            {/* Celular: selos so com icone + valor (mesmo desenho do cartao da
-                carteira) e a conta dos juros numa linha curta. */}
-            {(saldoCliente.vencido > 0.01 || acordoAtivo) && (
-              <div className="sm:hidden mt-2">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {saldoCliente.vencido > 0.01 && (
-                    <span
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700"
-                      title={temEncargo ? "Cobrar hoje: vencido + multa + juros" : "Vencido"}
-                    >
-                      <AlertCircle className="h-3 w-3" />
+            {/* 2. Situacao: mesma regra da carteira (vencido x a vencer; com
+                acordo ativo, as parcelas do acordo). Com multa/juros o numero
+                grande e o "Cobrar hoje" e a conta vem embaixo. A vencer so
+                aparece se houver valor, em cinza. */}
+            {(saldoCliente.vencido > 0.01 || saldoCliente.aVencer > 0.01) && (
+              <div className="mt-4 flex flex-wrap items-start gap-x-10 gap-y-3">
+                {saldoCliente.vencido > 0.01 && (
+                  <div
+                    className="min-w-0"
+                    title={
+                      temEncargo
+                        ? "Este cliente tem multa e juros de atraso: cobre o valor de hoje, não só o vencido. Mesma conta do Ciclone (Prev. Baixa); o valor sobe a cada dia de atraso."
+                        : undefined
+                    }
+                  >
+                    <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
+                      {temEncargo ? "Cobrar hoje" : "Vencido"}
+                      {/* Celular: dias no rotulo (uma linha a menos). */}
+                      {atrasoCliente > 0 && (
+                        <span className="sm:hidden text-red-600">
+                          {" "}
+                          · {atrasoCliente} dia{atrasoCliente !== 1 ? "s" : ""}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xl sm:text-2xl font-semibold tabular-nums text-red-600 leading-tight">
                       {formatCurrency(
                         saldoCliente.vencido +
                           (temEncargo ? encargoFicha!.encargo : 0),
                       )}
+                    </div>
+                    {/* Celular: conta de multa/juros recolhida. */}
+                    {temEncargo && (
+                      <button
+                        type="button"
+                        onClick={() => setContaEncargoAberta((v) => !v)}
+                        aria-expanded={contaEncargoAberta}
+                        className="sm:hidden text-xs text-amber-700"
+                      >
+                        {contaEncargoAberta ? (
+                          <>
+                            vencido {formatCurrency(saldoCliente.vencido)} +
+                            multa {formatCurrency(encargoFicha!.multa)} + juros{" "}
+                            {formatCurrency(encargoFicha!.juros)}
+                          </>
+                        ) : (
+                          <>inclui multa e juros ▸</>
+                        )}
+                      </button>
+                    )}
+                    <div className="hidden sm:block text-xs text-gray-500">
                       {temEncargo && (
-                        <Percent
-                          className="h-3 w-3 text-amber-600"
-                          aria-label="com multa e juros de hoje"
-                        />
+                        <>
+                          vencido {formatCurrency(saldoCliente.vencido)} + multa{" "}
+                          {formatCurrency(encargoFicha!.multa)} + juros{" "}
+                          {formatCurrency(encargoFicha!.juros)}
+                          {atrasoCliente > 0 && " · "}
+                        </>
                       )}
-                    </span>
-                  )}
-                  {saldoCliente.vencido > 0.01 && atrasoCliente > 0 && (
-                    <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-red-50 text-red-600">
-                      {atrasoCliente}d
-                    </span>
-                  )}
-                  {acordoAtivo && (
-                    <span
-                      className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200"
-                      title="Em acordo: valores e atraso seguem as parcelas do acordo"
-                      aria-label="Em acordo"
-                    >
-                      <Handshake className="h-3.5 w-3.5" />
-                    </span>
-                  )}
-                </div>
-                {temEncargo && (
-                  <p className="mt-1 text-[11px] text-amber-800">
-                    {formatCurrency(saldoCliente.vencido)} + multa{" "}
-                    {formatCurrency(encargoFicha!.multa)} + juros{" "}
-                    {formatCurrency(encargoFicha!.juros)}
-                  </p>
+                      {atrasoCliente > 0 && (
+                        <span className="text-red-600">
+                          {atrasoCliente} dia{atrasoCliente !== 1 ? "s" : ""} de
+                          atraso
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 )}
-              </div>
-            )}
-
-            <div className="hidden sm:flex mt-3 flex-row items-center justify-between gap-3">
-              {/* So o que pede atencao: valor vencido (com o atraso) e acordo
-                  ativo. Em dia / a vencer nao aparece (pedido do usuario). */}
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                {/* Com multa/juros o aviso "Cobrar hoje" ja traz o vencido e
-                    os dias: o selo some para nao repetir. */}
-                {saldoCliente.vencido > 0.01 &&
-                  !(encargoFicha && encargoFicha.encargo > 0.009) && (
-                  <span className="px-2 py-0.5 rounded-md bg-red-50 text-red-700">
-                    Vencido{" "}
-                    <strong>{formatCurrency(saldoCliente.vencido)}</strong>
-                    {atrasoCliente > 0 && (
-                      <span className="text-red-600">
-                        {" "}
-                        · {atrasoCliente} dia{atrasoCliente !== 1 ? "s" : ""}{" "}
-                        de atraso
-                      </span>
-                    )}
-                  </span>
-                )}
-                {acordoAtivo && (
-                  <span
-                    className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 text-xs font-medium"
-                    title="Valores e atraso seguem as parcelas do acordo, não o vencimento original dos títulos"
-                  >
-                    Em acordo
-                  </span>
-                )}
-              </div>
-
-              {/* Atender e Receber pagamento sao o dia a dia; Acordo ao lado;
-                  Editar pagamentos (rara, pede autorizacao) no menu. */}
-              <div className="flex flex-wrap items-center gap-2 shrink-0">
-                {mostrarAtender && (
-                  <button
-                    type="button"
-                    onClick={() => setIsAtenderOpen(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium shadow-sm"
-                    title="Registrar contato e agendar o próximo"
-                  >
-                    <PhoneCall className="h-4 w-4" />
-                    Atender
-                  </button>
-                )}
-                {mostrarReceber && (
-                  <button
-                    id="distribute-payment"
-                    name="distributePayment"
-                    type="button"
-                    onClick={abrirReceber}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium shadow-sm"
-                    title="Lançar o valor recebido; o sistema distribui entre as parcelas"
-                  >
-                    <CreditCard className="h-4 w-4" />
-                    Receber pagamento
-                  </button>
-                )}
-                {mostrarAcordo && (
-                  <button
-                    type="button"
-                    onClick={abrirAcordo}
-                    className="flex items-center gap-1.5 px-3 py-1.5 border border-amber-300 text-amber-800 bg-white rounded-lg hover:bg-amber-50 text-sm font-medium"
-                    title={
-                      acordoAtivo
-                        ? "Ver o acordo ativo, registrar pagamento de parcela"
-                        : "Negociar a dívida em parcelas"
-                    }
-                  >
-                    <Handshake className="h-4 w-4" />
-                    {acordoAtivo ? "Ver acordo" : "Fazer acordo"}
-                  </button>
-                )}
-                {mostrarMenuMais && (
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setMenuMaisAberto((v) => !v)}
-                      className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
-                      title="Mais ações"
-                      aria-label="Mais ações"
-                      aria-expanded={menuMaisAberto}
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </button>
-                    {menuMaisAberto && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-10"
-                          onClick={() => setMenuMaisAberto(false)}
-                        />
-                        <div className="absolute right-0 mt-1 z-20 w-56 bg-white border border-gray-200 rounded-xl shadow-lg py-1">
-                          {itensMenuMais}
-                        </div>
-                      </>
-                    )}
+                {saldoCliente.aVencer > 0.01 && (
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
+                      A vencer
+                    </div>
+                    <div className="text-xl sm:text-2xl font-semibold tabular-nums text-gray-700 leading-tight">
+                      {formatCurrency(saldoCliente.aVencer)}
+                    </div>
                   </div>
                 )}
               </div>
-            </div>
-
-            {/* Item 67: aviso de multa e juros (Ciclone) -- o cobrador nao
-                pode cobrar so o vencido. */}
-            {encargoFicha && encargoFicha.encargo > 0.009 && (
-              <div
-                className="hidden sm:flex mt-2 items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs text-amber-900"
-                title="Este cliente tem multa e juros de atraso: cobre o valor de hoje, não só o vencido. Mesma conta do Ciclone (Prev. Baixa); o valor sobe a cada dia de atraso."
-              >
-                <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-                <div>
-                  <strong>
-                    Cobrar hoje{" "}
-                    {formatCurrency(
-                      saldoCliente.vencido + encargoFicha.encargo,
-                    )}
-                  </strong>{" "}
-                  — vencido {formatCurrency(saldoCliente.vencido)}
-                  {atrasoCliente > 0 &&
-                    ` há ${atrasoCliente} dia${atrasoCliente !== 1 ? "s" : ""}`}{" "}
-                  + multa{" "}
-                  {formatCurrency(encargoFicha.multa)} + juros{" "}
-                  {formatCurrency(encargoFicha.juros)}
-                </div>
-              </div>
             )}
             {encargoFicha?.conferirNoErp && (
-              <div className="mt-2 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                <div>
+              <div className="mt-2 flex items-start gap-1.5 text-xs text-amber-800">
+                <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                <span>
                   O juro cadastrado no Ciclone para uma parcela deste cliente
                   parece errado. Confira o valor no Ciclone antes de cobrar.
-                </div>
+                </span>
               </div>
             )}
 
-            {/* Gestor: em nome de quem fica o registro. Sem cobrador de
-                carteira nao ha escolha (fica no nome dele) -- nada a mostrar. */}
-            {souGestor && cobradorDaCarteira && (hasRealPendingValue || acordoAtivo) && (
-              <label className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-600">
-                <span>Registrar em nome de</span>
-                <select
-                  value={emNomeDoCobrador ? "cobrador" : "eu"}
-                  onChange={(e) =>
-                    setEmNomeDoCobrador(e.target.value === "cobrador")
-                  }
-                  className="px-2 py-1 rounded-lg border border-gray-200 bg-white text-xs"
-                  title={
-                    emNomeDoCobrador
-                      ? `Conta para o cobrador e o próximo contato vai para a agenda dele; fica registrado que foi você.${
-                          !acordoEmNomeDe
-                            ? " Acordo de cobrador de visita fica no seu nome."
-                            : ""
-                        }`
-                      : "Conta para você e o próximo contato fica na sua agenda."
-                  }
-                >
-                  <option value="cobrador">
-                    {cobradorDaCarteira.name} (
-                    {USER_TYPE_LABELS[cobradorDaCarteira.type] ?? "cobrador"})
-                  </option>
-                  <option value="eu">Eu ({user?.name ?? "gestor"})</option>
-                </select>
-                {emNomeDoCobrador && !acordoEmNomeDe && (
-                  <span className="text-gray-400">
-                    · acordo fica no seu nome
-                  </span>
-                )}
-              </label>
-            )}
+            {/* 3. Acoes (computador). "Lancar como" (gestor) fica junto dos
+                botoes que ele afeta. No celular, botoes e "Lancar como" ficam
+                na barra de baixo. Editar pagamentos e cheque no menu. */}
+            {(() => {
+              const temBotoes =
+                mostrarAtender || mostrarReceber || mostrarAcordo || mostrarMenuMais;
+              if (!mostrarLancarComo && !temBotoes) return null;
+              return (
+                <div className="hidden sm:flex mt-4 flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                  {seletorLancarComo ?? <span />}
+
+                  {temBotoes && (
+                    <div className="hidden sm:flex flex-wrap items-center gap-2 shrink-0">
+                      {mostrarAtender && (
+                        <button
+                          type="button"
+                          onClick={() => setIsAtenderOpen(true)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium"
+                          title="Registrar contato e agendar o próximo"
+                        >
+                          <PhoneCall className="h-4 w-4" />
+                          Atender
+                        </button>
+                      )}
+                      {mostrarReceber && (
+                        <button
+                          id="distribute-payment"
+                          name="distributePayment"
+                          type="button"
+                          onClick={abrirReceber}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium"
+                          title="Lançar o valor recebido; o sistema distribui entre as parcelas"
+                        >
+                          <CreditCard className="h-4 w-4" />
+                          Receber pagamento
+                        </button>
+                      )}
+                      {mostrarAcordo && (
+                        <button
+                          type="button"
+                          onClick={abrirAcordo}
+                          className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-700 bg-white rounded-lg hover:bg-gray-50 text-sm font-medium"
+                          title={
+                            acordoAtivo
+                              ? "Ver o acordo ativo, registrar pagamento de parcela"
+                              : "Negociar a dívida em parcelas"
+                          }
+                        >
+                          <Handshake className="h-4 w-4 text-amber-600" />
+                          {acordoAtivo ? "Ver acordo" : "Fazer acordo"}
+                        </button>
+                      )}
+                      {mostrarMenuMais && (
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setMenuMaisAberto((v) => !v)}
+                            className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
+                            title="Mais ações"
+                            aria-label="Mais ações"
+                            aria-expanded={menuMaisAberto}
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </button>
+                          {menuMaisAberto && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-10"
+                                onClick={() => setMenuMaisAberto(false)}
+                              />
+                              <div className="absolute right-0 mt-1 z-20 w-60 bg-white border border-gray-200 rounded-xl shadow-lg py-1">
+                                {itensMenuMais}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Abas: navegacao, nao acao. Sem overflow: com overflow-x o
               sublinhado (-mb-px) criava barra de rolagem vertical. */}
           <div
             role="tablist"
-            className="flex gap-1 px-4 lg:px-6 border-b border-gray-200 shrink-0"
+            className="flex justify-between sm:justify-start gap-1 px-4 lg:px-6 border-b border-gray-200 shrink-0"
           >
             {(
               [
@@ -1729,7 +1786,9 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           {/* Celular: acoes numa barra fixa embaixo. O menu "Mais" abre para
               cima. */}
           {(mostrarAtender || mostrarReceber || mostrarAcordo || mostrarMenuMais) && (
-            <div className="sm:hidden shrink-0 border-t border-gray-200 bg-white px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] flex items-center gap-2">
+            <div className="sm:hidden shrink-0 border-t border-gray-200 bg-white px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+            {seletorLancarComo && <div className="mb-2">{seletorLancarComo}</div>}
+            <div className="flex items-center gap-2">
               {mostrarAcordo && (
                 <button
                   type="button"
@@ -1789,6 +1848,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                   </button>
                 )}
               </div>
+            </div>
             </div>
           )}
         </div>
