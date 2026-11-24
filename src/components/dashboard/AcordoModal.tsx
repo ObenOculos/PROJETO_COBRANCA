@@ -12,6 +12,8 @@ import {
   QrCode,
   FileDown,
   MessageCircle,
+  Hourglass,
+  Send,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
@@ -30,6 +32,12 @@ import {
   razaoSocialDistinta,
 } from "../../utils/clienteNome";
 import { abrirWhatsApp } from "../../utils/whatsapp";
+import {
+  buscarPedidoDescontoAcordo,
+  liberacaoAcordoVigente,
+  pedirDescontoAcordo,
+  PedidoDescontoAcordo,
+} from "../../services/pedidosDesconto";
 import {
   gerarTermoAcordoPdf,
   nomeArquivoTermoAcordo,
@@ -181,8 +189,40 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
   const [descontoPercentual, setDescontoPercentual] = useState(() =>
     String(acordoConfiguracaoPadrao?.descontoPadraoPercentual ?? 0),
   );
-  const descontoMaximoPercentual =
+  const descontoMaximoConfig =
     acordoConfiguracaoPadrao?.descontoMaximoPercentual ?? 0;
+
+  // Desconto acima do maximo (2026-11-24): o cobrador pede a liberacao ao
+  // gestor; aprovada (3 dias), o maximo dele para este cliente passa a ser o
+  // percentual liberado. O gestor nao tem limite. O criar_acordo confere de
+  // novo no banco (migration 20261124000007).
+  const isGestor = user?.type === "manager";
+  const [pedidoLiberacao, setPedidoLiberacao] =
+    useState<PedidoDescontoAcordo | null>(null);
+  const [motivoLiberacao, setMotivoLiberacao] = useState("");
+  const [enviandoLiberacao, setEnviandoLiberacao] = useState(false);
+  const [erroLiberacao, setErroLiberacao] = useState("");
+  const [liberacaoEnviada, setLiberacaoEnviada] = useState<number | null>(null);
+  useEffect(() => {
+    if (isGestor) return;
+    let cancelado = false;
+    buscarPedidoDescontoAcordo(client.document)
+      .then((p) => {
+        if (!cancelado) setPedidoLiberacao(p);
+      })
+      .catch((e) => {
+        // Sem a migration aplicada o modal segue com o maximo da configuracao.
+        console.error("Erro ao carregar liberação de desconto:", e);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [isGestor, client.document]);
+  const percentualLiberado = liberacaoAcordoVigente(pedidoLiberacao);
+  const descontoMaximoPercentual = isGestor
+    ? Number.POSITIVE_INFINITY
+    : Math.max(descontoMaximoConfig, percentualLiberado ?? 0);
+  const pedidoLiberacaoEmAnalise = pedidoLiberacao?.decisao === null;
   const diasEntreParcelasPadrao = acordoConfiguracaoPadrao?.diasEntreParcelas ?? 30;
   const [formaPagamentoParcelas, setFormaPagamentoParcelas] = useState(
     FORMAS_PAGAMENTO_PARCELAS[0],
@@ -241,6 +281,48 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
     () => titulosComEncargo.reduce((sum, t) => sum + t.totalFinal, 0),
     [titulosComEncargo],
   );
+
+  const descontoDigitado = Number(descontoPercentual) || 0;
+  const descontoExcede = descontoDigitado > descontoMaximoPercentual + 0.001;
+  /** Saldo + multa + juros dos titulos marcados (sem o desconto). */
+  const totalSemDesconto = useMemo(
+    () =>
+      titulosComEncargo.reduce(
+        (sum, t) => sum + t.saldo + t.multaValor + t.jurosValor,
+        0,
+      ),
+    [titulosComEncargo],
+  );
+
+  const enviarPedidoLiberacao = async () => {
+    setErroLiberacao("");
+    if (!motivoLiberacao.trim()) {
+      setErroLiberacao("Explique ao gestor por que o desconto.");
+      return;
+    }
+    if (!(descontoDigitado > 0 && descontoDigitado < 100)) {
+      setErroLiberacao("Informe um desconto entre 0% e 100%.");
+      return;
+    }
+    setEnviandoLiberacao(true);
+    try {
+      await pedirDescontoAcordo({
+        documento: client.document,
+        titulos: titulosComEncargo.map((t) => t.collectionId),
+        percentual: descontoDigitado,
+        valorBruto: Math.round(totalSemDesconto * 100) / 100,
+        motivo: motivoLiberacao,
+      });
+      setError("");
+      setLiberacaoEnviada(descontoDigitado);
+    } catch (e) {
+      setErroLiberacao(
+        e instanceof Error ? e.message : "Falha ao enviar o pedido.",
+      );
+    } finally {
+      setEnviandoLiberacao(false);
+    }
+  };
 
   // "numeroInicial" rotula a parcela (#2, #3... quando vem depois da
   // entrada, que e sempre #1); "offsetIntervalo" conta quantos intervalos
@@ -545,10 +627,9 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
   /** Valida a etapa 2 (multa/juros/desconto) e avanca pra parcelas. */
   const handleAvancarEncargos = () => {
     setError("");
-    const desconto = Number(descontoPercentual) || 0;
-    if (desconto > descontoMaximoPercentual + 0.001) {
+    if (descontoExcede) {
       setError(
-        `O desconto (${desconto}%) passa do máximo permitido (${descontoMaximoPercentual}%). Ajuste ou peça para o gestor liberar um desconto maior.`,
+        `O desconto (${descontoDigitado}%) passa do máximo permitido (${descontoMaximoPercentual}%). Ajuste ou peça a liberação ao gestor logo abaixo.`,
       );
       return;
     }
@@ -765,14 +846,27 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
             ))}
           </div>
 
-          {error && (
+          {liberacaoEnviada != null && (
+            <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-900/40 rounded-xl space-y-1">
+              <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                Pedido de {liberacaoEnviada}% enviado ao gestor
+              </p>
+              <p className="text-sm text-gray-600 dark:text-dark-text-secondary">
+                Quando ele aprovar, abra o acordo deste cliente de novo: o
+                desconto liberado já vem disponível (vale 3 dias).
+              </p>
+            </div>
+          )}
+
+          {liberacaoEnviada == null && error && (
             <div className="p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               {error}
             </div>
           )}
 
-          {step === 1 && (
+          {liberacaoEnviada == null && step === 1 && (
             <div className="space-y-2">
               <label className="text-xs font-bold text-gray-400">
                 Títulos em aberto ({titulosEmAberto.length})
@@ -832,7 +926,7 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
             </div>
           )}
 
-          {step === 2 && (
+          {liberacaoEnviada == null && step === 2 && (
             <>
               <div className="space-y-2 p-3 bg-gray-50 dark:bg-dark-bg-tertiary rounded-xl border border-gray-100 dark:border-dark-border">
                 <label className="text-xs font-bold text-gray-400">
@@ -863,13 +957,15 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
                   </div>
                   <div>
                     <label className="text-[10px] text-gray-400">
-                      Desconto (%) — máx. {descontoMaximoPercentual}%
+                      {isGestor
+                        ? "Desconto (%)"
+                        : `Desconto (%) — máx. ${descontoMaximoPercentual}%`}
                     </label>
                     <input
                       type="number"
                       step="0.01"
                       min={0}
-                      max={descontoMaximoPercentual}
+                      max={isGestor ? undefined : descontoMaximoPercentual}
                       value={descontoPercentual}
                       onChange={(e) => setDescontoPercentual(e.target.value)}
                       className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
@@ -885,10 +981,77 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
                   </span>
                 </div>
               </div>
+
+              {!isGestor && percentualLiberado != null && (
+                <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-sm rounded-xl flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>
+                    O gestor liberou até {percentualLiberado}% de desconto para
+                    este cliente (válido até{" "}
+                    {formatDate(pedidoLiberacao?.valido_ate ?? null)}).
+                    {pedidoLiberacao?.resposta &&
+                      ` “${pedidoLiberacao.resposta}”`}
+                  </span>
+                </div>
+              )}
+
+              {!isGestor &&
+                descontoExcede &&
+                (pedidoLiberacaoEmAnalise ? (
+                  <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-900/40 text-amber-800 dark:text-amber-300 text-sm rounded-xl flex items-center gap-2">
+                    <Hourglass className="w-4 h-4 shrink-0" />
+                    <span>
+                      Você já pediu {pedidoLiberacao?.percentual_pedido}% ao
+                      gestor e o pedido está em análise. Quando ele aprovar,
+                      abra o acordo de novo.
+                    </span>
+                  </div>
+                ) : (
+                  <div className="space-y-2 p-3 rounded-xl border border-indigo-100 dark:border-dark-border bg-indigo-50/60 dark:bg-dark-bg-tertiary">
+                    <p className="text-sm font-bold text-gray-800 dark:text-dark-text">
+                      Pedir liberação de {descontoDigitado}% ao gestor
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
+                      Total sem desconto {formatCurrency(totalSemDesconto)} →
+                      negociado {formatCurrency(totalNegociado)}. O gestor
+                      aprova este percentual ou um menor; a liberação vale 3
+                      dias.
+                    </p>
+                    {pedidoLiberacao?.decisao === "recusado" && (
+                      <p className="text-xs text-red-600 dark:text-red-400">
+                        Último pedido ({pedidoLiberacao.percentual_pedido}%)
+                        recusado: “{pedidoLiberacao.resposta}”
+                      </p>
+                    )}
+                    <textarea
+                      value={motivoLiberacao}
+                      onChange={(e) => setMotivoLiberacao(e.target.value)}
+                      rows={2}
+                      placeholder="Por que este desconto? (ex.: cliente paga a entrada hoje com este desconto)"
+                      className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm dark:bg-dark-bg-secondary dark:border-dark-border dark:text-dark-text"
+                    />
+                    {erroLiberacao && (
+                      <p className="text-xs text-red-600 dark:text-red-400">
+                        {erroLiberacao}
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => void enviarPedidoLiberacao()}
+                      disabled={enviandoLiberacao}
+                      className="w-full sm:w-auto px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      <Send className="w-4 h-4" />
+                      {enviandoLiberacao
+                        ? "Enviando…"
+                        : "Enviar pedido ao gestor"}
+                    </button>
+                  </div>
+                ))}
             </>
           )}
 
-          {step === 3 && (
+          {liberacaoEnviada == null && step === 3 && (
             <>
               <div className="space-y-2 p-3 bg-indigo-50 dark:bg-dark-bg-tertiary rounded-xl border border-indigo-100 dark:border-dark-border">
                 <label className="text-xs font-bold text-gray-400">
@@ -1024,7 +1187,7 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
             </>
           )}
 
-          {step === 4 && (
+          {liberacaoEnviada == null && step === 4 && (
             <>
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-400">
@@ -1081,7 +1244,7 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
             </>
           )}
 
-          {step === 5 && (
+          {liberacaoEnviada == null && step === 5 && (
             <div className="space-y-4">
               <p className="text-sm text-gray-600 dark:text-dark-text-secondary">
                 A entrada de <strong>{formatCurrency(valorEntrada)}</strong> precisa
@@ -1175,7 +1338,15 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
         </div>
 
         <div className="p-6 pt-4 border-t border-gray-100 dark:border-dark-border flex gap-3 shrink-0">
-          {step === 1 ? (
+          {liberacaoEnviada != null ? (
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all"
+            >
+              Fechar
+            </button>
+          ) : step === 1 ? (
             <>
               <button
                 type="button"

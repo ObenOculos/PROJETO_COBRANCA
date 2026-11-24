@@ -192,7 +192,9 @@ const GeneralPaymentModal: React.FC<GeneralPaymentModalProps> = memo(
       let cancelado = false;
       listarPedidosDescontoDoCliente(clientGroup.document)
         .then((p) => {
-          if (!cancelado) setPedidosDesconto(p);
+          // Liberacao de desconto de acordo nao vale aqui.
+          if (!cancelado)
+            setPedidosDesconto(p.filter((x) => x.tipo !== "acordo"));
         })
         .catch((e) => {
           // Sem a migration aplicada o modal segue como antes.

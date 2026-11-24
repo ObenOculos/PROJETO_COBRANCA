@@ -289,6 +289,7 @@ export type Database = {
           motivo_cancelamento: string | null;
           multa_percentual_aplicado: number;
           numero_parcelas: number;
+          pedido_desconto_id: string | null;
           resolved_at: string | null;
           status: string;
           testemunha1_cpf: string | null;
@@ -313,6 +314,7 @@ export type Database = {
           motivo_cancelamento?: string | null;
           multa_percentual_aplicado?: number;
           numero_parcelas: number;
+          pedido_desconto_id?: string | null;
           resolved_at?: string | null;
           status?: string;
           testemunha1_cpf?: string | null;
@@ -337,6 +339,7 @@ export type Database = {
           motivo_cancelamento?: string | null;
           multa_percentual_aplicado?: number;
           numero_parcelas?: number;
+          pedido_desconto_id?: string | null;
           resolved_at?: string | null;
           status?: string;
           testemunha1_cpf?: string | null;
@@ -1698,6 +1701,8 @@ export type Database = {
           decisao: string | null;
           desconto_aprovado: number | null;
           desconto_pedido: number;
+          desconto_percentual_aprovado: number | null;
+          desconto_percentual_pedido: number | null;
           documento: string;
           id: string;
           motivo: string;
@@ -1717,6 +1722,8 @@ export type Database = {
           decisao?: string | null;
           desconto_aprovado?: number | null;
           desconto_pedido: number;
+          desconto_percentual_aprovado?: number | null;
+          desconto_percentual_pedido?: number | null;
           documento: string;
           id?: string;
           motivo: string;
@@ -1736,6 +1743,8 @@ export type Database = {
           decisao?: string | null;
           desconto_aprovado?: number | null;
           desconto_pedido?: number;
+          desconto_percentual_aprovado?: number | null;
+          desconto_percentual_pedido?: number | null;
           documento?: string;
           id?: string;
           motivo?: string;
@@ -2580,6 +2589,7 @@ export type Database = {
           motivo_cancelamento: string | null;
           multa_percentual_aplicado: number;
           numero_parcelas: number;
+          pedido_desconto_id: string | null;
           resolved_at: string | null;
           status: string;
           testemunha1_cpf: string | null;
@@ -2720,43 +2730,6 @@ export type Database = {
         | {
             Args: {
               p_client_document: string;
-              p_parcelas: Json;
-              p_titulos: Json;
-            };
-            Returns: {
-              acordo_origem_id: string | null;
-              client_document: string;
-              client_name: string | null;
-              collector_id: string;
-              created_at: string;
-              created_by_id: string | null;
-              desconto_percentual_aplicado: number;
-              destino_pagamentos: string | null;
-              encargos_reimputados: number | null;
-              forma_pagamento_parcelas: string | null;
-              id: string;
-              juros_percentual_am_aplicado: number;
-              motivo_cancelamento: string | null;
-              multa_percentual_aplicado: number;
-              numero_parcelas: number;
-              resolved_at: string | null;
-              status: string;
-              testemunha1_cpf: string | null;
-              testemunha1_nome: string | null;
-              testemunha2_cpf: string | null;
-              testemunha2_nome: string | null;
-              valor_negociado: number;
-            };
-            SetofOptions: {
-              from: "*";
-              to: "acordos";
-              isOneToOne: true;
-              isSetofReturn: false;
-            };
-          }
-        | {
-            Args: {
-              p_client_document: string;
               p_desconto_percentual_aplicado?: number;
               p_em_nome_de?: string;
               p_forma_pagamento_parcelas?: string;
@@ -2785,6 +2758,7 @@ export type Database = {
               motivo_cancelamento: string | null;
               multa_percentual_aplicado: number;
               numero_parcelas: number;
+              pedido_desconto_id: string | null;
               resolved_at: string | null;
               status: string;
               testemunha1_cpf: string | null;
@@ -2831,6 +2805,7 @@ export type Database = {
           p_aprovar: boolean;
           p_desconto_aprovado?: number;
           p_id: string;
+          p_percentual_aprovado?: number;
           p_resposta?: string;
         };
         Returns: Json;
@@ -3143,6 +3118,10 @@ export type Database = {
           venda: number;
         }[];
       };
+      pedido_desconto_acordo_atual: {
+        Args: { p_documento: string };
+        Returns: Json;
+      };
       pedidos_desconto_do_cliente: {
         Args: { p_documento: string };
         Returns: {
@@ -3191,6 +3170,16 @@ export type Database = {
           p_parcelas: number[];
           p_tipo: string;
           p_valor_pago: number;
+        };
+        Returns: string;
+      };
+      pedir_desconto_acordo: {
+        Args: {
+          p_desconto_percentual: number;
+          p_documento: string;
+          p_motivo: string;
+          p_titulos: number[];
+          p_valor_bruto: number;
         };
         Returns: string;
       };

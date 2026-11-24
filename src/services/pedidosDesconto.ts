@@ -12,9 +12,13 @@ import { avisarPendenciasMudaram } from "./pendenciasCorrecoes";
 
 export type TipoPedidoDesconto = "parcelas" | "tudo";
 
+// 2026-11-24: tipo "acordo" -- desconto do acordo acima do maximo da
+// configuracao; o gestor libera um PERCENTUAL e o criar_acordo confere
+// (migration 20261124000007). Nao vale no Receber pagamento.
+
 export interface PedidoDesconto {
   id: string;
-  tipo: TipoPedidoDesconto;
+  tipo: TipoPedidoDesconto | "acordo";
   parcelas: number[];
   valor_devido: number;
   valor_pago: number;
@@ -37,6 +41,9 @@ export interface PedidoDescontoGestor
   extends Omit<PedidoDesconto, "desconto_usado"> {
   documento: string;
   cliente: string | null;
+  /** So tipo acordo. */
+  desconto_percentual_pedido: number | null;
+  desconto_percentual_aprovado: number | null;
 }
 
 const mensagem = (e: { message?: string } | null, padrao: string): string =>
@@ -50,6 +57,7 @@ export const autorizacaoVigente = (
 ): (PedidoDesconto & { disponivel: number }) | null => {
   const hoje = todayLocalStr();
   for (const p of pedidos) {
+    if (p.tipo === "acordo") continue;
     if (p.decisao !== "aprovado" || !p.valido_ate || p.valido_ate < hoje) {
       continue;
     }
@@ -72,7 +80,7 @@ export const listarPedidosDescontoDoCliente = async (
   }
   return (data ?? []).map((r) => ({
     ...r,
-    tipo: r.tipo as TipoPedidoDesconto,
+    tipo: r.tipo as PedidoDesconto["tipo"],
     decisao: r.decisao as PedidoDesconto["decisao"],
     valor_devido: num(r.valor_devido),
     valor_pago: num(r.valor_pago),
@@ -105,17 +113,30 @@ export const decidirPedidoDesconto = async (p: {
   id: string;
   aprovar: boolean;
   descontoAprovado?: number;
+  /** So pedido de acordo: percentual liberado (o pedido ou menor). */
+  percentualAprovado?: number;
   resposta?: string;
-}): Promise<{ decisao: string; desconto?: number; valido_ate?: string }> => {
+}): Promise<{
+  decisao: string;
+  desconto?: number;
+  percentual?: number;
+  valido_ate?: string;
+}> => {
   const { data, error } = await supabase.rpc("decidir_pedido_desconto", {
     p_id: p.id,
     p_aprovar: p.aprovar,
     p_desconto_aprovado: p.aprovar ? p.descontoAprovado : undefined,
+    p_percentual_aprovado: p.aprovar ? p.percentualAprovado : undefined,
     p_resposta: p.resposta?.trim() || undefined,
   });
   if (error) throw new Error(mensagem(error, "Falha ao registrar a decisão."));
   avisarPendenciasMudaram();
-  return data as { decisao: string; desconto?: number; valido_ate?: string };
+  return data as {
+    decisao: string;
+    desconto?: number;
+    percentual?: number;
+    valido_ate?: string;
+  };
 };
 
 /** Gestor: pedidos em aberto + decididos desde `desde` (ISO). */
@@ -139,5 +160,83 @@ export const listarPedidosDescontoGestor = async (
     desconto_pedido: num(r.desconto_pedido),
     desconto_aprovado:
       r.desconto_aprovado == null ? null : num(r.desconto_aprovado),
+    desconto_percentual_pedido:
+      r.desconto_percentual_pedido == null
+        ? null
+        : num(r.desconto_percentual_pedido),
+    desconto_percentual_aprovado:
+      r.desconto_percentual_aprovado == null
+        ? null
+        : num(r.desconto_percentual_aprovado),
   }));
+};
+
+// ---------------------------------------------------------------------------
+// Acordo
+// ---------------------------------------------------------------------------
+
+/** Ultimo pedido de liberacao de desconto de acordo do usuario logado para o
+ * cliente (a aprovada, valida e nao usada vem primeiro). */
+export interface PedidoDescontoAcordo {
+  id: string;
+  decisao: "aprovado" | "recusado" | null;
+  percentual_pedido: number;
+  percentual_aprovado: number | null;
+  valido_ate: string | null; // YYYY-MM-DD
+  resposta: string | null;
+  usado: boolean;
+  created_at: string;
+}
+
+/** Percentual liberado que ainda pode ser usado hoje -- ou null. */
+export const liberacaoAcordoVigente = (
+  p: PedidoDescontoAcordo | null,
+): number | null => {
+  if (!p || p.decisao !== "aprovado" || p.usado) return null;
+  if (!p.valido_ate || p.valido_ate < todayLocalStr()) return null;
+  return p.percentual_aprovado;
+};
+
+export const buscarPedidoDescontoAcordo = async (
+  documento: string,
+): Promise<PedidoDescontoAcordo | null> => {
+  const { data, error } = await supabase.rpc("pedido_desconto_acordo_atual", {
+    p_documento: documento,
+  });
+  if (error) {
+    throw new Error(mensagem(error, "Falha ao carregar a liberação de desconto."));
+  }
+  if (!data) return null;
+  const r = data as Record<string, unknown>;
+  return {
+    id: String(r.id),
+    decisao: (r.decisao as PedidoDescontoAcordo["decisao"]) ?? null,
+    percentual_pedido: num(r.percentual_pedido),
+    percentual_aprovado:
+      r.percentual_aprovado == null ? null : num(r.percentual_aprovado),
+    valido_ate: (r.valido_ate as string | null) ?? null,
+    resposta: (r.resposta as string | null) ?? null,
+    usado: Boolean(r.usado),
+    created_at: String(r.created_at),
+  };
+};
+
+export const pedirDescontoAcordo = async (p: {
+  documento: string;
+  titulos: number[];
+  percentual: number;
+  /** Saldo + multa + juros dos titulos (total sem desconto). */
+  valorBruto: number;
+  motivo: string;
+}): Promise<string> => {
+  const { data, error } = await supabase.rpc("pedir_desconto_acordo", {
+    p_documento: p.documento,
+    p_titulos: p.titulos,
+    p_desconto_percentual: p.percentual,
+    p_valor_bruto: p.valorBruto,
+    p_motivo: p.motivo.trim(),
+  });
+  if (error) throw new Error(mensagem(error, "Falha ao enviar o pedido."));
+  avisarPendenciasMudaram();
+  return data as string;
 };

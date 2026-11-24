@@ -36,6 +36,15 @@ const pct = (v: number, base: number) =>
 const dataBR = (iso: string | null) =>
   iso ? iso.slice(0, 10).split("-").reverse().join("/") : "";
 
+/** 58 -> "58%", 12.5 -> "12,5%". */
+const pctTexto = (v: number | null) =>
+  v == null ? "" : `${String(Math.round(v * 100) / 100).replace(".", ",")}%`;
+
+// Pedido de ACORDO (2026-11-24): o cobrador passou do desconto maximo da
+// configuracao; o gestor libera um percentual (o pedido ou menor), que vale
+// 3 dias para o proximo acordo desse cliente.
+const ehAcordo = (p: PedidoDescontoGestor) => p.tipo === "acordo";
+
 const PedidosDesconto: React.FC = () => {
   const { users } = useCollection();
   const [pedidos, setPedidos] = useState<PedidoDescontoGestor[] | null>(null);
@@ -81,15 +90,31 @@ const PedidosDesconto: React.FC = () => {
   const abrir = (p: PedidoDescontoGestor, tipo: "aprovar" | "recusar") => {
     setAberto(p.id);
     setAcao(tipo);
-    setValorTexto(p.desconto_pedido.toFixed(2).replace(".", ","));
+    setValorTexto(
+      ehAcordo(p)
+        ? String(p.desconto_percentual_pedido ?? "").replace(".", ",")
+        : p.desconto_pedido.toFixed(2).replace(".", ","),
+    );
     setResposta("");
     setErroAcao(null);
   };
 
   const decidir = async (p: PedidoDescontoGestor) => {
     const valor = lerValor(valorTexto);
+    const acordo = ehAcordo(p);
     if (
       acao === "aprovar" &&
+      acordo &&
+      !(valor > 0 && valor <= (p.desconto_percentual_pedido ?? 0) + 0.001)
+    ) {
+      setErroAcao(
+        `Informe um percentual maior que 0 e até ${pctTexto(p.desconto_percentual_pedido)} (o pedido).`,
+      );
+      return;
+    }
+    if (
+      acao === "aprovar" &&
+      !acordo &&
       !(valor >= 0.01 && valor < p.valor_devido - 0.001)
     ) {
       setErroAcao(
@@ -107,11 +132,16 @@ const PedidosDesconto: React.FC = () => {
       const r = await decidirPedidoDesconto({
         id: p.id,
         aprovar: acao === "aprovar",
-        descontoAprovado: acao === "aprovar" ? round2(valor) : undefined,
+        descontoAprovado:
+          acao === "aprovar" && !acordo ? round2(valor) : undefined,
+        percentualAprovado:
+          acao === "aprovar" && acordo ? round2(valor) : undefined,
         resposta,
       });
       setAviso(
-        r.decisao === "aprovado"
+        r.decisao === "aprovado" && acordo
+          ? `Desconto de até ${pctTexto(Number(r.percentual ?? valor))} liberado no acordo (${p.cliente ?? p.documento}), válido até ${dataBR(r.valido_ate ?? null)}. O cobrador refaz o acordo.`
+          : r.decisao === "aprovado"
           ? `Desconto de ${formatCurrency(Number(r.desconto ?? valor))} autorizado (${p.cliente ?? p.documento}), válido até ${dataBR(r.valido_ate ?? null)}. O cobrador registra o pagamento.`
           : `Pedido recusado (${p.cliente ?? p.documento}).`,
       );
@@ -130,7 +160,9 @@ const PedidosDesconto: React.FC = () => {
   const okDecididos = decididos.filter((p) => p.decisao === "aprovado");
 
   const resumo = (p: PedidoDescontoGestor) =>
-    `${p.tipo === "tudo" ? "Quitar a dívida inteira" : `${p.parcelas.length} ${p.parcelas.length === 1 ? "parcela marcada" : "parcelas marcadas"}`}: devia ${formatCurrency(p.valor_devido)}, paga ${formatCurrency(p.valor_pago)}`;
+    ehAcordo(p)
+      ? `Acordo com ${p.parcelas.length} ${p.parcelas.length === 1 ? "título" : "títulos"}: total ${formatCurrency(p.valor_devido)}, negociado ${formatCurrency(p.valor_pago)}`
+      : `${p.tipo === "tudo" ? "Quitar a dívida inteira" : `${p.parcelas.length} ${p.parcelas.length === 1 ? "parcela marcada" : "parcelas marcadas"}`}: devia ${formatCurrency(p.valor_devido)}, paga ${formatCurrency(p.valor_pago)}`;
 
   return (
     <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-4 lg:p-5 space-y-4">
@@ -140,9 +172,10 @@ const PedidosDesconto: React.FC = () => {
           Pedidos de desconto
         </h2>
         <p className="mt-1 text-xs text-gray-500 dark:text-dark-text-secondary">
-          O cobrador pede antes de registrar o pagamento. Aprovado, ele pode dar
-          até o valor autorizado nos próximos 3 dias. Você pode aprovar um valor
-          diferente do pedido.
+          O cobrador pede antes de registrar o pagamento ou de fechar um acordo
+          com desconto acima do máximo. Aprovado, ele pode dar até o autorizado
+          nos próximos 3 dias. Você pode aprovar um valor diferente do pedido
+          (no acordo, um percentual menor).
         </p>
       </div>
 
@@ -238,9 +271,26 @@ const PedidosDesconto: React.FC = () => {
                           })}
                         </div>
                         <div className="text-sm text-gray-800 dark:text-dark-text">
+                          {ehAcordo(p) && (
+                            <span className="mr-1.5 inline-block rounded-full bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 text-[10px] font-bold text-indigo-600 dark:text-indigo-300">
+                              Acordo
+                            </span>
+                          )}
                           Desconto de{" "}
-                          <strong>{formatCurrency(p.desconto_pedido)}</strong>{" "}
-                          ({pct(p.desconto_pedido, p.valor_devido)}) · {resumo(p)}
+                          {ehAcordo(p) ? (
+                            <>
+                              <strong>
+                                {pctTexto(p.desconto_percentual_pedido)}
+                              </strong>{" "}
+                              ({formatCurrency(p.desconto_pedido)})
+                            </>
+                          ) : (
+                            <>
+                              <strong>{formatCurrency(p.desconto_pedido)}</strong>{" "}
+                              ({pct(p.desconto_pedido, p.valor_devido)})
+                            </>
+                          )}{" "}
+                          · {resumo(p)}
                         </div>
                         <div className="text-sm text-gray-700 dark:text-dark-text italic">
                           “{p.motivo}”
@@ -272,7 +322,9 @@ const PedidosDesconto: React.FC = () => {
                           {acao === "aprovar" && (
                             <label className="sm:w-44">
                               <span className="text-[11px] font-semibold text-gray-600 dark:text-dark-text-secondary">
-                                Desconto autorizado
+                                {ehAcordo(p)
+                                  ? "Desconto autorizado (%)"
+                                  : "Desconto autorizado"}
                               </span>
                               <input
                                 type="text"
@@ -298,6 +350,25 @@ const PedidosDesconto: React.FC = () => {
                           </label>
                         </div>
                         {acao === "aprovar" &&
+                          ehAcordo(p) &&
+                          lerValor(valorTexto) > 0 &&
+                          Math.abs(
+                            lerValor(valorTexto) -
+                              (p.desconto_percentual_pedido ?? 0),
+                          ) > 0.001 && (
+                            <div className="text-xs text-amber-700 dark:text-amber-400">
+                              Menor que o pedido: o cobrador poderá dar até{" "}
+                              {pctTexto(lerValor(valorTexto))} (cerca de{" "}
+                              {formatCurrency(
+                                round2(
+                                  (p.valor_devido * lerValor(valorTexto)) / 100,
+                                ),
+                              )}
+                              ) e precisa refazer o acordo com esse desconto.
+                            </div>
+                          )}
+                        {acao === "aprovar" &&
+                          !ehAcordo(p) &&
                           Math.abs(lerValor(valorTexto) - p.desconto_pedido) >
                             0.009 &&
                           lerValor(valorTexto) > 0 && (
@@ -375,12 +446,17 @@ const PedidosDesconto: React.FC = () => {
                         <XCircle className="h-3 w-3" />
                       )}
                       {p.decisao === "aprovado"
-                        ? `Aprovado ${formatCurrency(Number(p.desconto_aprovado))} até ${dataBR(p.valido_ate)}`
+                        ? ehAcordo(p)
+                          ? `Aprovado ${pctTexto(p.desconto_percentual_aprovado)} no acordo até ${dataBR(p.valido_ate)}`
+                          : `Aprovado ${formatCurrency(Number(p.desconto_aprovado))} até ${dataBR(p.valido_ate)}`
                         : "Recusado"}
                     </span>{" "}
                     · {p.cliente ?? p.documento} ·{" "}
                     {nomePorId.get(p.solicitado_por_id) ?? "cobrador"} pediu{" "}
-                    {formatCurrency(p.desconto_pedido)} ({p.motivo}) · decidido
+                    {ehAcordo(p)
+                      ? `${pctTexto(p.desconto_percentual_pedido)} no acordo`
+                      : formatCurrency(p.desconto_pedido)}{" "}
+                    ({p.motivo}) · decidido
                     por{" "}
                     {p.decidido_por_id
                       ? (nomePorId.get(p.decidido_por_id) ?? "gestor")
