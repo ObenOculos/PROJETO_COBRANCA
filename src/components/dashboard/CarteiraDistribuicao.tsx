@@ -1156,17 +1156,32 @@ const CarteiraDistribuicao: React.FC = () => {
 
   const lojasComProblema = cobertura.filter((c) => c.problema).length;
   // Resumo do topo: mesma base da tabela de cobertura (clientesPorLoja).
+  // "Sem cobrador" so conta quem alguma faixa ativa cobre (a proxima rodada
+  // entrega); quem esta fora das faixas (a vencer, carencia de 1-2 dias)
+  // fica a parte -- nao e falha.
   const totaisCarteira = useMemo(() => {
+    const ativasPorLoja = new Map(cobertura.map((c) => [c.loja.loja, c.ativas]));
     let emAberto = 0;
     let semCobrador = 0;
-    clientesPorLoja.forEach((lista) =>
+    let foraDasFaixas = 0;
+    clientesPorLoja.forEach((lista, loja) =>
       lista.forEach((x) => {
         emAberto += x.n;
-        if (!x.dono) semCobrador += x.n;
+        if (x.dono) return;
+        const coberto = (ativasPorLoja.get(loja) ?? []).some(
+          ({ r }) => r.minDias <= x.atraso && x.atraso <= (r.maxDias ?? Infinity),
+        );
+        if (coberto) semCobrador += x.n;
+        else foraDasFaixas += x.n;
       }),
     );
-    return { emAberto, semCobrador, carregado: mapaCarteira !== null };
-  }, [clientesPorLoja, mapaCarteira]);
+    return {
+      emAberto,
+      semCobrador,
+      foraDasFaixas,
+      carregado: mapaCarteira !== null,
+    };
+  }, [clientesPorLoja, mapaCarteira, cobertura]);
   // Regra salva depois da ultima rodada: ainda nao chegou nos clientes.
   const regraDepoisDaRodada = useMemo(() => {
     if (!ultimaRodada) return false;
@@ -1363,7 +1378,7 @@ const CarteiraDistribuicao: React.FC = () => {
                 ? "bg-amber-50 dark:bg-amber-900/20"
                 : "bg-gray-50 dark:bg-dark-bg"
             }`}
-            title="Clientes em aberto sem nenhum cobrador"
+            title="Clientes sem cobrador que alguma faixa ativa cobre: a próxima rodada entrega"
           >
             <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
               Sem cobrador
@@ -1381,6 +1396,14 @@ const CarteiraDistribuicao: React.FC = () => {
                   ? "—"
                   : "…"}
             </div>
+            {totaisCarteira.carregado && totaisCarteira.foraDasFaixas > 0 && (
+              <div
+                className="text-[11px] text-gray-500"
+                title="Sem cobrador e fora de todas as faixas (a vencer ou atraso abaixo da primeira faixa): ninguém deveria cobrar ainda"
+              >
+                +{totaisCarteira.foraDasFaixas.toLocaleString("pt-BR")} fora das faixas
+              </div>
+            )}
           </div>
           <div
             className={`rounded-xl px-3 py-2 ${
