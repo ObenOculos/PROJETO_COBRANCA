@@ -111,6 +111,17 @@ const SEGMENT_COLORS = [
 
 const inputClass =
   "w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text";
+// Colunas fixas da tabela de cobertura (dias de atraso).
+const COLUNAS_COBERTURA: { ini: number; fim: number }[] = [
+  { ini: 1, fim: 30 },
+  { ini: 31, fim: 60 },
+  { ini: 61, fim: 90 },
+  { ini: 91, fim: 180 },
+  { ini: 181, fim: 365 },
+  { ini: 366, fim: 730 },
+  { ini: 731, fim: Infinity },
+];
+
 // Rodada automatica diaria (pg_cron 10:00 UTC = 7h, migration
 // 20261116000001): usa as regras salvas. "Aplicar" so adianta.
 const HORA_DISTRIBUICAO_AUTOMATICA = "7h";
@@ -1136,55 +1147,94 @@ const CarteiraDistribuicao: React.FC = () => {
     })
     return m;
   }, [mapaCarteira]);
-  /** Clientes da loja com atraso entre ini e fim: total, sem cobrador e com
-   * um cobrador especifico (o dono da faixa). */
-  const contaEntre = (loja: string, ini: number, fim: number, donoId?: string) => {
-    let total = 0;
-    let sem = 0;
-    let doDono = 0;
-    // Sem cobrador e "Aguardando ..." (ex.: Juridico): saiu de proposito e
-    // a distribuicao nao devolve -- conta a parte, por situacao.
-    const aguardando = new Map<string, number>();
-    (clientesPorLoja.get(loja) ?? []).forEach((x) => {
-      if (x.atraso < ini || x.atraso > fim) return;
-      total += x.n;
-      if (!x.dono && x.aguardando) {
-        aguardando.set(x.aguardando, (aguardando.get(x.aguardando) ?? 0) + x.n);
-      } else if (!x.dono) sem += x.n;
-      else if (donoId && x.dono === donoId) doDono += x.n;
-    });
-    const nAguardando = Array.from(aguardando.values()).reduce((a, b) => a + b, 0);
-    return {
-      total,
-      sem,
-      doDono,
-      aguardando,
-      nAguardando,
-      comOutro: total - sem - doDono - nAguardando,
+
+  // Colunas da tabela de cobertura: fixas (pedido 2026-11-24 -- antes
+  // seguiam os cortes das faixas, e cada loja ficava com colunas diferentes
+  // de leitura). Uma faixa pode cobrir so parte de uma coluna: a casa conta
+  // cliente a cliente (contaColuna).
+  const colunasCobertura = COLUNAS_COBERTURA;
+
+  /** Clientes da loja numa coluna, cliente a cliente pela faixa que cobre o
+   * atraso dele: na carteira do dono, com outro, sem cobrador, aguardando
+   * (juridico etc.), fora da faixa (buraco/acima do teto) e carencia (abaixo
+   * da primeira faixa -- so informacao). */
+  const contaColuna = (
+    loja: string,
+    col: { ini: number; fim: number },
+    ativas: { c: User; r: CollectorOverdueRange }[],
+  ) => {
+    const primeira = ativas.length
+      ? Math.min(...ativas.map(({ r }) => r.minDias))
+      : null;
+    const r = {
+      total: 0,
+      naCarteira: 0,
+      comOutro: 0,
+      sem: 0,
+      foraSem: 0,
+      foraCom: 0,
+      carencia: 0,
+      conflito: 0,
+      aguardando: new Map<string, number>(),
     };
+    (clientesPorLoja.get(loja) ?? []).forEach((x) => {
+      if (x.atraso < col.ini || x.atraso > col.fim) return;
+      r.total += x.n;
+      const donos = new Set(
+        ativas
+          .filter(({ r: f }) => f.minDias <= x.atraso && x.atraso <= (f.maxDias ?? Infinity))
+          .map(({ c }) => c.id),
+      );
+      if (donos.size > 1) {
+        r.conflito += x.n;
+        return;
+      }
+      if (donos.size === 0) {
+        if (primeira != null && x.atraso < primeira) r.carencia += x.n;
+        else if (x.dono) r.foraCom += x.n;
+        else if (x.aguardando)
+          r.aguardando.set(x.aguardando, (r.aguardando.get(x.aguardando) ?? 0) + x.n);
+        else r.foraSem += x.n;
+        return;
+      }
+      const dono = Array.from(donos)[0];
+      if (x.dono === dono) r.naCarteira += x.n;
+      else if (x.dono) r.comOutro += x.n;
+      else if (x.aguardando)
+        r.aguardando.set(x.aguardando, (r.aguardando.get(x.aguardando) ?? 0) + x.n);
+      else r.sem += x.n;
+    });
+    return r;
   };
 
-  // Colunas da tabela de cobertura (pedido 2026-11-19: faixas de atraso
-  // como colunas). Cortes = inicio de cada faixa ativa e o dia seguinte ao
-  // teto -- assim cada coluna fica inteira dentro ou fora de cada faixa.
-  const colunasCobertura = useMemo(() => {
-    const cortes = new Set<number>([1]);
-    cobertura.forEach(({ ativas }) =>
-      ativas.forEach(({ r }) => {
-        cortes.add(r.minDias);
-        if (r.maxDias != null) cortes.add(r.maxDias + 1);
-      }),
-    );
-    const lista = Array.from(cortes)
-      .filter((n) => n >= 1)
-      .sort((a, b) => a - b);
-    return lista.map((ini, i) => ({
-      ini,
-      fim: i + 1 < lista.length ? lista[i + 1] - 1 : Infinity,
-    }));
-  }, [cobertura]);
-
-  const lojasComProblema = cobertura.filter((c) => c.problema).length;
+  // Falha da loja: o que a cobertura ja via (buraco entre faixas, conflito,
+  // loja sem faixa) + cliente sem cobrador acima do teto da ultima faixa
+  // (24/11: o teto 948 deixava centenas de fora e a tela dizia "todas
+  // cobertas"). Carencia (abaixo da 1a faixa) e aguardando nao sao falha.
+  const falhaPorLoja = useMemo(() => {
+    const m = new Map<string, boolean>();
+    cobertura.forEach(({ loja, ativas, problema }) => {
+      if (problema) {
+        m.set(loja.loja, true);
+        return;
+      }
+      if (ativas.length === 0) return;
+      const primeira = Math.min(...ativas.map(({ r }) => r.minDias));
+      const foraSem = (clientesPorLoja.get(loja.loja) ?? []).some(
+        (x) =>
+          !x.dono &&
+          !x.aguardando &&
+          x.atraso >= primeira &&
+          !ativas.some(
+            ({ r }) => r.minDias <= x.atraso && x.atraso <= (r.maxDias ?? Infinity),
+          ),
+      );
+      if (foraSem) m.set(loja.loja, true);
+    });
+    return m;
+  }, [cobertura, clientesPorLoja]);
+  const temFalha = (loja: string) => falhaPorLoja.get(loja) === true;
+  const lojasComProblema = falhaPorLoja.size;
   // Resumo do topo: mesma base da tabela de cobertura (clientesPorLoja).
   // "Sem cobrador" so conta quem alguma faixa ativa cobre (a proxima rodada
   // entrega); quem esta fora das faixas (a vencer, carencia de 1-2 dias)
@@ -1237,17 +1287,21 @@ const CarteiraDistribuicao: React.FC = () => {
   const [cobradorCobertura, setCobradorCobertura] = useState("");
   const coberturaVisivel = useMemo(() => {
     const ordenada = [...cobertura].sort(
-      (a, b) => Number(b.problema) - Number(a.problema),
+      (a, b) =>
+        Number(falhaPorLoja.get(b.loja.loja) === true) -
+        Number(falhaPorLoja.get(a.loja.loja) === true),
     );
     const doCobrador = cobradorCobertura
       ? ordenada.filter((c) =>
           c.regras.some(({ c: cob }) => cob.id === cobradorCobertura),
         )
       : ordenada;
-    return soProblemas && doCobrador.some((c) => c.problema)
-      ? doCobrador.filter((c) => c.problema)
+    const falha = (c: (typeof cobertura)[number]) =>
+      falhaPorLoja.get(c.loja.loja) === true;
+    return soProblemas && doCobrador.some(falha)
+      ? doCobrador.filter(falha)
       : doCobrador;
-  }, [cobertura, soProblemas, cobradorCobertura]);
+  }, [cobertura, soProblemas, cobradorCobertura, falhaPorLoja]);
 
   const simular = async () => {
     setSimulando(true);
@@ -1907,10 +1961,10 @@ const CarteiraDistribuicao: React.FC = () => {
         </div>
         {lojasComProblema > 0 && (
           <p className="-mt-1 mb-3 text-[11px] text-gray-500 dark:text-dark-text-secondary">
-            Falha = trecho de atraso sem cobrador entre as faixas da loja, dois
-            cobradores na mesma faixa, ou loja com clientes e nenhuma faixa
-            ativa. O cinza ("ninguém cobra" antes da primeira ou depois da
-            última faixa) é só informação.
+            Falha = cliente sem cobrador fora de toda faixa (entre faixas ou
+            acima do teto da última), dois cobradores na mesma faixa, ou loja
+            com clientes e nenhuma faixa ativa. Carência (antes da primeira
+            faixa) e aguardando jurídico são só informação.
           </p>
         )}
 
@@ -1948,21 +2002,13 @@ const CarteiraDistribuicao: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {coberturaVisivel.map(({ loja, regras, ativas, problema }) => {
-                  const primeira = ativas.length
-                    ? Math.min(...ativas.map(({ r }) => r.minDias))
-                    : null;
-                  const ultimoTeto = ativas.some(({ r }) => r.maxDias == null)
-                    ? Infinity
-                    : ativas.length
-                      ? Math.max(...ativas.map(({ r }) => r.maxDias ?? 0))
-                      : null;
+                {coberturaVisivel.map(({ loja, regras, ativas }) => {
                   const inativas = regras.filter(({ r }) => !r.ativa);
                   return (
                     <tr key={loja.loja} className="align-top">
                       <td className="sticky left-0 z-10 bg-white dark:bg-dark-bg-secondary py-2 px-2 border-b border-gray-100 dark:border-dark-border min-w-[140px]">
                         <div className="font-semibold text-gray-900 dark:text-dark-text flex items-center gap-1.5">
-                          {problema && (
+                          {temFalha(loja.loja) && (
                             <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
                           )}
                           {loja.loja}
@@ -1982,25 +2028,23 @@ const CarteiraDistribuicao: React.FC = () => {
                         )}
                       </td>
                       {colunasCobertura.map((col) => {
+                        // Cobradores com faixa ativa que toca esta coluna.
                         const donos = Array.from(
                           new Map(
                             ativas
                               .filter(
                                 ({ r }) =>
-                                  r.minDias <= col.ini &&
-                                  (r.maxDias ?? Infinity) >= col.fim,
+                                  r.minDias <= col.fim &&
+                                  (r.maxDias ?? Infinity) >= col.ini,
                               )
                               .map(({ c }) => [c.id, c]),
                           ).values(),
                         );
-                        const dono = donos.length === 1 ? donos[0] : undefined;
-                        const q = contaEntre(loja.loja, col.ini, col.fim, dono?.id);
-                        const fora =
-                          donos.length === 0 &&
-                          primeira != null &&
-                          (col.fim < primeira || (ultimoTeto != null && col.ini > ultimoTeto));
-                        const falha = donos.length === 0 && !fora;
-                        const conflito = donos.length > 1;
+                        const q = contaColuna(loja.loja, col, ativas);
+                        const conflito = q.conflito > 0;
+                        // Falha: cliente sem cobrador fora de toda faixa (buraco
+                        // ou acima do teto), ou loja com clientes e sem faixa.
+                        const falha = q.foraSem > 0 || q.sem > 0;
                         const apagada =
                           !!cobradorCobertura &&
                           !donos.some((d) => d.id === cobradorCobertura);
@@ -2008,40 +2052,40 @@ const CarteiraDistribuicao: React.FC = () => {
                           ? "bg-red-50 dark:bg-red-900/15"
                           : falha
                             ? "bg-amber-50 dark:bg-amber-900/15"
-                            : fora
+                            : donos.length === 0
                               ? "bg-gray-50 dark:bg-dark-bg/40"
                               : "";
+                        const detalhe = [
+                          q.naCarteira > 0 && `${q.naCarteira} na carteira do dono da faixa`,
+                          q.comOutro > 0 && `${q.comOutro} com outro cobrador`,
+                          q.sem > 0 && `${q.sem} sem cobrador (entram na próxima rodada)`,
+                          q.foraSem > 0 && `${q.foraSem} fora de toda faixa e sem cobrador`,
+                          q.foraCom > 0 && `${q.foraCom} fora de toda faixa, com cobrador (carteira manual)`,
+                          q.carencia > 0 && `${q.carencia} na carência (antes da primeira faixa)`,
+                          ...Array.from(q.aguardando.entries()).map(
+                            ([sit, n]) => `${n} em ${sit} (a distribuição não devolve a cobrador)`,
+                          ),
+                          conflito && `${q.conflito} em conflito: ${donos.map((d) => d.name).join(" e ")}`,
+                        ]
+                          .filter(Boolean)
+                          .join("\n");
                         return (
                           <td
                             key={col.ini}
                             className={`py-2 px-2 text-center border-b border-l border-gray-100 dark:border-dark-border ${fundo} ${apagada ? "opacity-40" : ""}`}
-                            title={
-                              dono
-                                ? `${dono.name}: ${q.doDono} na carteira, ${q.sem} sem cobrador, ${q.comOutro} com outro${
-                                    q.nAguardando > 0
-                                      ? `, ${Array.from(q.aguardando.entries())
-                                          .map(([sit, n]) => `${n} em ${sit} (a distribuição não devolve a cobrador)`)
-                                          .join(", ")}`
-                                      : ""
-                                  }`
-                                : conflito
-                                  ? `Conflito: ${donos.map((d) => d.name).join(" e ")}`
-                                  : `${q.sem} sem cobrador, ${q.total - q.sem - q.nAguardando} com algum cobrador (carteira manual)${q.nAguardando > 0 ? `, ${q.nAguardando} aguardando jurídico` : ""}`
-                            }
+                            title={detalhe || "Nenhum cliente nesta faixa de atraso"}
                           >
                             <div className="text-[11px] whitespace-nowrap">
-                              {dono ? (
-                                <span className="inline-flex items-center gap-1 text-gray-700 dark:text-dark-text">
-                                  <span className={`h-2 w-2 rounded-sm shrink-0 ${corPorCobrador.get(dono.id)}`} />
-                                  {dono.name.split(" ")[0]}
-                                </span>
-                              ) : conflito ? (
-                                <span className="font-semibold text-red-700 dark:text-red-300">
-                                  {donos.map((d) => d.name.split(" ")[0]).join(" e ")}
-                                </span>
-                              ) : falha ? (
-                                <span className="font-semibold text-amber-700 dark:text-amber-300">
-                                  sem cobrador
+                              {donos.length > 0 ? (
+                                <span
+                                  className={`inline-flex items-center gap-1 ${conflito ? "font-semibold text-red-700 dark:text-red-300" : "text-gray-700 dark:text-dark-text"}`}
+                                >
+                                  {donos.map((d) => (
+                                    <span key={d.id} className="inline-flex items-center gap-1">
+                                      <span className={`h-2 w-2 rounded-sm shrink-0 ${corPorCobrador.get(d.id)}`} />
+                                      {d.name.split(" ")[0]}
+                                    </span>
+                                  ))}
                                 </span>
                               ) : (
                                 <span className="text-gray-400">ninguém cobra</span>
@@ -2054,29 +2098,32 @@ const CarteiraDistribuicao: React.FC = () => {
                             >
                               {q.total.toLocaleString("pt-BR")}
                             </div>
-                            {dono && q.sem > 0 && (
+                            {q.sem > 0 && (
                               <div className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 whitespace-nowrap">
                                 {q.sem} sem cobrador
                               </div>
                             )}
-                            {q.nAguardando > 0 &&
-                              Array.from(q.aguardando.entries()).map(([sit, n]) => (
-                                <div
-                                  key={sit}
-                                  className="text-[10px] text-gray-500 whitespace-nowrap"
-                                  title={`${sit}: saiu da carteira de propósito e a distribuição não devolve a cobrador comum`}
-                                >
-                                  {n} {sit.toLowerCase()}
-                                </div>
-                              ))}
-                            {dono && q.comOutro > 0 && (
-                              <div className="text-[10px] text-gray-500 whitespace-nowrap">
-                                {q.comOutro} com outro
+                            {q.foraSem > 0 && (
+                              <div className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 whitespace-nowrap">
+                                {q.foraSem} fora da faixa
                               </div>
                             )}
-                            {!dono && q.total - q.sem - q.nAguardando > 0 && (
+                            {Array.from(q.aguardando.entries()).map(([sit, n]) => (
+                              <div
+                                key={sit}
+                                className="text-[10px] text-gray-500 whitespace-nowrap"
+                              >
+                                {n} {sit.toLowerCase()}
+                              </div>
+                            ))}
+                            {q.comOutro + q.foraCom > 0 && (
                               <div className="text-[10px] text-gray-500 whitespace-nowrap">
-                                {q.total - q.sem - q.nAguardando} com cobrador
+                                {q.comOutro + q.foraCom} com outro
+                              </div>
+                            )}
+                            {q.carencia > 0 && (
+                              <div className="text-[10px] text-gray-400 whitespace-nowrap">
+                                {q.carencia} na carência
                               </div>
                             )}
                           </td>
