@@ -22,6 +22,7 @@ import {
   ArrowUp,
   ArrowDown,
   MoreHorizontal,
+  Check,
   Trash2,
   FileDown,
   XCircle,
@@ -1045,43 +1046,63 @@ export const CollectionTable = React.forwardRef<
               {/* Main vertical stack */}
               {/* Top Row: Title and Global Actions */}
               {isDeleteMode ? (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <input
-                      type="checkbox"
-                      className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      checked={
-                        selectedClients.size > 0 &&
-                        selectedClients.size === paginatedSalesGroups.length
-                      }
-                      onChange={() =>
-                        handleToggleSelectAll(paginatedSalesGroups)
-                      }
-                    />
-                    <h2 className="text-lg font-semibold text-red-700">
-                      {selectedClients.size > 0
-                        ? `${selectedClients.size} cliente(s) selecionado(s)`
-                        : "Selecione os clientes para cancelar"}
-                    </h2>
-                  </div>
-                  <div className="flex items-center gap-2">
+                /* Modo de cancelamento em massa (24/11): faixa vermelha
+                   clara, sem checkbox -- toca no card para selecionar. */
+                <div className="rounded-xl bg-red-50 dark:bg-red-900/20 px-3 py-2.5 sm:flex sm:items-center sm:justify-between sm:gap-3">
+                  <div className="flex items-start justify-between gap-3 min-w-0">
+                    <div className="min-w-0">
+                      <h2 className="text-base font-semibold text-red-800 dark:text-red-300">
+                        Cancelamento de vendas
+                      </h2>
+                      <p className="text-xs text-red-700/80 dark:text-red-300/80">
+                        {selectedClients.size > 0
+                          ? `${selectedClients.size} cliente${selectedClients.size !== 1 ? "s" : ""} selecionado${selectedClients.size !== 1 ? "s" : ""}`
+                          : "Toque nos clientes para selecionar"}
+                      </p>
+                    </div>
+                    {/* Celular: Sair na linha do titulo. */}
                     <button
-                      onClick={() => setShowBulkDeleteModal(true)}
-                      disabled={selectedClients.size === 0}
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:bg-gray-400 transition-all duration-200"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      <span className="hidden sm:inline">Cancelar</span>
-                    </button>
-                    <button
+                      type="button"
                       onClick={() => {
                         setIsDeleteMode(false);
                         setSelectedClients(new Set());
                       }}
-                      className="p-3 rounded-lg text-gray-700 bg-gray-200 hover:bg-gray-300 transition-all duration-200"
-                      title="Sair do modo de exclusão"
+                      className="sm:hidden shrink-0 px-3 h-9 rounded-xl text-sm font-medium text-gray-700 dark:text-dark-text bg-white dark:bg-dark-bg border border-gray-200 dark:border-dark-border"
                     >
-                      <XCircle className="h-4 w-4" />
+                      Sair
+                    </button>
+                  </div>
+                  <div className="mt-2 sm:mt-0 flex items-center justify-between sm:justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleSelectAll(paginatedSalesGroups)}
+                      className="whitespace-nowrap px-3 h-9 rounded-xl text-sm font-medium text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                    >
+                      {selectedClients.size > 0 &&
+                      selectedClients.size === paginatedSalesGroups.length
+                        ? "Desmarcar todos"
+                        : "Marcar a página"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowBulkDeleteModal(true)}
+                      disabled={selectedClients.size === 0}
+                      className="whitespace-nowrap flex items-center gap-1.5 px-3 h-9 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:bg-red-300 dark:disabled:bg-red-900/40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Cancelar vendas
+                      {selectedClients.size > 0 && ` (${selectedClients.size})`}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsDeleteMode(false);
+                        setSelectedClients(new Set());
+                      }}
+                      className="hidden sm:block px-3 h-9 rounded-xl text-sm font-medium text-gray-700 dark:text-dark-text bg-white dark:bg-dark-bg border border-gray-200 dark:border-dark-border hover:bg-gray-50 transition-colors"
+                      title="Sair do modo de cancelamento"
+                    >
+                      Sair
                     </button>
                   </div>
                 </div>
@@ -1233,20 +1254,44 @@ export const CollectionTable = React.forwardRef<
               >
                 {/* Cabeçalho do Cliente */}
                 <div
-                  className={`flex items-center bg-white dark:bg-dark-bg-secondary rounded-2xl border border-gray-200 dark:border-dark-border ${isDeleteMode ? "" : "cursor-pointer"} overflow-hidden`}
-                  onClick={() => !isDeleteMode && abrirFicha(clientGroup.document)}
-                  title="Abrir a ficha do cliente"
+                  className={`flex items-center rounded-2xl border cursor-pointer overflow-hidden transition-colors ${
+                    !isDeleteMode
+                      ? "bg-white dark:bg-dark-bg-secondary border-gray-200 dark:border-dark-border"
+                      : selectedClients.has(clientGroup.document)
+                        ? "bg-red-50/60 dark:bg-red-900/10 border-red-400 ring-2 ring-red-200 dark:ring-red-900/40"
+                        : "bg-white dark:bg-dark-bg-secondary border-dashed border-gray-300 dark:border-dark-border hover:border-red-300"
+                  }`}
+                  onClick={() =>
+                    isDeleteMode
+                      ? handleToggleClientSelection(clientGroup.document)
+                      : abrirFicha(clientGroup.document)
+                  }
+                  title={
+                    isDeleteMode
+                      ? "Tocar para selecionar"
+                      : "Abrir a ficha do cliente"
+                  }
+                  role={isDeleteMode ? "checkbox" : undefined}
+                  aria-checked={
+                    isDeleteMode
+                      ? selectedClients.has(clientGroup.document)
+                      : undefined
+                  }
                 >
                   {isDeleteMode && (
-                    <div className="p-4">
-                      <input
-                        type="checkbox"
-                        className="h-5 w-5 rounded border-gray-300 dark:border-dark-border text-blue-600 focus:ring-blue-500 bg-white dark:bg-dark-bg"
-                        checked={selectedClients.has(clientGroup.document)}
-                        onChange={() =>
-                          handleToggleClientSelection(clientGroup.document)
-                        }
-                      />
+                    <div className="pl-3 sm:pl-4 shrink-0">
+                      <span
+                        className={`flex items-center justify-center w-6 h-6 rounded-full border-2 transition-colors ${
+                          selectedClients.has(clientGroup.document)
+                            ? "bg-red-600 border-red-600 text-white"
+                            : "border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg"
+                        }`}
+                        aria-hidden
+                      >
+                        {selectedClients.has(clientGroup.document) && (
+                          <Check className="h-4 w-4" />
+                        )}
+                      </span>
                     </div>
                   )}
                   <div className="flex-1 px-4 sm:px-6 py-3">
@@ -1381,10 +1426,11 @@ export const CollectionTable = React.forwardRef<
                           setShowDeleteConfirmation(true);
                         }
                       }}
-                      className="flex items-center justify-center w-12 bg-red-500 text-white hover:bg-red-600 transition-colors flex-shrink-0 self-stretch rounded-r-2xl"
-                      title="Cancelar vendas do cliente"
+                      className="mr-3 hidden sm:flex items-center justify-center w-9 h-9 rounded-xl border border-red-200 dark:border-red-900/40 bg-white dark:bg-dark-bg text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex-shrink-0"
+                      title="Cancelar só este cliente (escolher as vendas)"
+                      aria-label="Cancelar só este cliente"
                     >
-                      <Trash2 className="h-5 w-5" />
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   )}{" "}
                 </div>
