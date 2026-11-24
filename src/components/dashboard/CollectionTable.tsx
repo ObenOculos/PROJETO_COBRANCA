@@ -9,7 +9,6 @@ import { createPortal } from "react-dom";
 import { supabase } from "../../lib/supabase";
 import {
   Eye,
-  CheckCircle,
   Clock,
   AlertCircle,
   MapPin,
@@ -24,22 +23,17 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  ChevronDown,
-  ChevronUp,
-  Maximize2,
-  Minimize2,
   EyeIcon,
   Trash2,
   FileDown,
   XCircle,
 } from "lucide-react";
-import { Collection, ClientGroup, SaleGroup, UserType } from "../../types";
+import { Collection, ClientGroup, UserType } from "../../types";
 import {
   formatCurrency,
   parseAndFormatDate,
   calculateOverdueDays,
 } from "../../utils/formatters";
-import { seloForaDaCobranca } from "../../types/status";
 import {
   clientBalanceSplit,
   getClientPaymentStatus,
@@ -184,11 +178,6 @@ export const CollectionTable = React.forwardRef<
     const [showFilters, setShowFilters] = useState(false);
     const [showSortOptions, setShowSortOptions] = useState(false);
 
-    // Estado para controlar quais clientes estão expandidos
-    const [expandedClients, setExpandedClients] = useState<Set<string>>(
-      new Set(),
-    );
-
     const [isMobile, setIsMobile] = useState(
       typeof window !== "undefined" && window.innerWidth < 640,
     );
@@ -227,27 +216,6 @@ export const CollectionTable = React.forwardRef<
       ) : (
         <ArrowDown className="h-4 w-4 text-white" />
       );
-    };
-
-    const toggleClientExpansion = (clientDocument: string) => {
-      const newExpanded = new Set(expandedClients);
-      if (newExpanded.has(clientDocument)) {
-        newExpanded.delete(clientDocument);
-      } else {
-        newExpanded.add(clientDocument);
-      }
-      setExpandedClients(newExpanded);
-    };
-
-    const expandAll = () => {
-      const allClientDocuments = new Set(
-        paginatedSalesGroups.map((group) => group.document),
-      );
-      setExpandedClients(allClientDocuments);
-    };
-
-    const collapseAll = () => {
-      setExpandedClients(new Set());
     };
 
     const handleViewClient = (clientGroup: ClientGroup) => {
@@ -390,19 +358,6 @@ export const CollectionTable = React.forwardRef<
         )}
       </div>
     );
-
-    const getStatusIcon = (status: string | null) => {
-      if (!status) return <Clock className="h-4 w-4 text-gray-600" />;
-
-      switch (status.toLowerCase()) {
-        case "recebido":
-          return <CheckCircle className="h-4 w-4 text-green-600" />;
-        case "pendente":
-          return <Clock className="h-4 w-4 text-yellow-600" />;
-        default:
-          return <AlertCircle className="h-4 w-4 text-red-600" />;
-      }
-    };
 
     // Para gerentes, criar grupos de clientes baseados nas collections filtradas
     const clientGroups = useMemo(() => {
@@ -1236,40 +1191,6 @@ export const CollectionTable = React.forwardRef<
                         <Filter className="h-4 w-4" />
                       </button>
                     )}
-                    <button
-                      onClick={() => {
-                        const allExpanded = paginatedSalesGroups.every(
-                          (group) => expandedClients.has(group.document),
-                        );
-                        if (allExpanded) {
-                          collapseAll();
-                        } else {
-                          expandAll();
-                        }
-                      }}
-                      className={`p-2 rounded-2xl transition-colors responsive-hide-sm ${
-                        paginatedSalesGroups.every((group) =>
-                          expandedClients.has(group.document),
-                        )
-                          ? "text-orange-600 hover:bg-orange-50"
-                          : "text-green-600 hover:bg-green-50"
-                      }`}
-                      title={
-                        paginatedSalesGroups.every((group) =>
-                          expandedClients.has(group.document),
-                        )
-                          ? "Retrair todas"
-                          : "Expandir todas"
-                      }
-                    >
-                      {paginatedSalesGroups.every((group) =>
-                        expandedClients.has(group.document),
-                      ) ? (
-                        <Minimize2 className="h-4 w-4" />
-                      ) : (
-                        <Maximize2 className="h-4 w-4" />
-                      )}
-                    </button>
                   </div>
                 </div>
               )}
@@ -1511,58 +1432,7 @@ export const CollectionTable = React.forwardRef<
                       </div>
                     </div>
 
-                    {/* Seta (celular): mostra/esconde as vendas aqui na
-                        lista -- clicar no cliente abre a ficha. No desktop a
-                        seta e a faixa ao lado do excluir (abaixo). */}
-                    <div className="flex sm:hidden justify-center mt-3 pt-3 border-t border-gray-100 dark:border-dark-border">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (!isDeleteMode)
-                            toggleClientExpansion(clientGroup.document);
-                        }}
-                        className="p-2 rounded-full bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
-                        title={
-                          expandedClients.has(clientGroup.document)
-                            ? "Esconder as vendas"
-                            : "Mostrar as vendas aqui"
-                        }
-                      >
-                        {expandedClients.has(clientGroup.document) ? (
-                          <ChevronUp className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                        )}
-                      </button>
-                    </div>
                   </div>
-                  {/* Seta (desktop): faixa da altura do cartao, ao lado do
-                      excluir -- mesmo formato dele. */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!isDeleteMode)
-                        toggleClientExpansion(clientGroup.document);
-                    }}
-                    className={`hidden sm:flex items-center justify-center w-12 self-stretch flex-shrink-0 border-l border-gray-200 dark:border-dark-border transition-colors ${
-                      expandedClients.has(clientGroup.document)
-                        ? "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
-                        : "bg-gray-50 text-gray-500 hover:bg-blue-50 hover:text-blue-600 dark:bg-dark-bg dark:text-dark-text-secondary dark:hover:bg-blue-900/20"
-                    }`}
-                    title={
-                      expandedClients.has(clientGroup.document)
-                        ? "Esconder as vendas"
-                        : "Mostrar as vendas aqui"
-                    }
-                  >
-                    {expandedClients.has(clientGroup.document) ? (
-                      <ChevronUp className="h-5 w-5" />
-                    ) : (
-                      <ChevronDown className="h-5 w-5" />
-                    )}
-                  </button>
                   {userType === "manager" && (
                     <button
                       onClick={async (e) => {
@@ -1583,192 +1453,6 @@ export const CollectionTable = React.forwardRef<
                   )}{" "}
                 </div>
 
-                {/* Lista de Vendas do Cliente - Condicional */}
-                {expandedClients.has(clientGroup.document) && (
-                  <div className="px-4 sm:px-6 py-4 mt-2 rounded-2xl border border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-bg/30 animate-in slide-in-from-top-2 duration-200">
-                    <div className="space-y-3">
-                      {clientGroup.sales.map((sale: SaleGroup) => {
-                        // Determinar o status real da venda baseado nos valores.
-                        // Venda totalmente fora da cobranca (todas as parcelas
-                        // canceladas, agrupadas ou renegociadas) recebe o selo
-                        // correspondente em vez de "Quitado" -- nao e pagamento.
-                        let displayStatus: string;
-                        let statusColor: string;
-
-                        const seloFora = seloForaDaCobranca(
-                          sale.installments.map((i: Collection) => i.status),
-                        );
-
-                        if (seloFora) {
-                          displayStatus = seloFora;
-                          statusColor =
-                            "bg-gray-200 text-gray-600 dark:bg-dark-bg-tertiary dark:text-dark-text-secondary";
-                        } else if (
-                          sale.totalReceived > 0 &&
-                          sale.pendingValue > 0
-                        ) {
-                          displayStatus = "Parcial";
-                          statusColor = "bg-yellow-100 text-yellow-800";
-                        } else if (sale.pendingValue <= 0.01) {
-                          displayStatus = "Quitado";
-                          statusColor = "bg-green-100 text-green-800";
-                        } else {
-                          displayStatus = "Pendente";
-                          statusColor = "bg-red-100 text-red-800";
-                        }
-
-                        return (
-                          <div
-                            key={sale.saleNumber}
-                            className="bg-white dark:bg-dark-bg-secondary border border-gray-200 dark:border-dark-border rounded-2xl hover:shadow-md transition-all duration-200"
-                          >
-                            <div className="p-4">
-                              {/* Header */}
-                              <div className="flex items-start justify-between mb-4">
-                                <div>
-                                  <h4 className="font-semibold text-gray-800 dark:text-dark-text">
-                                    {sale.saleNumber === 0
-                                      ? "Venda Renegociada"
-                                      : `Venda #${sale.saleNumber}`}
-                                  </h4>
-                                  <p className="text-xs text-gray-500 dark:text-dark-text-secondary mt-1">
-                                    {sale.installments.length} parcela
-                                    {sale.installments.length !== 1 ? "s" : ""}
-                                  </p>
-                                </div>
-                                <span
-                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full ${statusColor}`}
-                                >
-                                  {getStatusIcon(
-                                    displayStatus === "Quitado"
-                                      ? "recebido"
-                                      : "pendente",
-                                  )}
-                                  {displayStatus}
-                                </span>
-                              </div>
-
-                              {/* Financial info */}
-                              <div className="space-y-3">
-                                <div className="flex justify-between items-center">
-                                  <span className="text-sm text-gray-600 dark:text-dark-text-secondary">
-                                    Valor Total
-                                  </span>
-                                  <span className="font-semibold text-gray-800 dark:text-dark-text">
-                                    {formatCurrency(sale.totalValue, !isMobile)}
-                                  </span>
-                                </div>
-                                {!!sale.totalReceived && (
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-sm text-gray-600 dark:text-dark-text-secondary">
-                                      Valor Recebido
-                                    </span>
-                                    <span className="font-semibold text-green-600 dark:text-green-400">
-                                      {formatCurrency(
-                                        sale.totalReceived,
-                                        !isMobile,
-                                      )}
-                                    </span>
-                                  </div>
-                                )}
-                                {!!sale.totalDiscount && (
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-sm text-gray-600 dark:text-dark-text-secondary">
-                                      Desconto
-                                    </span>
-                                    <span className="font-semibold text-blue-600 dark:text-blue-400">
-                                      {formatCurrency(
-                                        sale.totalDiscount,
-                                        !isMobile,
-                                      )}
-                                    </span>
-                                  </div>
-                                )}
-                                {/* Saldo da venda em vencido x a vencer (padrao,
-                                    ver SaldoAberto): parcelas da propria venda,
-                                    sem o acordo (que e do cliente todo). */}
-                                {(() => {
-                                  const sv = clientBalanceSplit({
-                                    document: clientGroup.document,
-                                    sales: [sale],
-                                  });
-                                  return (
-                                    <>
-                                      {sv.vencido > 0.01 && (
-                                        <div className="flex justify-between items-center">
-                                          <span className="text-sm text-gray-600 dark:text-dark-text-secondary">
-                                            Vencido
-                                          </span>
-                                          <span className="font-semibold text-red-600 dark:text-red-400">
-                                            {formatCurrency(sv.vencido, !isMobile)}
-                                          </span>
-                                        </div>
-                                      )}
-                                      {sv.aVencer > 0.01 && (
-                                        <div className="flex justify-between items-center">
-                                          <span className="text-sm text-gray-600 dark:text-dark-text-secondary">
-                                            A vencer
-                                          </span>
-                                          <span className="font-semibold text-gray-700 dark:text-dark-text">
-                                            {formatCurrency(sv.aVencer, !isMobile)}
-                                          </span>
-                                        </div>
-                                      )}
-                                    </>
-                                  );
-                                })()}
-                              </div>
-
-                              {/* Actions */}
-                              <div className="mt-5 pt-4 border-t border-gray-100 dark:border-dark-border flex gap-3">
-                                <button
-                                  id={`view-sale-${sale.saleNumber}`}
-                                  name={`viewSale${sale.saleNumber}`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    // Ficha do cliente aberta nesta venda.
-                                    abrirFicha(
-                                      clientGroup.document,
-                                      sale.saleNumber,
-                                    );
-                                  }}
-                                  className="flex-1 flex items-center justify-center px-4 py-2 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 transition-colors text-sm font-medium"
-                                  title="Abrir a ficha do cliente nesta venda"
-                                >
-                                  <Eye className="h-4 w-4 mr-2" />
-                                  <span>Detalhes</span>
-                                </button>
-                                {userType !== "manager" && (
-                                  <button
-                                    id={`manage-payments-${sale.saleNumber}`}
-                                    name={`managePayments${sale.saleNumber}`}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const clientGroupForModal =
-                                        clientGroups.find(
-                                          (cg) =>
-                                            cg.document ===
-                                            clientGroup.document,
-                                        );
-                                      if (clientGroupForModal) {
-                                        handleViewClient(clientGroupForModal);
-                                      }
-                                    }}
-                                    className="flex-1 flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors text-sm font-medium"
-                                    title="Gerenciar pagamentos"
-                                  >
-                                    <DollarSign className="h-4 w-4 mr-2" />
-                                    <span>Pagar</span>
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
               </div>
             ))}
           </div>

@@ -28,6 +28,7 @@ import {
 } from "../../utils/cacheHistoricoCliente";
 import { comRetentativa } from "../../utils/supabaseRetry";
 import { formatCurrency, parseAndFormatDate } from "../../utils/formatters";
+import { USER_TYPE_LABELS } from "../../config/profiles";
 import { round2 } from "../../filters/clientStatus";
 import {
   ATTEMPT_TYPE_LABELS,
@@ -66,6 +67,8 @@ interface EventoLinha {
   icone: React.ReactNode;
   titulo: React.ReactNode;
   autor?: string | null;
+  /** Onde (ex.: vendas do contato): vai na linha do autor, em cinza. */
+  contexto?: React.ReactNode;
   detalhes?: React.ReactNode[];
 }
 
@@ -163,6 +166,13 @@ const diaMes = (data: string): string => {
   const [, m, d] = data.split("T")[0].split("-");
   return d && m ? `${d}/${m}` : data;
 };
+
+/** Nome sem o perfil repetido ("Jose - Cobranca Interna" -> "Jose"). */
+const autorCurto = (autor: string): string =>
+  Object.values(USER_TYPE_LABELS).reduce(
+    (txt, perfil) => txt.replace(` - ${perfil}`, ""),
+    autor,
+  );
 
 const mesAno = (ms: number): string =>
   new Date(ms)
@@ -457,7 +467,6 @@ const LinhaDoTempoCliente: React.FC<Props> = ({
           }`,
         );
       }
-      detalhes.push(<span className="text-gray-400">{vendas.join(", ")}</span>);
       lista.push({
         chave: `contato-${row.id}`,
         ordem: instante(row.created_at),
@@ -475,6 +484,7 @@ const LinhaDoTempoCliente: React.FC<Props> = ({
           </>
         ),
         autor: nome(row.collector_id),
+        contexto: vendas.join(", "),
         detalhes,
       });
     });
@@ -849,32 +859,50 @@ const LinhaDoTempoCliente: React.FC<Props> = ({
         </div>
       )}
 
-      {/* Filtros: so os que tem registro */}
-      {contagem.size > 1 && (
-        <div className="flex flex-wrap gap-1.5 text-xs">
-          {[
-            { id: "todos" as const, rotulo: "Todos", total: eventos.length },
-            ...CATEGORIAS.filter((c) => contagem.has(c.id)).map((c) => ({
-              ...c,
-              total: contagem.get(c.id) ?? 0,
-            })),
-          ].map((c) => (
+      {/* Filtros (so os que tem registro) numa linha so -- rola de lado se
+          nao couber -- e Atualizar como icone no fim (24/11). */}
+      {(contagem.size > 1 || (!carregando && atualizadoEm != null)) && (
+        <div className="flex items-center gap-2">
+          <div className="flex-1 min-w-0 flex gap-1.5 overflow-x-auto text-xs [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {contagem.size > 1 &&
+              [
+                { id: "todos" as const, rotulo: "Todos", total: eventos.length },
+                ...CATEGORIAS.filter((c) => contagem.has(c.id)).map((c) => ({
+                  ...c,
+                  total: contagem.get(c.id) ?? 0,
+                })),
+              ].map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => {
+                    setFiltro(c.id);
+                    setLimite(POR_PAGINA);
+                  }}
+                  className={`shrink-0 whitespace-nowrap px-2.5 py-1 rounded-full border font-medium transition-colors ${
+                    filtro === c.id
+                      ? "bg-gray-900 border-gray-900 text-white"
+                      : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  {c.rotulo} ({c.total})
+                </button>
+              ))}
+          </div>
+          {!carregando && atualizadoEm != null && (
             <button
-              key={c.id}
               type="button"
-              onClick={() => {
-                setFiltro(c.id);
-                setLimite(POR_PAGINA);
-              }}
-              className={`px-2.5 py-1 rounded-full border font-medium transition-colors ${
-                filtro === c.id
-                  ? "bg-gray-900 border-gray-900 text-white"
-                  : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
-              }`}
+              onClick={atualizarHistorico}
+              className="shrink-0 p-1.5 rounded-full text-gray-400 hover:text-indigo-600 hover:bg-gray-100"
+              title={(() => {
+                const min = Math.floor((Date.now() - atualizadoEm) / 60000);
+                return `${min < 1 ? "Atualizado agora" : `Atualizado há ${min} min`} — clique para atualizar`;
+              })()}
+              aria-label="Atualizar histórico"
             >
-              {c.rotulo} ({c.total})
+              <RefreshCw className="h-4 w-4" />
             </button>
-          ))}
+          )}
         </div>
       )}
 
@@ -885,25 +913,6 @@ const LinhaDoTempoCliente: React.FC<Props> = ({
         </p>
       )}
 
-      {!carregando && atualizadoEm != null && (
-        <p className="text-[11px] text-gray-400 dark:text-dark-text-secondary">
-          {(() => {
-            const min = Math.floor((Date.now() - atualizadoEm) / 60000);
-            return min < 1
-              ? "Atualizado agora"
-              : `Atualizado há ${min} min`;
-          })()}{" "}
-          ·{" "}
-          <button
-            type="button"
-            onClick={atualizarHistorico}
-            className="font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-400"
-          >
-            Atualizar
-          </button>
-        </p>
-      )}
-
       {carregando ? (
         <p className="text-sm text-gray-500 animate-pulse">
           Carregando histórico...
@@ -911,7 +920,7 @@ const LinhaDoTempoCliente: React.FC<Props> = ({
       ) : filtrados.length === 0 ? (
         <p className="text-sm text-gray-500">Nenhum registro para este cliente.</p>
       ) : (
-        <ol className="relative">
+        <ol className="space-y-2">
           {visiveis.map((ev) => {
             const mes = mesAno(ev.ordem);
             const novoMes = mes !== mesAnterior;
@@ -919,33 +928,59 @@ const LinhaDoTempoCliente: React.FC<Props> = ({
             return (
               <React.Fragment key={ev.chave}>
                 {novoMes && (
-                  <li className="pt-3 pb-1 first:pt-0 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                  <li className="pt-2 first:pt-0 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
                     {mes}
                   </li>
                 )}
-                <li className="flex gap-3 py-2 border-b border-gray-100 last:border-0">
-                  <span className="w-[4.5rem] shrink-0 text-[11px] text-gray-400 tabular-nums pt-0.5">
-                    {ev.quandoTexto}
-                  </span>
+                {/* Sem coluna de data (24/11): cada registro num card cinza
+                    claro, hora a direita do titulo, autor + venda numa
+                    linha cinza. */}
+                <li className="flex gap-3 rounded-xl bg-gray-50 px-3 py-2.5">
                   <span className="shrink-0 pt-0.5">{ev.icone}</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-900">
-                      {ev.titulo}
-                      {ev.autor && (
-                        <span className="font-normal text-gray-500">
-                          {" "}
-                          — {ev.autor}
+                  {/* Celular: hora ao lado do titulo, autor/venda embaixo.
+                      Computador: hora e autor/venda numa coluna a direita. */}
+                  <div className="min-w-0 flex-1 sm:flex sm:items-start sm:justify-between sm:gap-6">
+                    <div className="min-w-0">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className="min-w-0 text-sm font-medium text-gray-900">
+                          {ev.titulo}
+                        </p>
+                        <span className="sm:hidden shrink-0 text-[11px] text-gray-400 tabular-nums">
+                          {ev.quandoTexto.replace(",", "")}
                         </span>
+                      </div>
+                      {(ev.autor || ev.contexto) && (
+                        <p className="sm:hidden text-xs text-gray-500 truncate">
+                          {ev.autor && (
+                            <span title={ev.autor}>{autorCurto(ev.autor)}</span>
+                          )}
+                          {ev.autor && ev.contexto && " · "}
+                          {ev.contexto}
+                        </p>
                       )}
-                    </p>
-                    {ev.detalhes?.map((d, i) => (
-                      <p
-                        key={i}
-                        className="text-xs text-gray-600 mt-0.5 whitespace-pre-wrap break-words"
-                      >
-                        {d}
-                      </p>
-                    ))}
+                      {ev.detalhes?.map((d, i) => (
+                        <p
+                          key={i}
+                          className="text-xs text-gray-700 mt-1 whitespace-pre-wrap break-words"
+                        >
+                          {d}
+                        </p>
+                      ))}
+                    </div>
+                    <div className="hidden sm:block shrink-0 text-right">
+                      <div className="text-[11px] text-gray-400 tabular-nums">
+                        {ev.quandoTexto.replace(",", "")}
+                      </div>
+                      {(ev.autor || ev.contexto) && (
+                        <div className="text-xs text-gray-500 max-w-[18rem] truncate">
+                          {ev.autor && (
+                            <span title={ev.autor}>{autorCurto(ev.autor)}</span>
+                          )}
+                          {ev.autor && ev.contexto && " · "}
+                          {ev.contexto}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </li>
               </React.Fragment>

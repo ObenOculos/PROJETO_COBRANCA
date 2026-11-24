@@ -853,22 +853,24 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 acordo ativo, as parcelas do acordo). Com multa/juros o numero
                 grande e o "Cobrar hoje" e a conta vem embaixo. A vencer so
                 aparece se houver valor, em cinza. */}
+            {/* Computador: cards a esquerda, acoes a direita na mesma faixa. */}
+            <div className="sm:flex sm:items-end sm:justify-between sm:gap-4">
             {(saldoCliente.vencido > 0.01 || saldoCliente.aVencer > 0.01) && (
-              <div className="mt-4 flex flex-wrap items-start gap-x-10 gap-y-3">
+              <div className="mt-4 grid grid-cols-2 sm:flex sm:flex-wrap items-stretch gap-2 sm:gap-3">
                 {saldoCliente.vencido > 0.01 && (
                   <div
-                    className="min-w-0"
+                    className="min-w-0 rounded-xl bg-red-50 px-3 py-2 sm:px-4 sm:min-w-[12rem]"
                     title={
                       temEncargo
                         ? "Este cliente tem multa e juros de atraso: cobre o valor de hoje, não só o vencido. Mesma conta do Ciclone (Prev. Baixa); o valor sobe a cada dia de atraso."
                         : undefined
                     }
                   >
-                    <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
+                    <div className="text-[11px] font-medium uppercase tracking-wider text-red-700/80">
                       {temEncargo ? "Cobrar hoje" : "Vencido"}
-                      {/* Celular: dias no rotulo (uma linha a menos). */}
+                      {/* Dias no rotulo (uma linha a menos). */}
                       {atrasoCliente > 0 && (
-                        <span className="sm:hidden text-red-600">
+                        <span className="text-red-600">
                           {" "}
                           · {atrasoCliente} dia{atrasoCliente !== 1 ? "s" : ""}
                         </span>
@@ -899,46 +901,27 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                         )}
                       </button>
                     )}
-                    <div className="hidden sm:block text-xs text-gray-500">
-                      {temEncargo && (
-                        <>
-                          vencido {formatCurrency(saldoCliente.vencido)} + multa{" "}
-                          {formatCurrency(encargoFicha!.multa)} + juros{" "}
-                          {formatCurrency(encargoFicha!.juros)}
-                          {atrasoCliente > 0 && " · "}
-                        </>
-                      )}
-                      {atrasoCliente > 0 && (
-                        <span className="text-red-600">
-                          {atrasoCliente} dia{atrasoCliente !== 1 ? "s" : ""} de
-                          atraso
-                        </span>
-                      )}
-                    </div>
+                    {temEncargo && (
+                      <div className="hidden sm:block text-xs text-red-900/70">
+                        vencido {formatCurrency(saldoCliente.vencido)} + multa{" "}
+                        {formatCurrency(encargoFicha!.multa)} + juros{" "}
+                        {formatCurrency(encargoFicha!.juros)}
+                      </div>
+                    )}
                   </div>
                 )}
                 {saldoCliente.aVencer > 0.01 && (
-                  <div className="min-w-0">
+                  <div className="min-w-0 rounded-xl bg-gray-100 px-3 py-2 sm:px-4 sm:min-w-[12rem]">
                     <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
                       A vencer
                     </div>
-                    <div className="text-xl sm:text-2xl font-semibold tabular-nums text-gray-700 leading-tight">
+                    <div className="text-xl sm:text-2xl font-semibold tabular-nums text-gray-800 leading-tight">
                       {formatCurrency(saldoCliente.aVencer)}
                     </div>
                   </div>
                 )}
               </div>
             )}
-            {encargoFicha?.conferirNoErp && (
-              <div className="mt-2 flex items-start gap-1.5 text-xs text-amber-800">
-                <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
-                <span>
-                  O juro cadastrado no Ciclone para uma parcela deste cliente
-                  parece errado. Confira o valor no Ciclone antes de cobrar.
-                </span>
-              </div>
-            )}
-
             {/* 3. Acoes (computador). "Lancar como" (gestor) fica junto dos
                 botoes que ele afeta. No celular, botoes e "Lancar como" ficam
                 na barra de baixo. Editar pagamentos e cheque no menu. */}
@@ -947,8 +930,7 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 mostrarAtender || mostrarReceber || mostrarAcordo || mostrarMenuMais;
               if (!mostrarLancarComo && !temBotoes) return null;
               return (
-                <div className="hidden sm:flex mt-4 flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                  {seletorLancarComo ?? <span />}
+                <div className="hidden sm:flex sm:ml-auto mt-4 flex-col items-end gap-2 shrink-0">
 
                   {temBotoes && (
                     <div className="hidden sm:flex flex-wrap items-center gap-2 shrink-0">
@@ -1018,9 +1000,21 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                       )}
                     </div>
                   )}
+                  {seletorLancarComo}
                 </div>
               );
             })()}
+            </div>
+            {encargoFicha?.conferirNoErp && (
+              <div className="mt-2 flex items-start gap-1.5 text-xs text-amber-800">
+                <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                <span>
+                  O juro cadastrado no Ciclone para uma parcela deste cliente
+                  parece errado. Confira o valor no Ciclone antes de cobrar.
+                </span>
+              </div>
+            )}
+
           </div>
 
           {/* Abas: navegacao, nao acao. Sem overflow: com overflow-x o
@@ -1742,17 +1736,8 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
             <div className="sm:hidden shrink-0 border-t border-gray-200 bg-white px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
             {seletorLancarComo && <div className="mb-2">{seletorLancarComo}</div>}
             <div className="flex items-center gap-2">
-              {mostrarAcordo && (
-                <button
-                  type="button"
-                  onClick={abrirAcordo}
-                  className="flex items-center justify-center w-11 h-11 rounded-xl border border-amber-300 text-amber-700 bg-white shrink-0"
-                  title={acordoAtivo ? "Ver acordo" : "Fazer acordo"}
-                  aria-label={acordoAtivo ? "Ver acordo" : "Fazer acordo"}
-                >
-                  <Handshake className="h-5 w-5" />
-                </button>
-              )}
+              {/* Ordem: do mais raro ao mais usado, Atender no polegar
+                  (espelho da ordem do computador). */}
               {mostrarMenuMais && (
                 <div className="relative shrink-0">
                   <button
@@ -1776,6 +1761,17 @@ const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                     </>
                   )}
                 </div>
+              )}
+              {mostrarAcordo && (
+                <button
+                  type="button"
+                  onClick={abrirAcordo}
+                  className="flex items-center justify-center w-11 h-11 rounded-xl border border-gray-200 text-amber-600 bg-white shrink-0"
+                  title={acordoAtivo ? "Ver acordo" : "Fazer acordo"}
+                  aria-label={acordoAtivo ? "Ver acordo" : "Fazer acordo"}
+                >
+                  <Handshake className="h-5 w-5" />
+                </button>
               )}
               <div className="flex-1 flex items-center justify-end gap-2 min-w-0">
                 {mostrarReceber && (
