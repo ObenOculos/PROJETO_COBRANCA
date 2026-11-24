@@ -1085,7 +1085,15 @@ const CarteiraDistribuicao: React.FC = () => {
   // era calculado sobre as parcelas do navegador, que o gestor nao carrega
   // inteiras (item 8) -- todas as casas da cobertura apareciam com 0.
   const [mapaCarteira, setMapaCarteira] = useState<
-    { loja: string; atraso: number; cobrador_id: string | null; clientes: number }[] | null
+    {
+      loja: string;
+      atraso: number;
+      cobrador_id: string | null;
+      /** Situacao "Aguardando ..." (ex.: Aguardando Juridico): fora da
+       * distribuicao de proposito (migration 20261124000004). */
+      aguardando?: string | null;
+      clientes: number;
+    }[] | null
   >(null);
   const [mapaErro, setMapaErro] = useState(false);
   const carregarMapa = React.useCallback(async () => {
@@ -1102,6 +1110,7 @@ const CarteiraDistribuicao: React.FC = () => {
         loja: string;
         atraso: number;
         cobrador_id: string | null;
+        aguardando?: string | null;
         clientes: number;
       }[],
     );
@@ -1110,9 +1119,17 @@ const CarteiraDistribuicao: React.FC = () => {
     void carregarMapa();
   }, [carregarMapa]);
   const clientesPorLoja = useMemo(() => {
-    const m = new Map<string, { atraso: number; dono: string | null; n: number }[]>();
+    const m = new Map<
+      string,
+      { atraso: number; dono: string | null; aguardando: string | null; n: number }[]
+    >();
     (mapaCarteira ?? []).forEach((x) => {
-      const item = { atraso: x.atraso, dono: x.cobrador_id, n: x.clientes };
+      const item = {
+        atraso: x.atraso,
+        dono: x.cobrador_id,
+        aguardando: x.aguardando ?? null,
+        n: x.clientes,
+      };
       const l = m.get(x.loja);
       if (l) l.push(item);
       else m.set(x.loja, [item]);
@@ -1125,13 +1142,26 @@ const CarteiraDistribuicao: React.FC = () => {
     let total = 0;
     let sem = 0;
     let doDono = 0;
+    // Sem cobrador e "Aguardando ..." (ex.: Juridico): saiu de proposito e
+    // a distribuicao nao devolve -- conta a parte, por situacao.
+    const aguardando = new Map<string, number>();
     (clientesPorLoja.get(loja) ?? []).forEach((x) => {
       if (x.atraso < ini || x.atraso > fim) return;
       total += x.n;
-      if (!x.dono) sem += x.n;
+      if (!x.dono && x.aguardando) {
+        aguardando.set(x.aguardando, (aguardando.get(x.aguardando) ?? 0) + x.n);
+      } else if (!x.dono) sem += x.n;
       else if (donoId && x.dono === donoId) doDono += x.n;
     });
-    return { total, sem, doDono, comOutro: total - sem - doDono };
+    const nAguardando = Array.from(aguardando.values()).reduce((a, b) => a + b, 0);
+    return {
+      total,
+      sem,
+      doDono,
+      aguardando,
+      nAguardando,
+      comOutro: total - sem - doDono - nAguardando,
+    };
   };
 
   // Colunas da tabela de cobertura (pedido 2026-11-19: faixas de atraso
@@ -1164,10 +1194,15 @@ const CarteiraDistribuicao: React.FC = () => {
     let emAberto = 0;
     let semCobrador = 0;
     let foraDasFaixas = 0;
+    let aguardando = 0;
     clientesPorLoja.forEach((lista, loja) =>
       lista.forEach((x) => {
         emAberto += x.n;
         if (x.dono) return;
+        if (x.aguardando) {
+          aguardando += x.n;
+          return;
+        }
         const coberto = (ativasPorLoja.get(loja) ?? []).some(
           ({ r }) => r.minDias <= x.atraso && x.atraso <= (r.maxDias ?? Infinity),
         );
@@ -1179,6 +1214,7 @@ const CarteiraDistribuicao: React.FC = () => {
       emAberto,
       semCobrador,
       foraDasFaixas,
+      aguardando,
       carregado: mapaCarteira !== null,
     };
   }, [clientesPorLoja, mapaCarteira, cobertura]);
@@ -1402,6 +1438,14 @@ const CarteiraDistribuicao: React.FC = () => {
                 title="Sem cobrador e fora de todas as faixas (a vencer ou atraso abaixo da primeira faixa): ninguém deveria cobrar ainda"
               >
                 +{totaisCarteira.foraDasFaixas.toLocaleString("pt-BR")} fora das faixas
+              </div>
+            )}
+            {totaisCarteira.carregado && totaisCarteira.aguardando > 0 && (
+              <div
+                className="text-[11px] text-gray-500"
+                title="Saíram da carteira para o jurídico (Aguardando …): a distribuição não devolve a cobrador comum"
+              >
+                +{totaisCarteira.aguardando.toLocaleString("pt-BR")} aguardando jurídico
               </div>
             )}
           </div>
@@ -1973,10 +2017,16 @@ const CarteiraDistribuicao: React.FC = () => {
                             className={`py-2 px-2 text-center border-b border-l border-gray-100 dark:border-dark-border ${fundo} ${apagada ? "opacity-40" : ""}`}
                             title={
                               dono
-                                ? `${dono.name}: ${q.doDono} na carteira, ${q.sem} sem cobrador, ${q.comOutro} com outro`
+                                ? `${dono.name}: ${q.doDono} na carteira, ${q.sem} sem cobrador, ${q.comOutro} com outro${
+                                    q.nAguardando > 0
+                                      ? `, ${Array.from(q.aguardando.entries())
+                                          .map(([sit, n]) => `${n} em ${sit} (a distribuição não devolve a cobrador)`)
+                                          .join(", ")}`
+                                      : ""
+                                  }`
                                 : conflito
                                   ? `Conflito: ${donos.map((d) => d.name).join(" e ")}`
-                                  : `${q.sem} sem cobrador, ${q.total - q.sem} com algum cobrador (carteira manual)`
+                                  : `${q.sem} sem cobrador, ${q.total - q.sem - q.nAguardando} com algum cobrador (carteira manual)${q.nAguardando > 0 ? `, ${q.nAguardando} aguardando jurídico` : ""}`
                             }
                           >
                             <div className="text-[11px] whitespace-nowrap">
@@ -2009,14 +2059,24 @@ const CarteiraDistribuicao: React.FC = () => {
                                 {q.sem} sem cobrador
                               </div>
                             )}
+                            {q.nAguardando > 0 &&
+                              Array.from(q.aguardando.entries()).map(([sit, n]) => (
+                                <div
+                                  key={sit}
+                                  className="text-[10px] text-gray-500 whitespace-nowrap"
+                                  title={`${sit}: saiu da carteira de propósito e a distribuição não devolve a cobrador comum`}
+                                >
+                                  {n} {sit.toLowerCase()}
+                                </div>
+                              ))}
                             {dono && q.comOutro > 0 && (
                               <div className="text-[10px] text-gray-500 whitespace-nowrap">
                                 {q.comOutro} com outro
                               </div>
                             )}
-                            {!dono && q.total - q.sem > 0 && (
+                            {!dono && q.total - q.sem - q.nAguardando > 0 && (
                               <div className="text-[10px] text-gray-500 whitespace-nowrap">
-                                {q.total - q.sem} com cobrador
+                                {q.total - q.sem - q.nAguardando} com cobrador
                               </div>
                             )}
                           </td>
