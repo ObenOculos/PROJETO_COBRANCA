@@ -29,6 +29,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { Collection, ClientGroup, UserType } from "../../types";
+import Pagination from "../common/Pagination";
 import {
   formatCurrency,
   parseAndFormatDate,
@@ -181,15 +182,11 @@ export const CollectionTable = React.forwardRef<
     const [isMobile, setIsMobile] = useState(
       typeof window !== "undefined" && window.innerWidth < 640,
     );
-    const [maxButtons, setMaxButtons] = useState(
-      typeof window !== "undefined" && window.innerWidth < 640 ? 2 : 5,
-    );
 
     React.useEffect(() => {
       const handleResize = () => {
         const mobile = window.innerWidth < 640;
         setIsMobile(mobile);
-        setMaxButtons(mobile ? 2 : 5);
       };
 
       window.addEventListener("resize", handleResize);
@@ -636,8 +633,22 @@ export const CollectionTable = React.forwardRef<
         )
       : countVendas(collections);
     const totalPages = Math.ceil(totalItems / itemsPerPage);
-    const startItem = totalItems > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0;
-    const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+
+    // Paginacao padrao do projeto (common/Pagination).
+    const paginacao = (
+      <Pagination
+        page={currentPage}
+        total={totalItems}
+        perPage={itemsPerPage}
+        onChange={setCurrentPage}
+        className="mt-4 px-1 py-3"
+        totais={`${totalClientes.toLocaleString("pt-BR")} ${
+          totalClientes === 1 ? "cliente" : "clientes"
+        } · ${totalVendas.toLocaleString("pt-BR")} ${
+          totalVendas === 1 ? "venda" : "vendas"
+        }`}
+      />
+    );
 
     if (loading) {
       return (
@@ -929,115 +940,7 @@ export const CollectionTable = React.forwardRef<
               </div>
             )}
           </div>
-          {/* Controles de Paginação */}
-          {totalPages > 1 && (
-            <div className="bg-gray-800 dark:bg-dark-bg-secondary border border-gray-200 dark:border-dark-border px-4 sm:px-6 py-4 rounded-2xl mt-4">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="text-sm text-white text-center sm:text-left">
-                  <span className="font-semibold">
-                    Página {currentPage} de {totalPages}
-                  </span>
-                  <span className="text-gray-300 dark:text-dark-text-secondary ml-2">
-                    • Mostrando {startItem} a {endItem} de {totalClientes}{" "}
-                    {totalClientes === 1 ? "cliente" : "clientes"} •{" "}
-                    {totalVendas} {totalVendas === 1 ? "venda" : "vendas"}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between w-full sm:w-auto space-x-1 sm:space-x-2">
-                  {/* Botão Início */}
-                  <button
-                    id="pagination-start"
-                    name="paginationStart"
-                    onClick={() => setCurrentPage(1)}
-                    disabled={currentPage === 1}
-                    className="flex items-center px-2 sm:px-3 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-                  >
-                    <span className="text-xs">Início</span>
-                  </button>
-
-                  {/* Botão Anterior */}
-                  <button
-                    id="pagination-previous"
-                    name="paginationPrevious"
-                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                    disabled={currentPage === 1}
-                    className="flex items-center px-2 sm:px-3 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-                  >
-                    <ChevronLeft className="h-4 w-4 sm:mr-1" />
-                    <span className="hidden sm:inline">Anterior</span>
-                  </button>
-
-                  {/* Números das páginas */}
-                  <div className="flex space-x-3 flex-1 justify-center sm:flex-none">
-                    {Array.from(
-                      {
-                        length: Math.min(maxButtons, totalPages),
-                      },
-                      (_, i) => {
-                        let pageNum;
-
-                        if (totalPages <= maxButtons) {
-                          pageNum = i + 1;
-                        } else if (currentPage <= Math.ceil(maxButtons / 2)) {
-                          pageNum = i + 1;
-                        } else if (
-                          currentPage >=
-                          totalPages - Math.floor(maxButtons / 2)
-                        ) {
-                          pageNum = totalPages - maxButtons + 1 + i;
-                        } else {
-                          pageNum =
-                            currentPage - Math.floor(maxButtons / 2) + i;
-                        }
-
-                        return (
-                          <button
-                            key={pageNum}
-                            id={`pagination-page-${pageNum}`}
-                            name={`paginationPage${pageNum}`}
-                            onClick={() => setCurrentPage(pageNum)}
-                            className={`px-2 sm:px-2 py-2 text-sm font-semibold rounded-2xl transition-all duration-200 min-w-[44px] ${
-                              pageNum === currentPage
-                                ? "bg-white text-gray-800 shadow-lg transform scale-105"
-                                : "text-white bg-white bg-opacity-10 border border-white border-opacity-30 hover:bg-opacity-20"
-                            }`}
-                          >
-                            {pageNum}
-                          </button>
-                        );
-                      },
-                    )}
-                  </div>
-
-                  {/* Botão Próxima */}
-                  <button
-                    id="pagination-next"
-                    name="paginationNext"
-                    onClick={() =>
-                      setCurrentPage(Math.min(totalPages, currentPage + 1))
-                    }
-                    disabled={currentPage === totalPages}
-                    className="flex items-center px-2 sm:px-2 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-                  >
-                    <span className="hidden sm:inline">Próxima</span>
-                    <ChevronRight className="h-4 w-4 sm:ml-1" />
-                  </button>
-
-                  {/* Botão Fim */}
-                  <button
-                    id="pagination-end"
-                    name="paginationEnd"
-                    onClick={() => setCurrentPage(totalPages)}
-                    disabled={currentPage === totalPages}
-                    className="flex items-center px-2 sm:px-2 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-                  >
-                    <span className="text-xs">Fim</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          {totalPages > 1 && paginacao}
           {/* Client Detail Modal - Renderizado via Portal */}
           {isClientModalOpen &&
             selectedClientGroup &&
@@ -1404,7 +1307,50 @@ export const CollectionTable = React.forwardRef<
                           {clientGroup.sales.length} venda
                           {clientGroup.sales.length !== 1 ? "s" : ""}
                         </div>
-                        <div className="flex flex-wrap justify-start sm:justify-end gap-2 mt-4">
+                        {/* Celular (24/11): mini-colunas numa linha so --
+                            Pago, Vencido, A vencer. Desconto fica no
+                            computador e na Ficha. */}
+                        {(() => {
+                          const saldo = clientBalanceSplit(
+                            clientGroup,
+                            acordoAtivoOverdueMap,
+                          );
+                          const itens = [
+                            {
+                              rotulo: "Pago",
+                              valor: clientGroup.totalReceived ?? 0,
+                              cor: "text-green-700 dark:text-green-400",
+                            },
+                            {
+                              rotulo: "Vencido",
+                              valor: saldo.vencido,
+                              cor: "text-red-600 dark:text-red-400",
+                            },
+                            {
+                              rotulo: "A vencer",
+                              valor: saldo.aVencer,
+                              cor: "text-gray-700 dark:text-dark-text",
+                            },
+                          ].filter((i) => i.valor > 0.01);
+                          if (itens.length === 0) return null;
+                          return (
+                            <div className="sm:hidden mt-3 flex justify-between gap-2">
+                              {itens.map((i) => (
+                                <div key={i.rotulo} className="min-w-0">
+                                  <div className="text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                                    {i.rotulo}
+                                  </div>
+                                  <div
+                                    className={`text-sm font-semibold tabular-nums whitespace-nowrap ${i.cor}`}
+                                  >
+                                    {formatCurrency(i.valor)}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                        <div className="hidden sm:flex flex-wrap justify-end gap-2 mt-4">
                           {!!clientGroup.totalReceived && (
                             <span
                               title="Pago"
@@ -1486,114 +1432,7 @@ export const CollectionTable = React.forwardRef<
           )}
         </div>
 
-        {/* Controles de Paginação */}
-        {totalPages > 1 && (
-          <div className="bg-gray-800 dark:bg-dark-bg-secondary mt-4 border border-gray-200 dark:border-dark-border px-4 sm:px-6 py-4 rounded-2xl">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="text-sm text-white text-center sm:text-left">
-                <span className="font-semibold">
-                  Página {currentPage} de {totalPages}
-                </span>
-                <span className="text-gray-300 dark:text-dark-text-secondary ml-2">
-                  • Mostrando {startItem} a {endItem} de {totalClientes}{" "}
-                  {totalClientes === 1 ? "cliente" : "clientes"} • {totalVendas}{" "}
-                  {totalVendas === 1 ? "venda" : "vendas"}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between w-full sm:w-auto space-x-1 sm:space-x-2">
-                {/* Botão Início */}
-                <button
-                  id="pagination-start-2"
-                  name="paginationStart2"
-                  onClick={() => setCurrentPage(1)}
-                  disabled={currentPage === 1}
-                  className="flex items-center px-2 sm:px-2 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-                >
-                  <span className="text-xs">Início</span>
-                </button>
-
-                {/* Botão Anterior */}
-                <button
-                  id="pagination-previous-2"
-                  name="paginationPrevious2"
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                  className="flex items-center px-2 sm:px-2 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-                >
-                  <ChevronLeft className="h-4 w-4 sm:mr-1" />
-                  <span className="hidden sm:inline">Anterior</span>
-                </button>
-
-                {/* Números das páginas */}
-                <div className="flex space-x-3 flex-1 justify-center sm:flex-none">
-                  {Array.from(
-                    {
-                      length: Math.min(maxButtons, totalPages),
-                    },
-                    (_, i) => {
-                      let pageNum;
-
-                      if (totalPages <= maxButtons) {
-                        pageNum = i + 1;
-                      } else if (currentPage <= Math.ceil(maxButtons / 2)) {
-                        pageNum = i + 1;
-                      } else if (
-                        currentPage >=
-                        totalPages - Math.floor(maxButtons / 2)
-                      ) {
-                        pageNum = totalPages - maxButtons + 1 + i;
-                      } else {
-                        pageNum = currentPage - Math.floor(maxButtons / 2) + i;
-                      }
-
-                      return (
-                        <button
-                          key={pageNum}
-                          id={`pagination-page-${pageNum}-2`}
-                          name={`paginationPage${pageNum}2`}
-                          onClick={() => setCurrentPage(pageNum)}
-                          className={`px-2 sm:px-2 py-2 text-sm font-semibold rounded-2xl transition-all duration-200 min-w-[34px] ${
-                            pageNum === currentPage
-                              ? "bg-white text-gray-800 shadow-lg"
-                              : "text-white bg-white bg-opacity-10 border border-white border-opacity-30 hover:bg-opacity-20"
-                          }`}
-                        >
-                          {pageNum}
-                        </button>
-                      );
-                    },
-                  )}
-                </div>
-
-                {/* Botão Próxima */}
-                <button
-                  id="pagination-next-2"
-                  name="paginationNext2"
-                  onClick={() =>
-                    setCurrentPage(Math.min(totalPages, currentPage + 1))
-                  }
-                  disabled={currentPage === totalPages}
-                  className="flex items-center px-2 sm:px-3 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-                >
-                  <span className="hidden sm:inline">Próxima</span>
-                  <ChevronRight className="h-4 w-4 sm:ml-1" />
-                </button>
-
-                {/* Botão Fim */}
-                <button
-                  id="pagination-end-2"
-                  name="paginationEnd2"
-                  onClick={() => setCurrentPage(totalPages)}
-                  disabled={currentPage === totalPages}
-                  className="flex items-center px-2 sm:px-3 py-2 border border-white border-opacity-30 rounded-2xl text-sm font-medium text-white bg-white bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-                >
-                  <span className="text-xs">Fim</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {totalPages > 1 && paginacao}
 
         {/* Ficha do cliente (unificacao, etapa 1) */}
         {isClientModalOpen &&
