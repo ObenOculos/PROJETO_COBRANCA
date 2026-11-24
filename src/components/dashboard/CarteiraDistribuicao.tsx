@@ -2090,17 +2090,31 @@ const CarteiraDistribuicao: React.FC = () => {
               <tbody>
                 {coberturaVisivel.map(({ loja, regras, ativas }) => {
                   const inativas = regras.filter(({ r }) => !r.ativa);
+                  // Cobradores com faixa ativa na loja: aparecem uma vez aqui;
+                  // a casa so repete nome quando difere (24/11, linhas baixas).
+                  const cobradoresDaLoja = Array.from(
+                    new Map(ativas.map(({ c }) => [c.id, c])).values(),
+                  );
+                  const unicoDaLoja =
+                    cobradoresDaLoja.length === 1 ? cobradoresDaLoja[0] : null;
                   return (
-                    <tr key={loja.loja} className="group align-top even:bg-gray-50/70 dark:even:bg-dark-bg/40">
-                      <td className="sticky left-0 z-10 bg-white group-even:bg-gray-50 dark:bg-dark-bg-secondary dark:group-even:bg-dark-bg py-2 px-2 border-b border-gray-100 dark:border-dark-border">
+                    <tr key={loja.loja} className="group align-middle">
+                      <td className="sticky left-0 z-10 bg-white group-even:bg-gray-50 dark:bg-dark-bg-secondary dark:group-even:bg-dark-bg h-[60px] py-1.5 px-2 border-b border-gray-100 dark:border-dark-border">
                         <div className="font-semibold text-gray-900 dark:text-dark-text flex items-center gap-1.5">
                           {temFalha(loja.loja) && (
                             <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
                           )}
                           {loja.loja}
                         </div>
-                        <div className="text-[11px] text-gray-500">
-                          {loja.clientes_em_aberto.toLocaleString("pt-BR")} em aberto
+                        <div className="text-[11px] text-gray-500 flex flex-wrap items-center gap-x-1.5">
+                          <span>{loja.clientes_em_aberto.toLocaleString("pt-BR")} em aberto</span>
+                          {cobradoresDaLoja.map((c) => (
+                            <span key={c.id} className="inline-flex items-center gap-1 text-gray-700 dark:text-dark-text">
+                              <span className="text-gray-300">·</span>
+                              <span className={`h-2 w-2 rounded-sm shrink-0 ${corPorCobrador.get(c.id)}`} />
+                              {c.name.split(" ")[0]}
+                            </span>
+                          ))}
                         </div>
                         {inativas.length > 0 && (
                           <div
@@ -2134,12 +2148,13 @@ const CarteiraDistribuicao: React.FC = () => {
                         const apagada =
                           !!cobradorCobertura &&
                           !donos.some((d) => d.id === cobradorCobertura);
+                        // Linha par (zebra): o mesmo fundo um tom acima.
                         const fundo = conflito
-                          ? "bg-red-50 dark:bg-red-900/15"
+                          ? "bg-red-50 group-even:bg-red-100/70 dark:bg-red-900/15"
                           : falha
-                            ? "bg-amber-50 dark:bg-amber-900/15"
+                            ? "bg-amber-50 group-even:bg-amber-100/70 dark:bg-amber-900/15"
                             : donos.length === 0
-                              ? "bg-gray-50 dark:bg-dark-bg/40"
+                              ? "bg-gray-50 group-even:bg-gray-100 dark:bg-dark-bg/40"
                               : "";
                         const detalhe = [
                           q.naCarteira > 0 && `${q.naCarteira} na carteira do dono da faixa`,
@@ -2158,60 +2173,69 @@ const CarteiraDistribuicao: React.FC = () => {
                         return (
                           <td
                             key={col.ini}
-                            className={`py-2 px-2 text-center border-b border-l border-gray-100 dark:border-dark-border ${fundo} ${apagada ? "opacity-40" : ""}`}
+                            className={`h-[60px] py-1.5 px-1.5 text-center border-b border-l border-gray-100 dark:border-dark-border ${fundo || "group-even:bg-gray-50 dark:group-even:bg-dark-bg/40"} ${apagada ? "opacity-40" : ""}`}
                             title={detalhe || "Nenhum cliente nesta faixa de atraso"}
                           >
-                            <div className="text-[11px] whitespace-nowrap">
-                              {donos.length > 0 ? (
-                                <span
-                                  className={`inline-flex items-center gap-1 ${conflito ? "font-semibold text-red-700 dark:text-red-300" : "text-gray-700 dark:text-dark-text"}`}
-                                >
-                                  {donos.map((d) => (
-                                    <span key={d.id} className="inline-flex items-center gap-1">
-                                      <span className={`h-2 w-2 rounded-sm shrink-0 ${corPorCobrador.get(d.id)}`} />
-                                      {d.name.split(" ")[0]}
-                                    </span>
-                                  ))}
-                                </span>
-                              ) : (
-                                <span className="text-gray-400">ninguém cobra</span>
-                              )}
-                            </div>
+                            {/* Nome so quando difere do cobrador da loja. */}
+                            {(donos.length === 0 ||
+                              conflito ||
+                              !unicoDaLoja ||
+                              donos.some((d) => d.id !== unicoDaLoja.id)) && (
+                              <div className="text-[10px] leading-tight whitespace-nowrap truncate">
+                                {donos.length > 0 ? (
+                                  <span
+                                    className={conflito ? "font-semibold text-red-700 dark:text-red-300" : "text-gray-600 dark:text-dark-text-secondary"}
+                                  >
+                                    {donos.map((d) => d.name.split(" ")[0]).join(" e ")}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-400">ninguém cobra</span>
+                                )}
+                              </div>
+                            )}
                             <div
-                              className={`text-base font-bold leading-tight ${
+                              className={`text-base font-bold leading-tight tabular-nums ${
                                 q.total === 0 ? "text-gray-300 dark:text-dark-text-secondary" : "text-gray-900 dark:text-dark-text"
                               }`}
                             >
                               {q.total.toLocaleString("pt-BR")}
                             </div>
-                            {q.sem > 0 && (
-                              <div className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 whitespace-nowrap">
-                                {q.sem} sem cobrador
-                              </div>
-                            )}
-                            {q.foraSem > 0 && (
-                              <div className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 whitespace-nowrap">
-                                {q.foraSem} fora da faixa
-                              </div>
-                            )}
-                            {Array.from(q.aguardando.entries()).map(([sit, n]) => (
-                              <div
-                                key={sit}
-                                className="text-[10px] text-gray-500 whitespace-nowrap"
-                              >
-                                {n} {sit.toLowerCase()}
-                              </div>
-                            ))}
-                            {q.comOutro + q.foraCom > 0 && (
-                              <div className="text-[10px] text-gray-500 whitespace-nowrap">
-                                {q.comOutro + q.foraCom} com outro
-                              </div>
-                            )}
-                            {q.carencia > 0 && (
-                              <div className="text-[10px] text-gray-400 whitespace-nowrap">
-                                {q.carencia} na carência
-                              </div>
-                            )}
+                            {/* Detalhe numa linha: falha em ambar, o resto cinza;
+                                o texto completo fica no title da casa. */}
+                            {(() => {
+                              const nAguardando = Array.from(q.aguardando.values()).reduce(
+                                (a, b) => a + b,
+                                0,
+                              );
+                              const partes: { t: string; falha?: boolean }[] = [
+                                ...(q.foraSem > 0 ? [{ t: `${q.foraSem} fora`, falha: true }] : []),
+                                ...(q.sem > 0 ? [{ t: `${q.sem} sem cobr.`, falha: true }] : []),
+                                ...(q.comOutro + q.foraCom > 0
+                                  ? [{ t: `${q.comOutro + q.foraCom} c/ outro` }]
+                                  : []),
+                                ...(nAguardando > 0 ? [{ t: `${nAguardando} jurídico` }] : []),
+                                ...(q.carencia > 0 ? [{ t: `${q.carencia} carência` }] : []),
+                              ];
+                              if (partes.length === 0) return null;
+                              return (
+                                <div className="text-[10px] leading-tight whitespace-nowrap truncate">
+                                  {partes.map((p, k) => (
+                                    <span key={p.t}>
+                                      {k > 0 && <span className="text-gray-300"> · </span>}
+                                      <span
+                                        className={
+                                          p.falha
+                                            ? "font-semibold text-amber-700 dark:text-amber-300"
+                                            : "text-gray-500"
+                                        }
+                                      >
+                                        {p.t}
+                                      </span>
+                                    </span>
+                                  ))}
+                                </div>
+                              );
+                            })()}
                           </td>
                         );
                       })}
