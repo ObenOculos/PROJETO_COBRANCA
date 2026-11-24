@@ -1072,24 +1072,24 @@ export const CollectionTable = React.forwardRef<
                       Sair
                     </button>
                   </div>
-                  <div className="mt-2 sm:mt-0 flex items-center justify-between sm:justify-end gap-2">
+                  <div className="mt-2 sm:mt-0 grid grid-cols-2 sm:flex sm:items-center sm:justify-end gap-2">
                     <button
                       type="button"
                       onClick={() => handleToggleSelectAll(paginatedSalesGroups)}
-                      className="whitespace-nowrap px-3 h-9 rounded-xl text-sm font-medium text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                      className="whitespace-nowrap px-2 sm:px-3 h-9 rounded-xl text-sm font-medium text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
                     >
                       {selectedClients.size > 0 &&
                       selectedClients.size === paginatedSalesGroups.length
                         ? "Desmarcar todos"
-                        : "Marcar a página"}
+                        : "Marcar todos"}
                     </button>
                     <button
                       type="button"
                       onClick={() => setShowBulkDeleteModal(true)}
                       disabled={selectedClients.size === 0}
-                      className="whitespace-nowrap flex items-center gap-1.5 px-3 h-9 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:bg-red-300 dark:disabled:bg-red-900/40 disabled:cursor-not-allowed transition-colors"
+                      className="whitespace-nowrap flex items-center justify-center gap-1.5 px-2 sm:px-3 h-9 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:bg-red-300 dark:disabled:bg-red-900/40 disabled:cursor-not-allowed transition-colors"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="hidden sm:block h-4 w-4" />
                       Cancelar vendas
                       {selectedClients.size > 0 && ` (${selectedClients.size})`}
                     </button>
