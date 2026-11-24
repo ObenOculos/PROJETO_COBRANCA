@@ -33,6 +33,9 @@ import {
   AcordoPagamento,
   AcordoConfiguracaoPadrao,
   CredorLoja,
+  CredorMarca,
+  Marca,
+  CadastroCredor,
   AcordoLancamentoCiclone,
   AcordoLancamentoCicloneStatus,
   SistemaLancamentoAcordo,
@@ -311,6 +314,11 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     useState<AcordoConfiguracaoPadrao | null>(null);
   // Credor do acordo por loja (item 91), com historico.
   const [credoresLoja, setCredoresLoja] = useState<CredorLoja[]>([]);
+  const [marcas, setMarcas] = useState<Marca[]>([]);
+  const [credoresMarca, setCredoresMarca] = useState<CredorMarca[]>([]);
+  const [lojaMarca, setLojaMarca] = useState<Map<string, string>>(
+    () => new Map(),
+  );
   const [allowedVisitDates, setAllowedVisitDates] = useState<
     AllowedVisitDate[]
   >([]);
@@ -987,7 +995,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             fetchReincidenciaResets(),
             fetchAcordos(),
             fetchAcordoConfiguracaoPadrao(),
-            fetchCredoresLoja(),
+            fetchCadastroCredor(),
             fetchCollectorOverdueRanges(),
             fetchManagerCollectorLinks(),
           ]);
@@ -2378,10 +2386,14 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     return nova;
   };
 
-  // Credor do acordo por loja (item 91, migration 20261124000008).
-  const LOGOS_LOJAS_BUCKET = "logos-lojas";
+  // Credor do acordo por marca/loja (item 91, migrations 20261124000008/9).
+  const LOGOS_BUCKET = "logos-lojas";
+
+  const urlLogo = (path: string | null) =>
+    path ? supabase.storage.from(LOGOS_BUCKET).getPublicUrl(path).data.publicUrl : null;
 
   type CredorLojaRow = Database["public"]["Tables"]["acordo_credor_loja"]["Row"];
+  type CredorMarcaRow = Database["public"]["Tables"]["marca_credor"]["Row"];
 
   const mapCredorLojaRow = (row: CredorLojaRow): CredorLoja => ({
     id: row.id,
@@ -2391,29 +2403,123 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     empresaEndereco: row.empresa_endereco,
     empresaChavePix: row.empresa_chave_pix,
     logoPath: row.logo_path,
-    logoUrl: row.logo_path
-      ? supabase.storage.from(LOGOS_LOJAS_BUCKET).getPublicUrl(row.logo_path)
-          .data.publicUrl
-      : null,
+    logoUrl: urlLogo(row.logo_path),
     vigenteAte: row.vigente_ate,
     createdAt: row.created_at,
   });
 
-  const fetchCredoresLoja = async () => {
+  const mapCredorMarcaRow = (row: CredorMarcaRow): CredorMarca => ({
+    id: row.id,
+    marcaId: row.marca_id,
+    empresaNome: row.empresa_nome,
+    empresaCnpj: row.empresa_cnpj,
+    empresaEndereco: row.empresa_endereco,
+    empresaChavePix: row.empresa_chave_pix,
+    logoPath: row.logo_path,
+    logoUrl: urlLogo(row.logo_path),
+    vigenteAte: row.vigente_ate,
+    createdAt: row.created_at,
+  });
+
+  const fetchCadastroCredor = async () => {
     try {
-      // Tabela pequena (algumas linhas por loja): carrega o historico todo
-      // para o Termo antigo achar o registro vigente na data do acordo.
-      const { data, error: fetchError } = await supabase
-        .from("acordo_credor_loja")
-        .select("*")
-        .order("created_at")
-        .order("id");
-      if (fetchError) throw fetchError;
-      setCredoresLoja((data ?? []).map(mapCredorLojaRow));
+      // Tabelas pequenas (poucas linhas por marca/loja): carrega o historico
+      // todo para o Termo antigo achar o registro vigente na data do acordo.
+      const [marcasRes, credMarcaRes, credLojaRes, lojaMarcaRes] =
+        await Promise.all([
+          supabase.from("marcas").select("id, nome").order("nome").order("id"),
+          supabase
+            .from("marca_credor")
+            .select("*")
+            .order("created_at")
+            .order("id"),
+          supabase
+            .from("acordo_credor_loja")
+            .select("*")
+            .order("created_at")
+            .order("id"),
+          supabase
+            .from("loja_marca")
+            .select("nome_da_loja, marca_id")
+            .order("nome_da_loja"),
+        ]);
+      for (const r of [marcasRes, credMarcaRes, credLojaRes, lojaMarcaRes]) {
+        if (r.error) throw r.error;
+      }
+      setMarcas((marcasRes.data ?? []) as Marca[]);
+      setCredoresMarca((credMarcaRes.data ?? []).map(mapCredorMarcaRow));
+      setCredoresLoja((credLojaRes.data ?? []).map(mapCredorLojaRow));
+      setLojaMarca(
+        new Map(
+          (lojaMarcaRes.data ?? []).map((r) => [r.nome_da_loja, r.marca_id]),
+        ),
+      );
     } catch (err) {
-      // Sem a migration aplicada, tudo segue no padrao.
-      console.error("Erro ao buscar dados das lojas no acordo:", err);
+      // Sem as migrations aplicadas, tudo segue no padrao.
+      console.error("Erro ao buscar marcas/lojas do acordo:", err);
     }
+  };
+
+  const cadastroCredor = useMemo<CadastroCredor>(
+    () => ({
+      padrao: acordoConfiguracaoPadrao,
+      marcas,
+      credoresMarca,
+      credoresLoja,
+      lojaMarca,
+    }),
+    [acordoConfiguracaoPadrao, marcas, credoresMarca, credoresLoja, lojaMarca],
+  );
+
+  const criarMarca = async (nome: string): Promise<Marca> => {
+    const { data, error: rpcError } = await supabase.rpc("criar_marca", {
+      p_nome: nome,
+    });
+    if (rpcError) {
+      console.error("Erro ao criar marca:", rpcError);
+      throw rpcError;
+    }
+    await fetchCadastroCredor();
+    const nova = data as { id: string; nome: string };
+    return { id: nova.id, nome: nova.nome };
+  };
+
+  const definirCredorMarca = async (params: {
+    marcaId: string;
+    empresaNome: string;
+    empresaCnpj: string;
+    empresaEndereco: string;
+    empresaChavePix: string;
+    logoPath: string;
+  }): Promise<void> => {
+    const { error: rpcError } = await supabase.rpc("definir_credor_marca", {
+      p_marca_id: params.marcaId,
+      p_empresa_nome: params.empresaNome,
+      p_empresa_cnpj: params.empresaCnpj,
+      p_empresa_endereco: params.empresaEndereco,
+      p_empresa_chave_pix: params.empresaChavePix,
+      p_logo_path: params.logoPath,
+    });
+    if (rpcError) {
+      console.error("Erro ao salvar dados da marca:", rpcError);
+      throw rpcError;
+    }
+    await fetchCadastroCredor();
+  };
+
+  const definirMarcaDaLoja = async (
+    nomeDaLoja: string,
+    marcaId: string | null,
+  ): Promise<void> => {
+    const { error: rpcError } = await supabase.rpc("definir_marca_da_loja", {
+      p_nome_da_loja: nomeDaLoja,
+      p_marca_id: marcaId,
+    });
+    if (rpcError) {
+      console.error("Erro ao definir a marca da loja:", rpcError);
+      throw rpcError;
+    }
+    await fetchCadastroCredor();
   };
 
   const definirCredorAcordoLoja = async (params: {
@@ -2423,45 +2529,39 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     empresaEndereco: string;
     empresaChavePix: string;
     logoPath: string;
-  }): Promise<CredorLoja> => {
-    const { data, error: rpcError } = await supabase
-      .rpc("definir_credor_acordo_loja", {
-        p_nome_da_loja: params.nomeDaLoja,
-        p_empresa_nome: params.empresaNome,
-        p_empresa_cnpj: params.empresaCnpj,
-        p_empresa_endereco: params.empresaEndereco,
-        p_empresa_chave_pix: params.empresaChavePix,
-        p_logo_path: params.logoPath,
-      })
-      .single();
+  }): Promise<void> => {
+    const { error: rpcError } = await supabase.rpc("definir_credor_acordo_loja", {
+      p_nome_da_loja: params.nomeDaLoja,
+      p_empresa_nome: params.empresaNome,
+      p_empresa_cnpj: params.empresaCnpj,
+      p_empresa_endereco: params.empresaEndereco,
+      p_empresa_chave_pix: params.empresaChavePix,
+      p_logo_path: params.logoPath,
+    });
     if (rpcError) {
-      console.error("Erro ao salvar dados da loja no acordo:", rpcError);
+      console.error("Erro ao salvar a exceção da loja:", rpcError);
       throw rpcError;
     }
-    await fetchCredoresLoja();
-    return mapCredorLojaRow(data);
+    await fetchCadastroCredor();
   };
 
-  const enviarLogoLoja = async (
-    nomeDaLoja: string,
-    arquivo: File,
-  ): Promise<string> => {
+  const enviarLogo = async (pasta: string, arquivo: File): Promise<string> => {
     const ext = arquivo.type === "image/png" ? "png" : "jpg";
-    const pasta =
-      nomeDaLoja
+    const slug =
+      pasta
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
         .replace(/[^A-Za-z0-9]+/g, "-")
         .replace(/^-|-$/g, "")
-        .toLowerCase() || "loja";
+        .toLowerCase() || "logo";
     // Nome unico: o arquivo antigo nunca e sobrescrito (Termo antigo segue
     // com o logo da epoca).
-    const caminho = `${pasta}/${Date.now()}.${ext}`;
+    const caminho = `${slug}/${Date.now()}.${ext}`;
     const { error: upError } = await supabase.storage
-      .from(LOGOS_LOJAS_BUCKET)
+      .from(LOGOS_BUCKET)
       .upload(caminho, arquivo, { contentType: arquivo.type, upsert: false });
     if (upError) {
-      console.error("Erro ao enviar logo da loja:", upError);
+      console.error("Erro ao enviar logo:", upError);
       throw upError;
     }
     return caminho;
@@ -5489,10 +5589,13 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     acordoConfiguracaoPadrao,
     fetchAcordoConfiguracaoPadrao,
     definirConfiguracaoPadraoAcordo,
-    credoresLoja,
-    fetchCredoresLoja,
+    cadastroCredor,
+    fetchCadastroCredor,
+    criarMarca,
+    definirCredorMarca,
+    definirMarcaDaLoja,
     definirCredorAcordoLoja,
-    enviarLogoLoja,
+    enviarLogo,
     criarAcordo,
     fetchAcordoDetalhe,
     fetchAcordoLancamentoCiclone,

@@ -1572,6 +1572,42 @@ export type Database = {
           },
         ];
       };
+      loja_marca: {
+        Row: {
+          marca_id: string;
+          nome_da_loja: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          marca_id: string;
+          nome_da_loja: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          marca_id?: string;
+          nome_da_loja?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "loja_marca_marca_id_fkey";
+            columns: ["marca_id"];
+            isOneToOne: false;
+            referencedRelation: "marcas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "loja_marca_updated_by_fkey";
+            columns: ["updated_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       manager_collector_links: {
         Row: {
           collector_id: string;
@@ -1618,6 +1654,89 @@ export type Database = {
           {
             foreignKeyName: "manager_collector_links_manager_id_fkey";
             columns: ["manager_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      marca_credor: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          empresa_chave_pix: string | null;
+          empresa_cnpj: string | null;
+          empresa_endereco: string | null;
+          empresa_nome: string | null;
+          id: string;
+          logo_path: string | null;
+          marca_id: string;
+          vigente_ate: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          empresa_chave_pix?: string | null;
+          empresa_cnpj?: string | null;
+          empresa_endereco?: string | null;
+          empresa_nome?: string | null;
+          id?: string;
+          logo_path?: string | null;
+          marca_id: string;
+          vigente_ate?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          empresa_chave_pix?: string | null;
+          empresa_cnpj?: string | null;
+          empresa_endereco?: string | null;
+          empresa_nome?: string | null;
+          id?: string;
+          logo_path?: string | null;
+          marca_id?: string;
+          vigente_ate?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "marca_credor_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "marca_credor_marca_id_fkey";
+            columns: ["marca_id"];
+            isOneToOne: false;
+            referencedRelation: "marcas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      marcas: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          nome: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          nome: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          nome?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "marcas_created_by_fkey";
+            columns: ["created_by"];
             isOneToOne: false;
             referencedRelation: "users";
             referencedColumns: ["id"];
@@ -2821,6 +2940,21 @@ export type Database = {
               isSetofReturn: false;
             };
           };
+      criar_marca: {
+        Args: { p_nome: string };
+        Returns: {
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          nome: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "marcas";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       criar_usuario_com_login: {
         Args: {
           p_login: string;
@@ -2944,8 +3078,40 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      definir_credor_marca: {
+        Args: {
+          p_empresa_chave_pix: string;
+          p_empresa_cnpj: string;
+          p_empresa_endereco: string;
+          p_empresa_nome: string;
+          p_logo_path: string;
+          p_marca_id: string;
+        };
+        Returns: {
+          created_at: string;
+          created_by: string | null;
+          empresa_chave_pix: string | null;
+          empresa_cnpj: string | null;
+          empresa_endereco: string | null;
+          empresa_nome: string | null;
+          id: string;
+          logo_path: string | null;
+          marca_id: string;
+          vigente_ate: string | null;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "marca_credor";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       definir_fila_cobranca: {
         Args: { p_collector_id: string; p_pesos: Json };
+        Returns: undefined;
+      };
+      definir_marca_da_loja: {
+        Args: { p_marca_id: string | null; p_nome_da_loja: string };
         Returns: undefined;
       };
       definir_metas_mes: {

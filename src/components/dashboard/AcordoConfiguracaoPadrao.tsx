@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Save, Percent, Building2, CheckCircle2, AlertCircle } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
-import CredorLojaConfig from "./CredorLojaConfig";
+import MarcasLojasConfig from "./MarcasLojasConfig";
 import type { AcordoConfiguracaoPadrao as Config } from "../../types";
 
 // Tela do gestor (Etapa 3a da iniciativa "Termo de Acordo automatico", ver
@@ -9,7 +9,7 @@ import type { AcordoConfiguracaoPadrao as Config } from "../../types";
 // e os dados da empresa usados como ponto de partida ao negociar um acordo
 // novo (AcordoModal) e impressos no Termo de Acordo. O cobrador continua
 // podendo ajustar os valores na negociacao -- isto so define o valor
-// inicial que ele ve. Dados por loja (item 91) em CredorLojaConfig.
+// inicial que ele ve. Credor por marca/loja (item 91) em MarcasLojasConfig.
 
 interface Form {
   multaPercentual: string;
@@ -273,7 +273,7 @@ const AcordoConfiguracaoPadrao: React.FC = () => {
                 Empresa padrão
               </h3>
               <p className="mt-1 text-xs text-gray-500 dark:text-dark-text-secondary">
-                Credor e Pix das lojas sem cadastro próprio (abaixo).
+                Credor, Pix e logo das lojas sem marca ou de marca sem dados.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-3">
@@ -304,7 +304,7 @@ const AcordoConfiguracaoPadrao: React.FC = () => {
         </div>
       </form>
 
-      <CredorLojaConfig />
+      <MarcasLojasConfig />
     </div>
   );
 };

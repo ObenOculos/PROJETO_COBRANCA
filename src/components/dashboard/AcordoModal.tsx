@@ -113,7 +113,7 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
   const {
     criarAcordo,
     acordoConfiguracaoPadrao,
-    credoresLoja,
+    cadastroCredor,
     fetchAcordoDetalhe,
     registrarPagamentoAcordo,
     clientesRegistry,
@@ -174,12 +174,8 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
   );
   const credor = useMemo(
     () =>
-      resolverCredorAcordo(
-        acordoConfiguracaoPadrao,
-        credoresLoja,
-        lojaAcordo || null,
-      ),
-    [acordoConfiguracaoPadrao, credoresLoja, lojaAcordo],
+      resolverCredorAcordo(cadastroCredor, lojaAcordo || null),
+    [cadastroCredor, lojaAcordo],
   );
 
   const gruposPorVenda = useMemo(() => {

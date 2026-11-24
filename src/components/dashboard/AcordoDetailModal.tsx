@@ -55,8 +55,7 @@ const AcordoDetailModal: React.FC<AcordoDetailModalProps> = ({
     registrarPagamentoAcordo,
     cancelarAcordo,
     getClientGroups,
-    acordoConfiguracaoPadrao,
-    credoresLoja,
+    cadastroCredor,
     clientesRegistry,
   } = useCollection();
 
@@ -199,8 +198,7 @@ const AcordoDetailModal: React.FC<AcordoDetailModalProps> = ({
         // Loja dos títulos, com os dados vigentes quando o acordo foi
         // criado (trocar a chave hoje não muda o Termo de ontem).
         empresa: resolverCredorAcordo(
-          acordoConfiguracaoPadrao,
-          credoresLoja,
+          cadastroCredor,
           lojaDosTitulos(titulos),
           acordo.createdAt,
         ),

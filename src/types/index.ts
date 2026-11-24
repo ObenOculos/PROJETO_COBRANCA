@@ -534,21 +534,33 @@ export interface CollectionContextType {
     empresaEndereco: string;
     empresaChavePix: string;
   }) => Promise<AcordoConfiguracaoPadrao>;
-  // Credor do acordo por loja (item 91): todos os registros, com historico
-  // (o Termo antigo usa o vigente na data do acordo).
-  credoresLoja: CredorLoja[];
-  fetchCredoresLoja: () => Promise<void>;
-  definirCredorAcordoLoja: (params: {
-    nomeDaLoja: string;
+  // Credor do acordo por marca/loja (item 91): todos os registros, com
+  // historico (o Termo antigo usa o vigente na data do acordo).
+  cadastroCredor: CadastroCredor;
+  fetchCadastroCredor: () => Promise<void>;
+  criarMarca: (nome: string) => Promise<Marca>;
+  definirCredorMarca: (params: {
+    marcaId: string;
     empresaNome: string;
     empresaCnpj: string;
     empresaEndereco: string;
     empresaChavePix: string;
     /** Caminho no bucket (ja enviado) ou "" sem logo. */
     logoPath: string;
-  }) => Promise<CredorLoja>;
-  /** Sobe o arquivo de logo e devolve o caminho no bucket. */
-  enviarLogoLoja: (nomeDaLoja: string, arquivo: File) => Promise<string>;
+  }) => Promise<void>;
+  /** marcaId null = loja sem marca. */
+  definirMarcaDaLoja: (nomeDaLoja: string, marcaId: string | null) => Promise<void>;
+  definirCredorAcordoLoja: (params: {
+    nomeDaLoja: string;
+    empresaNome: string;
+    empresaCnpj: string;
+    empresaEndereco: string;
+    empresaChavePix: string;
+    /** Caminho no bucket (ja enviado) ou "" = segue a marca. */
+    logoPath: string;
+  }) => Promise<void>;
+  /** Sobe o arquivo de logo (pasta = marca ou loja) e devolve o caminho no bucket. */
+  enviarLogo: (pasta: string, arquivo: File) => Promise<string>;
   criarAcordo: (params: {
     clientDocument: string;
     titulos: {
@@ -938,9 +950,30 @@ export interface AcordoConfiguracaoPadrao {
   createdAt: string;
 }
 
-// Credor do acordo por loja (item 91, migration 20261124000008): nome, CNPJ,
-// endereco, chave Pix e logo de uma loja, com historico. Registro com tudo
-// null = a loja voltou a usar o padrao (AcordoConfiguracaoPadrao).
+// Credor do acordo (item 91): cadastrado por MARCA (Focco, Oticas Luana,
+// Excellence) e herdado pelas lojas dela; a loja so guarda excecao. Ver
+// migrations 20261124000008/9 e utils/credorAcordo.ts.
+export interface Marca {
+  id: string;
+  nome: string;
+}
+
+/** Dados do credor de uma marca, com historico (vigenteAte null = atual). */
+export interface CredorMarca {
+  id: string;
+  marcaId: string;
+  empresaNome: string | null;
+  empresaCnpj: string | null;
+  empresaEndereco: string | null;
+  empresaChavePix: string | null;
+  logoPath: string | null;
+  logoUrl: string | null;
+  vigenteAte: string | null;
+  createdAt: string;
+}
+
+/** Excecao da loja a marca, com historico. Dados null = segue a marca;
+ * logo null = segue a marca. */
 export interface CredorLoja {
   id: string;
   nomeDaLoja: string;
@@ -955,7 +988,19 @@ export interface CredorLoja {
   createdAt: string;
 }
 
-/** Quem recebe no acordo (Termo, Resumo e Pix), ja resolvido loja × padrao. */
+/** Tudo o que resolve o credor de um acordo (carregado pelo contexto). */
+export interface CadastroCredor {
+  padrao: AcordoConfiguracaoPadrao | null;
+  marcas: Marca[];
+  credoresMarca: CredorMarca[];
+  credoresLoja: CredorLoja[];
+  /** nome_da_loja -> marca_id */
+  lojaMarca: Map<string, string>;
+}
+
+export type OrigemCredor = "loja" | "marca" | "padrao";
+
+/** Quem recebe no acordo (Termo, Resumo e Pix), ja resolvido loja × marca × padrao. */
 export interface CredorAcordo {
   empresaNome: string | null;
   empresaCnpj: string | null;
@@ -963,8 +1008,10 @@ export interface CredorAcordo {
   empresaChavePix: string | null;
   /** URL do logo; null = sem logo; undefined = logo padrao do app (Focco). */
   logoUrl?: string | null;
-  /** Loja de onde vieram os dados; null = padrao. */
-  lojaConfigurada: string | null;
+  origemDados: OrigemCredor;
+  origemLogo: OrigemCredor;
+  /** Marca da loja (null = loja sem marca). */
+  marca: Marca | null;
 }
 
 export interface SaleBalance {
