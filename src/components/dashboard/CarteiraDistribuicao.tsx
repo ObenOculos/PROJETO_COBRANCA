@@ -1096,7 +1096,15 @@ const CarteiraDistribuicao: React.FC = () => {
       return;
     }
     setMapaErro(false);
-    setMapaCarteira(data ?? []);
+    // jsonb (migration 20261124000003): linhas cortariam em 1.000.
+    setMapaCarteira(
+      (data ?? []) as {
+        loja: string;
+        atraso: number;
+        cobrador_id: string | null;
+        clientes: number;
+      }[],
+    );
   }, []);
   useEffect(() => {
     void carregarMapa();
