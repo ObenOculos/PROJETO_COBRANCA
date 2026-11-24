@@ -720,6 +720,12 @@ const CarteiraDistribuicao: React.FC = () => {
   const [confirmAplicar, setConfirmAplicar] = useState(false);
   const [erroDistribuicao, setErroDistribuicao] = useState("");
   const [resultado, setResultado] = useState<string>("");
+  const resultadoRef = React.useRef<HTMLParagraphElement>(null);
+  // Mostra o resultado de aplicar (o botao fica bem abaixo da mensagem).
+  useEffect(() => {
+    if (resultado)
+      resultadoRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [resultado]);
   const [filtroAcao, setFiltroAcao] = useState<AcaoDistribuicao | "travados" | "">("");
   // Cobradores sem regra dos quais o GESTOR decidiu retirar os clientes que
   // as regras cobrem (p_retirar_de). Comeca vazio: a distribuicao nunca tira
@@ -1257,11 +1263,13 @@ const CarteiraDistribuicao: React.FC = () => {
         clientes_atribuidos: number;
         clientes_retirados: number;
       };
+      setConfirmAplicar(false);
+      // A nova simulacao limpa o resultado: a mensagem vem depois dela
+      // (antes sumia e o gestor ficava sem retorno).
+      await simular();
       setResultado(
         `Distribuição aplicada: ${r.clientes_atribuidos} cliente(s) atribuído(s) e ${r.clientes_retirados} sem cobrador agora. As outras telas mostram a mudança na próxima consulta.`,
       );
-      setConfirmAplicar(false);
-      await simular();
     } catch (err) {
       setErroDistribuicao(
         "Falha ao aplicar: " +
@@ -1976,7 +1984,11 @@ const CarteiraDistribuicao: React.FC = () => {
           <p className="mb-3 p-3 rounded-lg bg-red-50 text-red-700 text-sm">{erroDistribuicao}</p>
         )}
         {resultado && (
-          <p className="mb-3 p-3 rounded-lg bg-green-50 text-green-700 text-sm flex items-center gap-2 dark:bg-green-900/20 dark:text-green-300">
+          <p
+            ref={resultadoRef}
+            role="status"
+            className="mb-3 p-3 rounded-lg bg-green-50 text-green-700 text-sm flex items-center gap-2 dark:bg-green-900/20 dark:text-green-300"
+          >
             <CheckCircle className="h-4 w-4 shrink-0" />
             {resultado}
           </p>
