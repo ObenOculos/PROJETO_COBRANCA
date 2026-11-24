@@ -67,8 +67,10 @@ const EditorCoberturaLoja: React.FC<{
     for (const l of linhas) {
       if (!l.collectorId) return "Escolha o cobrador de cada faixa.";
       const min = Number(l.min);
-      if (l.min.trim() === "" || !Number.isInteger(min) || min < 0)
-        return "Informe o início de cada faixa (0 ou mais).";
+      // 1 dia ou mais: cliente a vencer nao vai para cobrador (o banco
+      // recusa tambem).
+      if (l.min.trim() === "" || !Number.isInteger(min) || min < 1)
+        return "Cada faixa começa em 1 dia de atraso ou mais.";
       const max = l.max.trim() === "" ? null : Number(l.max);
       if (max != null && (!Number.isInteger(max) || max <= min))
         return "O fim da faixa deve ser maior que o início, ou deixe sem limite.";
@@ -159,7 +161,7 @@ const EditorCoberturaLoja: React.FC<{
                 <span className="text-gray-500 text-xs">de</span>
                 <input
                   type="number"
-                  min={0}
+                  min={1}
                   value={l.min}
                   onChange={(e) => mudar(l.chave, { min: e.target.value })}
                   className="w-20 px-2 py-1.5 rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-sm tabular-nums"

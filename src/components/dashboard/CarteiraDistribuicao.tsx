@@ -970,8 +970,10 @@ const CarteiraDistribuicao: React.FC = () => {
     const r = rascunhoDaLinha(chave, regra);
     const min = r.min.trim() === "" ? null : Number(r.min);
     const max = r.max.trim() === "" ? null : Number(r.max);
-    if (min === null || Number.isNaN(min) || min < 0) {
-      setErroRegra((p) => ({ ...p, [chave]: "Informe o início da faixa (0 ou mais)." }));
+    // Faixa comeca em 1 dia ou mais: cliente a vencer nao vai para cobrador
+    // (24/11; o banco recusa tambem).
+    if (min === null || Number.isNaN(min) || min < 1) {
+      setErroRegra((p) => ({ ...p, [chave]: "A faixa começa em 1 dia de atraso ou mais." }));
       return;
     }
     if (max !== null && (Number.isNaN(max) || max <= min)) {
@@ -1840,7 +1842,7 @@ const CarteiraDistribuicao: React.FC = () => {
                         <div className="grid grid-cols-2 md:grid-cols-[90px_90px_minmax(0,1fr)_auto] gap-2 items-center">
                           <input
                             type="number"
-                            min={0}
+                            min={1}
                             value={r.min}
                             placeholder="De (dias)"
                             onChange={(e) => setRascunho(chave, { min: e.target.value }, r)}
