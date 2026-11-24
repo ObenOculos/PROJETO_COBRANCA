@@ -2127,7 +2127,26 @@ const CarteiraDistribuicao: React.FC = () => {
                           </button>
                         </div>
                         <div className="text-[11px] text-gray-500 flex flex-wrap items-center gap-x-1.5">
-                          <span>{loja.clientes_em_aberto.toLocaleString("pt-BR")} em aberto</span>
+                          {/* Em atraso x a vencer (padrao: nunca um "em aberto"
+                              unico); mesma base da tabela (carteira_mapa). */}
+                          {(() => {
+                            let atraso = 0;
+                            let aVencer = 0;
+                            (clientesPorLoja.get(loja.loja) ?? []).forEach((x) => {
+                              if (x.atraso > 0) atraso += x.n;
+                              else aVencer += x.n;
+                            });
+                            return (
+                              <span>
+                                <span className="text-red-600 dark:text-red-400">
+                                  {atraso.toLocaleString("pt-BR")} em atraso
+                                </span>
+                                {aVencer > 0 && (
+                                  <span> · {aVencer.toLocaleString("pt-BR")} a vencer</span>
+                                )}
+                              </span>
+                            );
+                          })()}
                           {cobradoresDaLoja.map((c) => (
                             <span key={c.id} className="inline-flex items-center gap-1 text-gray-700 dark:text-dark-text">
                               <span className="text-gray-300">·</span>
