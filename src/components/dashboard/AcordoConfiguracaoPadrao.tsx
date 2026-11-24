@@ -1,61 +1,138 @@
-import React, { useEffect, useState } from "react";
-import { Save, Percent, Building2, CheckCircle2 } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { Save, Percent, Building2, CheckCircle2, AlertCircle } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import CredorLojaConfig from "./CredorLojaConfig";
+import type { AcordoConfiguracaoPadrao as Config } from "../../types";
 
 // Tela do gestor (Etapa 3a da iniciativa "Termo de Acordo automatico", ver
 // docs/PROGRESSO.md pendencia 12): define o padrao de multa/juros/desconto
 // e os dados da empresa usados como ponto de partida ao negociar um acordo
 // novo (AcordoModal) e impressos no Termo de Acordo. O cobrador continua
 // podendo ajustar os valores na negociacao -- isto so define o valor
-// inicial que ele ve.
+// inicial que ele ve. Dados por loja (item 91) em CredorLojaConfig.
+
+interface Form {
+  multaPercentual: string;
+  jurosPercentualAm: string;
+  descontoPadraoPercentual: string;
+  descontoMaximoPercentual: string;
+  diasEntreParcelas: string;
+  empresaNome: string;
+  empresaCnpj: string;
+  empresaEndereco: string;
+  empresaChavePix: string;
+}
+
+const formDe = (c: Config | null): Form => ({
+  multaPercentual: String(c?.multaPercentual ?? 0),
+  jurosPercentualAm: String(c?.jurosPercentualAm ?? 0),
+  descontoPadraoPercentual: String(c?.descontoPadraoPercentual ?? 0),
+  descontoMaximoPercentual: String(c?.descontoMaximoPercentual ?? 0),
+  diasEntreParcelas: String(c?.diasEntreParcelas ?? 30),
+  empresaNome: c?.empresaNome ?? "",
+  empresaCnpj: c?.empresaCnpj ?? "",
+  empresaEndereco: c?.empresaEndereco ?? "",
+  empresaChavePix: c?.empresaChavePix ?? "",
+});
+
+const inputCls =
+  "w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 dark:bg-dark-bg-tertiary dark:border-dark-border dark:text-dark-text";
+
+const cardCls =
+  "bg-white dark:bg-dark-bg-secondary border border-gray-200 dark:border-dark-border rounded-2xl p-5";
+
+/** Campo numerico com unidade a direita ("%", "% a.m.", "dias"). */
+const CampoNumero: React.FC<{
+  label: string;
+  unidade: string;
+  dica: string;
+  value: string;
+  onChange: (v: string) => void;
+  step?: string;
+  min?: number;
+}> = ({ label, unidade, dica, value, onChange, step = "0.01", min = 0 }) => (
+  <div>
+    <label className="block text-xs font-bold text-gray-500 dark:text-dark-text-secondary mb-1">
+      {label}
+    </label>
+    <div className="relative">
+      <input
+        type="number"
+        inputMode="decimal"
+        step={step}
+        min={min}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${inputCls} pr-14`}
+      />
+      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">
+        {unidade}
+      </span>
+    </div>
+    <p className="mt-1 text-[11px] leading-snug text-gray-400">{dica}</p>
+  </div>
+);
+
+const CampoTexto: React.FC<{
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  className?: string;
+  placeholder?: string;
+}> = ({ label, value, onChange, className = "", placeholder }) => (
+  <div className={className}>
+    <label className="block text-xs font-bold text-gray-500 dark:text-dark-text-secondary mb-1">
+      {label}
+    </label>
+    <input
+      type="text"
+      value={value}
+      placeholder={placeholder}
+      onChange={(e) => onChange(e.target.value)}
+      className={inputCls}
+    />
+  </div>
+);
+
 const AcordoConfiguracaoPadrao: React.FC = () => {
   const { acordoConfiguracaoPadrao, definirConfiguracaoPadraoAcordo } =
     useCollection();
 
-  const [multaPercentual, setMultaPercentual] = useState("0");
-  const [jurosPercentualAm, setJurosPercentualAm] = useState("0");
-  const [descontoPadraoPercentual, setDescontoPadraoPercentual] = useState("0");
-  const [descontoMaximoPercentual, setDescontoMaximoPercentual] = useState("0");
-  const [diasEntreParcelas, setDiasEntreParcelas] = useState("30");
-  const [empresaNome, setEmpresaNome] = useState("");
-  const [empresaCnpj, setEmpresaCnpj] = useState("");
-  const [empresaEndereco, setEmpresaEndereco] = useState("");
-  const [empresaChavePix, setEmpresaChavePix] = useState("");
+  const [form, setForm] = useState<Form>(() => formDe(acordoConfiguracaoPadrao));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [savedAt, setSavedAt] = useState<number | null>(null);
 
-  // Preenche o formulario com a configuracao vigente assim que ela carrega
-  // (ou quando outra aba/sessao salva uma nova enquanto esta tela esta
-  // aberta) -- nunca sobrescreve o que o gestor esta digitando.
+  // Preenche com a configuracao vigente quando ela carrega ou quando outra
+  // sessao salva uma nova (troca de id).
   useEffect(() => {
     if (!acordoConfiguracaoPadrao) return;
-    setMultaPercentual(String(acordoConfiguracaoPadrao.multaPercentual));
-    setJurosPercentualAm(String(acordoConfiguracaoPadrao.jurosPercentualAm));
-    setDescontoPadraoPercentual(
-      String(acordoConfiguracaoPadrao.descontoPadraoPercentual),
-    );
-    setDescontoMaximoPercentual(
-      String(acordoConfiguracaoPadrao.descontoMaximoPercentual),
-    );
-    setDiasEntreParcelas(String(acordoConfiguracaoPadrao.diasEntreParcelas));
-    setEmpresaNome(acordoConfiguracaoPadrao.empresaNome ?? "");
-    setEmpresaCnpj(acordoConfiguracaoPadrao.empresaCnpj ?? "");
-    setEmpresaEndereco(acordoConfiguracaoPadrao.empresaEndereco ?? "");
-    setEmpresaChavePix(acordoConfiguracaoPadrao.empresaChavePix ?? "");
+    setForm(formDe(acordoConfiguracaoPadrao));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [acordoConfiguracaoPadrao?.id]);
+
+  const original = useMemo(
+    () => formDe(acordoConfiguracaoPadrao),
+    [acordoConfiguracaoPadrao],
+  );
+  const alterado = (Object.keys(form) as (keyof Form)[]).some(
+    (k) => form[k].trim() !== original[k].trim(),
+  );
+
+  const set = (campo: keyof Form) => (v: string) => {
+    setSavedAt(null);
+    setForm((f) => ({ ...f, [campo]: v }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    const multa = Number(multaPercentual);
-    const juros = Number(jurosPercentualAm);
-    const descontoPadrao = Number(descontoPadraoPercentual);
-    const descontoMaximo = Number(descontoMaximoPercentual);
-    const dias = Number(diasEntreParcelas);
+    const multa = Number(form.multaPercentual);
+    const juros = Number(form.jurosPercentualAm);
+    const descontoPadrao = Number(form.descontoPadraoPercentual);
+    const descontoMaximo = Number(form.descontoMaximoPercentual);
+    const dias = Number(form.diasEntreParcelas);
 
     if ([multa, juros, descontoPadrao, descontoMaximo].some((v) => Number.isNaN(v) || v < 0)) {
       setError("Multa, juros e desconto precisam ser números 0 ou maiores.");
@@ -78,10 +155,10 @@ const AcordoConfiguracaoPadrao: React.FC = () => {
         descontoPadraoPercentual: descontoPadrao,
         descontoMaximoPercentual: descontoMaximo,
         diasEntreParcelas: dias,
-        empresaNome: empresaNome.trim(),
-        empresaCnpj: empresaCnpj.trim(),
-        empresaEndereco: empresaEndereco.trim(),
-        empresaChavePix: empresaChavePix.trim(),
+        empresaNome: form.empresaNome.trim(),
+        empresaCnpj: form.empresaCnpj.trim(),
+        empresaEndereco: form.empresaEndereco.trim(),
+        empresaChavePix: form.empresaChavePix.trim(),
       });
       setSavedAt(Date.now());
     } catch (err) {
@@ -96,198 +173,134 @@ const AcordoConfiguracaoPadrao: React.FC = () => {
   };
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
-      <div>
-        <h2 className="text-xl font-bold text-gray-900 dark:text-dark-text">
-          Configuração padrão de acordo
-        </h2>
-        <p className="text-sm text-gray-500 dark:text-dark-text-secondary mt-1">
-          Valores usados como ponto de partida quando um cobrador monta um
-          acordo novo — ele ainda pode ajustar multa, juros e desconto na
-          hora da negociação. Também é o que aparece no Termo de Acordo
-          gerado.
-        </p>
-      </div>
+    <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-dark-text">
+              Configuração de acordos
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-dark-text-secondary mt-1 max-w-2xl">
+              Ponto de partida do acordo novo — o cobrador ainda pode ajustar
+              multa, juros e desconto na negociação.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            {alterado && !loading && (
+              <span className="text-xs font-medium text-amber-600">
+                Alterações não salvas
+              </span>
+            )}
+            {!alterado && savedAt && !loading && (
+              <span className="flex items-center gap-1.5 text-sm text-green-600 font-medium">
+                <CheckCircle2 className="w-4 h-4" />
+                Salvo
+              </span>
+            )}
+            <button
+              type="submit"
+              disabled={loading || !alterado}
+              className="px-5 py-2.5 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {loading ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <Save className="w-4 h-4" />
+              )}
+              Salvar
+            </button>
+          </div>
+        </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
         {error && (
-          <div className="p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl">
+          <div className="p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
             {error}
           </div>
         )}
 
-        <section className="bg-white dark:bg-dark-bg-secondary border border-gray-200 dark:border-dark-border rounded-2xl p-5 space-y-4">
-          <h3 className="flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-dark-text">
-            <Percent className="w-4 h-4 text-indigo-500" />
-            Multa, juros e desconto
-          </h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-gray-400 mb-1">
-                Multa (%)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min={0}
-                value={multaPercentual}
-                onChange={(e) => setMultaPercentual(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm dark:bg-dark-bg-tertiary dark:border-dark-border dark:text-dark-text"
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <section className={`${cardCls} space-y-4`}>
+            <h3 className="flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-dark-text">
+              <Percent className="w-4 h-4 text-indigo-500" />
+              Regras do acordo
+            </h3>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+              <CampoNumero
+                label="Multa"
+                unidade="%"
+                dica="Uma vez sobre o saldo de cada título."
+                value={form.multaPercentual}
+                onChange={set("multaPercentual")}
               />
-              <p className="mt-1 text-[11px] text-gray-400">
-                Aplicada uma vez sobre o saldo de cada título.
-              </p>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-400 mb-1">
-                Juros (% ao mês)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min={0}
-                value={jurosPercentualAm}
-                onChange={(e) => setJurosPercentualAm(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm dark:bg-dark-bg-tertiary dark:border-dark-border dark:text-dark-text"
+              <CampoNumero
+                label="Juros"
+                unidade="% a.m."
+                dica="Simples, pelos dias de atraso."
+                value={form.jurosPercentualAm}
+                onChange={set("jurosPercentualAm")}
               />
-              <p className="mt-1 text-[11px] text-gray-400">
-                Simples, proporcional aos dias de atraso de cada título.
-              </p>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-400 mb-1">
-                Desconto padrão (%)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min={0}
-                value={descontoPadraoPercentual}
-                onChange={(e) => setDescontoPadraoPercentual(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm dark:bg-dark-bg-tertiary dark:border-dark-border dark:text-dark-text"
+              <CampoNumero
+                label="Desconto padrão"
+                unidade="%"
+                dica="Já vem preenchido no acordo."
+                value={form.descontoPadraoPercentual}
+                onChange={set("descontoPadraoPercentual")}
               />
-              <p className="mt-1 text-[11px] text-gray-400">
-                Valor inicial do campo de desconto no acordo (0% = sem
-                desconto por padrão).
-              </p>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-400 mb-1">
-                Desconto máximo (%)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min={0}
-                value={descontoMaximoPercentual}
-                onChange={(e) => setDescontoMaximoPercentual(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm dark:bg-dark-bg-tertiary dark:border-dark-border dark:text-dark-text"
+              <CampoNumero
+                label="Desconto máximo"
+                unidade="%"
+                dica="Acima disso o cobrador pede liberação."
+                value={form.descontoMaximoPercentual}
+                onChange={set("descontoMaximoPercentual")}
               />
-              <p className="mt-1 text-[11px] text-gray-400">
-                Limite que o cobrador pode conceder sem precisar de você.
-              </p>
+              <CampoNumero
+                label="Dias entre parcelas"
+                unidade="dias"
+                dica="Sugere as datas; sem limite de parcelas."
+                step="1"
+                min={1}
+                value={form.diasEntreParcelas}
+                onChange={set("diasEntreParcelas")}
+              />
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section className="bg-white dark:bg-dark-bg-secondary border border-gray-200 dark:border-dark-border rounded-2xl p-5 space-y-4">
-          <h3 className="text-sm font-bold text-gray-700 dark:text-dark-text">
-            Parcelamento
-          </h3>
-          <div>
-            <label className="block text-xs font-bold text-gray-400 mb-1">
-              Dias entre parcelas
-            </label>
-            <input
-              type="number"
-              min={1}
-              step="1"
-              value={diasEntreParcelas}
-              onChange={(e) => setDiasEntreParcelas(e.target.value)}
-              className="w-full max-w-[12rem] px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm dark:bg-dark-bg-tertiary dark:border-dark-border dark:text-dark-text"
-            />
-            <p className="mt-1 text-[11px] text-gray-400">
-              Usado para sugerir as datas de vencimento das parcelas. Não há
-              limite para o número de parcelas.
-            </p>
-          </div>
-        </section>
-
-        <section className="bg-white dark:bg-dark-bg-secondary border border-gray-200 dark:border-dark-border rounded-2xl p-5 space-y-4">
-          <h3 className="flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-dark-text">
-            <Building2 className="w-4 h-4 text-indigo-500" />
-            Dados da empresa — padrão
-          </h3>
-          <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
-            Usado no Termo e no Pix das lojas sem cadastro próprio (abaixo).
-          </p>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="block text-xs font-bold text-gray-400 mb-1">
-                Nome da empresa
-              </label>
-              <input
-                type="text"
-                value={empresaNome}
-                onChange={(e) => setEmpresaNome(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm dark:bg-dark-bg-tertiary dark:border-dark-border dark:text-dark-text"
-              />
-            </div>
+          <section className={`${cardCls} space-y-4`}>
             <div>
-              <label className="block text-xs font-bold text-gray-400 mb-1">
-                CNPJ
-              </label>
-              <input
-                type="text"
-                value={empresaCnpj}
-                onChange={(e) => setEmpresaCnpj(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm dark:bg-dark-bg-tertiary dark:border-dark-border dark:text-dark-text"
+              <h3 className="flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-dark-text">
+                <Building2 className="w-4 h-4 text-indigo-500" />
+                Empresa padrão
+              </h3>
+              <p className="mt-1 text-xs text-gray-500 dark:text-dark-text-secondary">
+                Credor e Pix das lojas sem cadastro próprio (abaixo).
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+              <CampoTexto
+                label="Nome da empresa"
+                className="col-span-2"
+                value={form.empresaNome}
+                onChange={set("empresaNome")}
+              />
+              <CampoTexto
+                label="CNPJ"
+                value={form.empresaCnpj}
+                onChange={set("empresaCnpj")}
+              />
+              <CampoTexto
+                label="Chave Pix"
+                value={form.empresaChavePix}
+                onChange={set("empresaChavePix")}
+              />
+              <CampoTexto
+                label="Endereço"
+                className="col-span-2"
+                value={form.empresaEndereco}
+                onChange={set("empresaEndereco")}
               />
             </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-400 mb-1">
-                Chave Pix (entrada do acordo)
-              </label>
-              <input
-                type="text"
-                value={empresaChavePix}
-                onChange={(e) => setEmpresaChavePix(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm dark:bg-dark-bg-tertiary dark:border-dark-border dark:text-dark-text"
-              />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-xs font-bold text-gray-400 mb-1">
-                Endereço
-              </label>
-              <input
-                type="text"
-                value={empresaEndereco}
-                onChange={(e) => setEmpresaEndereco(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm dark:bg-dark-bg-tertiary dark:border-dark-border dark:text-dark-text"
-              />
-            </div>
-          </div>
-        </section>
-
-        <div className="flex items-center gap-3">
-          <button
-            type="submit"
-            disabled={loading}
-            className="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-none transition-all disabled:opacity-50 flex items-center gap-2"
-          >
-            {loading ? (
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              <Save className="w-4 h-4" />
-            )}
-            Salvar configuração
-          </button>
-          {savedAt && !loading && (
-            <span className="flex items-center gap-1.5 text-sm text-green-600 font-medium">
-              <CheckCircle2 className="w-4 h-4" />
-              Salvo
-            </span>
-          )}
+          </section>
         </div>
       </form>
 

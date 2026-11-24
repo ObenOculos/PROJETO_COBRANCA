@@ -11,3 +11,14 @@ export function nomeCurtoLoja(loja: string): string {
   }
   return loja;
 }
+
+const REDES: { padrao: RegExp; nome: string }[] = [
+  { padrao: /^Oticas Luana/i, nome: "Óticas Luana" },
+  { padrao: /^Excellence Óticas/i, nome: "Excellence Óticas" },
+];
+
+/** Rede da loja para agrupar na tela ("Óticas Luana"); sem rede conhecida
+ * a própria loja é a rede (ex.: "Focco Brasil"). */
+export function redeDaLoja(loja: string): string {
+  return REDES.find((r) => r.padrao.test(loja))?.nome ?? loja;
+}
