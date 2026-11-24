@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Save, Percent, Building2, CheckCircle2 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
+import CredorLojaConfig from "./CredorLojaConfig";
 
 // Tela do gestor (Etapa 3a da iniciativa "Termo de Acordo automatico", ver
 // docs/PROGRESSO.md pendencia 12): define o padrao de multa/juros/desconto
@@ -215,8 +216,11 @@ const AcordoConfiguracaoPadrao: React.FC = () => {
         <section className="bg-white dark:bg-dark-bg-secondary border border-gray-200 dark:border-dark-border rounded-2xl p-5 space-y-4">
           <h3 className="flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-dark-text">
             <Building2 className="w-4 h-4 text-indigo-500" />
-            Dados da empresa (Termo de Acordo)
+            Dados da empresa — padrão
           </h3>
+          <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
+            Usado no Termo e no Pix das lojas sem cadastro próprio (abaixo).
+          </p>
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className="block text-xs font-bold text-gray-400 mb-1">
@@ -286,6 +290,8 @@ const AcordoConfiguracaoPadrao: React.FC = () => {
           )}
         </div>
       </form>
+
+      <CredorLojaConfig />
     </div>
   );
 };

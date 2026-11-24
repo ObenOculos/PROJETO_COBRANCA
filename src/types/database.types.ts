@@ -98,6 +98,53 @@ export type Database = {
           },
         ];
       };
+      acordo_credor_loja: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          empresa_chave_pix: string | null;
+          empresa_cnpj: string | null;
+          empresa_endereco: string | null;
+          empresa_nome: string | null;
+          id: string;
+          logo_path: string | null;
+          nome_da_loja: string;
+          vigente_ate: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          empresa_chave_pix?: string | null;
+          empresa_cnpj?: string | null;
+          empresa_endereco?: string | null;
+          empresa_nome?: string | null;
+          id?: string;
+          logo_path?: string | null;
+          nome_da_loja: string;
+          vigente_ate?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          empresa_chave_pix?: string | null;
+          empresa_cnpj?: string | null;
+          empresa_endereco?: string | null;
+          empresa_nome?: string | null;
+          id?: string;
+          logo_path?: string | null;
+          nome_da_loja?: string;
+          vigente_ate?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "acordo_credor_loja_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       acordo_pagamentos: {
         Row: {
           acordo_parcela_id: string;
@@ -2830,6 +2877,34 @@ export type Database = {
         SetofOptions: {
           from: "*";
           to: "vendas_conferencia";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      definir_credor_acordo_loja: {
+        Args: {
+          p_empresa_chave_pix: string;
+          p_empresa_cnpj: string;
+          p_empresa_endereco: string;
+          p_empresa_nome: string;
+          p_logo_path: string;
+          p_nome_da_loja: string;
+        };
+        Returns: {
+          created_at: string;
+          created_by: string | null;
+          empresa_chave_pix: string | null;
+          empresa_cnpj: string | null;
+          empresa_endereco: string | null;
+          empresa_nome: string | null;
+          id: string;
+          logo_path: string | null;
+          nome_da_loja: string;
+          vigente_ate: string | null;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "acordo_credor_loja";
           isOneToOne: true;
           isSetofReturn: false;
         };

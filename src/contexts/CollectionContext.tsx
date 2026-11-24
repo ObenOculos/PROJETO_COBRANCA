@@ -32,6 +32,7 @@ import {
   AcordoParcela,
   AcordoPagamento,
   AcordoConfiguracaoPadrao,
+  CredorLoja,
   AcordoLancamentoCiclone,
   AcordoLancamentoCicloneStatus,
   SistemaLancamentoAcordo,
@@ -308,6 +309,8 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   // Configuracao padrao de acordo vigente (Etapa 3a, ver fetchAcordoConfiguracaoPadrao).
   const [acordoConfiguracaoPadrao, setAcordoConfiguracaoPadrao] =
     useState<AcordoConfiguracaoPadrao | null>(null);
+  // Credor do acordo por loja (item 91), com historico.
+  const [credoresLoja, setCredoresLoja] = useState<CredorLoja[]>([]);
   const [allowedVisitDates, setAllowedVisitDates] = useState<
     AllowedVisitDate[]
   >([]);
@@ -984,6 +987,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             fetchReincidenciaResets(),
             fetchAcordos(),
             fetchAcordoConfiguracaoPadrao(),
+            fetchCredoresLoja(),
             fetchCollectorOverdueRanges(),
             fetchManagerCollectorLinks(),
           ]);
@@ -2122,12 +2126,15 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       numero_titulo: number | null;
       descricao: string | null;
       data_vencimento: string | null;
+      nome_da_loja: string | null;
     }
     const collectionIds = titulosRows.map((row) => row.collection_id);
     const titulosInfoRes = collectionIds.length
       ? await supabase
           .from("BANCO_DADOS")
-          .select("id_parcela, venda_n, numero_titulo, descricao, data_vencimento")
+          .select(
+            "id_parcela, venda_n, numero_titulo, descricao, data_vencimento, nome_da_loja",
+          )
           .in("id_parcela", collectionIds)
       : { data: [] as TituloOrigemInfo[], error: null };
     if (titulosInfoRes.error) throw titulosInfoRes.error;
@@ -2158,6 +2165,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
               `Venda ${info.numero_titulo ?? info.venda_n ?? 0}`
             : undefined,
           vencimentoOriginal: info?.data_vencimento ?? null,
+          nomeDaLoja: info?.nome_da_loja ?? null,
         };
       }),
       parcelas: ((parcelasRes.data ?? []) as AcordoParcelaRow[]).map(
@@ -2368,6 +2376,95 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     const nova = mapAcordoConfiguracaoPadraoRow(data);
     setAcordoConfiguracaoPadrao(nova);
     return nova;
+  };
+
+  // Credor do acordo por loja (item 91, migration 20261124000008).
+  const LOGOS_LOJAS_BUCKET = "logos-lojas";
+
+  type CredorLojaRow = Database["public"]["Tables"]["acordo_credor_loja"]["Row"];
+
+  const mapCredorLojaRow = (row: CredorLojaRow): CredorLoja => ({
+    id: row.id,
+    nomeDaLoja: row.nome_da_loja,
+    empresaNome: row.empresa_nome,
+    empresaCnpj: row.empresa_cnpj,
+    empresaEndereco: row.empresa_endereco,
+    empresaChavePix: row.empresa_chave_pix,
+    logoPath: row.logo_path,
+    logoUrl: row.logo_path
+      ? supabase.storage.from(LOGOS_LOJAS_BUCKET).getPublicUrl(row.logo_path)
+          .data.publicUrl
+      : null,
+    vigenteAte: row.vigente_ate,
+    createdAt: row.created_at,
+  });
+
+  const fetchCredoresLoja = async () => {
+    try {
+      // Tabela pequena (algumas linhas por loja): carrega o historico todo
+      // para o Termo antigo achar o registro vigente na data do acordo.
+      const { data, error: fetchError } = await supabase
+        .from("acordo_credor_loja")
+        .select("*")
+        .order("created_at")
+        .order("id");
+      if (fetchError) throw fetchError;
+      setCredoresLoja((data ?? []).map(mapCredorLojaRow));
+    } catch (err) {
+      // Sem a migration aplicada, tudo segue no padrao.
+      console.error("Erro ao buscar dados das lojas no acordo:", err);
+    }
+  };
+
+  const definirCredorAcordoLoja = async (params: {
+    nomeDaLoja: string;
+    empresaNome: string;
+    empresaCnpj: string;
+    empresaEndereco: string;
+    empresaChavePix: string;
+    logoPath: string;
+  }): Promise<CredorLoja> => {
+    const { data, error: rpcError } = await supabase
+      .rpc("definir_credor_acordo_loja", {
+        p_nome_da_loja: params.nomeDaLoja,
+        p_empresa_nome: params.empresaNome,
+        p_empresa_cnpj: params.empresaCnpj,
+        p_empresa_endereco: params.empresaEndereco,
+        p_empresa_chave_pix: params.empresaChavePix,
+        p_logo_path: params.logoPath,
+      })
+      .single();
+    if (rpcError) {
+      console.error("Erro ao salvar dados da loja no acordo:", rpcError);
+      throw rpcError;
+    }
+    await fetchCredoresLoja();
+    return mapCredorLojaRow(data);
+  };
+
+  const enviarLogoLoja = async (
+    nomeDaLoja: string,
+    arquivo: File,
+  ): Promise<string> => {
+    const ext = arquivo.type === "image/png" ? "png" : "jpg";
+    const pasta =
+      nomeDaLoja
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^A-Za-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .toLowerCase() || "loja";
+    // Nome unico: o arquivo antigo nunca e sobrescrito (Termo antigo segue
+    // com o logo da epoca).
+    const caminho = `${pasta}/${Date.now()}.${ext}`;
+    const { error: upError } = await supabase.storage
+      .from(LOGOS_LOJAS_BUCKET)
+      .upload(caminho, arquivo, { contentType: arquivo.type, upsert: false });
+    if (upError) {
+      console.error("Erro ao enviar logo da loja:", upError);
+      throw upError;
+    }
+    return caminho;
   };
 
   const addUser = async (
@@ -5392,6 +5489,10 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     acordoConfiguracaoPadrao,
     fetchAcordoConfiguracaoPadrao,
     definirConfiguracaoPadraoAcordo,
+    credoresLoja,
+    fetchCredoresLoja,
+    definirCredorAcordoLoja,
+    enviarLogoLoja,
     criarAcordo,
     fetchAcordoDetalhe,
     fetchAcordoLancamentoCiclone,

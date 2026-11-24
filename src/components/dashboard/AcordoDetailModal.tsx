@@ -24,6 +24,7 @@ import {
   AcordoTitulo,
 } from "../../types";
 import { gerarTermoAcordoPdf, nomeArquivoTermoAcordo } from "../../utils/termoAcordo";
+import { lojaDosTitulos, resolverCredorAcordo } from "../../utils/credorAcordo";
 import AcordoLancamentoCiclone from "./AcordoLancamentoCiclone";
 
 interface AcordoDetailModalProps {
@@ -55,6 +56,7 @@ const AcordoDetailModal: React.FC<AcordoDetailModalProps> = ({
     cancelarAcordo,
     getClientGroups,
     acordoConfiguracaoPadrao,
+    credoresLoja,
     clientesRegistry,
   } = useCollection();
 
@@ -194,7 +196,14 @@ const AcordoDetailModal: React.FC<AcordoDetailModalProps> = ({
         acordo,
         titulos,
         parcelas,
-        empresa: acordoConfiguracaoPadrao,
+        // Loja dos títulos, com os dados vigentes quando o acordo foi
+        // criado (trocar a chave hoje não muda o Termo de ontem).
+        empresa: resolverCredorAcordo(
+          acordoConfiguracaoPadrao,
+          credoresLoja,
+          lojaDosTitulos(titulos),
+          acordo.createdAt,
+        ),
         devedor: {
           // Razao social do CPF/CNPJ (ERP) quando existe; senao o nome
           // gravado no acordo.

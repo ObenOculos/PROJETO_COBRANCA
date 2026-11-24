@@ -27,6 +27,8 @@ import { todayLocalStr } from "../../config/visitStatus";
 import { encargosPorAtraso } from "../../config/encargos";
 import { ClientGroup } from "../../types";
 import { gerarPixCopiaECola } from "../../utils/pix";
+import { resolverCredorAcordo } from "../../utils/credorAcordo";
+import { nomeCurtoLoja } from "../../config/lojas";
 import {
   nomeJuridicoCliente,
   razaoSocialDistinta,
@@ -68,6 +70,8 @@ interface TituloAberto {
   saleLabel: string;
   vencido: boolean;
   diasAtraso: number;
+  /** Loja do título: o acordo só junta títulos de uma loja (item 91). */
+  loja: string | null;
 }
 
 type Etapa = 1 | 2 | 3 | 4 | 5;
@@ -109,6 +113,7 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
   const {
     criarAcordo,
     acordoConfiguracaoPadrao,
+    credoresLoja,
     fetchAcordoDetalhe,
     registrarPagamentoAcordo,
     clientesRegistry,
@@ -139,6 +144,7 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
             saleLabel: sale.description || `Venda ${sale.titleNumber}`,
             vencido: diasAtraso > 0,
             diasAtraso,
+            loja: inst.nome_da_loja ?? null,
           });
         }
       });
@@ -146,9 +152,39 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
     return list;
   }, [client]);
 
+  // Um acordo por loja (item 91, decisão de 24/11): cada loja tem seu Pix e
+  // seu CNPJ, então o acordo só junta títulos de uma loja. Cliente com
+  // títulos em mais de uma escolhe a loja; abre na de maior saldo.
+  const lojasDoCliente = useMemo(() => {
+    const map = new Map<string, number>();
+    titulosEmAberto.forEach((t) => {
+      const k = t.loja ?? "";
+      map.set(k, (map.get(k) ?? 0) + t.saldo);
+    });
+    return Array.from(map.entries())
+      .map(([loja, saldo]) => ({ loja, saldo }))
+      .sort((a, b) => b.saldo - a.saldo);
+  }, [titulosEmAberto]);
+  const [lojaAcordo, setLojaAcordo] = useState<string>(
+    () => lojasDoCliente[0]?.loja ?? "",
+  );
+  const titulosDaLoja = useMemo(
+    () => titulosEmAberto.filter((t) => (t.loja ?? "") === lojaAcordo),
+    [titulosEmAberto, lojaAcordo],
+  );
+  const credor = useMemo(
+    () =>
+      resolverCredorAcordo(
+        acordoConfiguracaoPadrao,
+        credoresLoja,
+        lojaAcordo || null,
+      ),
+    [acordoConfiguracaoPadrao, credoresLoja, lojaAcordo],
+  );
+
   const gruposPorVenda = useMemo(() => {
     const map = new Map<number, { saleLabel: string; titulos: TituloAberto[] }>();
-    titulosEmAberto.forEach((t) => {
+    titulosDaLoja.forEach((t) => {
       const grupo = map.get(t.saleNumber);
       if (grupo) grupo.titulos.push(t);
       else map.set(t.saleNumber, { saleLabel: t.saleLabel, titulos: [t] });
@@ -157,11 +193,21 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
       saleNumber,
       ...g,
     }));
-  }, [titulosEmAberto]);
+  }, [titulosDaLoja]);
 
   const [selecionados, setSelecionados] = useState<Set<number>>(
-    new Set(titulosEmAberto.map((t) => t.collectionId)),
+    () => new Set(titulosDaLoja.map((t) => t.collectionId)),
   );
+  const trocarLojaAcordo = (loja: string) => {
+    setLojaAcordo(loja);
+    setSelecionados(
+      new Set(
+        titulosEmAberto
+          .filter((t) => (t.loja ?? "") === loja)
+          .map((t) => t.collectionId),
+      ),
+    );
+  };
   const [numeroParcelas, setNumeroParcelas] = useState(2);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -568,7 +614,7 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
           acordo,
           titulos: detalhe.titulos,
           parcelas: detalhe.parcelas,
-          empresa: acordoConfiguracaoPadrao,
+          empresa: credor,
           devedor: {
             nome: nomeDevedor,
             documento: client.document,
@@ -706,15 +752,15 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
   useEffect(() => {
     if (step !== 5) return;
     setEntradaConfirmada(false);
-    if (!acordoConfiguracaoPadrao?.empresaChavePix || valorEntrada <= 0) {
+    if (!credor.empresaChavePix || valorEntrada <= 0) {
       setPixCopiaECola("");
       setPixQrDataUrl("");
       return;
     }
     const payload = gerarPixCopiaECola({
-      chave: acordoConfiguracaoPadrao.empresaChavePix,
-      nomeRecebedor: acordoConfiguracaoPadrao.empresaNome || "",
-      cidadeRecebedor: acordoConfiguracaoPadrao.empresaEndereco || "",
+      chave: credor.empresaChavePix,
+      nomeRecebedor: credor.empresaNome || "",
+      cidadeRecebedor: credor.empresaEndereco || "",
       valor: valorEntrada,
       txid: client.document,
     });
@@ -748,7 +794,7 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
     try {
       const pdf = await gerarResumoAcordoPdf({
         devedor: { nome: nomeDevedor, documento: client.document },
-        empresa: acordoConfiguracaoPadrao,
+        empresa: credor,
         totalNegociado,
         parcelas: parcelas.map((p) => ({
           numero: p.numero,
@@ -869,10 +915,35 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
           {liberacaoEnviada == null && step === 1 && (
             <div className="space-y-2">
               <label className="text-xs font-bold text-gray-400">
-                Títulos em aberto ({titulosEmAberto.length})
+                Títulos em aberto ({titulosDaLoja.length})
               </label>
+              {lojasDoCliente.length > 1 && (
+                <div className="space-y-1.5">
+                  <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
+                    Este cliente deve em {lojasDoCliente.length} lojas. O acordo é
+                    feito por loja, cada uma com o seu Pix.
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {lojasDoCliente.map((l) => (
+                      <button
+                        key={l.loja}
+                        type="button"
+                        onClick={() => trocarLojaAcordo(l.loja)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors ${
+                          lojaAcordo === l.loja
+                            ? "bg-indigo-600 border-indigo-600 text-white"
+                            : "bg-white dark:bg-dark-bg-secondary border-gray-200 dark:border-dark-border text-gray-600 dark:text-dark-text-secondary hover:border-indigo-300"
+                        }`}
+                      >
+                        {l.loja ? nomeCurtoLoja(l.loja) : "Sem loja"} ·{" "}
+                        {formatCurrency(l.saldo)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="border border-gray-200 dark:border-dark-border rounded-xl max-h-[26rem] overflow-y-auto minimal-scrollbar">
-                {titulosEmAberto.length === 0 && (
+                {titulosDaLoja.length === 0 && (
                   <p className="p-3 text-sm text-gray-400">
                     Este cliente não tem título em aberto.
                   </p>
@@ -1253,7 +1324,7 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
                 recebimento abaixo.
               </p>
 
-              {!acordoConfiguracaoPadrao?.empresaChavePix ? (
+              {!credor.empresaChavePix ? (
                 <div className="p-3 bg-amber-50 border border-amber-100 text-amber-700 text-sm rounded-xl flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   Nenhuma chave Pix cadastrada. Peça para o gestor configurar em
@@ -1261,6 +1332,21 @@ const AcordoModal: React.FC<AcordoModalProps> = ({
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-3 p-4 bg-gray-50 dark:bg-dark-bg-tertiary rounded-xl border border-gray-100 dark:border-dark-border">
+                  <div className="w-full flex items-center gap-2 text-xs text-gray-500 dark:text-dark-text-secondary">
+                    {credor.logoUrl && (
+                      <img
+                        src={credor.logoUrl}
+                        alt=""
+                        className="h-6 max-w-[6rem] object-contain"
+                      />
+                    )}
+                    <span className="min-w-0">
+                      Pix para{" "}
+                      <strong className="text-gray-700 dark:text-dark-text">
+                        {credor.empresaNome || "—"}
+                      </strong>
+                    </span>
+                  </div>
                   {pixQrDataUrl ? (
                     <img
                       src={pixQrDataUrl}

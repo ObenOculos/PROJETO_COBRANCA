@@ -13,9 +13,10 @@ import {
   Acordo,
   AcordoTitulo,
   AcordoParcela,
-  AcordoConfiguracaoPadrao,
+  CredorAcordo,
 } from "../types";
 import { gerarPixCopiaECola } from "./pix";
+import { todayLocalStr } from "../config/visitStatus";
 import logoUrl from "../assets/focco-brasil-logo.png";
 
 export interface DevedorInfo {
@@ -28,7 +29,8 @@ export interface TermoAcordoParams {
   acordo: Acordo;
   titulos: AcordoTitulo[];
   parcelas: AcordoParcela[];
-  empresa: AcordoConfiguracaoPadrao | null;
+  /** Credor ja resolvido pela loja (utils/credorAcordo). */
+  empresa: CredorAcordo | null;
   devedor: DevedorInfo;
 }
 
@@ -94,10 +96,43 @@ const formatDateExtenso = (dateStr: string): string => {
 const loadImage = (src: string): Promise<HTMLImageElement> =>
   new Promise((resolve, reject) => {
     const img = new Image();
+    // Logo da loja vem do Storage (outra origem): sem isto o canvas do
+    // jsPDF fica "contaminado" e o addImage falha.
+    img.crossOrigin = "anonymous";
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error("Falha ao carregar imagem"));
     img.src = src;
   });
+
+/**
+ * Desenha o logo do credor no canto (altura 10 mm, largura ate 50 mm) e
+ * devolve onde ele termina. Logo da loja quando ela tem; undefined = logo do
+ * app (loja no padrao); null = loja configurada sem logo. Falha de carga
+ * segue sem logo.
+ */
+const desenharLogo = async (
+  doc: jsPDF,
+  empresa: CredorAcordo | null,
+  x: number,
+  y: number,
+): Promise<number> => {
+  const src = empresa?.logoUrl === undefined ? logoUrl : empresa.logoUrl;
+  if (!src) return y;
+  try {
+    const img = await loadImage(src);
+    let h = 10;
+    let w = (img.width / img.height) * h;
+    if (w > 50) {
+      w = 50;
+      h = (img.height / img.width) * w;
+    }
+    doc.addImage(img, "PNG", x, y, w, h);
+    return y + h;
+  } catch {
+    // segue sem logo se o navegador nao conseguir carregar a imagem
+    return y;
+  }
+};
 
 /** Monta o jsPDF do Termo de Acordo. Nao salva/baixa -- quem chama decide. */
 export const gerarTermoAcordoPdf = async ({
@@ -145,16 +180,7 @@ export const gerarTermoAcordoPdf = async ({
   doc.rect(0, 0, pageWidth, 3, "F");
   y = 13;
 
-  let logoBottom = y;
-  try {
-    const logoImg = await loadImage(logoUrl);
-    const logoH = 10;
-    const logoW = (logoImg.width / logoImg.height) * logoH;
-    doc.addImage(logoImg, "PNG", marginX, y, logoW, logoH);
-    logoBottom = y + logoH;
-  } catch {
-    // segue sem logo se o navegador nao conseguir carregar a imagem
-  }
+  const logoBottom = await desenharLogo(doc, empresa, marginX, y);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
@@ -162,7 +188,7 @@ export const gerarTermoAcordoPdf = async ({
   const referencia = `ACORDO Nº ${acordo.id.slice(0, 8).toUpperCase()}`;
   doc.text(referencia, pageWidth - marginX, y + 3, { align: "right" });
   doc.text(
-    `Emitido em ${formatDateBr(new Date().toISOString().slice(0, 10))}`,
+    `Emitido em ${formatDateBr(todayLocalStr())}`,
     pageWidth - marginX,
     y + 7.5,
     { align: "right" },
@@ -725,7 +751,8 @@ export interface ParcelaResumo {
 
 export interface ResumoAcordoParams {
   devedor: { nome: string; documento: string };
-  empresa: AcordoConfiguracaoPadrao | null;
+  /** Credor ja resolvido pela loja (utils/credorAcordo). */
+  empresa: CredorAcordo | null;
   totalNegociado: number;
   parcelas: ParcelaResumo[];
   formaPagamentoParcelas: string;
@@ -772,22 +799,13 @@ export const gerarResumoAcordoPdf = async ({
   doc.rect(0, 0, pageWidth, 3, "F");
   y = 13;
 
-  let logoBottom = y;
-  try {
-    const logoImg = await loadImage(logoUrl);
-    const logoH = 10;
-    const logoW = (logoImg.width / logoImg.height) * logoH;
-    doc.addImage(logoImg, "PNG", marginX, y, logoW, logoH);
-    logoBottom = y + logoH;
-  } catch {
-    // segue sem logo se o navegador nao conseguir carregar a imagem
-  }
+  const logoBottom = await desenharLogo(doc, empresa, marginX, y);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   setColor(MUTED);
   doc.text(
-    `Emitido em ${formatDateBr(new Date().toISOString().slice(0, 10))}`,
+    `Emitido em ${formatDateBr(todayLocalStr())}`,
     pageWidth - marginX,
     y + 3,
     { align: "right" },

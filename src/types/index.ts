@@ -534,6 +534,21 @@ export interface CollectionContextType {
     empresaEndereco: string;
     empresaChavePix: string;
   }) => Promise<AcordoConfiguracaoPadrao>;
+  // Credor do acordo por loja (item 91): todos os registros, com historico
+  // (o Termo antigo usa o vigente na data do acordo).
+  credoresLoja: CredorLoja[];
+  fetchCredoresLoja: () => Promise<void>;
+  definirCredorAcordoLoja: (params: {
+    nomeDaLoja: string;
+    empresaNome: string;
+    empresaCnpj: string;
+    empresaEndereco: string;
+    empresaChavePix: string;
+    /** Caminho no bucket (ja enviado) ou "" sem logo. */
+    logoPath: string;
+  }) => Promise<CredorLoja>;
+  /** Sobe o arquivo de logo e devolve o caminho no bucket. */
+  enviarLogoLoja: (nomeDaLoja: string, arquivo: File) => Promise<string>;
   criarAcordo: (params: {
     clientDocument: string;
     titulos: {
@@ -846,6 +861,8 @@ export interface AcordoTitulo {
   saleNumber?: number;
   saleLabel?: string;
   vencimentoOriginal?: string | null;
+  /** Loja do título (BANCO_DADOS.nome_da_loja) — define o credor/Pix do acordo. */
+  nomeDaLoja?: string | null;
 }
 
 export interface AcordoParcela {
@@ -919,6 +936,35 @@ export interface AcordoConfiguracaoPadrao {
   vigenteAte: string | null;
   createdBy: string | null;
   createdAt: string;
+}
+
+// Credor do acordo por loja (item 91, migration 20261124000008): nome, CNPJ,
+// endereco, chave Pix e logo de uma loja, com historico. Registro com tudo
+// null = a loja voltou a usar o padrao (AcordoConfiguracaoPadrao).
+export interface CredorLoja {
+  id: string;
+  nomeDaLoja: string;
+  empresaNome: string | null;
+  empresaCnpj: string | null;
+  empresaEndereco: string | null;
+  empresaChavePix: string | null;
+  logoPath: string | null;
+  /** URL publica do logo (bucket logos-lojas); null sem logo. */
+  logoUrl: string | null;
+  vigenteAte: string | null;
+  createdAt: string;
+}
+
+/** Quem recebe no acordo (Termo, Resumo e Pix), ja resolvido loja × padrao. */
+export interface CredorAcordo {
+  empresaNome: string | null;
+  empresaCnpj: string | null;
+  empresaEndereco: string | null;
+  empresaChavePix: string | null;
+  /** URL do logo; null = sem logo; undefined = logo padrao do app (Focco). */
+  logoUrl?: string | null;
+  /** Loja de onde vieram os dados; null = padrao. */
+  lojaConfigurada: string | null;
 }
 
 export interface SaleBalance {
