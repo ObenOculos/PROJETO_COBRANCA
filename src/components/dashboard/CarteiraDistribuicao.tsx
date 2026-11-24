@@ -15,6 +15,7 @@ import {
   Pencil,
   X,
   ChevronRight,
+  ChevronLeft,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { supabase } from "../../lib/supabase";
@@ -111,7 +112,10 @@ const SEGMENT_COLORS = [
 
 const inputClass =
   "w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-dark-bg dark:border-dark-border dark:text-dark-text";
-// Colunas fixas da tabela de cobertura (dias de atraso).
+// Colunas fixas da tabela de cobertura (dias de atraso). A tela mostra
+// COLUNAS_VISIVEIS de cada vez e anda com < > (pedido 2026-11-24: ver as
+// faixas acima de 2 anos, onde os tetos das regras cortam -- atraso maximo
+// em producao ~2.100 dias). A ultima visivel junta o resto ("N+").
 const COLUNAS_COBERTURA: { ini: number; fim: number }[] = [
   { ini: 1, fim: 30 },
   { ini: 31, fim: 60 },
@@ -119,8 +123,12 @@ const COLUNAS_COBERTURA: { ini: number; fim: number }[] = [
   { ini: 91, fim: 180 },
   { ini: 181, fim: 365 },
   { ini: 366, fim: 730 },
-  { ini: 731, fim: Infinity },
+  { ini: 731, fim: 1095 },
+  { ini: 1096, fim: 1460 },
+  { ini: 1461, fim: 1825 },
+  { ini: 1826, fim: Infinity },
 ];
+const COLUNAS_VISIVEIS = 7;
 
 // Rodada automatica diaria (pg_cron 10:00 UTC = 7h, migration
 // 20261116000001): usa as regras salvas. "Aplicar" so adianta.
@@ -1152,7 +1160,17 @@ const CarteiraDistribuicao: React.FC = () => {
   // seguiam os cortes das faixas, e cada loja ficava com colunas diferentes
   // de leitura). Uma faixa pode cobrir so parte de uma coluna: a casa conta
   // cliente a cliente (contaColuna).
-  const colunasCobertura = COLUNAS_COBERTURA;
+  const [inicioColunas, setInicioColunas] = useState(0);
+  const maxInicioColunas = COLUNAS_COBERTURA.length - COLUNAS_VISIVEIS;
+  const colunasCobertura = useMemo(() => {
+    const janela = COLUNAS_COBERTURA.slice(
+      inicioColunas,
+      inicioColunas + COLUNAS_VISIVEIS,
+    );
+    // A ultima visivel junta tudo acima dela (nada some da conta).
+    const ultima = janela[janela.length - 1];
+    return [...janela.slice(0, -1), { ini: ultima.ini, fim: Infinity }];
+  }, [inicioColunas]);
 
   /** Clientes da loja numa coluna, cliente a cliente pela faixa que cobre o
    * atraso dele: na carteira do dono, com outro, sem cobrador, aguardando
@@ -1244,8 +1262,13 @@ const CarteiraDistribuicao: React.FC = () => {
     let emAberto = 0;
     let semCobrador = 0;
     let foraDasFaixas = 0;
+    let aVencerOuCarencia = 0;
     let aguardando = 0;
-    clientesPorLoja.forEach((lista, loja) =>
+    clientesPorLoja.forEach((lista, loja) => {
+      const ativas = ativasPorLoja.get(loja) ?? [];
+      const primeira = ativas.length
+        ? Math.min(...ativas.map(({ r }) => r.minDias))
+        : null;
       lista.forEach((x) => {
         emAberto += x.n;
         if (x.dono) return;
@@ -1253,17 +1276,25 @@ const CarteiraDistribuicao: React.FC = () => {
           aguardando += x.n;
           return;
         }
-        const coberto = (ativasPorLoja.get(loja) ?? []).some(
+        // A vencer ou antes da 1a faixa da loja: ninguem deveria cobrar.
+        if (x.atraso <= 0 || (primeira != null && x.atraso < primeira)) {
+          aVencerOuCarencia += x.n;
+          return;
+        }
+        const coberto = ativas.some(
           ({ r }) => r.minDias <= x.atraso && x.atraso <= (r.maxDias ?? Infinity),
         );
         if (coberto) semCobrador += x.n;
         else foraDasFaixas += x.n;
-      }),
-    );
+      });
+    });
     return {
       emAberto,
       semCobrador,
       foraDasFaixas,
+      // Problema de verdade: deveria ter cobrador e nao tem.
+      problema: semCobrador + foraDasFaixas,
+      aVencerOuCarencia,
       aguardando,
       carregado: mapaCarteira !== null,
     };
@@ -1462,44 +1493,67 @@ const CarteiraDistribuicao: React.FC = () => {
                   : "…"}
             </div>
           </div>
+          {/* Sem cobrador (24/11): o numero grande e so o que e problema
+              (deveria ter cobrador e nao tem); a vencer/carencia e
+              aguardando juridico ficam em cinza, so informacao. */}
           <div
             className={`rounded-xl px-3 py-2 ${
-              totaisCarteira.semCobrador > 0
+              totaisCarteira.problema > 0
                 ? "bg-amber-50 dark:bg-amber-900/20"
                 : "bg-gray-50 dark:bg-dark-bg"
             }`}
-            title="Clientes sem cobrador que alguma faixa ativa cobre: a próxima rodada entrega"
+            title="Clientes em atraso que deveriam ter cobrador e não têm"
           >
             <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
               Sem cobrador
             </div>
             <div
               className={`text-lg sm:text-xl font-semibold tabular-nums ${
-                totaisCarteira.semCobrador > 0
+                totaisCarteira.problema > 0
                   ? "text-amber-700 dark:text-amber-300"
                   : "text-gray-900 dark:text-dark-text"
               }`}
             >
               {totaisCarteira.carregado
-                ? totaisCarteira.semCobrador.toLocaleString("pt-BR")
+                ? totaisCarteira.problema.toLocaleString("pt-BR")
                 : mapaErro
                   ? "—"
                   : "…"}
             </div>
-            {totaisCarteira.carregado && totaisCarteira.foraDasFaixas > 0 && (
-              <div
-                className="text-[11px] text-gray-500"
-                title="Sem cobrador e fora de todas as faixas (a vencer ou atraso abaixo da primeira faixa): ninguém deveria cobrar ainda"
-              >
-                +{totaisCarteira.foraDasFaixas.toLocaleString("pt-BR")} fora das faixas
-              </div>
-            )}
-            {totaisCarteira.carregado && totaisCarteira.aguardando > 0 && (
-              <div
-                className="text-[11px] text-gray-500"
-                title="Saíram da carteira para o jurídico (Aguardando …): a distribuição não devolve a cobrador comum"
-              >
-                +{totaisCarteira.aguardando.toLocaleString("pt-BR")} aguardando jurídico
+            {totaisCarteira.carregado && (
+              <div className="mt-0.5 space-y-0.5 text-[11px]">
+                {totaisCarteira.foraDasFaixas > 0 && (
+                  <div
+                    className="text-amber-800 dark:text-amber-300"
+                    title="Atraso acima do teto da última faixa da loja (ou entre faixas): nenhuma regra cobre"
+                  >
+                    {totaisCarteira.foraDasFaixas.toLocaleString("pt-BR")} fora da faixa (acima do teto)
+                  </div>
+                )}
+                {totaisCarteira.semCobrador > 0 && (
+                  <div
+                    className="text-amber-800 dark:text-amber-300"
+                    title="Uma faixa cobre: a distribuição de amanhã às 7h entrega"
+                  >
+                    {totaisCarteira.semCobrador.toLocaleString("pt-BR")} entram na próxima rodada
+                  </div>
+                )}
+                {totaisCarteira.aVencerOuCarencia > 0 && (
+                  <div
+                    className="text-gray-400"
+                    title="Ainda não venceu ou está antes da primeira faixa da loja: ninguém deveria cobrar"
+                  >
+                    {totaisCarteira.aVencerOuCarencia.toLocaleString("pt-BR")} a vencer ou na carência
+                  </div>
+                )}
+                {totaisCarteira.aguardando > 0 && (
+                  <div
+                    className="text-gray-400"
+                    title="Saíram da carteira para o jurídico (Aguardando …): a distribuição não devolve a cobrador comum"
+                  >
+                    {totaisCarteira.aguardando.toLocaleString("pt-BR")} aguardando jurídico
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1984,29 +2038,61 @@ const CarteiraDistribuicao: React.FC = () => {
             vermelho = dois cobradores na mesma faixa. */}
         {coberturaVisivel.length > 0 && colunasCobertura.length > 0 && (
           <div className="overflow-x-auto -mx-1">
-            <table className="w-full text-sm border-separate border-spacing-0">
+            <table className="w-full min-w-[860px] table-fixed text-sm border-separate border-spacing-0">
               <thead>
                 <tr className="text-[11px] text-gray-500 dark:text-dark-text-secondary">
-                  <th className="sticky left-0 z-10 bg-white dark:bg-dark-bg-secondary py-2 px-2 text-left font-semibold border-b border-gray-200 dark:border-dark-border">
+                  <th className="sticky left-0 z-10 w-[200px] bg-white dark:bg-dark-bg-secondary py-2 px-2 text-left font-semibold border-b border-gray-200 dark:border-dark-border">
                     Loja
                   </th>
-                  {colunasCobertura.map((col) => (
-                    <th
-                      key={col.ini}
-                      className="py-2 px-2 text-center font-semibold whitespace-nowrap border-b border-gray-200 dark:border-dark-border"
-                    >
-                      {col.fim === Infinity ? `${col.ini}+` : `${col.ini} a ${col.fim}`}
-                      <div className="font-normal text-[10px] text-gray-400">dias</div>
-                    </th>
-                  ))}
+                  {colunasCobertura.map((col, idx) => {
+                    const rotulo =
+                      col.fim === Infinity ? `${col.ini}+` : `${col.ini} a ${col.fim}`;
+                    const primeiraCol = idx === 0;
+                    const ultimaCol = idx === colunasCobertura.length - 1;
+                    return (
+                      <th
+                        key={col.ini}
+                        className="py-2 px-2 text-center font-semibold whitespace-nowrap border-b border-gray-200 dark:border-dark-border"
+                      >
+                        <div className="inline-flex items-center gap-1">
+                          {primeiraCol && inicioColunas > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setInicioColunas((v) => Math.max(0, v - 1))}
+                              className="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-dark-bg text-blue-700 dark:text-blue-300"
+                              aria-label="Faixas de atraso menores"
+                              title="Ver faixas de atraso menores"
+                            >
+                              <ChevronLeft className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                          {rotulo}
+                          {ultimaCol && inicioColunas < maxInicioColunas && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setInicioColunas((v) => Math.min(maxInicioColunas, v + 1))
+                              }
+                              className="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-dark-bg text-blue-700 dark:text-blue-300"
+                              aria-label="Faixas de atraso maiores"
+                              title="Ver faixas de atraso maiores (abre o que está somado aqui)"
+                            >
+                              <ChevronRight className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                        <div className="font-normal text-[10px] text-gray-400">dias</div>
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
                 {coberturaVisivel.map(({ loja, regras, ativas }) => {
                   const inativas = regras.filter(({ r }) => !r.ativa);
                   return (
-                    <tr key={loja.loja} className="align-top">
-                      <td className="sticky left-0 z-10 bg-white dark:bg-dark-bg-secondary py-2 px-2 border-b border-gray-100 dark:border-dark-border min-w-[140px]">
+                    <tr key={loja.loja} className="group align-top even:bg-gray-50/70 dark:even:bg-dark-bg/40">
+                      <td className="sticky left-0 z-10 bg-white group-even:bg-gray-50 dark:bg-dark-bg-secondary dark:group-even:bg-dark-bg py-2 px-2 border-b border-gray-100 dark:border-dark-border">
                         <div className="font-semibold text-gray-900 dark:text-dark-text flex items-center gap-1.5">
                           {temFalha(loja.loja) && (
                             <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
