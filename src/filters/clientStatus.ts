@@ -251,6 +251,9 @@ export interface ClientBalanceSplit {
 export const clientBalanceSplit = (
   group: Pick<ClientGroup, "sales" | "document">,
   acordoAtivoParcelas?: AcordoAtivoOverdueMap,
+  /** Dias de atraso de um vencimento. Padrao: calculateOverdueDays; quem soma
+   * a base inteira passa criarCalculoAtraso() (cache, mesma regra). */
+  atrasoDias: (vencimento: string | null | undefined) => number = calculateOverdueDays,
 ): ClientBalanceSplit => {
   let vencido = 0;
   let aVencer = 0;
@@ -258,7 +261,7 @@ export const clientBalanceSplit = (
   if (parcelasAcordo) {
     parcelasAcordo.forEach((parcela) => {
       if (round2(parcela.saldo) <= 0.01) return;
-      if (calculateOverdueDays(parcela.dataVencimento) > 0) {
+      if (atrasoDias(parcela.dataVencimento) > 0) {
         vencido += parcela.saldo;
       } else {
         aVencer += parcela.saldo;
@@ -274,7 +277,7 @@ export const clientBalanceSplit = (
         (inst.valor_original || 0) -
         (inst.valor_recebido || 0) -
         (inst.desconto || 0);
-      if (calculateOverdueDays(inst.data_vencimento) > 0) {
+      if (atrasoDias(inst.data_vencimento) > 0) {
         vencido += saldo;
       } else {
         aVencer += saldo;
@@ -292,10 +295,12 @@ export const collectionsBalanceSplit = (
   documento: string,
   collections: Collection[],
   acordoAtivoParcelas?: AcordoAtivoOverdueMap,
+  atrasoDias?: (vencimento: string | null | undefined) => number,
 ): ClientBalanceSplit =>
   clientBalanceSplit(
     { document: documento, sales: [{ installments: collections } as SaleGroup] },
     acordoAtivoParcelas,
+    atrasoDias,
   );
 
 /**

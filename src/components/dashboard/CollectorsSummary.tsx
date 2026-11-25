@@ -31,6 +31,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { isCollectorType, UserType } from "../../types";
 import { useAtendimentosPeriodo } from "../../hooks/useAtendimentosPeriodo";
 import SummaryCard from "../common/SummaryCard";
+import ResumoEmpresa from "./ResumoEmpresa";
 import { USER_TYPE_LABELS, isWalletCollectorType } from "../../config/profiles";
 import {
   isVisitOverdue,
@@ -1461,6 +1462,8 @@ const CollectorsSummary: React.FC = () => {
           </span>
         </div>
       </div>
+
+      <ResumoEmpresa dateFrom={dateFrom} dateTo={dateTo} today={today} />
 
       {teamGoal && (
         <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border-2 border-indigo-100 dark:border-indigo-900/40 p-4 space-y-2">
