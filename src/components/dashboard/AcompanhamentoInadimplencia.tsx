@@ -36,7 +36,6 @@ import {
   rotuloMes,
   Tendencia,
   tendenciaInadimplencia,
-  tendenciaRecuperacao,
   variacaoPp,
 } from "../../filters/inadimplenciaHistorico";
 
@@ -555,37 +554,50 @@ const TEMA_CARD = {
     faixa: "border-t-red-400 dark:border-t-red-500/70",
     numero: "text-red-600 dark:text-red-400",
     icone: "text-red-600 dark:text-red-400",
+    barra: "bg-red-500",
   },
   green: {
     faixa: "border-t-green-400 dark:border-t-green-500/70",
     numero: "text-green-600 dark:text-green-400",
     icone: "text-green-600 dark:text-green-400",
+    barra: "bg-green-500",
   },
 } as const;
 
-/** Card: titulo + seta, numero grande, e o desenho ao lado. */
+/** Card (formato A, escolhido pelo usuario 25/11): um numero so, uma
+ * barra sobre fundo cinza com um tracinho de referencia (mes passado ou
+ * media) e o valor em R$ pequeno embaixo. Sem verde no card vermelho, sem
+ * repetir a tendencia (o veredito ja diz). */
 const CardVisual: React.FC<{
   icon: React.ElementType;
   titulo: string;
   tema: keyof typeof TEMA_CARD;
-  tendencia: Tendencia;
   carregando: boolean;
-  numero: string;
-  detalhe: string;
+  /** Valor em % (numero grande e tamanho da barra). */
+  pct: number;
+  /** Onde fica o tracinho, em %; null = sem tracinho. */
+  referencia: number | null;
+  rotuloReferencia: string;
+  /** Fim da escala da barra, em %. */
+  escala: number;
+  /** Valor em R$ (linha pequena). */
+  valor: string;
   hint: string;
-  children: React.ReactNode;
 }> = ({
   icon: Icon,
   titulo,
   tema,
-  tendencia,
   carregando,
-  numero,
-  detalhe,
+  pct,
+  referencia,
+  rotuloReferencia,
+  escala,
+  valor,
   hint,
-  children,
 }) => {
   const t = TEMA_CARD[tema];
+  const pos = (v: number) =>
+    `${Math.max(0, Math.min(100, (v / escala) * 100))}%`;
   return (
     <div
       className={`min-w-0 rounded-xl border border-gray-200 border-t-4 ${t.faixa} dark:border-dark-border bg-gray-100 dark:bg-dark-bg px-4 py-3`}
@@ -594,79 +606,37 @@ const CardVisual: React.FC<{
       <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-600 dark:text-dark-text-secondary">
         <Icon className={`h-4 w-4 ${t.icone}`} />
         {titulo}
-        {!carregando && (
-          <span className="ml-auto">
-            <SetaTendencia
-              tendencia={tendencia}
-              melhor={tema === "green" ? "maior" : "menor"}
+      </div>
+      <div
+        className={`mt-1 text-4xl font-extrabold leading-tight ${t.numero} ${carregando ? "animate-pulse" : ""}`}
+      >
+        {carregando ? "…" : formatarPct(pct)}
+      </div>
+      <div className="relative mt-2 mb-4">
+        <div className="h-3 rounded-full bg-gray-300/70 dark:bg-dark-border overflow-hidden">
+          {!carregando && (
+            <div
+              className={`h-full rounded-full ${t.barra}`}
+              style={{ width: pos(pct) }}
             />
-          </span>
+          )}
+        </div>
+        {!carregando && referencia != null && (
+          <div
+            className="absolute top-[-3px] flex flex-col items-center -translate-x-1/2"
+            style={{ left: pos(referencia) }}
+            title={`${rotuloReferencia}: ${formatarPct(referencia)}`}
+          >
+            <span className="h-[18px] w-0.5 rounded bg-gray-700 dark:bg-gray-200" />
+            <span className="mt-0.5 whitespace-nowrap text-[10px] text-gray-500 dark:text-dark-text-secondary">
+              {rotuloReferencia}
+            </span>
+          </div>
         )}
       </div>
-      <div className="mt-1 flex items-center gap-4">
-        <div className="min-w-0">
-          <div
-            className={`text-4xl font-extrabold leading-tight ${t.numero} ${carregando ? "animate-pulse" : ""}`}
-          >
-            {carregando ? "…" : numero}
-          </div>
-          <div className="text-sm text-gray-600 dark:text-dark-text-secondary">
-            {carregando ? "" : detalhe}
-          </div>
-        </div>
-        <div className="ml-auto shrink-0">{!carregando && children}</div>
+      <div className="text-sm font-semibold text-gray-700 dark:text-dark-text">
+        {carregando ? "" : valor}
       </div>
-    </div>
-  );
-};
-
-/** Uma barra = R$ 100: vermelho o que ficou sem pagar, verde o pago
- * (25/11: o usuario preferiu barra aos 100 quadradinhos). */
-const CemReais: React.FC<{ parte: number }> = ({ parte }) => {
-  const sem = Math.max(0, Math.min(100, parte));
-  return (
-    <div
-      className="w-48 space-y-1"
-      role="img"
-      aria-label={`R$ ${Math.round(sem)} a cada R$ 100 sem pagar`}
-    >
-      <div className="flex h-4 rounded-full overflow-hidden bg-white dark:bg-dark-bg-secondary">
-        <div className="h-full bg-red-500" style={{ width: `${sem}%` }} />
-        <div
-          className="h-full bg-green-400 dark:bg-green-600 border-l-2 border-white dark:border-dark-bg"
-          style={{ width: `${100 - sem}%` }}
-        />
-      </div>
-      <div className="flex justify-between text-[10px] font-medium text-gray-500 dark:text-dark-text-secondary">
-        <span>R$ {Math.round(sem)} sem pagar</span>
-        <span>R$ {100 - Math.round(sem)} pago</span>
-      </div>
-      <div className="text-center text-[10px] text-gray-400">a cada R$ 100</div>
-    </div>
-  );
-};
-
-/** Barras horizontais curtas para comparar (ex.: este mes x media). */
-const Comparacao: React.FC<{
-  itens: { rotulo: string; valor: number; cor: string }[];
-}> = ({ itens }) => {
-  const max = Math.max(...itens.map((i) => i.valor), 0.0001);
-  return (
-    <div className="w-40 space-y-1.5">
-      {itens.map((i) => (
-        <div key={i.rotulo}>
-          <div className="flex justify-between text-[10px] font-medium text-gray-500 dark:text-dark-text-secondary">
-            <span>{i.rotulo}</span>
-            <span>{formatarPct(i.valor)}</span>
-          </div>
-          <div className="h-3 rounded-full bg-white dark:bg-dark-bg-secondary overflow-hidden">
-            <div
-              className={`h-full rounded-full ${i.cor}`}
-              style={{ width: `${(i.valor / max) * 100}%` }}
-            />
-          </div>
-        </div>
-      ))}
     </div>
   );
 };
@@ -785,7 +755,11 @@ const AcompanhamentoInadimplencia: React.FC = () => {
   const recHoje = atual ? pctRecuperacao(atual) : 0;
   // Media da recuperacao so dos meses FECHADOS (o atual ainda esta correndo).
   const mediaRec = media(serie.slice(0, -1).map(pctRecuperacao));
-  const tendRec = tendenciaRecuperacao(recHoje, mediaRec);
+  // Recuperacao e pequena (~2%): barra de 0 a 10% (ou a dezena acima).
+  const escalaRec = Math.max(
+    10,
+    Math.ceil(Math.max(recHoje, mediaRec) / 10) * 10,
+  );
   const temRetrato = serie.some((p) => p.fonte === "retrato");
   const maxRecLinhas = Math.max(
     ...(linhas ?? []).map((l) => pctRecuperacao(l.hoje)),
@@ -883,39 +857,28 @@ const AcompanhamentoInadimplencia: React.FC = () => {
               icon={AlertTriangle}
               titulo="Inadimplência"
               tema="red"
-              tendencia={tendInad}
               carregando={carregando}
-              numero={formatarPct(pctHoje)}
+              pct={pctHoje}
+              referencia={anterior ? pctInadimplencia(anterior) : null}
+              rotuloReferencia="mês passado"
+              escala={100}
+              valor={atual ? `${fmtCurto(atual.naoPago)} sem pagar` : ""}
               hint={`De cada R$ 100 que venceram nos últimos 12 meses, R$ ${Math.round(pctHoje)} estão sem pagar.`}
-              detalhe={atual ? `${fmtCurto(atual.naoPago)} sem pagar` : ""}
-            >
-              <CemReais parte={pctHoje} />
-            </CardVisual>
+            />
             <CardVisual
               icon={RotateCcw}
               titulo="Recuperação"
               tema="green"
-              tendencia={tendRec}
               carregando={carregando}
-              numero={atual ? fmtCurto(atual.recuperadoMes) : "—"}
-              hint={`Do atraso que vinha de antes (${atual ? fmtValor(atual.atrasoInicioMes) : "—"}), foram pagos ${atual ? fmtValor(atual.recuperadoMes) : "—"} neste mês (${formatarPct(recHoje)}). Média dos meses anteriores: ${formatarPct(mediaRec)}.`}
-              detalhe={`${formatarPct(recHoje)} do atraso`}
-            >
-              <Comparacao
-                itens={[
-                  {
-                    rotulo: "este mês",
-                    valor: recHoje,
-                    cor: "bg-green-500",
-                  },
-                  {
-                    rotulo: "média",
-                    valor: mediaRec,
-                    cor: "bg-gray-300 dark:bg-gray-600",
-                  },
-                ]}
-              />
-            </CardVisual>
+              pct={recHoje}
+              referencia={mediaRec > 0 ? mediaRec : null}
+              rotuloReferencia="média"
+              escala={escalaRec}
+              valor={
+                atual ? `${fmtCurto(atual.recuperadoMes)} recuperados` : ""
+              }
+              hint={`Do atraso que vinha de antes (${atual ? fmtValor(atual.atrasoInicioMes) : "—"}), foram pagos ${atual ? fmtValor(atual.recuperadoMes) : "—"} neste mês. Média dos meses anteriores: ${formatarPct(mediaRec)}.`}
+            />
           </div>
 
           {atual && atual.faixas.d365_mais > 0 && (

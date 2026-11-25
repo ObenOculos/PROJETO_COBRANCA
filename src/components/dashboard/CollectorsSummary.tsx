@@ -1273,7 +1273,8 @@ const CollectorsSummary: React.FC = () => {
             </div>
           </h2>
 
-          <div className="flex bg-gray-100 dark:bg-dark-bg rounded-lg p-0.5">
+          {/* Celular: grade 2x2 (4 abas nao cabem numa linha -- 25/11). */}
+          <div className="grid grid-cols-2 gap-0.5 sm:flex bg-gray-100 dark:bg-dark-bg rounded-lg p-0.5">
             {(
               [
                 ["geral", "Geral", Gauge],
@@ -1286,7 +1287,7 @@ const CollectorsSummary: React.FC = () => {
                 key={id}
                 type="button"
                 onClick={() => setAba(id)}
-                className={`flex items-center px-3 py-1.5 rounded-md text-sm font-semibold transition-all touch-manipulation ${
+                className={`flex items-center justify-center whitespace-nowrap px-3 py-2 sm:py-1.5 rounded-md text-sm font-semibold transition-all touch-manipulation ${
                   aba === id
                     ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
                     : "text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
