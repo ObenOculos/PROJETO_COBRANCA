@@ -179,3 +179,32 @@ export const tendenciaRecuperacao = (
     : atual > mediaMeses
       ? "melhorou"
       : "piorou";
+
+// ---------------------------------------------------------------------------
+// Intervalo da aba (25/11): meses no formato YYYY-MM (sem Date: evita fuso).
+// ---------------------------------------------------------------------------
+
+/** Primeiro mes do "Tudo": a base comeca em jan/2021 e o 1o ano so forma a
+ * janela de 12 meses. */
+export const INADIMPLENCIA_MES_INICIAL = "2022-01";
+
+export type PresetIntervalo = "12" | "24" | "tudo" | "personalizado";
+
+/** "2026-11" + n meses (n pode ser negativo). */
+export const somarMeses = (ym: string, n: number): string => {
+  const [a, m] = ym.split("-").map(Number);
+  const total = a * 12 + (m - 1) + n;
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, "0")}`;
+};
+
+/** Intervalo de um atalho, terminando no mes corrente. */
+export const intervaloDoPreset = (
+  preset: Exclude<PresetIntervalo, "personalizado">,
+  mesAtual: string,
+): { inicio: string; fim: string } => ({
+  inicio:
+    preset === "tudo"
+      ? INADIMPLENCIA_MES_INICIAL
+      : somarMeses(mesAtual, -(Number(preset) - 1)),
+  fim: mesAtual,
+});

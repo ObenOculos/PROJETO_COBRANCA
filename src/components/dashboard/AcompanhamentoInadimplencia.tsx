@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  CalendarRange,
   ArrowDown,
   ArrowUp,
   ChevronDown,
@@ -18,6 +19,7 @@ import { supabase } from "../../lib/supabase";
 import { useCollection } from "../../contexts/CollectionContext";
 import { buscarComCacheTela, lerCacheTela } from "../../utils/cacheTela";
 import { formatCurrency } from "../../utils/formatters";
+import { todayLocalStr } from "../../config/visitStatus";
 import FiltroMultiplo from "../common/FiltroMultiplo";
 import {
   INADIMPLENCIA_A_PARTIR_DIAS,
@@ -25,6 +27,10 @@ import {
 } from "../../filters/inadimplencia";
 import {
   FAIXAS_ATRASO,
+  INADIMPLENCIA_MES_INICIAL,
+  PresetIntervalo,
+  intervaloDoPreset,
+  somarMeses,
   PontoInadimplencia,
   atrasoTotal,
   formatarPct,
@@ -53,6 +59,9 @@ import {
 
 const fmtValor = (v: number): string => formatCurrency(v, false);
 
+/** De quantos em quantos meses vai um rotulo no eixo X (~12 no maximo). */
+const passoRotulo = (n: number): number => Math.max(1, Math.ceil(n / 12));
+
 /** R$ 1,24 mi / R$ 67 mil -- para eixos e quadrinhos. */
 const fmtCurto = (v: number): string => {
   const a = Math.abs(v);
@@ -66,12 +75,17 @@ const fmtCurto = (v: number): string => {
 type Agrupar = "loja" | "cobrador";
 
 const buscarHistorico = async (
-  meses: number,
+  inicio: string,
+  fim: string,
   lojas: string[] | null,
   agrupar: Agrupar | null,
 ): Promise<PontoInadimplencia[]> => {
+  // Meses passados vem guardados no banco (inadimplencia_retrato); so o dia
+  // de hoje e calculado na hora. Resposta pequena: 1 linha por mes (ou por
+  // mes x loja/cobrador), sem titulos.
   const { data, error } = await supabase.rpc("inadimplencia_historico", {
-    p_meses: meses,
+    p_inicio: `${inicio}-01`,
+    p_fim: `${fim}-01`,
     ...(lojas ? { p_lojas: lojas } : {}),
     ...(agrupar ? { p_agrupar: agrupar } : {}),
   });
@@ -81,12 +95,13 @@ const buscarHistorico = async (
 
 /** Busca com o cache de tela (voltar para a aba nao refaz a consulta). */
 function useHistorico(
-  meses: number,
+  inicio: string,
+  fim: string,
   lojas: string[] | null,
   agrupar: Agrupar | null,
   ativo = true,
 ): { dados: PontoInadimplencia[] | null; erro: boolean } {
-  const chave = `inadimplenciaHistorico|${meses}|${agrupar ?? ""}|${lojas ? [...lojas].sort().join(",") : "*"}`;
+  const chave = `inadimplenciaHistorico|${inicio}|${fim}|${agrupar ?? ""}|${lojas ? [...lojas].sort().join(",") : "*"}`;
   const [estado, setEstado] = useState<{
     chave: string;
     dados: PontoInadimplencia[];
@@ -105,7 +120,9 @@ function useHistorico(
       setEstado({ chave, dados: c.valor });
       if (c.fresco) return;
     }
-    buscarComCacheTela(chave, () => buscarHistorico(meses, lojas, agrupar))
+    buscarComCacheTela(chave, () =>
+      buscarHistorico(inicio, fim, lojas, agrupar),
+    )
       .then((dados) => {
         if (!cancelado) setEstado({ chave, dados });
       })
@@ -116,7 +133,7 @@ function useHistorico(
     return () => {
       cancelado = true;
     };
-    // `chave` ja carrega meses/lojas/agrupar.
+    // `chave` ja carrega intervalo/lojas/agrupar.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chave, ativo]);
 
@@ -203,8 +220,8 @@ const GraficoLinha: React.FC<{
             </g>
           ))}
           {pontos.map((p, i) =>
-            // Rotulo do eixo X: um sim, um nao quando ha muitos meses.
-            pontos.length <= 12 || i % 2 === ultimo % 2 ? (
+            // Rotulo do eixo X: no maximo ~12, sempre com o ultimo.
+            (ultimo - i) % passoRotulo(pontos.length) === 0 ? (
               <text
                 key={p.rotulo}
                 x={x(i)}
@@ -396,7 +413,7 @@ const GraficoFaixas: React.FC<{
                     />
                   ) : null;
                 })}
-                {(serie.length <= 12 || i % 2 === (serie.length - 1) % 2) && (
+                {(serie.length - 1 - i) % passoRotulo(serie.length) === 0 && (
                   <text
                     x={cx}
                     y={HF - 8}
@@ -643,10 +660,36 @@ const CardVisual: React.FC<{
 
 const AcompanhamentoInadimplencia: React.FC = () => {
   const { users } = useCollection();
-  const [meses, setMeses] = useState<number>(() => {
-    const salvo = Number(localStorage.getItem("inadimplenciaMeses"));
-    return [6, 12, 24].includes(salvo) ? salvo : 12;
+  const mesAtual = todayLocalStr().slice(0, 7);
+  // Intervalo do grafico (25/11): 12 / 24 meses, Tudo ou de/ate. Os cards
+  // mostram o ULTIMO mes do intervalo. O atalho escolhido fica salvo; o
+  // personalizado volta para 12 meses ao reabrir.
+  const [preset, setPreset] = useState<PresetIntervalo>(() => {
+    const salvo = localStorage.getItem("inadimplenciaIntervalo");
+    return salvo === "24" || salvo === "tudo" ? salvo : "12";
   });
+  const [intervalo, setIntervalo] = useState(() =>
+    intervaloDoPreset(preset === "personalizado" ? "12" : preset, mesAtual),
+  );
+  const escolherPreset = (p: Exclude<PresetIntervalo, "personalizado">) => {
+    setPreset(p);
+    setIntervalo(intervaloDoPreset(p, mesAtual));
+    localStorage.setItem("inadimplenciaIntervalo", p);
+  };
+  const mudarMes = (campo: "inicio" | "fim", valor: string) => {
+    if (!/^\d{4}-\d{2}$/.test(valor)) return;
+    setPreset("personalizado");
+    setIntervalo((atual) => {
+      const novo = { ...atual, [campo]: valor };
+      // Mantem inicio <= fim <= mes atual.
+      if (novo.fim > mesAtual) novo.fim = mesAtual;
+      if (novo.inicio > novo.fim) {
+        if (campo === "inicio") novo.fim = novo.inicio;
+        else novo.inicio = novo.fim;
+      }
+      return novo;
+    });
+  };
   const [agrupar, setAgrupar] = useState<Agrupar>(() =>
     localStorage.getItem("inadimplenciaAgrupar") === "cobrador"
       ? "cobrador"
@@ -657,14 +700,13 @@ const AcompanhamentoInadimplencia: React.FC = () => {
   const [mais, setMais] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem("inadimplenciaMeses", String(meses));
-  }, [meses]);
-  useEffect(() => {
     localStorage.setItem("inadimplenciaAgrupar", agrupar);
   }, [agrupar]);
 
-  // Por loja sem filtro: da as opcoes do filtro e a tabela por loja.
-  const porLoja = useHistorico(2, null, "loja");
+  // Tabela: ultimo mes do intervalo x mes anterior. Por loja sem filtro: da
+  // tambem as opcoes do filtro de loja.
+  const mesAnteriorFim = somarMeses(intervalo.fim, -1);
+  const porLoja = useHistorico(mesAnteriorFim, intervalo.fim, null, "loja");
   const lojas = useMemo(
     () =>
       [
@@ -681,9 +723,15 @@ const AcompanhamentoInadimplencia: React.FC = () => {
       ? null
       : lojas.filter((l) => !lojasExcluidas.has(l));
 
-  const empresa = useHistorico(meses, lojasFiltro, null);
+  const empresa = useHistorico(
+    intervalo.inicio,
+    intervalo.fim,
+    lojasFiltro,
+    null,
+  );
   const porCobrador = useHistorico(
-    2,
+    mesAnteriorFim,
+    intervalo.fim,
     lojasFiltro,
     "cobrador",
     agrupar === "cobrador",
@@ -692,8 +740,9 @@ const AcompanhamentoInadimplencia: React.FC = () => {
   const serie = empresa.dados ?? [];
   const atual = serie[serie.length - 1];
   const anterior = serie.length > 1 ? serie[serie.length - 2] : null;
-  const rotulos = serie.map((p, i) =>
-    i === serie.length - 1 ? `hoje` : rotuloMes(p.dia),
+  const hoje = todayLocalStr();
+  const rotulos = serie.map((p) =>
+    p.dia === hoje ? "hoje" : rotuloMes(p.dia),
   );
 
   const nomeCobrador = (id: string | null) =>
@@ -801,23 +850,57 @@ const AcompanhamentoInadimplencia: React.FC = () => {
         <div
           className="flex bg-gray-100 dark:bg-dark-bg rounded-lg p-0.5"
           role="group"
-          aria-label="Meses no gráfico"
+          aria-label="Intervalo do gráfico"
         >
-          {[6, 12, 24].map((m) => (
+          {(
+            [
+              ["12", "12 meses"],
+              ["24", "24 meses"],
+              ["tudo", "Tudo"],
+            ] as const
+          ).map(([id, rotulo]) => (
             <button
-              key={m}
+              key={id}
               type="button"
-              onClick={() => setMeses(m)}
-              aria-pressed={meses === m}
+              onClick={() => escolherPreset(id)}
+              aria-pressed={preset === id}
               className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all touch-manipulation ${
-                meses === m
+                preset === id
                   ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
                   : "text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
               }`}
             >
-              {m} meses
+              {rotulo}
             </button>
           ))}
+        </div>
+        <div
+          className={`flex items-center gap-1 rounded-lg px-1.5 py-0.5 text-xs ${
+            preset === "personalizado"
+              ? "bg-blue-50 ring-1 ring-blue-200 dark:bg-blue-900/20 dark:ring-blue-800"
+              : ""
+          }`}
+        >
+          <CalendarRange className="h-4 w-4 text-gray-400" />
+          <input
+            type="month"
+            aria-label="De"
+            value={intervalo.inicio}
+            min={INADIMPLENCIA_MES_INICIAL}
+            max={intervalo.fim}
+            onChange={(e) => mudarMes("inicio", e.target.value)}
+            className="px-1.5 py-1 rounded-md border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-xs text-gray-700 dark:text-dark-text"
+          />
+          <span className="text-gray-400">–</span>
+          <input
+            type="month"
+            aria-label="Até"
+            value={intervalo.fim}
+            min={intervalo.inicio}
+            max={mesAtual}
+            onChange={(e) => mudarMes("fim", e.target.value)}
+            className="px-1.5 py-1 rounded-md border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-xs text-gray-700 dark:text-dark-text"
+          />
         </div>
         <span
           className="ml-auto text-gray-400 hover:text-gray-600 dark:hover:text-dark-text cursor-help"
@@ -877,7 +960,7 @@ const AcompanhamentoInadimplencia: React.FC = () => {
               valor={
                 atual ? `${fmtCurto(atual.recuperadoMes)} recuperados` : ""
               }
-              hint={`Do atraso que vinha de antes (${atual ? fmtValor(atual.atrasoInicioMes) : "—"}), foram pagos ${atual ? fmtValor(atual.recuperadoMes) : "—"} neste mês. Média dos meses anteriores: ${formatarPct(mediaRec)}.`}
+              hint={`Do atraso que vinha de antes (${atual ? fmtValor(atual.atrasoInicioMes) : "—"}), foram pagos ${atual ? fmtValor(atual.recuperadoMes) : "—"} no mês. Média dos meses anteriores: ${formatarPct(mediaRec)}.`}
             />
           </div>
 

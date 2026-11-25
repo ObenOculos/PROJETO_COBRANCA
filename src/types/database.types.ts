@@ -2682,7 +2682,12 @@ export type Database = {
         Returns: { collector_id: string; documento: string }[];
       };
       inadimplencia_historico: {
-        Args: { p_meses?: number; p_lojas?: string[]; p_agrupar?: string };
+        Args: {
+          p_inicio: string;
+          p_fim: string;
+          p_lojas?: string[];
+          p_agrupar?: string;
+        };
         Returns: {
           dia: string;
           chave: string | null;

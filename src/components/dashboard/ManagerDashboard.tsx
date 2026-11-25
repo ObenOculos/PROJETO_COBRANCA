@@ -20,6 +20,12 @@ import DatabaseUpload from "../admin/DatabaseUpload";
 import { ClientAssignment } from "../ClientAssignment";
 import VisitTracking from "./VisitTracking";
 import CollectorsSummary from "./CollectorsSummary";
+import AcompanhamentoInadimplencia from "./AcompanhamentoInadimplencia";
+import CabecalhoResumoGeral, {
+  AbaResumoGeral,
+  lerAbaResumoGeral,
+  salvarAbaResumoGeral,
+} from "./CabecalhoResumoGeral";
 import ConferenciaRecebimentos from "./ConferenciaRecebimentos";
 import DailyCashReport from "./DailyCashReport";
 import AbaPedidosGestor from "./AbaPedidosGestor";
@@ -39,10 +45,7 @@ import { Notification } from "../../contexts/NotificationContext";
 // banco_dados_clientes_ativos + banco_dados_clientes_quitados particionam
 // BANCO_DADOS exatamente, entao o resultado e identico ao escopo "all", so
 // que em duas buscas menores em vez de uma varredura da tabela inteira).
-const TABS_NEEDING_FULL_SCOPE = new Set([
-  "clients",
-  "collectors-summary",
-]);
+const TABS_NEEDING_FULL_SCOPE = new Set(["clients", "collectors-summary"]);
 
 // Telas que dependem das cobrancas mas nao tem uma consulta propria: como o
 // gestor nao carrega mais nada no login, elas precisam pedir os dados ao abrir.
@@ -106,6 +109,13 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
       return "resumo";
     }
   });
+  // Aba do Resumo Geral (Geral / Por cobrador / Por loja / Inadimplencia),
+  // aqui em cima para decidir se precisa da carga completa.
+  const [resumoAba, setResumoAba] = useState<AbaResumoGeral>(lerAbaResumoGeral);
+  const mudarResumoAba = (aba: AbaResumoGeral) => {
+    setResumoAba(aba);
+    salvarAbaResumoGeral(aba);
+  };
   const changeSummaryView = (v: SummaryView) => {
     setSummaryView(v);
     try {
@@ -274,9 +284,16 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   // do dia — inclui clientes que quitaram tudo. Entra na mesma regra.
   // A aba Automatica da Atribuicao (CarteiraDistribuicao) tem consulta
   // propria e nao usa os titulos: nao dispara a carga completa.
+  // A aba Inadimplencia do Resumo Geral tem consulta propria (RPC
+  // inadimplencia_historico): nao baixa a base inteira (egress, 25/11).
   const tabNeedsFullScope =
     TABS_NEEDING_FULL_SCOPE.has(activeTab) &&
-    !(activeTab === "clients" && atribuicaoView === "automatica");
+    !(activeTab === "clients" && atribuicaoView === "automatica") &&
+    !(
+      activeTab === "collectors-summary" &&
+      summaryView === "resumo" &&
+      resumoAba === "inadimplencia"
+    );
   const needsFullScope =
     tabNeedsFullScope ||
     (activeTab === "collections" &&
@@ -419,8 +436,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                       Nenhuma consulta feita ainda
                     </h3>
                     <p className="text-sm text-gray-600 dark:text-dark-text-secondary max-w-md mx-auto mb-6">
-                      Ajuste os filtros acima e clique em consultar. As cobranças
-                      não são carregadas automaticamente para o gestor.
+                      Ajuste os filtros acima e clique em consultar. As
+                      cobranças não são carregadas automaticamente para o
+                      gestor.
                     </p>
                     <button
                       onClick={() => void requestCollections()}
@@ -448,7 +466,12 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
           short: string;
           badge?: number;
         }[] = [
-          { id: "resumo", icon: ClipboardList, label: "Resumo", short: "Resumo" },
+          {
+            id: "resumo",
+            icon: ClipboardList,
+            label: "Resumo",
+            short: "Resumo",
+          },
           {
             id: "acompanhamento",
             icon: CalendarClock,
@@ -494,7 +517,18 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
               })}
             </div>
             {summaryView === "resumo" ? (
-              <CollectorsSummary />
+              resumoAba === "inadimplencia" ? (
+                // Leve: so o cabecalho + a aba (sem montar o Resumo).
+                <div className="space-y-4">
+                  <CabecalhoResumoGeral
+                    aba={resumoAba}
+                    onAba={mudarResumoAba}
+                  />
+                  <AcompanhamentoInadimplencia />
+                </div>
+              ) : (
+                <CollectorsSummary aba={resumoAba} onAba={mudarResumoAba} />
+              )
             ) : summaryView === "acompanhamento" ? (
               <VisitTracking />
             ) : (

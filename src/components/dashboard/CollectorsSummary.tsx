@@ -8,19 +8,14 @@ import {
 } from "../../filters/periodo";
 import { buscarComCacheTela, lerCacheTela } from "../../utils/cacheTela";
 import {
-  ClipboardList,
-  Info,
   CalendarClock,
   Repeat,
   ChevronDown,
   ChevronUp,
   Gauge,
-  Users,
-  Store,
   UserX,
   Shuffle,
   History,
-  TrendingDown,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
@@ -31,7 +26,7 @@ import FiltroMultiplo from "../common/FiltroMultiplo";
 import SortTh from "../common/SortTh";
 import ModoVisualizacao, { Modo } from "../common/ModoVisualizacao";
 import ResumoPorLoja from "./ResumoPorLoja";
-import AcompanhamentoInadimplencia from "./AcompanhamentoInadimplencia";
+import CabecalhoResumoGeral, { AbaResumoGeral } from "./CabecalhoResumoGeral";
 import ResumoEmpresa, {
   CardCarteira,
   CardClientes,
@@ -276,7 +271,12 @@ const FaixasAlcance: React.FC<{ regras: CollectorOverdueRange[] }> = ({
   );
 };
 
-const CollectorsSummary: React.FC = () => {
+// Aba controlada pelo ManagerDashboard (25/11): a Inadimplencia abre sem
+// montar esta tela (ver CabecalhoResumoGeral).
+const CollectorsSummary: React.FC<{
+  aba: AbaResumoGeral;
+  onAba: (aba: AbaResumoGeral) => void;
+}> = ({ aba, onAba: setAba }) => {
   const {
     users,
     collections,
@@ -388,21 +388,6 @@ const CollectorsSummary: React.FC = () => {
   useEffect(() => {
     localStorage.setItem("resumoGeralModo", modo);
   }, [modo]);
-  // Abas do Resumo Geral (25/11): Geral (empresa + cobradores somados) e
-  // Por cobrador (uma linha por cobrador). A ultima aba aberta fica salva.
-  const [aba, setAba] = useState<
-    "geral" | "cobrador" | "loja" | "inadimplencia"
-  >(() => {
-    const salva = localStorage.getItem("resumoGeralAba");
-    return salva === "cobrador" || salva === "loja" || salva === "inadimplencia"
-      ? salva
-      : "geral";
-  });
-  useEffect(() => {
-    localStorage.setItem("resumoGeralAba", aba);
-  }, [aba]);
-  const [infoOpen, setInfoOpen] = useState(false);
-  const infoRef = useRef<HTMLDivElement>(null);
   // "Visao geral" e sempre colapsavel, em qualquer contexto (1 cobrador ou
   // vários) — o botao no cabecalho funciona igual nos dois casos. Só o
   // VALOR PADRAO muda: comeca fechada quando sobra 1 só (ver efeito abaixo,
@@ -432,16 +417,6 @@ const CollectorsSummary: React.FC = () => {
       setSortDir(key === "name" ? "asc" : "desc");
     }
   };
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (infoRef.current && !infoRef.current.contains(e.target as Node)) {
-        setInfoOpen(false);
-      }
-    };
-    if (infoOpen) document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [infoOpen]);
 
   const applyPreset = (key: PresetKey) => {
     setActivePreset(key);
@@ -1239,67 +1214,7 @@ const CollectorsSummary: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-4 lg:p-5 space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <h2 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-dark-text flex items-center">
-            <ClipboardList className="h-5 w-5 lg:h-6 lg:w-6 mr-2 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-            Resumo Geral
-            <div className="relative ml-1.5" ref={infoRef}>
-              <button
-                onClick={() => setInfoOpen((v) => !v)}
-                className="text-gray-300 hover:text-blue-600 dark:text-dark-text-secondary dark:hover:text-blue-400"
-                aria-label="O que significa cada número"
-              >
-                <Info className="h-4 w-4" />
-              </button>
-              {infoOpen && (
-                <div className="absolute z-20 mt-2 w-72 rounded-xl border border-blue-100 dark:border-blue-800/40 bg-blue-50 dark:bg-blue-900/20 px-4 py-3 text-xs font-normal normal-case text-blue-700 dark:text-blue-300 shadow-lg">
-                  <strong>Geral</strong>: a empresa inteira (todos os clientes,
-                  com ou sem cobrador) e, embaixo, os mesmos cards só com os
-                  cobradores marcados.
-                  <br />
-                  <strong>Por cobrador</strong> e <strong>Por loja</strong>: uma
-                  linha cada para comparar (Tabela) ou os cards de cada um
-                  (Cards).
-                  <br />
-                  <strong>Clientes</strong> e <strong>Carteira</strong>: a
-                  situação de hoje. <strong>Previsão</strong>: o que vence de
-                  hoje até o fim do período escolhido.
-                  <br />
-                  <strong>Clientes atendidos</strong>: cada cliente conta uma
-                  vez, mesmo atendido várias vezes.
-                </div>
-              )}
-            </div>
-          </h2>
-
-          {/* Celular: grade 2x2 (4 abas nao cabem numa linha -- 25/11). */}
-          <div className="grid grid-cols-2 gap-0.5 sm:flex bg-gray-100 dark:bg-dark-bg rounded-lg p-0.5">
-            {(
-              [
-                ["geral", "Geral", Gauge],
-                ["cobrador", "Por cobrador", Users],
-                ["loja", "Por loja", Store],
-                ["inadimplencia", "Inadimplência", TrendingDown],
-              ] as const
-            ).map(([id, rotulo, Icone]) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setAba(id)}
-                className={`flex items-center justify-center whitespace-nowrap px-3 py-2 sm:py-1.5 rounded-md text-sm font-semibold transition-all touch-manipulation ${
-                  aba === id
-                    ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
-                    : "text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
-                }`}
-              >
-                <Icone className="h-4 w-4 mr-1.5" />
-                {rotulo}
-              </button>
-            ))}
-          </div>
-        </div>
-
+      <CabecalhoResumoGeral aba={aba} onAba={setAba}>
         {/* A aba Inadimplencia tem janela propria (12 meses de vencimento):
             o periodo nao se aplica a ela. */}
         {aba !== "inadimplencia" && (
@@ -1348,7 +1263,7 @@ const CollectorsSummary: React.FC = () => {
             </label>
           </div>
         )}
-      </div>
+      </CabecalhoResumoGeral>
 
       {aba === "geral" && teamGoal && (
         <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border-2 border-indigo-100 dark:border-indigo-900/40 p-4 space-y-2">
@@ -2027,8 +1942,6 @@ const CollectorsSummary: React.FC = () => {
           )}
         </>
       )}
-
-      {aba === "inadimplencia" && <AcompanhamentoInadimplencia />}
 
       {aba === "loja" && (
         <ResumoPorLoja
