@@ -307,9 +307,7 @@ export const CardClientes: React.FC<{ r: Resumo; cobrador?: boolean }> = ({
       titulo="Clientes"
       tema="indigo"
       numero={fmtNum(total)}
-      frase={
-        cobrador ? "clientes com saldo na carteira" : "clientes no total"
-      }
+      frase={cobrador ? "clientes com saldo na carteira" : "clientes no total"}
       pilulas={partes}
       detalhes={[
         // No cobrador o com/sem agendamento ja esta nos quadrinhos.
@@ -382,14 +380,17 @@ export const CardPrevisao: React.FC<{ r: Resumo }> = ({ r }) => {
           ? [
               { valor: p.parcelas, txt: "parcelas", n: p.parcelasClientes },
               { valor: p.acordo, txt: "acordos", n: p.acordoClientes },
-              { valor: p.agendados, txt: "agendados (vencido)", n: p.agendadosClientes },
-            ]
-              .map((x) => ({
-                valor: fmtValorCurto(x.valor),
-                rotulo: x.txt,
-                tom: "gray" as const,
-                hint: `${fmtValor(x.valor)} · ${clientesTxt(x.n)}`,
-              }))
+              {
+                valor: p.agendados,
+                txt: "agendados (vencido)",
+                n: p.agendadosClientes,
+              },
+            ].map((x) => ({
+              valor: fmtValorCurto(x.valor),
+              rotulo: x.txt,
+              tom: "gray" as const,
+              hint: `${fmtValor(x.valor)} · ${clientesTxt(x.n)}`,
+            }))
           : []
       }
       detalhes={
@@ -474,7 +475,13 @@ export const CardDesempenho: React.FC<{
         {
           valor: loading ? "…" : `${pct.toFixed(0)}%`,
           rotulo: pct >= 100 ? "meta do mês batida!" : "da meta do mês",
-          tom: loading ? "gray" : pct >= 100 ? "green" : pct >= 70 ? "amber" : "red",
+          tom: loading
+            ? "gray"
+            : pct >= 100
+              ? "green"
+              : pct >= 70
+                ? "amber"
+                : "red",
           loading,
           hint: `${fmtValor(meta.recebido)} de ${fmtValor(meta.meta)} no mês atual`,
         },
@@ -538,7 +545,11 @@ export const CardCarteira: React.FC<{
       tema="slate"
       numero={fmtValorCurto(total)}
       numeroHint={fmtValor(total)}
-      frase={empresa ? "os clientes devem hoje" : "os clientes da carteira devem hoje"}
+      frase={
+        empresa
+          ? "os clientes devem hoje"
+          : "os clientes da carteira devem hoje"
+      }
       pilulas={[
         {
           valor: fmtValorCurto(r.carteira.vencido),
@@ -618,6 +629,8 @@ const ResumoEmpresa: React.FC<{
   const [lojasExcluidas, setLojasExcluidas] = useState<Set<string>>(
     () => new Set(),
   );
+  // Minimizar/expandir, igual a visao dos cobradores (25/11).
+  const [aberta, setAberta] = useState(true);
 
   const lojas = useMemo(() => lojasDaBase(collections), [collections]);
 
@@ -650,10 +663,19 @@ const ResumoEmpresa: React.FC<{
   return (
     <div className="space-y-3">
       <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-        <div className="flex items-center gap-2 text-base font-bold text-gray-900 dark:text-dark-text">
+        <button
+          type="button"
+          onClick={() => setAberta((v) => !v)}
+          className="flex items-center gap-2 text-base font-bold text-gray-900 dark:text-dark-text"
+        >
           <Building2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
           Visão geral da empresa
-        </div>
+          {aberta ? (
+            <ChevronUp className="h-4 w-4 text-gray-400" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-gray-400" />
+          )}
+        </button>
         <div className="sm:ml-auto flex items-center gap-1.5 text-sm text-gray-700 dark:text-dark-text-secondary">
           Loja
           <FiltroMultiplo
@@ -669,16 +691,18 @@ const ResumoEmpresa: React.FC<{
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-        <CardClientes r={r} />
-        <CardPrevisao r={r} />
-        <CardRecebidoEmpresa
-          r={r}
-          registradoCobradores={registradoCobradores}
-          acionados={acionados}
-        />
-        <CardCarteira r={r} empresa />
-      </div>
+      {aberta && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          <CardClientes r={r} />
+          <CardPrevisao r={r} />
+          <CardRecebidoEmpresa
+            r={r}
+            registradoCobradores={registradoCobradores}
+            acionados={acionados}
+          />
+          <CardCarteira r={r} empresa />
+        </div>
+      )}
     </div>
   );
 };
