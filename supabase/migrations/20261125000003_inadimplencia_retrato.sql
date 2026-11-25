@@ -8,6 +8,7 @@
 --
 -- A conta fica em UM lugar: inadimplencia_calculo (interna, sem acesso
 -- pelo app). A RPC inadimplencia_historico (etapa 1a) e o retrato usam ela.
+-- Etapa 1c no mesmo arquivo (antes do db push): a RPC le o retrato onde houver.
 
 -- 1) Conta unica, por dia de corte x loja x cobrador ------------------------
 CREATE OR REPLACE FUNCTION public.inadimplencia_calculo(
@@ -97,75 +98,7 @@ $function$;
 -- Interna: so as funcoes SECURITY DEFINER abaixo chamam.
 REVOKE ALL ON FUNCTION public.inadimplencia_calculo(date[], text[]) FROM PUBLIC, anon, authenticated;
 
--- 2) RPC da etapa 1a passa a usar a conta unica (mesma assinatura e saida) --
-CREATE OR REPLACE FUNCTION public.inadimplencia_historico(
-  p_meses integer DEFAULT 12,
-  p_lojas text[] DEFAULT NULL,
-  p_agrupar text DEFAULT NULL
-)
-RETURNS TABLE(
-  dia date,
-  chave text,
-  venceu numeric,
-  nao_pago numeric,
-  atraso_3_30 numeric,
-  atraso_31_60 numeric,
-  atraso_61_90 numeric,
-  atraso_91_180 numeric,
-  atraso_181_365 numeric,
-  atraso_365_mais numeric,
-  atraso_inicio_mes numeric,
-  recuperado_mes numeric
-)
-LANGUAGE plpgsql
-STABLE SECURITY DEFINER
-SET search_path TO 'public'
-AS $function$
-DECLARE
-  v_hoje date := (now() AT TIME ZONE 'America/Sao_Paulo')::date;
-  v_meses integer := LEAST(GREATEST(COALESCE(p_meses, 12), 1), 36);
-  v_cortes date[];
-BEGIN
-  IF (SELECT app_current_user_type()) IS DISTINCT FROM 'manager' THEN
-    RAISE EXCEPTION 'Sem permissão para ver a inadimplência da empresa.';
-  END IF;
-  IF p_agrupar IS NOT NULL AND p_agrupar NOT IN ('loja', 'cobrador') THEN
-    RAISE EXCEPTION 'p_agrupar deve ser loja, cobrador ou vazio.';
-  END IF;
-
-  -- Ultimo dia de cada mes fechado + hoje.
-  SELECT array_agg(LEAST((date_trunc('month', m) + interval '1 month - 1 day')::date, v_hoje))
-  INTO v_cortes
-  FROM generate_series(
-    date_trunc('month', v_hoje) - make_interval(months => v_meses - 1),
-    v_hoje,
-    interval '1 month'
-  ) AS m;
-
-  RETURN QUERY
-  SELECT
-    c.dia,
-    CASE p_agrupar
-      WHEN 'loja' THEN c.nome_da_loja
-      WHEN 'cobrador' THEN c.cobrador_id::text
-    END AS chave,
-    ROUND(SUM(c.venceu), 2),
-    ROUND(SUM(c.nao_pago), 2),
-    ROUND(SUM(c.atraso_3_30), 2),
-    ROUND(SUM(c.atraso_31_60), 2),
-    ROUND(SUM(c.atraso_61_90), 2),
-    ROUND(SUM(c.atraso_91_180), 2),
-    ROUND(SUM(c.atraso_181_365), 2),
-    ROUND(SUM(c.atraso_365_mais), 2),
-    ROUND(SUM(c.atraso_inicio_mes), 2),
-    ROUND(SUM(c.recuperado_mes), 2)
-  FROM inadimplencia_calculo(v_cortes, p_lojas) c
-  GROUP BY 1, 2
-  ORDER BY 1, 2 NULLS FIRST;
-END;
-$function$;
-
--- 3) Tabela do retrato --------------------------------------------------------
+-- 2) Tabela do retrato --------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.inadimplencia_retrato (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   dia date NOT NULL,
@@ -205,7 +138,7 @@ CREATE POLICY inadimplencia_retrato_gestor_le
 REVOKE ALL ON public.inadimplencia_retrato FROM anon;
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public.inadimplencia_retrato FROM authenticated;
 
--- 4) Gravacao do retrato do dia (pg_cron) -------------------------------------
+-- 3) Gravacao do retrato do dia (pg_cron) -------------------------------------
 CREATE OR REPLACE FUNCTION public.gravar_retrato_inadimplencia()
 RETURNS integer
 LANGUAGE plpgsql
@@ -242,6 +175,112 @@ END;
 $function$;
 
 REVOKE ALL ON FUNCTION public.gravar_retrato_inadimplencia() FROM PUBLIC, anon;
+
+-- 4) RPC (etapa 1c): retrato onde houver, reconstrucao no resto -------------
+-- Dia de corte ANTERIOR a hoje com retrato gravado usa o retrato (congelado,
+-- com o cobrador daquele dia); o resto (e sempre o dia de hoje) e
+-- reconstruido. A coluna `fonte` diz de onde veio cada linha.
+-- Muda o tipo de retorno (coluna fonte): precisa de DROP.
+DROP FUNCTION IF EXISTS public.inadimplencia_historico(integer, text[], text);
+
+CREATE FUNCTION public.inadimplencia_historico(
+  p_meses integer DEFAULT 12,
+  p_lojas text[] DEFAULT NULL,
+  p_agrupar text DEFAULT NULL
+)
+RETURNS TABLE(
+  dia date,
+  chave text,
+  fonte text,
+  venceu numeric,
+  nao_pago numeric,
+  atraso_3_30 numeric,
+  atraso_31_60 numeric,
+  atraso_61_90 numeric,
+  atraso_91_180 numeric,
+  atraso_181_365 numeric,
+  atraso_365_mais numeric,
+  atraso_inicio_mes numeric,
+  recuperado_mes numeric
+)
+LANGUAGE plpgsql
+STABLE SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_hoje date := (now() AT TIME ZONE 'America/Sao_Paulo')::date;
+  v_meses integer := LEAST(GREATEST(COALESCE(p_meses, 12), 1), 36);
+  v_cortes date[];
+  v_com_retrato date[];
+  v_sem_retrato date[];
+BEGIN
+  IF (SELECT app_current_user_type()) IS DISTINCT FROM 'manager' THEN
+    RAISE EXCEPTION 'Sem permissão para ver a inadimplência da empresa.';
+  END IF;
+  IF p_agrupar IS NOT NULL AND p_agrupar NOT IN ('loja', 'cobrador') THEN
+    RAISE EXCEPTION 'p_agrupar deve ser loja, cobrador ou vazio.';
+  END IF;
+
+  -- Ultimo dia de cada mes fechado + hoje.
+  SELECT array_agg(LEAST((date_trunc('month', m) + interval '1 month - 1 day')::date, v_hoje))
+  INTO v_cortes
+  FROM generate_series(
+    date_trunc('month', v_hoje) - make_interval(months => v_meses - 1),
+    v_hoje,
+    interval '1 month'
+  ) AS m;
+
+  SELECT array_agg(DISTINCT r.dia)
+  INTO v_com_retrato
+  FROM inadimplencia_retrato r
+  WHERE r.dia = ANY (v_cortes)
+    AND r.dia < v_hoje;
+
+  SELECT array_agg(c)
+  INTO v_sem_retrato
+  FROM unnest(v_cortes) AS c
+  WHERE NOT (c = ANY (COALESCE(v_com_retrato, '{}'::date[])));
+
+  RETURN QUERY
+  SELECT
+    t.dia,
+    CASE p_agrupar
+      WHEN 'loja' THEN t.nome_da_loja
+      WHEN 'cobrador' THEN t.cobrador_id::text
+    END AS chave,
+    t.fonte,
+    ROUND(SUM(t.venceu), 2),
+    ROUND(SUM(t.nao_pago), 2),
+    ROUND(SUM(t.atraso_3_30), 2),
+    ROUND(SUM(t.atraso_31_60), 2),
+    ROUND(SUM(t.atraso_61_90), 2),
+    ROUND(SUM(t.atraso_91_180), 2),
+    ROUND(SUM(t.atraso_181_365), 2),
+    ROUND(SUM(t.atraso_365_mais), 2),
+    ROUND(SUM(t.atraso_inicio_mes), 2),
+    ROUND(SUM(t.recuperado_mes), 2)
+  FROM (
+    SELECT r.dia, r.nome_da_loja, r.cobrador_id, 'retrato'::text AS fonte,
+           r.venceu, r.nao_pago, r.atraso_3_30, r.atraso_31_60, r.atraso_61_90,
+           r.atraso_91_180, r.atraso_181_365, r.atraso_365_mais,
+           r.atraso_inicio_mes, r.recuperado_mes
+    FROM inadimplencia_retrato r
+    WHERE r.dia = ANY (COALESCE(v_com_retrato, '{}'::date[]))
+      AND (p_lojas IS NULL OR r.nome_da_loja = ANY (p_lojas))
+    UNION ALL
+    SELECT c.dia, c.nome_da_loja, c.cobrador_id, 'reconstrucao'::text,
+           c.venceu, c.nao_pago, c.atraso_3_30, c.atraso_31_60, c.atraso_61_90,
+           c.atraso_91_180, c.atraso_181_365, c.atraso_365_mais,
+           c.atraso_inicio_mes, c.recuperado_mes
+    FROM inadimplencia_calculo(COALESCE(v_sem_retrato, '{}'::date[]), p_lojas) c
+  ) t
+  GROUP BY 1, 2, 3
+  ORDER BY 1, 2 NULLS FIRST;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.inadimplencia_historico(integer, text[], text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.inadimplencia_historico(integer, text[], text) TO authenticated;
 
 -- Todo dia 7h30 de Brasilia (10h30 UTC): depois do sync do Ciclone (5h),
 -- da SSOtica (6h) e da carteira automatica (7h).
