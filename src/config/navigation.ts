@@ -67,7 +67,8 @@ export const navigationItems: NavItemConfig[] = [
   },
   {
     id: "collectors-summary",
-    managerName: "Cobradores",
+    // Era "Cobradores": virou painel da empresa + cobradores (25/11).
+    managerName: "Resumo Geral",
     managerIcon: ClipboardList,
     roles: ["manager"],
   },

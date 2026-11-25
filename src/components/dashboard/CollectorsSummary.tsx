@@ -1214,7 +1214,7 @@ const CollectorsSummary: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h2 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-dark-text flex items-center">
             <ClipboardList className="h-5 w-5 lg:h-6 lg:w-6 mr-2 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-            Resumo por Cobrador
+            Resumo Geral
             <div className="relative ml-1.5" ref={infoRef}>
               <button
                 onClick={() => setInfoOpen((v) => !v)}
