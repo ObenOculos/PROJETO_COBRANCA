@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 export interface SummaryCardRow {
   label: string;
@@ -44,6 +45,10 @@ const SummaryCard: React.FC<{
   /** Conteudo no canto superior direito, ao lado do titulo (ex.: navegador
    * de mes). Clique nele nao dispara o onClick do card. */
   headerRight?: React.ReactNode;
+  /** Linhas escondidas atras de "ver detalhes" (abre dentro do card). Para
+   * o gestor leigo: o card mostra so o numero e os alertas; o resto aparece
+   * quando ele pede (reuniao 25/11, item 92). */
+  detalhes?: SummaryCardRow[];
 }> = ({
   icon: Icon,
   title,
@@ -59,7 +64,9 @@ const SummaryCard: React.FC<{
   hint,
   selecionado = false,
   headerRight,
+  detalhes = [],
 }) => {
+  const [detalhesAbertos, setDetalhesAbertos] = useState(false);
   const valueClasses: Record<string, string> = {
     neutral: "text-gray-900 dark:text-dark-text",
     red: "text-red-600 dark:text-red-400",
@@ -76,6 +83,33 @@ const SummaryCard: React.FC<{
     green:
       "text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-1.5 rounded",
   };
+  const renderRow = (r: SummaryCardRow) => (
+    <div
+      key={r.label}
+      onClick={
+        r.onClick
+          ? (e) => {
+              // Nao dispara tambem o clique do card.
+              e.stopPropagation();
+              r.onClick?.();
+            }
+          : undefined
+      }
+      title={r.hint}
+      className={`flex items-baseline justify-between gap-2 text-xs ${r.onClick ? "cursor-pointer rounded -mx-1 px-1 hover:bg-blue-100/60 dark:hover:bg-blue-900/20" : ""}`}
+    >
+      <span
+        className={`text-gray-500 dark:text-dark-text-secondary truncate ${r.onClick ? "underline decoration-dotted underline-offset-2" : ""}`}
+      >
+        {r.label}
+      </span>
+      <span
+        className={`font-bold whitespace-nowrap ${r.loading ? "animate-pulse" : ""} ${r.tone ? rowClasses[r.tone] : "text-gray-900 dark:text-dark-text"}`}
+      >
+        {r.value}
+      </span>
+    </div>
+  );
   return (
     <div
       onClick={onClick}
@@ -128,33 +162,31 @@ const SummaryCard: React.FC<{
         <div
           className={`border-t border-gray-300 dark:border-dark-border/60 ${compact ? "mt-1.5 pt-1.5 space-y-0.5" : "mt-2 pt-2 space-y-1"}`}
         >
-          {rows.map((r) => (
-            <div
-              key={r.label}
-              onClick={
-                r.onClick
-                  ? (e) => {
-                      // Nao dispara tambem o clique do card.
-                      e.stopPropagation();
-                      r.onClick?.();
-                    }
-                  : undefined
-              }
-              title={r.hint}
-              className={`flex items-baseline justify-between gap-2 text-xs ${r.onClick ? "cursor-pointer rounded -mx-1 px-1 hover:bg-blue-100/60 dark:hover:bg-blue-900/20" : ""}`}
-            >
-              <span
-                className={`text-gray-500 dark:text-dark-text-secondary truncate ${r.onClick ? "underline decoration-dotted underline-offset-2" : ""}`}
-              >
-                {r.label}
-              </span>
-              <span
-                className={`font-bold whitespace-nowrap ${r.loading ? "animate-pulse" : ""} ${r.tone ? rowClasses[r.tone] : "text-gray-900 dark:text-dark-text"}`}
-              >
-                {r.value}
-              </span>
+          {rows.map(renderRow)}
+        </div>
+      )}
+      {detalhes.length > 0 && (
+        <div className={compact ? "mt-1" : "mt-1.5"}>
+          {detalhesAbertos && (
+            <div className="mb-1 space-y-1 border-t border-dashed border-gray-300 dark:border-dark-border/60 pt-1.5">
+              {detalhes.map(renderRow)}
             </div>
-          ))}
+          )}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setDetalhesAbertos((v) => !v);
+            }}
+            className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400"
+          >
+            {detalhesAbertos ? "menos detalhes" : "ver detalhes"}
+            {detalhesAbertos ? (
+              <ChevronUp className="h-3 w-3" />
+            ) : (
+              <ChevronDown className="h-3 w-3" />
+            )}
+          </button>
         </div>
       )}
     </div>
