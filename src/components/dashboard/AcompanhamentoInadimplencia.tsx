@@ -20,6 +20,8 @@ import { useCollection } from "../../contexts/CollectionContext";
 import { buscarComCacheTela, lerCacheTela } from "../../utils/cacheTela";
 import { formatCurrency } from "../../utils/formatters";
 import { todayLocalStr } from "../../config/visitStatus";
+import { Pilula } from "./ResumoEmpresa";
+import { PILULA } from "../common/pilulaEstilo";
 import FiltroMultiplo from "../common/FiltroMultiplo";
 import {
   INADIMPLENCIA_A_PARTIR_DIAS,
@@ -597,8 +599,14 @@ const CardVisual: React.FC<{
   rotuloReferencia: string;
   /** Fim da escala da barra, em %. */
   escala: number;
-  /** Valor em R$ (linha pequena). */
-  valor: string;
+  /** 2-3 quadrinhos com os numeros principais (mesmo estilo do Resumo). */
+  pilulas: Pilula[];
+  /** Linhas do "ver detalhes" (barra opcional, 0-100). */
+  detalhes: { rotulo: string; valor: string; barra?: number; hint?: string }[];
+  /** Cor da barrinha dos detalhes. */
+  corDetalhe: string;
+  /** Mes que o numero grande mostra (o "ate" do intervalo). */
+  mes: string;
   hint: string;
 }> = ({
   icon: Icon,
@@ -609,9 +617,13 @@ const CardVisual: React.FC<{
   referencia,
   rotuloReferencia,
   escala,
-  valor,
+  pilulas,
+  detalhes,
+  corDetalhe,
+  mes,
   hint,
 }) => {
+  const [aberto, setAberto] = useState(false);
   const t = TEMA_CARD[tema];
   const pos = (v: number) =>
     `${Math.max(0, Math.min(100, (v / escala) * 100))}%`;
@@ -623,6 +635,17 @@ const CardVisual: React.FC<{
       <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-600 dark:text-dark-text-secondary">
         <Icon className={`h-4 w-4 ${t.icone}`} />
         {titulo}
+        {/* 25/11: deixar claro de que mes e o numero (o "ate"); o "de" so
+            muda a media e o grafico. */}
+        {!carregando && mes && (
+          <span
+            className="ml-auto inline-flex items-center gap-1 rounded-full bg-white dark:bg-dark-bg-secondary border border-gray-200 dark:border-dark-border px-2 py-0.5 text-[11px] font-semibold text-gray-600 dark:text-dark-text-secondary"
+            title="Mês mostrado no número grande (o fim do intervalo)"
+          >
+            <CalendarRange className="h-3 w-3" />
+            {mes}
+          </span>
+        )}
       </div>
       <div
         className={`mt-1 text-4xl font-extrabold leading-tight ${t.numero} ${carregando ? "animate-pulse" : ""}`}
@@ -646,14 +669,76 @@ const CardVisual: React.FC<{
           >
             <span className="h-[18px] w-0.5 rounded bg-gray-700 dark:bg-gray-200" />
             <span className="mt-0.5 whitespace-nowrap text-[10px] text-gray-500 dark:text-dark-text-secondary">
-              {rotuloReferencia}
+              {rotuloReferencia}{" "}
+              <strong className="text-gray-700 dark:text-dark-text">
+                {formatarPct(referencia)}
+              </strong>
             </span>
           </div>
         )}
       </div>
-      <div className="text-sm font-semibold text-gray-700 dark:text-dark-text">
-        {carregando ? "" : valor}
-      </div>
+      {!carregando && pilulas.length > 0 && (
+        <div
+          className={`grid gap-1 ${pilulas.length === 3 ? "grid-cols-3" : "grid-cols-2"}`}
+        >
+          {pilulas.map((p) => (
+            <div
+              key={p.rotulo}
+              title={p.hint}
+              className={`min-w-0 rounded-md px-2 py-1 ${PILULA[p.tom]}`}
+            >
+              <div className="text-sm font-bold leading-tight truncate">
+                {p.valor}
+              </div>
+              <div className="text-[10px] font-medium leading-tight truncate opacity-90">
+                {p.rotulo}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {!carregando && detalhes.length > 0 && (
+        <div className="pt-2">
+          {aberto && (
+            <div className="mb-1.5 space-y-1.5 border-t border-gray-300 dark:border-dark-border/60 pt-2">
+              {detalhes.map((d) => (
+                <div key={d.rotulo} title={d.hint} className="text-xs">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-gray-600 dark:text-dark-text-secondary truncate">
+                      {d.rotulo}
+                    </span>
+                    <span className="font-bold whitespace-nowrap text-gray-900 dark:text-dark-text">
+                      {d.valor}
+                    </span>
+                  </div>
+                  {d.barra != null && (
+                    <div className="mt-0.5 h-1.5 rounded-full bg-gray-300/60 dark:bg-dark-border overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${corDetalhe}`}
+                        style={{
+                          width: `${Math.max(0, Math.min(100, d.barra))}%`,
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setAberto((v) => !v)}
+            className="inline-flex items-center gap-0.5 text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400"
+          >
+            {aberto ? "menos detalhes" : "ver detalhes"}
+            {aberto ? (
+              <ChevronUp className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5" />
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 };
@@ -804,6 +889,7 @@ const AcompanhamentoInadimplencia: React.FC = () => {
   const recHoje = atual ? pctRecuperacao(atual) : 0;
   // Media da recuperacao so dos meses FECHADOS (o atual ainda esta correndo).
   const mediaRec = media(serie.slice(0, -1).map(pctRecuperacao));
+  const mediaValorRec = media(serie.slice(0, -1).map((p) => p.recuperadoMes));
   // Recuperacao e pequena (~2%): barra de 0 a 10% (ou a dezena acima).
   const escalaRec = Math.max(
     10,
@@ -819,6 +905,134 @@ const AcompanhamentoInadimplencia: React.FC = () => {
       ? linhas
       : linhas.slice(0, TOP_LINHAS)
     : null;
+
+  // "ver detalhes" dos cards (25/11: os cards tinham ficado resumidos
+  // demais). Inadimplencia: o sem pagar por tempo de atraso + lojas
+  // extremas + pico do periodo. Recuperacao: mes passado, melhor/pior mes e
+  // total recuperado no periodo.
+  const lojasOrdenadas =
+    agrupar === "loja" && linhas
+      ? linhas
+      : porLoja.dados
+        ? (() => {
+            const dias = [...new Set(porLoja.dados.map((p) => p.dia))].sort();
+            const ult = dias[dias.length - 1];
+            return porLoja.dados
+              .filter((p) => p.dia === ult && p.chave && p.venceu > 0)
+              .filter(
+                (p) =>
+                  lojasExcluidas.size === 0 ||
+                  !lojasExcluidas.has(p.chave as string),
+              )
+              .map((p) => ({ chave: p.chave, hoje: p }))
+              .sort(
+                (x, y) => pctInadimplencia(y.hoje) - pctInadimplencia(x.hoje),
+              );
+          })()
+        : [];
+  const piorLoja = lojasOrdenadas[0];
+  const melhorLoja = lojasOrdenadas[lojasOrdenadas.length - 1];
+  const fechados = serie.slice(0, -1);
+  const picoInad = serie.reduce<PontoInadimplencia | null>(
+    (m, p) => (!m || pctInadimplencia(p) > pctInadimplencia(m) ? p : m),
+    null,
+  );
+  const menorInad = serie.reduce<PontoInadimplencia | null>(
+    (m, p) => (!m || pctInadimplencia(p) < pctInadimplencia(m) ? p : m),
+    null,
+  );
+  const melhorRec = fechados.reduce<PontoInadimplencia | null>(
+    (m, p) => (!m || pctRecuperacao(p) > pctRecuperacao(m) ? p : m),
+    null,
+  );
+  const piorRec = fechados.reduce<PontoInadimplencia | null>(
+    (m, p) => (!m || pctRecuperacao(p) < pctRecuperacao(m) ? p : m),
+    null,
+  );
+  const totalRecuperado = serie.reduce((s2, p) => s2 + p.recuperadoMes, 0);
+  const rotuloPonto = (p: PontoInadimplencia) =>
+    p.dia === hoje ? "hoje" : rotuloMes(p.dia);
+  const mesDoCard = atual
+    ? atual.dia === hoje
+      ? `${rotuloMes(atual.dia)} até hoje`
+      : rotuloMes(atual.dia)
+    : "";
+
+  const detalhesInad = atual
+    ? [
+        ...FAIXAS_ATRASO.filter((f) => f.chave !== "d365_mais").map((f) => ({
+          rotulo: `Atrasado ${f.rotulo === "3 a 30 dias" ? "3 a 30 dias" : `${f.rotulo} dias`}`,
+          valor: fmtCurto(atual.faixas[f.chave]),
+          barra:
+            atual.naoPago > 0
+              ? (atual.faixas[f.chave] / atual.naoPago) * 100
+              : 0,
+          hint: fmtValor(atual.faixas[f.chave]),
+        })),
+        ...(piorLoja && piorLoja.chave
+          ? [
+              {
+                rotulo: `Pior loja: ${piorLoja.chave}`,
+                valor: formatarPct(pctInadimplencia(piorLoja.hoje)),
+              },
+            ]
+          : []),
+        ...(melhorLoja && melhorLoja.chave && melhorLoja !== piorLoja
+          ? [
+              {
+                rotulo: `Melhor loja: ${melhorLoja.chave}`,
+                valor: formatarPct(pctInadimplencia(melhorLoja.hoje)),
+              },
+            ]
+          : []),
+        ...(picoInad && menorInad && serie.length > 2
+          ? [
+              {
+                rotulo: `Maior do período (${rotuloPonto(picoInad)})`,
+                valor: formatarPct(pctInadimplencia(picoInad)),
+              },
+              {
+                rotulo: `Menor do período (${rotuloPonto(menorInad)})`,
+                valor: formatarPct(pctInadimplencia(menorInad)),
+              },
+            ]
+          : []),
+      ]
+    : [];
+
+  const detalhesRec = atual
+    ? [
+        ...(anterior
+          ? [
+              {
+                rotulo: `Mês passado (${rotuloMes(anterior.dia)})`,
+                valor: `${formatarPct(pctRecuperacao(anterior))} · ${fmtCurto(anterior.recuperadoMes)}`,
+              },
+            ]
+          : []),
+        ...(melhorRec && fechados.length > 1
+          ? [
+              {
+                rotulo: `Melhor mês (${rotuloMes(melhorRec.dia)})`,
+                valor: `${formatarPct(pctRecuperacao(melhorRec))} · ${fmtCurto(melhorRec.recuperadoMes)}`,
+              },
+            ]
+          : []),
+        ...(piorRec && fechados.length > 1
+          ? [
+              {
+                rotulo: `Pior mês (${rotuloMes(piorRec.dia)})`,
+                valor: `${formatarPct(pctRecuperacao(piorRec))} · ${fmtCurto(piorRec.recuperadoMes)}`,
+              },
+            ]
+          : []),
+        {
+          rotulo: `Recuperado no período (${serie.length} ${serie.length === 1 ? "mês" : "meses"})`,
+          valor: fmtCurto(totalRecuperado),
+          hint: fmtValor(totalRecuperado),
+        },
+      ]
+    : [];
 
   // Explicacao so na dica do (i): a tela fala pelo visual (pedido 25/11).
   const notaRodape = [
@@ -945,7 +1159,46 @@ const AcompanhamentoInadimplencia: React.FC = () => {
               referencia={anterior ? pctInadimplencia(anterior) : null}
               rotuloReferencia="mês passado"
               escala={100}
-              valor={atual ? `${fmtCurto(atual.naoPago)} sem pagar` : ""}
+              pilulas={
+                atual
+                  ? [
+                      {
+                        valor: fmtCurto(atual.naoPago),
+                        rotulo: "sem pagar",
+                        tom: "red",
+                        hint: fmtValor(atual.naoPago),
+                      },
+                      {
+                        valor: fmtCurto(atual.venceu),
+                        rotulo: "venceu em 12 meses",
+                        tom: "gray",
+                        hint: fmtValor(atual.venceu),
+                      },
+                      {
+                        valor:
+                          varInad == null
+                            ? "—"
+                            : tendInad === "estavel"
+                              ? "igual"
+                              : formatarPp(varInad),
+                        rotulo: "vs. mês passado",
+                        tom:
+                          tendInad === "piorou"
+                            ? "red"
+                            : tendInad === "melhorou"
+                              ? "green"
+                              : "gray",
+                        hint:
+                          varInad != null && anterior
+                            ? `Mês passado: ${formatarPct(pctInadimplencia(anterior))}`
+                            : undefined,
+                      },
+                    ]
+                  : []
+              }
+              corDetalhe="bg-red-400"
+              mes={mesDoCard}
+              detalhes={detalhesInad}
               hint={`De cada R$ 100 que venceram nos últimos 12 meses, R$ ${Math.round(pctHoje)} estão sem pagar.`}
             />
             <CardVisual
@@ -957,9 +1210,33 @@ const AcompanhamentoInadimplencia: React.FC = () => {
               referencia={mediaRec > 0 ? mediaRec : null}
               rotuloReferencia="média"
               escala={escalaRec}
-              valor={
-                atual ? `${fmtCurto(atual.recuperadoMes)} recuperados` : ""
+              pilulas={
+                atual
+                  ? [
+                      {
+                        valor: fmtCurto(atual.recuperadoMes),
+                        rotulo: "recuperados no mês",
+                        tom: "green",
+                        hint: fmtValor(atual.recuperadoMes),
+                      },
+                      {
+                        valor: fmtCurto(atual.atrasoInicioMes),
+                        rotulo: "em atraso no início",
+                        tom: "gray",
+                        hint: fmtValor(atual.atrasoInicioMes),
+                      },
+                      {
+                        valor: fmtCurto(mediaValorRec),
+                        rotulo: `média/mês · ${formatarPct(mediaRec)}`,
+                        tom: "gray",
+                        hint: `Média dos meses fechados do período: ${fmtValor(mediaValorRec)} por mês (${formatarPct(mediaRec)} do atraso).`,
+                      },
+                    ]
+                  : []
               }
+              corDetalhe="bg-green-500"
+              mes={mesDoCard}
+              detalhes={detalhesRec}
               hint={`Do atraso que vinha de antes (${atual ? fmtValor(atual.atrasoInicioMes) : "—"}), foram pagos ${atual ? fmtValor(atual.recuperadoMes) : "—"} no mês. Média dos meses anteriores: ${formatarPct(mediaRec)}.`}
             />
           </div>

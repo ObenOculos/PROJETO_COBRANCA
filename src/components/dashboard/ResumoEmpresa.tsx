@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { SummaryCardRow } from "../common/SummaryCard";
 import FiltroMultiplo from "../common/FiltroMultiplo";
+import { PILULA, TomPilula } from "../common/pilulaEstilo";
 import { useCollection } from "../../contexts/CollectionContext";
 import {
   resumoEmpresa,
@@ -58,7 +59,6 @@ const clientesTxt = (n: number) =>
 // ---------------------------------------------------------------------------
 
 type Tema = "red" | "indigo" | "blue" | "green" | "slate";
-type TomPilula = "red" | "amber" | "green" | "gray";
 
 /** Quadrinho do card: numero em cima, rotulo curto embaixo. */
 export interface Pilula {
@@ -101,17 +101,6 @@ const TEMA: Record<Tema, { faixa: string; numero: string; icone: string }> = {
     numero: "text-gray-900 dark:text-dark-text",
     icone: "text-gray-500 dark:text-dark-text-secondary",
   },
-};
-
-// Mesmos chips claros das linhas de alerta do SummaryCard (rowClasses), com
-// borda da propria cor em todas (25/11).
-const PILULA: Record<TomPilula, string> = {
-  red: "bg-red-100 text-red-700 border border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800",
-  amber:
-    "bg-amber-100 text-amber-700 border border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800",
-  green:
-    "bg-green-100 text-green-700 border border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800",
-  gray: "bg-white text-gray-700 border border-gray-300 dark:bg-dark-bg-secondary dark:text-dark-text dark:border-dark-border",
 };
 
 export const CardSimples: React.FC<{
