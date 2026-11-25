@@ -2681,6 +2681,24 @@ export type Database = {
         Args: { p_inicio: string; p_fim: string };
         Returns: { collector_id: string; documento: string }[];
       };
+      inadimplencia_historico: {
+        Args: { p_meses?: number; p_lojas?: string[]; p_agrupar?: string };
+        Returns: {
+          dia: string;
+          chave: string | null;
+          fonte: string;
+          venceu: number;
+          nao_pago: number;
+          atraso_3_30: number;
+          atraso_31_60: number;
+          atraso_61_90: number;
+          atraso_91_180: number;
+          atraso_181_365: number;
+          atraso_365_mais: number;
+          atraso_inicio_mes: number;
+          recuperado_mes: number;
+        }[];
+      };
       atribuicao_bloqueio_parcela: {
         Args: { p_id_parcela: number };
         Returns: string;

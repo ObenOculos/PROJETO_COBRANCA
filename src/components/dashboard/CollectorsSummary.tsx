@@ -20,6 +20,7 @@ import {
   UserX,
   Shuffle,
   History,
+  TrendingDown,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
@@ -30,6 +31,7 @@ import FiltroMultiplo from "../common/FiltroMultiplo";
 import SortTh from "../common/SortTh";
 import ModoVisualizacao, { Modo } from "../common/ModoVisualizacao";
 import ResumoPorLoja from "./ResumoPorLoja";
+import AcompanhamentoInadimplencia from "./AcompanhamentoInadimplencia";
 import ResumoEmpresa, {
   CardCarteira,
   CardClientes,
@@ -388,9 +390,13 @@ const CollectorsSummary: React.FC = () => {
   }, [modo]);
   // Abas do Resumo Geral (25/11): Geral (empresa + cobradores somados) e
   // Por cobrador (uma linha por cobrador). A ultima aba aberta fica salva.
-  const [aba, setAba] = useState<"geral" | "cobrador" | "loja">(() => {
+  const [aba, setAba] = useState<
+    "geral" | "cobrador" | "loja" | "inadimplencia"
+  >(() => {
     const salva = localStorage.getItem("resumoGeralAba");
-    return salva === "cobrador" || salva === "loja" ? salva : "geral";
+    return salva === "cobrador" || salva === "loja" || salva === "inadimplencia"
+      ? salva
+      : "geral";
   });
   useEffect(() => {
     localStorage.setItem("resumoGeralAba", aba);
@@ -1273,6 +1279,7 @@ const CollectorsSummary: React.FC = () => {
                 ["geral", "Geral", Gauge],
                 ["cobrador", "Por cobrador", Users],
                 ["loja", "Por loja", Store],
+                ["inadimplencia", "Inadimplência", TrendingDown],
               ] as const
             ).map(([id, rotulo, Icone]) => (
               <button
@@ -1292,50 +1299,54 @@ const CollectorsSummary: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {PERIODO_PRESETS.map((preset) => (
-            <button
-              key={preset.key}
-              onClick={() => applyPreset(preset.key)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors touch-manipulation ${
-                activePreset === preset.key
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 dark:bg-dark-bg text-gray-600 dark:text-dark-text-secondary hover:bg-gray-200 dark:hover:bg-dark-border"
-              }`}
-            >
-              {preset.label}
-            </button>
-          ))}
+        {/* A aba Inadimplencia tem janela propria (12 meses de vencimento):
+            o periodo nao se aplica a ela. */}
+        {aba !== "inadimplencia" && (
+          <div className="flex flex-wrap items-center gap-2">
+            {PERIODO_PRESETS.map((preset) => (
+              <button
+                key={preset.key}
+                onClick={() => applyPreset(preset.key)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors touch-manipulation ${
+                  activePreset === preset.key
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 dark:bg-dark-bg text-gray-600 dark:text-dark-text-secondary hover:bg-gray-200 dark:hover:bg-dark-border"
+                }`}
+              >
+                {preset.label}
+              </button>
+            ))}
 
-          {/* Datas na mesma linha dos atalhos (25/11: o rotulo "Periodo
+            {/* Datas na mesma linha dos atalhos (25/11: o rotulo "Periodo
               personalizado" e o texto "(de ... ate ...)" repetiam as datas). */}
-          <span className="hidden sm:block h-5 w-px bg-gray-200 dark:bg-dark-border mx-1" />
-          <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-dark-text-secondary">
-            De
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => {
-                setDateFrom(e.target.value);
-                setActivePreset("");
-              }}
-              className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-xs text-gray-700 dark:text-dark-text"
-            />
-          </label>
-          <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-dark-text-secondary">
-            Até
-            <input
-              type="date"
-              value={dateTo}
-              min={dateFrom}
-              onChange={(e) => {
-                setDateTo(e.target.value);
-                setActivePreset("");
-              }}
-              className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-xs text-gray-700 dark:text-dark-text"
-            />
-          </label>
-        </div>
+            <span className="hidden sm:block h-5 w-px bg-gray-200 dark:bg-dark-border mx-1" />
+            <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-dark-text-secondary">
+              De
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => {
+                  setDateFrom(e.target.value);
+                  setActivePreset("");
+                }}
+                className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-xs text-gray-700 dark:text-dark-text"
+              />
+            </label>
+            <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-dark-text-secondary">
+              Até
+              <input
+                type="date"
+                value={dateTo}
+                min={dateFrom}
+                onChange={(e) => {
+                  setDateTo(e.target.value);
+                  setActivePreset("");
+                }}
+                className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-xs text-gray-700 dark:text-dark-text"
+              />
+            </label>
+          </div>
+        )}
       </div>
 
       {aba === "geral" && teamGoal && (
@@ -2015,6 +2026,8 @@ const CollectorsSummary: React.FC = () => {
           )}
         </>
       )}
+
+      {aba === "inadimplencia" && <AcompanhamentoInadimplencia />}
 
       {aba === "loja" && (
         <ResumoPorLoja
