@@ -212,64 +212,94 @@ export const CardSimples: React.FC<{
 // da carteira deles (sem cobrador e sempre 0, e quitados viram "pagaram").
 // ---------------------------------------------------------------------------
 
-/** 1. Clientes: o TOTAL e o numero principal (pedido 25/11); embaixo, em
- * atraso e o que falta fazer com eles. */
+/** 1. Clientes: o TOTAL e o numero principal e as etiquetas sao as PARTES
+ * que somam o total (pedido do gestor 25/11: "quando somar vai bater com o
+ * total"), na ordem dele: quitados, em dia, atraso com cobrador, atraso sem
+ * cobrador. Cada cliente cai em uma parte so (filters/resumoEmpresa). O
+ * "sem agendamento" e os acionados detalham o atraso com cobrador. */
 export const CardClientes: React.FC<{ r: Resumo; cobrador?: boolean }> = ({
   r,
   cobrador = false,
 }) => {
   const c = r.clientes;
-  const base = cobrador ? c.emAtraso + c.emDia : c.total;
-  const pilulas: Pilula[] = [
-    {
-      texto: `${fmtNum(c.emAtraso)} em atraso`,
-      tom: c.emAtraso > 0 ? "red" : "green",
-      hint: "Têm alguma parcela vencida",
-    },
-  ];
-  if (!cobrador && c.semCobrador > 0) {
-    pilulas.push({
-      texto: `${fmtNum(c.semCobrador)} sem cobrador`,
-      tom: "red",
-      hint: "Em atraso e fora da carteira de qualquer cobrador: precisam ser incluídos",
-    });
-  }
-  if (c.semAgendamento > 0) {
-    pilulas.push({
-      texto: `${fmtNum(c.semAgendamento)} sem agendamento`,
-      tom: "amber",
-      hint: "Em atraso, com cobrador, sem visita ou contato marcado",
-    });
-  }
+  const atrasoComCobrador = c.emAtraso - c.semCobrador;
+  // Na carteira do cobrador nao ha quitado (quem quita sai da carteira) nem
+  // "sem cobrador": as partes sao em dia + em atraso.
+  const partes: (Pilula & { qtd: number })[] = cobrador
+    ? [
+        {
+          qtd: c.emDia,
+          texto: `${fmtNum(c.emDia)} em dia`,
+          tom: "green",
+          hint: "Têm saldo, mas nada vencido",
+        },
+        {
+          qtd: c.emAtraso,
+          texto: `${fmtNum(c.emAtraso)} em atraso`,
+          tom: "red",
+          hint: "Têm alguma parcela vencida",
+        },
+      ]
+    : [
+        {
+          qtd: c.quitados,
+          texto: `${fmtNum(c.quitados)} quitados`,
+          tom: "gray",
+          hint: "Sem nenhum saldo em aberto",
+        },
+        {
+          qtd: c.emDia,
+          texto: `${fmtNum(c.emDia)} em dia`,
+          tom: "green",
+          hint: "Têm saldo, mas nada vencido",
+        },
+        {
+          qtd: atrasoComCobrador,
+          texto: `${fmtNum(atrasoComCobrador)} atraso com cobrador`,
+          tom: "amber",
+          hint: "Têm parcela vencida e estão na carteira de um cobrador",
+        },
+        {
+          qtd: c.semCobrador,
+          texto: `${fmtNum(c.semCobrador)} atraso sem cobrador`,
+          tom: "red",
+          hint: "Têm parcela vencida e não estão na carteira de nenhum cobrador: precisam ser incluídos",
+        },
+      ];
+  const total = partes.reduce((soma, p) => soma + p.qtd, 0);
 
-  const acionados: SummaryCardRow = {
-    label: "Sem agendamento, mas acionados no período",
-    value:
-      c.semAgendamentoAcionados === null
-        ? "…"
-        : fmtNum(c.semAgendamentoAcionados),
-    loading: c.semAgendamentoAcionados === null,
-    hint: "O cobrador ligou, mandou mensagem ou visitou no período, mesmo sem agendamento",
-  };
   return (
     <CardSimples
       icon={Users}
       titulo="Clientes"
       tema="indigo"
-      numero={fmtNum(base)}
+      numero={fmtNum(total)}
       frase={
-        cobrador
-          ? "clientes com saldo na carteira"
-          : "clientes no total (com e sem saldo)"
+        cobrador ? "clientes com saldo na carteira" : "clientes no total"
       }
-      pilulas={pilulas}
+      pilulas={partes}
       detalhes={[
-        acionados,
-        { label: "Em atraso com agendamento", value: fmtNum(c.comAgendamento) },
         {
-          label: "Em dia (a vencer)",
-          value: fmtNum(c.emDia),
-          hint: "Têm saldo, mas nada vencido",
+          label: cobrador
+            ? "Em atraso sem agendamento"
+            : "Atraso com cobrador, sem agendamento",
+          value: fmtNum(c.semAgendamento),
+          hint: "Nenhuma visita ou contato marcado",
+        },
+        {
+          label: "   desses, acionados no período",
+          value:
+            c.semAgendamentoAcionados === null
+              ? "…"
+              : fmtNum(c.semAgendamentoAcionados),
+          loading: c.semAgendamentoAcionados === null,
+          hint: "O cobrador ligou, mandou mensagem ou visitou no período, mesmo sem agendamento",
+        },
+        {
+          label: cobrador
+            ? "Em atraso com agendamento"
+            : "Atraso com cobrador, com agendamento",
+          value: fmtNum(c.comAgendamento),
         },
         ...(cobrador
           ? [
@@ -283,13 +313,7 @@ export const CardClientes: React.FC<{ r: Resumo; cobrador?: boolean }> = ({
                 value: fmtNum(c.pagaramSoErp),
               },
             ]
-          : [
-              {
-                label: "Quitados",
-                value: fmtNum(c.quitados),
-                hint: "Sem nenhum saldo em aberto",
-              },
-            ]),
+          : []),
       ]}
     />
   );
