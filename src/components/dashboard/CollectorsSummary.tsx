@@ -17,6 +17,7 @@ import {
   LayoutGrid,
   Table2,
   Gauge,
+  Users,
   UserX,
   History,
   Shuffle,
@@ -145,23 +146,22 @@ type SortKey =
   | "naoEncontradoQtd"
   | "reincidentesQtd";
 
-const SORT_GETTERS: Record<SortKey, (row: CollectorRow) => number | string> =
-  {
-    name: (r) => r.name,
-    valorCarteira: (r) => r.resumo.carteira.vencido + r.resumo.carteira.aVencer,
-    vencidaValor: (r) => r.vencidaValor,
-    previstaValor: (r) => r.previstaValor,
-    aReceberValor: (r) => r.aReceberValor,
-    recebidoPeriodo: (r) => r.recebidoPeriodo,
-    emAtrasoVisitas: (r) => r.emAtrasoVisitas,
-    semAgendamentoClientes: (r) => r.resumo.clientes.semAgendamento,
-    clientesAtendidos: (r) => r.clientesAtendidos,
-    agendadasQtd: (r) => r.agendadasQtd,
-    realizadasQtd: (r) => r.realizadasQtd,
-    reagendadasQtd: (r) => r.reagendadasQtd,
-    naoEncontradoQtd: (r) => r.naoEncontradoQtd,
-    reincidentesQtd: (r) => r.reincidentes.length,
-  };
+const SORT_GETTERS: Record<SortKey, (row: CollectorRow) => number | string> = {
+  name: (r) => r.name,
+  valorCarteira: (r) => r.resumo.carteira.vencido + r.resumo.carteira.aVencer,
+  vencidaValor: (r) => r.vencidaValor,
+  previstaValor: (r) => r.previstaValor,
+  aReceberValor: (r) => r.aReceberValor,
+  recebidoPeriodo: (r) => r.recebidoPeriodo,
+  emAtrasoVisitas: (r) => r.emAtrasoVisitas,
+  semAgendamentoClientes: (r) => r.resumo.clientes.semAgendamento,
+  clientesAtendidos: (r) => r.clientesAtendidos,
+  agendadasQtd: (r) => r.agendadasQtd,
+  realizadasQtd: (r) => r.realizadasQtd,
+  reagendadasQtd: (r) => r.reagendadasQtd,
+  naoEncontradoQtd: (r) => r.naoEncontradoQtd,
+  reincidentesQtd: (r) => r.reincidentes.length,
+};
 
 // Segmentacao tonal: Financeiro (parcelas de BANCO_DADOS) sempre no cinza mais
 // claro, Agenda (scheduledVisits) no cinza um pouco mais escuro — mesma dupla
@@ -215,7 +215,8 @@ const atendimentoTexto = (visita: boolean) =>
         conversaram: "encontrados",
         registros: "Visitas",
         registrosMin: "visitas",
-        registrosHint: "Total de visitas concluídas no período (realizada, não encontrado ou reagendada)",
+        registrosHint:
+          "Total de visitas concluídas no período (realizada, não encontrado ou reagendada)",
       }
     : {
         clientes: "Clientes acionados",
@@ -223,10 +224,10 @@ const atendimentoTexto = (visita: boolean) =>
         conversaram: "conversaram",
         registros: "Acionamentos",
         registrosMin: "acionamentos",
-        registrosHint: "Total de registros no período, sem deduplicar por cliente",
+        registrosHint:
+          "Total de registros no período, sem deduplicar por cliente",
       };
 const ehExterno = (type: UserType): boolean => type === "collector";
-
 
 /** Faixas da Carteira Automatica como mini cards (pedido do usuario
  * 2026-11-17: melhor leitura que 1 frase corrida com "·"), lado a lado com o
@@ -270,7 +271,9 @@ const FaixasAlcance: React.FC<{ regras: CollectorOverdueRange[] }> = ({
                 {r.minDias}–{r.maxDias ?? "+"} dias
               </div>
               <div className="text-[10px] text-gray-500 dark:text-dark-text-secondary whitespace-nowrap">
-                {qtdLojas > 0 ? `${qtdLojas} ${qtdLojas === 1 ? "loja" : "lojas"}` : "todas as lojas"}
+                {qtdLojas > 0
+                  ? `${qtdLojas} ${qtdLojas === 1 ? "loja" : "lojas"}`
+                  : "todas as lojas"}
                 {!r.ativa && " · pausada"}
               </div>
             </button>
@@ -321,7 +324,11 @@ const CollectorsSummary: React.FC = () => {
   // comecava sem elas e o Recebido/metas "recalculavam" ao chegar. Agora a
   // volta mostra o guardado na hora; na 1a entrada o Recebido fica em "…"
   // ate chegar (nunca um valor sem o pago na loja).
-  type AtribuicaoAprovada = { collectorId: string; valor: number; data: string };
+  type AtribuicaoAprovada = {
+    collectorId: string;
+    valor: number;
+    data: string;
+  };
   const CHAVE_ATRIBUICOES = "atribuicoesVigentes|todas";
   const [atribuicoesEstado, setAtribuicoesEstado] = useState<
     AtribuicaoAprovada[] | null
@@ -369,13 +376,14 @@ const CollectorsSummary: React.FC = () => {
   const [activePreset, setActivePreset] = useState<PresetKey | "">(
     "month-atual",
   );
-  const [expandedReincidente, setExpandedReincidente] = useState<
-    string | null
-  >(null);
+  const [expandedReincidente, setExpandedReincidente] = useState<string | null>(
+    null,
+  );
   // Agendamento em massa de contato (ligação/WhatsApp) pro gestor, sem
   // precisar logar como o cobrador -- ver ContactScheduler.
-  const [scheduleContactCollectorId, setScheduleContactCollectorId] =
-    useState<string | null>(null);
+  const [scheduleContactCollectorId, setScheduleContactCollectorId] = useState<
+    string | null
+  >(null);
   // Modal do cobrador (Historico, Pendencias, Carteira) -- veio da antiga
   // tela Desempenho, que saiu do menu (reuniao 16/11, item 4).
   const [detalheCobradorId, setDetalheCobradorId] = useState<string | null>(
@@ -395,6 +403,16 @@ const CollectorsSummary: React.FC = () => {
     const saved = localStorage.getItem("collectorsSummaryViewMode");
     return saved === "cards" ? "cards" : "table";
   });
+  // Abas do Resumo Geral (25/11): Geral (empresa + cobradores somados) e
+  // Por cobrador (uma linha por cobrador). A ultima aba aberta fica salva.
+  const [aba, setAba] = useState<"geral" | "cobrador">(() =>
+    localStorage.getItem("resumoGeralAba") === "cobrador"
+      ? "cobrador"
+      : "geral",
+  );
+  useEffect(() => {
+    localStorage.setItem("resumoGeralAba", aba);
+  }, [aba]);
   const [infoOpen, setInfoOpen] = useState(false);
   const infoRef = useRef<HTMLDivElement>(null);
   // "Visao geral" e sempre colapsavel, em qualquer contexto (1 cobrador ou
@@ -408,9 +426,9 @@ const CollectorsSummary: React.FC = () => {
   // aparece. Essa inversao deixa representar os 3 estados (todos/parcial/
   // nenhum) sem ambiguidade — com "selecionados" o conjunto vazio nao
   // consegue distinguir "todos" de "nenhum".
-  const [excludedCollectorIds, setExcludedCollectorIds] = useState<
-    Set<string>
-  >(new Set());
+  const [excludedCollectorIds, setExcludedCollectorIds] = useState<Set<string>>(
+    new Set(),
+  );
   // Ordenacao (clicavel no titulo da coluna, tabela e cards compartilham).
   // Padrao: pior situacao primeiro, igual ao comportamento anterior fixo.
   const [sortKey, setSortKey] = useState<SortKey>("valorCarteira");
@@ -541,14 +559,14 @@ const CollectorsSummary: React.FC = () => {
   // o clique abre a lista detalhada de UM cobrador so (useSaidasSemAcao com
   // cobradorId -- nao busca nada enquanto nenhum modal esta aberto), onde o
   // gestor pode devolver os clientes ao cobrador.
-  const [saidasCobradorId, setSaidasCobradorId] = useState<string | null>(
-    null,
-  );
+  const [saidasCobradorId, setSaidasCobradorId] = useState<string | null>(null);
   const saidasCobrador = saidasCobradorId
     ? (users.find((u) => u.id === saidasCobradorId) ?? null)
     : null;
-  const { porCobrador: saidasPorCobrador, recarregar: recarregarSaidasDetalhe } =
-    useSaidasSemAcao(dateFrom, dateTo, saidasCobradorId);
+  const {
+    porCobrador: saidasPorCobrador,
+    recarregar: recarregarSaidasDetalhe,
+  } = useSaidasSemAcao(dateFrom, dateTo, saidasCobradorId);
   const [movVersao, setMovVersao] = useState(0);
   const { movimentacao: movCarteira, carregando: movCarregando } =
     useCarteiraMovimentacao(dateFrom, dateTo, movVersao);
@@ -580,9 +598,7 @@ const CollectorsSummary: React.FC = () => {
   const estornados = useMemo(
     () =>
       new Set(
-        salePayments
-          .map((p) => p.estornoDe)
-          .filter((id): id is string => !!id),
+        salePayments.map((p) => p.estornoDe).filter((id): id is string => !!id),
       ),
     [salePayments],
   );
@@ -649,9 +665,7 @@ const CollectorsSummary: React.FC = () => {
             )
             .reduce((sum, p) => sum + valorRecebidoTotal(p), 0) +
           atribuicoesAprovadas
-            .filter(
-              (a) => a.collectorId === collector.id && inPeriod(a.data),
-            )
+            .filter((a) => a.collectorId === collector.id && inPeriod(a.data))
             .reduce((sum, a) => sum + a.valor, 0) +
           acordoRecebido(collector.id, dateFrom, dateTo);
 
@@ -665,9 +679,9 @@ const CollectorsSummary: React.FC = () => {
           isVisitOverdue(v),
         ).length;
 
-        const semAgendamentoClientes = Array.from(
-          clientesCarteiraSet,
-        ).filter((doc) => lastVisitStatus.get(doc) !== "agendada").length;
+        const semAgendamentoClientes = Array.from(clientesCarteiraSet).filter(
+          (doc) => lastVisitStatus.get(doc) !== "agendada",
+        ).length;
 
         let agendadasQtd = 0;
         let agendadasValor = 0;
@@ -728,7 +742,9 @@ const CollectorsSummary: React.FC = () => {
           dateFrom,
           dateTo,
           today,
-          acionados: acionados ? (acionados.get(collector.id) ?? new Set()) : null,
+          acionados: acionados
+            ? (acionados.get(collector.id) ?? new Set())
+            : null,
           registradosCobrador: pagosDocs,
         });
 
@@ -989,7 +1005,8 @@ const CollectorsSummary: React.FC = () => {
         )
         .reduce((sum, a) => sum + a.valor, 0) +
       Array.from(teamCollectorIds).reduce(
-        (sum, id) => sum + acordoRecebido(id, inicioDoMes(today), fimDoMes(today)),
+        (sum, id) =>
+          sum + acordoRecebido(id, inicioDoMes(today), fimDoMes(today)),
         0,
       );
 
@@ -1136,9 +1153,7 @@ const CollectorsSummary: React.FC = () => {
     return { regrasPor, vaoSairPor };
   }, [collectorOverdueRanges, collections, acordoAtivoOverdueMap]);
 
-  const [expandedVaoSair, setExpandedVaoSair] = useState<string | null>(
-    null,
-  );
+  const [expandedVaoSair, setExpandedVaoSair] = useState<string | null>(null);
 
   const nomeMesAtual = new Date(
     Number(today.slice(0, 4)),
@@ -1156,7 +1171,8 @@ const CollectorsSummary: React.FC = () => {
           ? `${m.pct.toFixed(0)}% de ${formatCurrency(m.meta, false)}`
           : "…",
         loading: !atribuicoesProntas,
-        tone: atribuicoesProntas && m.pct >= 100 ? ("green" as const) : undefined,
+        tone:
+          atribuicoesProntas && m.pct >= 100 ? ("green" as const) : undefined,
         hint: `${formatCurrency(m.recebido, false)} recebidos no mês atual`,
       },
     ];
@@ -1225,9 +1241,12 @@ const CollectorsSummary: React.FC = () => {
               </button>
               {infoOpen && (
                 <div className="absolute z-20 mt-2 w-72 rounded-xl border border-blue-100 dark:border-blue-800/40 bg-blue-50 dark:bg-blue-900/20 px-4 py-3 text-xs font-normal normal-case text-blue-700 dark:text-blue-300 shadow-lg">
-                  <strong>Empresa</strong>: todos os clientes, com ou sem
-                  cobrador. Embaixo, os mesmos cards só com os cobradores
-                  marcados.
+                  <strong>Geral</strong>: a empresa inteira (todos os clientes,
+                  com ou sem cobrador) e, embaixo, os mesmos cards só com os
+                  cobradores marcados.
+                  <br />
+                  <strong>Por cobrador</strong>: uma linha por cobrador, para
+                  comparar.
                   <br />
                   <strong>Clientes</strong> e <strong>Carteira</strong>: a
                   situação de hoje. <strong>Previsão</strong>: o que vence de
@@ -1240,29 +1259,27 @@ const CollectorsSummary: React.FC = () => {
             </div>
           </h2>
 
-          <div className="flex bg-gray-100 dark:bg-dark-bg rounded-md p-0.5">
-            <button
-              onClick={() => setViewMode("cards")}
-              className={`flex items-center px-3 py-1.5 rounded-md text-xs font-medium transition-all touch-manipulation ${
-                viewMode === "cards"
-                  ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
-                  : "text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
-              }`}
-            >
-              <LayoutGrid className="h-3.5 w-3.5 mr-1.5" />
-              Cards
-            </button>
-            <button
-              onClick={() => setViewMode("table")}
-              className={`flex items-center px-3 py-1.5 rounded-md text-xs font-medium transition-all touch-manipulation ${
-                viewMode === "table"
-                  ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
-                  : "text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
-              }`}
-            >
-              <Table2 className="h-3.5 w-3.5 mr-1.5" />
-              Tabela
-            </button>
+          <div className="flex bg-gray-100 dark:bg-dark-bg rounded-lg p-0.5">
+            {(
+              [
+                ["geral", "Geral", Gauge],
+                ["cobrador", "Por cobrador", Users],
+              ] as const
+            ).map(([id, rotulo, Icone]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setAba(id)}
+                className={`flex items-center px-3 py-1.5 rounded-md text-sm font-semibold transition-all touch-manipulation ${
+                  aba === id
+                    ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
+                    : "text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
+                }`}
+              >
+                <Icone className="h-4 w-4 mr-1.5" />
+                {rotulo}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -1312,7 +1329,7 @@ const CollectorsSummary: React.FC = () => {
         </div>
       </div>
 
-      {teamGoal && (
+      {aba === "geral" && teamGoal && (
         <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border-2 border-indigo-100 dark:border-indigo-900/40 p-4 space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-sm font-bold text-gray-900 dark:text-dark-text">
@@ -1352,597 +1369,666 @@ const CollectorsSummary: React.FC = () => {
           cobrador ou com varios — só o valor PADRAO de `overviewOpen` muda
           (comeca fechada ao cair pra 1 so, ver efeito acima; o usuario pode
           abrir/fechar manualmente depois, em qualquer contagem). */}
-      <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border-2 border-blue-100 dark:border-blue-900/40 p-4 space-y-3">
-        <ResumoEmpresa
-          dateFrom={dateFrom}
-          dateTo={dateTo}
-          today={today}
-          acionados={empresaAcionados}
-          registradosCobrador={empresaRegistrados}
-          registradoCobradores={{
-            valor: empresaRegistradoValor,
-            loading: !atribuicoesProntas || !acordoPagosProntos,
-          }}
-        />
-        <div className="border-t-2 border-gray-200 dark:border-dark-border" />
-        {/* Filtro de cobrador aqui, como o de Loja na visao da empresa
+      {aba === "geral" && (
+        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border-2 border-blue-100 dark:border-blue-900/40 p-4 space-y-3">
+          <ResumoEmpresa
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            today={today}
+            acionados={empresaAcionados}
+            registradosCobrador={empresaRegistrados}
+            registradoCobradores={{
+              valor: empresaRegistradoValor,
+              loading: !atribuicoesProntas || !acordoPagosProntos,
+            }}
+          />
+          <div className="border-t-2 border-gray-200 dark:border-dark-border" />
+          {/* Filtro de cobrador aqui, como o de Loja na visao da empresa
             (25/11): cada filtro fica junto do bloco que ele muda. */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-          <button
-            onClick={() => setOverviewOpen((o) => !o)}
-            className="flex items-center gap-2 text-base font-bold text-gray-900 dark:text-dark-text"
-          >
-            <Gauge className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            {rows.length === 1
-              ? "Visão geral do cobrador"
-              : "Visão geral dos cobradores"}
-            {overviewOpen ? (
-              <ChevronUp className="h-4 w-4 text-gray-400" />
-            ) : (
-              <ChevronDown className="h-4 w-4 text-gray-400" />
-            )}
-          </button>
-          <div className="sm:ml-auto flex items-center gap-1.5 text-sm text-gray-700 dark:text-dark-text-secondary">
-            Cobrador
-            <FiltroMultiplo
-              opcoes={allCollectors.map((c) => ({ id: c.id, nome: c.name }))}
-              excluidos={excludedCollectorIds}
-              onChange={setExcludedCollectorIds}
-              textos={{
-                todos: "Todos os cobradores",
-                nenhum: "Nenhum cobrador",
-                plural: "cobradores",
-              }}
-            />
-          </div>
-        </div>
-
-        {overviewOpen && (
-          // Pedido do usuario (2026-11-17): o mais simples possivel -- 4
-          // grupos fixos (Carteira, Vencido, Numero de clientes,
-          // Desempenho), mesmo layout do Meu desempenho do cobrador.
-          // Carteira e Vencido ja foram unidos num card so, mas o gestor
-          // pediu mais destaque pro valor vencido -- separados de novo,
-          // sem repetir "A vencer" nos dois (fica so dentro de Carteira).
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-            <CardClientes r={resumoCobradores} cobrador />
-            <CardPrevisao r={resumoCobradores} />
-            <CardDesempenho
-              r={resumoCobradores}
-              recebido={totals.recebidoPeriodo}
-              loading={!atribuicoesProntas || !acordoPagosProntos}
-              meta={metaGeral.meta > 0 ? metaGeral : null}
-              atendimentos={linhaAtendimentos(
-                totals.clientesAtendidos,
-                totals.clientesConversaram,
-                totals.acionamentosQtd,
-                rows.length > 0 && rows.every((r) => ehExterno(r.type)),
-              )}
-            />
-            <CardCarteira r={resumoCobradores} />
-          </div>
-        )}
-      </div>
-
-      {viewMode === "cards" ? (
-        // Com 1 cobrador so, o card usa a largura toda em vez de ficar
-        // espremido num terco da tela — nao ha mais ninguem pra formar grid.
-        // Mesmos 4 blocos da Visao geral (Carteira, Vencido, Numero de
-        // clientes, Desempenho), so que por cobrador.
-        <div
-          className={
-            rows.length === 1
-              ? "grid grid-cols-1 gap-4"
-              : "grid grid-cols-1 lg:grid-cols-2 gap-4"
-          }
-        >
-          {rows.map((row, index) => (
-            <div
-              key={row.id}
-              className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-4 space-y-3"
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            <button
+              onClick={() => setOverviewOpen((o) => !o)}
+              className="flex items-center gap-2 text-base font-bold text-gray-900 dark:text-dark-text"
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-start gap-2 min-w-0">
-                  <span className="flex-shrink-0 mt-0.5 flex items-center justify-center h-5 w-5 rounded-full bg-gray-100 dark:bg-dark-bg text-[10px] font-bold text-gray-500 dark:text-dark-text-secondary">
-                    {index + 1}
-                  </span>
-                  <div className="min-w-0">
-                    <div className="font-bold text-gray-900 dark:text-dark-text truncate">
-                      {row.name}
-                    </div>
-                    <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
-                      {USER_TYPE_LABELS[row.type]}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex-shrink-0 flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setDetalheCobradorId(row.id)}
-                    title="Histórico mês a mês, pendências e carteira"
-                    className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-700"
-                  >
-                    <History className="h-3.5 w-3.5" />
-                    Histórico
-                  </button>
-                  {isWalletCollectorType(row.type) && (
-                    <button
-                      type="button"
-                      onClick={() => setScheduleContactCollectorId(row.id)}
-                      title="Agendar ligação/WhatsApp para vários clientes"
-                      className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-700"
-                    >
-                      <CalendarClock className="h-3.5 w-3.5" />
-                      Agendar contatos
-                    </button>
-                  )}
-                  {row.type === "collector" && (
-                    <button
-                      type="button"
-                      onClick={() => setScheduleVisitCollectorId(row.id)}
-                      title="Agendar visitas presenciais"
-                      className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-700"
-                    >
-                      <CalendarClock className="h-3.5 w-3.5" />
-                      Agendar visitas
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <CardClientes r={row.resumo} cobrador />
-                <CardPrevisao r={row.resumo} />
-                <CardDesempenho
-                  r={row.resumo}
-                  recebido={row.recebidoPeriodo}
-                  loading={!atribuicoesProntas || !acordoPagosProntos}
-                  meta={metaPorCobrador.get(row.id) ?? null}
-                  atendimentos={linhaAtendimentos(
-                    row.clientesAtendidos,
-                    row.clientesConversaram,
-                    row.acionamentosQtd,
-                    ehExterno(row.type),
-                  )}
-                />
-                <CardCarteira
-                  r={row.resumo}
-                  extraPilulas={
-                    isWalletCollectorType(row.type) &&
-                    !carteiraAuto.regrasPor.has(row.id) &&
-                    qtdSaidas(row.id) > 0
-                      ? [
-                          {
-                            valor: qtdSaidasValor(row.id),
-                            rotulo: "saíram sem ação",
-                            tom: "red" as const,
-                            loading: movCarregando,
-                            onClick: () => setSaidasCobradorId(row.id),
-                            hint: "Clientes que passaram da faixa no período sem nenhuma ação do cobrador. Clique para ver e devolver.",
-                          },
-                        ]
-                      : []
-                  }
-                />
-                {carteiraAuto.regrasPor.has(row.id) &&
-                  (() => {
-                    const regras = carteiraAuto.regrasPor.get(row.id) ?? [];
-                    const vaoSair = carteiraAuto.vaoSairPor.get(row.id) ?? [];
-                    const mov = movCarteira.get(row.id);
-                    return (
-                      <div className="sm:col-span-2">
-                        {/* Mesmo modelo dos outros cards (25/11): numero
-                            grande + quadrinhos (4 numa linha, card largo);
-                            as faixas da regra ficam no "ver detalhes". */}
-                        <CardSimples
-                          icon={Shuffle}
-                          titulo="Carteira automática"
-                          tema="red"
-                          numero={fmtNum(vaoSair.length)}
-                          frase={`vão sair da carteira em até ${URGENTE_SAIDA_CARTEIRA_DIAS} dias`}
-                          colunas={4}
-                          pilulas={[
-                            {
-                              valor: formatCurrency(
-                                vaoSair.reduce((s, v) => s + v.vencido, 0),
-                                false,
-                              ),
-                              rotulo: "vencido de quem vai sair",
-                              tom: vaoSair.length > 0 ? "red" : "gray",
-                              onClick:
-                                vaoSair.length > 0
-                                  ? () =>
-                                      setExpandedVaoSair((cur) =>
-                                        cur === row.id ? null : row.id,
-                                      )
-                                  : undefined,
-                              hint:
-                                vaoSair.length > 0
-                                  ? "Clique para ver os clientes"
-                                  : undefined,
-                            },
-                            {
-                              valor: movCarregando
-                                ? "…"
-                                : mov
-                                  ? fmtNum(mov.entraram)
-                                  : "—",
-                              rotulo: "entraram no período",
-                              tom: "gray",
-                              loading: movCarregando,
-                              hint: "Data em que o cliente foi atribuído ao cobrador — não é o vencimento da parcela",
-                            },
-                            {
-                              valor: movCarregando
-                                ? "…"
-                                : mov
-                                  ? fmtNum(mov.sairam)
-                                  : "—",
-                              rotulo: "saíram no período",
-                              tom: "gray",
-                              loading: movCarregando,
-                              hint: "Data em que o cliente deixou de ser do cobrador — não é o vencimento da parcela",
-                            },
-                            {
-                              valor: qtdSaidasValor(row.id),
-                              rotulo: "saíram sem ação",
-                              tom: qtdSaidas(row.id) > 0 ? "red" : "gray",
-                              loading: movCarregando,
-                              onClick:
-                                qtdSaidas(row.id) > 0
-                                  ? () => setSaidasCobradorId(row.id)
-                                  : undefined,
-                              hint: "Clientes que passaram da faixa no período sem nenhuma ação do cobrador. Clique para ver e devolver.",
-                            },
-                          ]}
-                          detalhesExtra={<FaixasAlcance regras={regras} />}
-                        />
-                        {expandedVaoSair === row.id && vaoSair.length > 0 && (
-                          <ul className="mt-1.5 rounded-lg bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-800/30 px-3 py-2 text-xs text-red-800 dark:text-red-300 space-y-0.5 max-h-56 overflow-y-auto">
-                            {vaoSair.map((v) => (
-                              <li
-                                key={v.documento}
-                                className="flex justify-between gap-3"
-                              >
-                                <span className="truncate">{v.nome}</span>
-                                <span className="shrink-0 font-semibold">
-                                  {v.diasRestantes <= 0
-                                    ? "sai hoje"
-                                    : `${v.diasRestantes} ${v.diasRestantes === 1 ? "dia" : "dias"}`}{" "}
-                                  · {formatCurrency(v.vencido, false)}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    );
-                  })()}
-              </div>
-
-              {row.reincidentes.length > 0 && (
-                <div>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setExpandedReincidente((cur) =>
-                        cur === row.id ? null : row.id,
-                      )
-                    }
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 dark:text-amber-400 hover:opacity-80"
-                  >
-                    <Repeat className="h-3.5 w-3.5" />
-                    {row.reincidentes.length}{" "}
-                    {row.reincidentes.length === 1
-                      ? "cliente remarcado"
-                      : "clientes remarcados"}{" "}
-                    3x ou mais
-                    {expandedReincidente === row.id ? (
-                      <ChevronUp className="h-3.5 w-3.5" />
-                    ) : (
-                      <ChevronDown className="h-3.5 w-3.5" />
-                    )}
-                  </button>
-                  {expandedReincidente === row.id && (
-                    <ul className="mt-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800/30 px-3 py-2 text-xs text-amber-800 dark:text-amber-300 space-y-0.5">
-                      {row.reincidentes.map((r) => (
-                        <li key={r.document} className="flex justify-between">
-                          <span>{r.name}</span>
-                          <span className="font-semibold">{r.count}x</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+              <Gauge className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              {rows.length === 1
+                ? "Visão geral do cobrador"
+                : "Visão geral dos cobradores"}
+              {overviewOpen ? (
+                <ChevronUp className="h-4 w-4 text-gray-400" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-gray-400" />
               )}
+            </button>
+            <div className="sm:ml-auto flex items-center gap-1.5 text-sm text-gray-700 dark:text-dark-text-secondary">
+              Cobrador
+              <FiltroMultiplo
+                opcoes={allCollectors.map((c) => ({ id: c.id, nome: c.name }))}
+                excluidos={excludedCollectorIds}
+                onChange={setExcludedCollectorIds}
+                textos={{
+                  todos: "Todos os cobradores",
+                  nenhum: "Nenhum cobrador",
+                  plural: "cobradores",
+                }}
+              />
             </div>
-          ))}
+          </div>
 
-          {rows.length === 0 && (
-            <div className="col-span-full bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border px-6 py-12 text-center text-sm text-gray-400 dark:text-dark-text-secondary">
-              Nenhum cobrador encontrado para esse filtro.
+          {overviewOpen && (
+            // Pedido do usuario (2026-11-17): o mais simples possivel -- 4
+            // grupos fixos (Carteira, Vencido, Numero de clientes,
+            // Desempenho), mesmo layout do Meu desempenho do cobrador.
+            // Carteira e Vencido ja foram unidos num card so, mas o gestor
+            // pediu mais destaque pro valor vencido -- separados de novo,
+            // sem repetir "A vencer" nos dois (fica so dentro de Carteira).
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+              <CardClientes r={resumoCobradores} cobrador />
+              <CardPrevisao r={resumoCobradores} />
+              <CardDesempenho
+                r={resumoCobradores}
+                recebido={totals.recebidoPeriodo}
+                loading={!atribuicoesProntas || !acordoPagosProntos}
+                meta={metaGeral.meta > 0 ? metaGeral : null}
+                atendimentos={linhaAtendimentos(
+                  totals.clientesAtendidos,
+                  totals.clientesConversaram,
+                  totals.acionamentosQtd,
+                  rows.length > 0 && rows.every((r) => ehExterno(r.type)),
+                )}
+              />
+              <CardCarteira r={resumoCobradores} />
             </div>
           )}
         </div>
-      ) : (
-        // Tabela: as mesmas perguntas da Visao geral, uma coluna cada; o
-        // detalhe vai na linha de baixo da celula. Antes eram 15 colunas.
-        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-[9px] font-bold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider">
-                <th className="px-3 py-1.5 bg-gray-50 dark:bg-dark-bg/50" />
-                <th className="px-3 py-1.5 bg-gray-50 dark:bg-dark-bg/50" />
-                <th
-                  colSpan={2}
-                  className={`px-3 py-1.5 text-center border-l border-gray-200 dark:border-dark-border ${TONE_FINANCEIRO}`}
+      )}
+
+      {/* Por cobrador: filtro de cobrador (o mesmo da aba Geral) e a
+          lista. */}
+      {aba === "cobrador" && (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 text-sm text-gray-700 dark:text-dark-text-secondary">
+              Cobrador
+              <FiltroMultiplo
+                opcoes={allCollectors.map((c) => ({ id: c.id, nome: c.name }))}
+                excluidos={excludedCollectorIds}
+                onChange={setExcludedCollectorIds}
+                textos={{
+                  todos: "Todos os cobradores",
+                  nenhum: "Nenhum cobrador",
+                  plural: "cobradores",
+                }}
+              />
+            </div>
+            <div className="ml-auto">
+              <div className="flex bg-gray-100 dark:bg-dark-bg rounded-md p-0.5">
+                <button
+                  onClick={() => setViewMode("cards")}
+                  className={`flex items-center px-3 py-1.5 rounded-md text-xs font-medium transition-all touch-manipulation ${
+                    viewMode === "cards"
+                      ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
+                      : "text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
+                  }`}
                 >
-                  Dinheiro
-                </th>
-                <th
-                  className={`px-3 py-1.5 text-center border-l border-gray-200 dark:border-dark-border ${TONE_ATENDIMENTO}`}
+                  <LayoutGrid className="h-3.5 w-3.5 mr-1.5" />
+                  Cards
+                </button>
+                <button
+                  onClick={() => setViewMode("table")}
+                  className={`flex items-center px-3 py-1.5 rounded-md text-xs font-medium transition-all touch-manipulation ${
+                    viewMode === "table"
+                      ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
+                      : "text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
+                  }`}
                 >
-                  Atendimento
-                </th>
-                <th
-                  colSpan={5}
-                  className={`px-3 py-1.5 text-center border-l border-gray-200 dark:border-dark-border ${TONE_AGENDA}`}
-                >
-                  Agenda
-                </th>
-              </tr>
-              <tr className="border-b border-gray-100 dark:border-dark-border/40 text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider">
-                <th className="px-2 py-2.5 text-center whitespace-nowrap bg-gray-50 dark:bg-dark-bg/50">
-                  #
-                </th>
-                <SortTh
-                  active={sortKey === "name"}
-                  dir={sortDir}
-                  onClick={() => toggleSort("name")}
-                  className="px-3 py-2.5 text-left whitespace-nowrap bg-gray-50 dark:bg-dark-bg/50"
-                >
-                  Cobrador
-                </SortTh>
-                <SortTh
-                  active={sortKey === "valorCarteira"}
-                  dir={sortDir}
-                  onClick={() => toggleSort("valorCarteira")}
-                  className={`px-3 py-2.5 text-right whitespace-nowrap border-l border-gray-200 dark:border-dark-border ${TONE_FINANCEIRO}`}
-                >
-                  Carteira
-                </SortTh>
-                <SortTh
-                  active={sortKey === "recebidoPeriodo"}
-                  dir={sortDir}
-                  onClick={() => toggleSort("recebidoPeriodo")}
-                  className={`px-3 py-2.5 text-right whitespace-nowrap ${TONE_FINANCEIRO}`}
-                >
-                  Recebido
-                </SortTh>
-                <SortTh
-                  active={sortKey === "clientesAtendidos"}
-                  dir={sortDir}
-                  onClick={() => toggleSort("clientesAtendidos")}
-                  className={`px-3 py-2.5 text-right whitespace-nowrap border-l border-gray-200 dark:border-dark-border ${TONE_ATENDIMENTO}`}
-                >
-                  Clientes atendidos
-                </SortTh>
-                <SortTh
-                  active={sortKey === "emAtrasoVisitas"}
-                  dir={sortDir}
-                  onClick={() => toggleSort("emAtrasoVisitas")}
-                  className={`px-3 py-2.5 text-right whitespace-nowrap border-l border-gray-200 dark:border-dark-border ${TONE_AGENDA}`}
-                >
-                  Atrasados
-                </SortTh>
-                <SortTh
-                  active={sortKey === "agendadasQtd"}
-                  dir={sortDir}
-                  onClick={() => toggleSort("agendadasQtd")}
-                  className={`px-3 py-2.5 text-right whitespace-nowrap ${TONE_AGENDA}`}
-                >
-                  Agendados
-                </SortTh>
-                <SortTh
-                  active={sortKey === "realizadasQtd"}
-                  dir={sortDir}
-                  onClick={() => toggleSort("realizadasQtd")}
-                  className={`px-3 py-2.5 text-right whitespace-nowrap ${TONE_AGENDA}`}
-                >
-                  Feitos
-                </SortTh>
-                <SortTh
-                  active={sortKey === "reagendadasQtd"}
-                  dir={sortDir}
-                  onClick={() => toggleSort("reagendadasQtd")}
-                  className={`px-3 py-2.5 text-right whitespace-nowrap ${TONE_AGENDA}`}
-                >
-                  Remarcados
-                </SortTh>
-                <SortTh
-                  active={sortKey === "semAgendamentoClientes"}
-                  dir={sortDir}
-                  onClick={() => toggleSort("semAgendamentoClientes")}
-                  className={`px-3 py-2.5 text-right whitespace-nowrap ${TONE_AGENDA}`}
-                >
-                  Sem agendamento
-                </SortTh>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-dark-border/20 text-gray-700 dark:text-dark-text">
+                  <Table2 className="h-3.5 w-3.5 mr-1.5" />
+                  Tabela
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {viewMode === "cards" ? (
+            // Com 1 cobrador so, o card usa a largura toda em vez de ficar
+            // espremido num terco da tela — nao ha mais ninguem pra formar grid.
+            // Mesmos 4 blocos da Visao geral (Carteira, Vencido, Numero de
+            // clientes, Desempenho), so que por cobrador.
+            <div
+              className={
+                rows.length === 1
+                  ? "grid grid-cols-1 gap-4"
+                  : "grid grid-cols-1 lg:grid-cols-2 gap-4"
+              }
+            >
               {rows.map((row, index) => (
-                <tr
+                <div
                   key={row.id}
-                  className="hover:bg-gray-50/50 dark:hover:bg-dark-bg/25 transition-colors"
+                  className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-4 space-y-3"
                 >
-                  <td className="px-2 py-3 text-center text-[10px] text-gray-400 dark:text-dark-text-secondary whitespace-nowrap">
-                    {index + 1}
-                  </td>
-                  <td className="px-3 py-3 whitespace-nowrap">
-                    <button
-                      type="button"
-                      onClick={() => setDetalheCobradorId(row.id)}
-                      title="Histórico mês a mês, pendências e carteira"
-                      className="font-medium text-gray-900 dark:text-dark-text hover:text-blue-600 dark:hover:text-blue-400 hover:underline text-left"
-                    >
-                      {row.name}
-                    </button>
-                    <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
-                      {USER_TYPE_LABELS[row.type]}
-                    </div>
-                    {isWalletCollectorType(row.type) && (
-                      <button
-                        type="button"
-                        onClick={() => setScheduleContactCollectorId(row.id)}
-                        title="Agendar ligação/WhatsApp para vários clientes"
-                        className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-700"
-                      >
-                        <CalendarClock className="h-3 w-3" />
-                        Agendar contatos
-                      </button>
-                    )}
-                    {row.type === "collector" && (
-                      <button
-                        type="button"
-                        onClick={() => setScheduleVisitCollectorId(row.id)}
-                        title="Agendar visitas presenciais"
-                        className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-700"
-                      >
-                        <CalendarClock className="h-3 w-3" />
-                        Agendar visitas
-                      </button>
-                    )}
-                    {(carteiraAuto.vaoSairPor.get(row.id)?.length ?? 0) > 0 && (
-                      <div
-                        className="mt-1 flex items-center gap-1 text-[10px] font-bold text-red-600 dark:text-red-400"
-                        title={`Clientes que saem da carteira em até ${URGENTE_SAIDA_CARTEIRA_DIAS} dias (veja no modo Cards)`}
-                      >
-                        <Shuffle className="h-3 w-3" />
-                        {fmtNum(carteiraAuto.vaoSairPor.get(row.id)!.length)}{" "}
-                        vão sair em até {URGENTE_SAIDA_CARTEIRA_DIAS} dias
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2 min-w-0">
+                      <span className="flex-shrink-0 mt-0.5 flex items-center justify-center h-5 w-5 rounded-full bg-gray-100 dark:bg-dark-bg text-[10px] font-bold text-gray-500 dark:text-dark-text-secondary">
+                        {index + 1}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="font-bold text-gray-900 dark:text-dark-text truncate">
+                          {row.name}
+                        </div>
+                        <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
+                          {USER_TYPE_LABELS[row.type]}
+                        </div>
                       </div>
-                    )}
-                    {qtdSaidas(row.id) > 0 && (
+                    </div>
+                    <div className="flex-shrink-0 flex items-center gap-3">
                       <button
                         type="button"
-                        onClick={() => setSaidasCobradorId(row.id)}
-                        title="Clientes que passaram da faixa no período sem nenhuma ação do cobrador. Clique para ver e devolver."
-                        className="mt-1 flex items-center gap-1 text-[10px] font-bold text-red-600 hover:text-red-700 dark:text-red-400"
+                        onClick={() => setDetalheCobradorId(row.id)}
+                        title="Histórico mês a mês, pendências e carteira"
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-700"
                       >
-                        <UserX className="h-3 w-3" />
-                        {fmtNum(qtdSaidas(row.id))} saíram sem ação
+                        <History className="h-3.5 w-3.5" />
+                        Histórico
                       </button>
-                    )}
-                  </td>
-                  <td className="px-3 py-3 text-right whitespace-nowrap border-l border-gray-100 dark:border-dark-border/40">
-                    <div className="font-semibold">
-                      {formatCurrency(
-                        row.resumo.carteira.vencido + row.resumo.carteira.aVencer,
-                        false,
+                      {isWalletCollectorType(row.type) && (
+                        <button
+                          type="button"
+                          onClick={() => setScheduleContactCollectorId(row.id)}
+                          title="Agendar ligação/WhatsApp para vários clientes"
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-700"
+                        >
+                          <CalendarClock className="h-3.5 w-3.5" />
+                          Agendar contatos
+                        </button>
+                      )}
+                      {row.type === "collector" && (
+                        <button
+                          type="button"
+                          onClick={() => setScheduleVisitCollectorId(row.id)}
+                          title="Agendar visitas presenciais"
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-700"
+                        >
+                          <CalendarClock className="h-3.5 w-3.5" />
+                          Agendar visitas
+                        </button>
                       )}
                     </div>
-                    <div className="text-[10px] text-red-500 dark:text-red-400">
-                      {formatCurrency(row.resumo.carteira.vencido, false)} vencido
-                    </div>
-                    <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
-                      {formatCurrency(row.resumo.carteira.aVencer, false)} a vencer
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 text-right whitespace-nowrap">
-                    <div
-                      className={`font-semibold text-green-600 dark:text-green-400 ${atribuicoesProntas ? "" : "animate-pulse"}`}
-                    >
-                      {fmtRecebido(row.recebidoPeriodo)}
-                    </div>
-                    <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
-                      {formatCurrency(row.previstaValor, false)} ainda vence
-                    </div>
-                    {linhaMeta(row.id).map((m) => (
-                      <div
-                        key={m.label}
-                        title={m.hint}
-                        className={`text-[10px] font-semibold ${m.tone === "green" ? "text-green-600 dark:text-green-400" : "text-indigo-600 dark:text-indigo-400"}`}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <CardClientes r={row.resumo} cobrador />
+                    <CardPrevisao r={row.resumo} />
+                    <CardDesempenho
+                      r={row.resumo}
+                      recebido={row.recebidoPeriodo}
+                      loading={!atribuicoesProntas || !acordoPagosProntos}
+                      meta={metaPorCobrador.get(row.id) ?? null}
+                      atendimentos={linhaAtendimentos(
+                        row.clientesAtendidos,
+                        row.clientesConversaram,
+                        row.acionamentosQtd,
+                        ehExterno(row.type),
+                      )}
+                    />
+                    <CardCarteira
+                      r={row.resumo}
+                      extraPilulas={
+                        isWalletCollectorType(row.type) &&
+                        !carteiraAuto.regrasPor.has(row.id) &&
+                        qtdSaidas(row.id) > 0
+                          ? [
+                              {
+                                valor: qtdSaidasValor(row.id),
+                                rotulo: "saíram sem ação",
+                                tom: "red" as const,
+                                loading: movCarregando,
+                                onClick: () => setSaidasCobradorId(row.id),
+                                hint: "Clientes que passaram da faixa no período sem nenhuma ação do cobrador. Clique para ver e devolver.",
+                              },
+                            ]
+                          : []
+                      }
+                    />
+                    {carteiraAuto.regrasPor.has(row.id) &&
+                      (() => {
+                        const regras = carteiraAuto.regrasPor.get(row.id) ?? [];
+                        const vaoSair =
+                          carteiraAuto.vaoSairPor.get(row.id) ?? [];
+                        const mov = movCarteira.get(row.id);
+                        return (
+                          <div className="sm:col-span-2">
+                            {/* Mesmo modelo dos outros cards (25/11): numero
+                            grande + quadrinhos (4 numa linha, card largo);
+                            as faixas da regra ficam no "ver detalhes". */}
+                            <CardSimples
+                              icon={Shuffle}
+                              titulo="Carteira automática"
+                              tema="red"
+                              numero={fmtNum(vaoSair.length)}
+                              frase={`vão sair da carteira em até ${URGENTE_SAIDA_CARTEIRA_DIAS} dias`}
+                              colunas={4}
+                              pilulas={[
+                                {
+                                  valor: formatCurrency(
+                                    vaoSair.reduce((s, v) => s + v.vencido, 0),
+                                    false,
+                                  ),
+                                  rotulo: "vencido de quem vai sair",
+                                  tom: vaoSair.length > 0 ? "red" : "gray",
+                                  onClick:
+                                    vaoSair.length > 0
+                                      ? () =>
+                                          setExpandedVaoSair((cur) =>
+                                            cur === row.id ? null : row.id,
+                                          )
+                                      : undefined,
+                                  hint:
+                                    vaoSair.length > 0
+                                      ? "Clique para ver os clientes"
+                                      : undefined,
+                                },
+                                {
+                                  valor: movCarregando
+                                    ? "…"
+                                    : mov
+                                      ? fmtNum(mov.entraram)
+                                      : "—",
+                                  rotulo: "entraram no período",
+                                  tom: "gray",
+                                  loading: movCarregando,
+                                  hint: "Data em que o cliente foi atribuído ao cobrador — não é o vencimento da parcela",
+                                },
+                                {
+                                  valor: movCarregando
+                                    ? "…"
+                                    : mov
+                                      ? fmtNum(mov.sairam)
+                                      : "—",
+                                  rotulo: "saíram no período",
+                                  tom: "gray",
+                                  loading: movCarregando,
+                                  hint: "Data em que o cliente deixou de ser do cobrador — não é o vencimento da parcela",
+                                },
+                                {
+                                  valor: qtdSaidasValor(row.id),
+                                  rotulo: "saíram sem ação",
+                                  tom: qtdSaidas(row.id) > 0 ? "red" : "gray",
+                                  loading: movCarregando,
+                                  onClick:
+                                    qtdSaidas(row.id) > 0
+                                      ? () => setSaidasCobradorId(row.id)
+                                      : undefined,
+                                  hint: "Clientes que passaram da faixa no período sem nenhuma ação do cobrador. Clique para ver e devolver.",
+                                },
+                              ]}
+                              detalhesExtra={<FaixasAlcance regras={regras} />}
+                            />
+                            {expandedVaoSair === row.id &&
+                              vaoSair.length > 0 && (
+                                <ul className="mt-1.5 rounded-lg bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-800/30 px-3 py-2 text-xs text-red-800 dark:text-red-300 space-y-0.5 max-h-56 overflow-y-auto">
+                                  {vaoSair.map((v) => (
+                                    <li
+                                      key={v.documento}
+                                      className="flex justify-between gap-3"
+                                    >
+                                      <span className="truncate">{v.nome}</span>
+                                      <span className="shrink-0 font-semibold">
+                                        {v.diasRestantes <= 0
+                                          ? "sai hoje"
+                                          : `${v.diasRestantes} ${v.diasRestantes === 1 ? "dia" : "dias"}`}{" "}
+                                        · {formatCurrency(v.vencido, false)}
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                          </div>
+                        );
+                      })()}
+                  </div>
+
+                  {row.reincidentes.length > 0 && (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandedReincidente((cur) =>
+                            cur === row.id ? null : row.id,
+                          )
+                        }
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 dark:text-amber-400 hover:opacity-80"
                       >
-                        {m.label}: {m.value}
-                      </div>
-                    ))}
-                  </td>
-                  <td className="px-3 py-3 text-right whitespace-nowrap border-l border-gray-100 dark:border-dark-border/40">
-                    <div
-                      className="font-semibold text-blue-600 dark:text-blue-400"
-                      title={atendimentoTexto(ehExterno(row.type)).clientes}
-                    >
-                      {atendimentosValor(row.clientesAtendidos)}
-                    </div>
-                    {(row.clientesAtendidos > 0 ||
-                      atendimentos === null ||
-                      atendimentosErro) && (
-                      <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
-                        {atendimentosSub(row.clientesConversaram, ehExterno(row.type))}
-                      </div>
-                    )}
-                    {row.acionamentosQtd > 0 && (
-                      <div
-                        className="text-[10px] text-gray-400 dark:text-dark-text-secondary"
-                        title={atendimentoTexto(ehExterno(row.type)).registrosHint}
-                      >
-                        {atendimentosValor(row.acionamentosQtd)}{" "}
-                        {atendimentoTexto(ehExterno(row.type)).registrosMin}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-3 py-3 text-right whitespace-nowrap border-l border-gray-100 dark:border-dark-border/40">
-                    <span
-                      className={`font-semibold ${row.emAtrasoVisitas > 0 ? "text-red-600 dark:text-red-400" : ""}`}
-                    >
-                      {fmtNum(row.emAtrasoVisitas)}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3 text-right whitespace-nowrap font-semibold">
-                    {fmtNum(row.agendadasQtd)}
-                  </td>
-                  <td className="px-3 py-3 text-right whitespace-nowrap">
-                    <div className="font-semibold">
-                      {fmtNum(row.realizadasQtd)}
-                    </div>
-                    {row.naoEncontradoQtd > 0 && (
-                      <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
-                        {fmtNum(row.naoEncontradoQtd)} não encontrado
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-3 py-3 text-right whitespace-nowrap">
-                    <div className="font-semibold">
-                      {fmtNum(row.reagendadasQtd)}
-                    </div>
-                    {row.reincidentes.length > 0 && (
-                      <div className="text-[10px] text-amber-600 dark:text-amber-400">
+                        <Repeat className="h-3.5 w-3.5" />
                         {row.reincidentes.length}{" "}
                         {row.reincidentes.length === 1
-                          ? "cliente"
-                          : "clientes"}{" "}
+                          ? "cliente remarcado"
+                          : "clientes remarcados"}{" "}
                         3x ou mais
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-3 py-3 text-right whitespace-nowrap font-semibold">
-                    {fmtNum(row.resumo.clientes.semAgendamento)}
-                  </td>
-                </tr>
+                        {expandedReincidente === row.id ? (
+                          <ChevronUp className="h-3.5 w-3.5" />
+                        ) : (
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                      {expandedReincidente === row.id && (
+                        <ul className="mt-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800/30 px-3 py-2 text-xs text-amber-800 dark:text-amber-300 space-y-0.5">
+                          {row.reincidentes.map((r) => (
+                            <li
+                              key={r.document}
+                              className="flex justify-between"
+                            >
+                              <span>{r.name}</span>
+                              <span className="font-semibold">{r.count}x</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                </div>
               ))}
+
               {rows.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={10}
-                    className="px-3 py-10 text-center text-sm text-gray-400 dark:text-dark-text-secondary"
-                  >
-                    Nenhum cobrador encontrado para esse filtro.
-                  </td>
-                </tr>
+                <div className="col-span-full bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border px-6 py-12 text-center text-sm text-gray-400 dark:text-dark-text-secondary">
+                  Nenhum cobrador encontrado para esse filtro.
+                </div>
               )}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          ) : (
+            // Tabela: as mesmas perguntas da Visao geral, uma coluna cada; o
+            // detalhe vai na linha de baixo da celula. Antes eram 15 colunas.
+            <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-[9px] font-bold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider">
+                    <th className="px-3 py-1.5 bg-gray-50 dark:bg-dark-bg/50" />
+                    <th className="px-3 py-1.5 bg-gray-50 dark:bg-dark-bg/50" />
+                    <th
+                      colSpan={2}
+                      className={`px-3 py-1.5 text-center border-l border-gray-200 dark:border-dark-border ${TONE_FINANCEIRO}`}
+                    >
+                      Dinheiro
+                    </th>
+                    <th
+                      className={`px-3 py-1.5 text-center border-l border-gray-200 dark:border-dark-border ${TONE_ATENDIMENTO}`}
+                    >
+                      Atendimento
+                    </th>
+                    <th
+                      colSpan={5}
+                      className={`px-3 py-1.5 text-center border-l border-gray-200 dark:border-dark-border ${TONE_AGENDA}`}
+                    >
+                      Agenda
+                    </th>
+                  </tr>
+                  <tr className="border-b border-gray-100 dark:border-dark-border/40 text-[10px] font-bold text-gray-400 dark:text-dark-text-secondary uppercase tracking-wider">
+                    <th className="px-2 py-2.5 text-center whitespace-nowrap bg-gray-50 dark:bg-dark-bg/50">
+                      #
+                    </th>
+                    <SortTh
+                      active={sortKey === "name"}
+                      dir={sortDir}
+                      onClick={() => toggleSort("name")}
+                      className="px-3 py-2.5 text-left whitespace-nowrap bg-gray-50 dark:bg-dark-bg/50"
+                    >
+                      Cobrador
+                    </SortTh>
+                    <SortTh
+                      active={sortKey === "valorCarteira"}
+                      dir={sortDir}
+                      onClick={() => toggleSort("valorCarteira")}
+                      className={`px-3 py-2.5 text-right whitespace-nowrap border-l border-gray-200 dark:border-dark-border ${TONE_FINANCEIRO}`}
+                    >
+                      Carteira
+                    </SortTh>
+                    <SortTh
+                      active={sortKey === "recebidoPeriodo"}
+                      dir={sortDir}
+                      onClick={() => toggleSort("recebidoPeriodo")}
+                      className={`px-3 py-2.5 text-right whitespace-nowrap ${TONE_FINANCEIRO}`}
+                    >
+                      Recebido
+                    </SortTh>
+                    <SortTh
+                      active={sortKey === "clientesAtendidos"}
+                      dir={sortDir}
+                      onClick={() => toggleSort("clientesAtendidos")}
+                      className={`px-3 py-2.5 text-right whitespace-nowrap border-l border-gray-200 dark:border-dark-border ${TONE_ATENDIMENTO}`}
+                    >
+                      Clientes atendidos
+                    </SortTh>
+                    <SortTh
+                      active={sortKey === "emAtrasoVisitas"}
+                      dir={sortDir}
+                      onClick={() => toggleSort("emAtrasoVisitas")}
+                      className={`px-3 py-2.5 text-right whitespace-nowrap border-l border-gray-200 dark:border-dark-border ${TONE_AGENDA}`}
+                    >
+                      Atrasados
+                    </SortTh>
+                    <SortTh
+                      active={sortKey === "agendadasQtd"}
+                      dir={sortDir}
+                      onClick={() => toggleSort("agendadasQtd")}
+                      className={`px-3 py-2.5 text-right whitespace-nowrap ${TONE_AGENDA}`}
+                    >
+                      Agendados
+                    </SortTh>
+                    <SortTh
+                      active={sortKey === "realizadasQtd"}
+                      dir={sortDir}
+                      onClick={() => toggleSort("realizadasQtd")}
+                      className={`px-3 py-2.5 text-right whitespace-nowrap ${TONE_AGENDA}`}
+                    >
+                      Feitos
+                    </SortTh>
+                    <SortTh
+                      active={sortKey === "reagendadasQtd"}
+                      dir={sortDir}
+                      onClick={() => toggleSort("reagendadasQtd")}
+                      className={`px-3 py-2.5 text-right whitespace-nowrap ${TONE_AGENDA}`}
+                    >
+                      Remarcados
+                    </SortTh>
+                    <SortTh
+                      active={sortKey === "semAgendamentoClientes"}
+                      dir={sortDir}
+                      onClick={() => toggleSort("semAgendamentoClientes")}
+                      className={`px-3 py-2.5 text-right whitespace-nowrap ${TONE_AGENDA}`}
+                    >
+                      Sem agendamento
+                    </SortTh>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-dark-border/20 text-gray-700 dark:text-dark-text">
+                  {rows.map((row, index) => (
+                    <tr
+                      key={row.id}
+                      className="hover:bg-gray-50/50 dark:hover:bg-dark-bg/25 transition-colors"
+                    >
+                      <td className="px-2 py-3 text-center text-[10px] text-gray-400 dark:text-dark-text-secondary whitespace-nowrap">
+                        {index + 1}
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => setDetalheCobradorId(row.id)}
+                          title="Histórico mês a mês, pendências e carteira"
+                          className="font-medium text-gray-900 dark:text-dark-text hover:text-blue-600 dark:hover:text-blue-400 hover:underline text-left"
+                        >
+                          {row.name}
+                        </button>
+                        <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
+                          {USER_TYPE_LABELS[row.type]}
+                        </div>
+                        {isWalletCollectorType(row.type) && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setScheduleContactCollectorId(row.id)
+                            }
+                            title="Agendar ligação/WhatsApp para vários clientes"
+                            className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-700"
+                          >
+                            <CalendarClock className="h-3 w-3" />
+                            Agendar contatos
+                          </button>
+                        )}
+                        {row.type === "collector" && (
+                          <button
+                            type="button"
+                            onClick={() => setScheduleVisitCollectorId(row.id)}
+                            title="Agendar visitas presenciais"
+                            className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-700"
+                          >
+                            <CalendarClock className="h-3 w-3" />
+                            Agendar visitas
+                          </button>
+                        )}
+                        {(carteiraAuto.vaoSairPor.get(row.id)?.length ?? 0) >
+                          0 && (
+                          <div
+                            className="mt-1 flex items-center gap-1 text-[10px] font-bold text-red-600 dark:text-red-400"
+                            title={`Clientes que saem da carteira em até ${URGENTE_SAIDA_CARTEIRA_DIAS} dias (veja no modo Cards)`}
+                          >
+                            <Shuffle className="h-3 w-3" />
+                            {fmtNum(
+                              carteiraAuto.vaoSairPor.get(row.id)!.length,
+                            )}{" "}
+                            vão sair em até {URGENTE_SAIDA_CARTEIRA_DIAS} dias
+                          </div>
+                        )}
+                        {qtdSaidas(row.id) > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setSaidasCobradorId(row.id)}
+                            title="Clientes que passaram da faixa no período sem nenhuma ação do cobrador. Clique para ver e devolver."
+                            className="mt-1 flex items-center gap-1 text-[10px] font-bold text-red-600 hover:text-red-700 dark:text-red-400"
+                          >
+                            <UserX className="h-3 w-3" />
+                            {fmtNum(qtdSaidas(row.id))} saíram sem ação
+                          </button>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-right whitespace-nowrap border-l border-gray-100 dark:border-dark-border/40">
+                        <div className="font-semibold">
+                          {formatCurrency(
+                            row.resumo.carteira.vencido +
+                              row.resumo.carteira.aVencer,
+                            false,
+                          )}
+                        </div>
+                        <div className="text-[10px] text-red-500 dark:text-red-400">
+                          {formatCurrency(row.resumo.carteira.vencido, false)}{" "}
+                          vencido
+                        </div>
+                        <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
+                          {formatCurrency(row.resumo.carteira.aVencer, false)} a
+                          vencer
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-right whitespace-nowrap">
+                        <div
+                          className={`font-semibold text-green-600 dark:text-green-400 ${atribuicoesProntas ? "" : "animate-pulse"}`}
+                        >
+                          {fmtRecebido(row.recebidoPeriodo)}
+                        </div>
+                        <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
+                          {formatCurrency(row.previstaValor, false)} ainda vence
+                        </div>
+                        {linhaMeta(row.id).map((m) => (
+                          <div
+                            key={m.label}
+                            title={m.hint}
+                            className={`text-[10px] font-semibold ${m.tone === "green" ? "text-green-600 dark:text-green-400" : "text-indigo-600 dark:text-indigo-400"}`}
+                          >
+                            {m.label}: {m.value}
+                          </div>
+                        ))}
+                      </td>
+                      <td className="px-3 py-3 text-right whitespace-nowrap border-l border-gray-100 dark:border-dark-border/40">
+                        <div
+                          className="font-semibold text-blue-600 dark:text-blue-400"
+                          title={atendimentoTexto(ehExterno(row.type)).clientes}
+                        >
+                          {atendimentosValor(row.clientesAtendidos)}
+                        </div>
+                        {(row.clientesAtendidos > 0 ||
+                          atendimentos === null ||
+                          atendimentosErro) && (
+                          <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
+                            {atendimentosSub(
+                              row.clientesConversaram,
+                              ehExterno(row.type),
+                            )}
+                          </div>
+                        )}
+                        {row.acionamentosQtd > 0 && (
+                          <div
+                            className="text-[10px] text-gray-400 dark:text-dark-text-secondary"
+                            title={
+                              atendimentoTexto(ehExterno(row.type))
+                                .registrosHint
+                            }
+                          >
+                            {atendimentosValor(row.acionamentosQtd)}{" "}
+                            {atendimentoTexto(ehExterno(row.type)).registrosMin}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-right whitespace-nowrap border-l border-gray-100 dark:border-dark-border/40">
+                        <span
+                          className={`font-semibold ${row.emAtrasoVisitas > 0 ? "text-red-600 dark:text-red-400" : ""}`}
+                        >
+                          {fmtNum(row.emAtrasoVisitas)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-right whitespace-nowrap font-semibold">
+                        {fmtNum(row.agendadasQtd)}
+                      </td>
+                      <td className="px-3 py-3 text-right whitespace-nowrap">
+                        <div className="font-semibold">
+                          {fmtNum(row.realizadasQtd)}
+                        </div>
+                        {row.naoEncontradoQtd > 0 && (
+                          <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
+                            {fmtNum(row.naoEncontradoQtd)} não encontrado
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-right whitespace-nowrap">
+                        <div className="font-semibold">
+                          {fmtNum(row.reagendadasQtd)}
+                        </div>
+                        {row.reincidentes.length > 0 && (
+                          <div className="text-[10px] text-amber-600 dark:text-amber-400">
+                            {row.reincidentes.length}{" "}
+                            {row.reincidentes.length === 1
+                              ? "cliente"
+                              : "clientes"}{" "}
+                            3x ou mais
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-right whitespace-nowrap font-semibold">
+                        {fmtNum(row.resumo.clientes.semAgendamento)}
+                      </td>
+                    </tr>
+                  ))}
+                  {rows.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={10}
+                        className="px-3 py-10 text-center text-sm text-gray-400 dark:text-dark-text-secondary"
+                      >
+                        Nenhum cobrador encontrado para esse filtro.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
 
       {saidasCobrador && (
