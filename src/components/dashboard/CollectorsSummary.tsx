@@ -16,7 +16,6 @@ import {
   ChevronUp,
   LayoutGrid,
   Table2,
-  Check,
   Gauge,
   UserX,
   History,
@@ -28,6 +27,7 @@ import { isCollectorType, UserType } from "../../types";
 import { useAtendimentosPeriodo } from "../../hooks/useAtendimentosPeriodo";
 import { useClientesAcionados } from "../../hooks/useClientesAcionados";
 import SummaryCard from "../common/SummaryCard";
+import FiltroMultiplo from "../common/FiltroMultiplo";
 import ResumoEmpresa, {
   CardCarteira,
   CardClientes,
@@ -411,8 +411,6 @@ const CollectorsSummary: React.FC = () => {
   const [excludedCollectorIds, setExcludedCollectorIds] = useState<
     Set<string>
   >(new Set());
-  const [collectorMenuOpen, setCollectorMenuOpen] = useState(false);
-  const collectorMenuRef = useRef<HTMLDivElement>(null);
   // Ordenacao (clicavel no titulo da coluna, tabela e cards compartilham).
   // Padrao: pior situacao primeiro, igual ao comportamento anterior fixo.
   const [sortKey, setSortKey] = useState<SortKey>("valorCarteira");
@@ -432,19 +430,6 @@ const CollectorsSummary: React.FC = () => {
   useEffect(() => {
     localStorage.setItem("collectorsSummaryViewMode", viewMode);
   }, [viewMode]);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (
-        collectorMenuRef.current &&
-        !collectorMenuRef.current.contains(e.target as Node)
-      ) {
-        setCollectorMenuOpen(false);
-      }
-    };
-    if (collectorMenuOpen) document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [collectorMenuOpen]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -589,28 +574,6 @@ const CollectorsSummary: React.FC = () => {
     () => users.filter((u) => isCollectorType(u.type) && u.active !== false),
     [users],
   );
-
-  const toggleCollector = (id: string) => {
-    setExcludedCollectorIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
-
-  // Alterna entre "todos" (nada excluido) e "nenhum" (todos excluidos) —
-  // parte de qualquer estado parcial, sempre cai num dos dois extremos.
-  const toggleSelectAll = () => {
-    setExcludedCollectorIds((prev) =>
-      prev.size === 0 ? new Set(allCollectors.map((c) => c.id)) : new Set(),
-    );
-  };
-
-  const isCollectorChecked = (id: string) => !excludedCollectorIds.has(id);
 
   // Pagamentos que ja foram estornados (o estorno aponta para o original):
   // o cliente nao conta como "pagou no periodo".
@@ -765,7 +728,6 @@ const CollectorsSummary: React.FC = () => {
           dateFrom,
           dateTo,
           today,
-          loja: "",
           acionados: acionados ? (acionados.get(collector.id) ?? new Set()) : null,
           registradosCobrador: pagosDocs,
         });
@@ -864,7 +826,6 @@ const CollectorsSummary: React.FC = () => {
       dateFrom,
       dateTo,
       today,
-      loja: "",
       acionados: acionadosSel,
       registradosCobrador: registrados,
     });
@@ -1205,14 +1166,6 @@ const CollectorsSummary: React.FC = () => {
     ? users.find((u) => u.id === detalheCobradorId)
     : undefined;
 
-  const collectorFilterLabel =
-    excludedCollectorIds.size === 0
-      ? "Todos os cobradores"
-      : excludedCollectorIds.size >= allCollectors.length
-        ? "Nenhum cobrador"
-        : `${allCollectors.length - excludedCollectorIds.size} de ${allCollectors.length} cobradores`;
-
-
   // Atendimentos vem de uma busca a parte: enquanto carrega (ou se falhar)
   // nao mostra 0, que pareceria "nao atendeu ninguem".
   const atendimentosValor = (n: number): string =>
@@ -1431,55 +1384,16 @@ const CollectorsSummary: React.FC = () => {
           </button>
           <div className="sm:ml-auto flex items-center gap-1.5 text-sm text-gray-700 dark:text-dark-text-secondary">
             Cobrador
-            <div className="relative" ref={collectorMenuRef}>
-              <button
-                onClick={() => setCollectorMenuOpen((v) => !v)}
-                // w-56: mesma largura do filtro de Loja da empresa (25/11).
-                className="w-56 flex items-center justify-between gap-1 px-2 py-1.5 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-sm text-gray-900 dark:text-dark-text touch-manipulation"
-              >
-                <span className="truncate">{collectorFilterLabel}</span>
-                <ChevronDown className="h-3.5 w-3.5" />
-              </button>
-
-              {collectorMenuOpen && (
-                <div className="absolute right-0 z-20 mt-1 w-64 max-h-80 overflow-y-auto rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg-secondary shadow-lg p-2">
-                  <button
-                    onClick={toggleSelectAll}
-                    className="w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                  >
-                    {excludedCollectorIds.size === 0
-                      ? "Desmarcar todos"
-                      : "Selecionar todos"}
-                  </button>
-                  <div className="my-1 border-t border-gray-100 dark:border-dark-border/40" />
-                  {allCollectors.map((c) => (
-                    <label
-                      key={c.id}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-bg cursor-pointer"
-                    >
-                      <span
-                        className={`flex items-center justify-center h-4 w-4 rounded border ${
-                          isCollectorChecked(c.id)
-                            ? "bg-blue-600 border-blue-600"
-                            : "border-gray-300 dark:border-dark-border"
-                        }`}
-                      >
-                        {isCollectorChecked(c.id) && (
-                          <Check className="h-3 w-3 text-white" />
-                        )}
-                      </span>
-                      <input
-                        type="checkbox"
-                        className="hidden"
-                        checked={isCollectorChecked(c.id)}
-                        onChange={() => toggleCollector(c.id)}
-                      />
-                      {c.name}
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
+            <FiltroMultiplo
+              opcoes={allCollectors.map((c) => ({ id: c.id, nome: c.name }))}
+              excluidos={excludedCollectorIds}
+              onChange={setExcludedCollectorIds}
+              textos={{
+                todos: "Todos os cobradores",
+                nenhum: "Nenhum cobrador",
+                plural: "cobradores",
+              }}
+            />
           </div>
         </div>
 

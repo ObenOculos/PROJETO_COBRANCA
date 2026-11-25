@@ -10,6 +10,7 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { SummaryCardRow } from "../common/SummaryCard";
+import FiltroMultiplo from "../common/FiltroMultiplo";
 import { useCollection } from "../../contexts/CollectionContext";
 import {
   resumoEmpresa,
@@ -97,12 +98,15 @@ const TEMA: Record<Tema, { faixa: string; numero: string; icone: string }> = {
   },
 };
 
-// Mesmos chips claros das linhas de alerta do SummaryCard (rowClasses).
+// Mesmos chips claros das linhas de alerta do SummaryCard (rowClasses), com
+// borda da propria cor em todas (25/11).
 const PILULA: Record<TomPilula, string> = {
-  red: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  amber: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  green: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  gray: "bg-white text-gray-700 border border-gray-200 dark:bg-dark-bg-secondary dark:text-dark-text dark:border-dark-border",
+  red: "bg-red-100 text-red-700 border border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800",
+  amber:
+    "bg-amber-100 text-amber-700 border border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800",
+  green:
+    "bg-green-100 text-green-700 border border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800",
+  gray: "bg-white text-gray-700 border border-gray-300 dark:bg-dark-bg-secondary dark:text-dark-text dark:border-dark-border",
 };
 
 export const CardSimples: React.FC<{
@@ -543,7 +547,9 @@ const ResumoEmpresa: React.FC<{
 }) => {
   const { collections, scheduledVisits, acordoAtivoOverdueMap } =
     useCollection();
-  const [loja, setLoja] = useState("");
+  const [lojasExcluidas, setLojasExcluidas] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   const lojas = useMemo(() => lojasDaBase(collections), [collections]);
 
@@ -556,7 +562,7 @@ const ResumoEmpresa: React.FC<{
         dateFrom,
         dateTo,
         today,
-        loja,
+        lojasExcluidas,
         acionados,
         registradosCobrador,
       }),
@@ -567,7 +573,7 @@ const ResumoEmpresa: React.FC<{
       dateFrom,
       dateTo,
       today,
-      loja,
+      lojasExcluidas,
       acionados,
       registradosCobrador,
     ],
@@ -580,21 +586,19 @@ const ResumoEmpresa: React.FC<{
           <Building2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
           Visão geral da empresa
         </div>
-        <label className="sm:ml-auto flex items-center gap-1.5 text-sm text-gray-700 dark:text-dark-text-secondary">
+        <div className="sm:ml-auto flex items-center gap-1.5 text-sm text-gray-700 dark:text-dark-text-secondary">
           Loja
-          <select
-            value={loja}
-            onChange={(e) => setLoja(e.target.value)}
-            className="w-56 px-2 py-1.5 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-sm text-gray-900 dark:text-dark-text truncate"
-          >
-            <option value="">Todas</option>
-            {lojas.map((l) => (
-              <option key={l} value={l}>
-                {l}
-              </option>
-            ))}
-          </select>
-        </label>
+          <FiltroMultiplo
+            opcoes={lojas.map((l) => ({ id: l, nome: l }))}
+            excluidos={lojasExcluidas}
+            onChange={setLojasExcluidas}
+            textos={{
+              todos: "Todas as lojas",
+              nenhum: "Nenhuma loja",
+              plural: "lojas",
+            }}
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">

@@ -95,7 +95,7 @@ export const resumoEmpresa = ({
   dateFrom,
   dateTo,
   today,
-  loja,
+  lojasExcluidas = new Set<string>(),
   acionados = null,
   registradosCobrador = new Set<string>(),
 }: {
@@ -105,17 +105,18 @@ export const resumoEmpresa = ({
   dateFrom: string;
   dateTo: string;
   today: string;
-  /** Recorte por loja (nome_da_loja da parcela); "" = todas. */
-  loja: string;
+  /** Lojas fora do recorte (nome_da_loja da parcela); vazio = todas. */
+  lojasExcluidas?: Set<string>;
   /** Clientes acionados no periodo; null = carregando. */
   acionados?: Set<string> | null;
   /** Clientes com pagamento registrado pelo cobrador no periodo. */
   registradosCobrador?: Set<string>;
 }): ResumoEmpresa => {
   const atrasoDias = criarCalculoAtraso();
-  const titulos = loja
-    ? collections.filter((c) => c.nome_da_loja === loja)
-    : collections;
+  const titulos =
+    lojasExcluidas.size > 0
+      ? collections.filter((c) => !lojasExcluidas.has(c.nome_da_loja ?? ""))
+      : collections;
 
   const porCliente = new Map<string, Collection[]>();
   titulos.forEach((c) => {
