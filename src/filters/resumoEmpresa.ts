@@ -50,6 +50,9 @@ export interface ResumoEmpresa {
     /** Dos sem agendamento, quantos foram acionados no periodo (ligacao,
      * WhatsApp, visita). null = acionamentos ainda carregando/indisponiveis. */
     semAgendamentoAcionados: number | null;
+    /** Clientes da base acionados no periodo (qualquer situacao); null =
+     * carregando. */
+    acionados: number | null;
     /** Clientes que pagaram no periodo (registro do cobrador OU baixa no
      * ERP) e, deles, os que so tem baixa no ERP. */
     pagaram: number;
@@ -69,6 +72,10 @@ export interface ResumoEmpresa {
     erp: number;
     /** Desse, de clientes sem registro do cobrador no periodo. */
     soErp: number;
+    /** Registrado pelos cobradores no app (pagamentos, atribuicoes, acordo)
+     * de clientes desta base. Nao somar com o erp: o mesmo dinheiro tambem
+     * baixa no ERP. */
+    cobrador: number;
   };
   inadimplencia: Inadimplencia;
   previsao: {
@@ -98,6 +105,7 @@ export const resumoEmpresa = ({
   lojasExcluidas = new Set<string>(),
   acionados = null,
   registradosCobrador = new Set<string>(),
+  registradoPorCliente = new Map<string, number>(),
 }: {
   collections: Collection[];
   scheduledVisits: ScheduledVisit[];
@@ -111,6 +119,9 @@ export const resumoEmpresa = ({
   acionados?: Set<string> | null;
   /** Clientes com pagamento registrado pelo cobrador no periodo. */
   registradosCobrador?: Set<string>;
+  /** Valor registrado pelos cobradores no periodo, por cliente (documento):
+   * assim o "pelos cobradores" segue o recorte de loja. */
+  registradoPorCliente?: Map<string, number>;
 }): ResumoEmpresa => {
   const atrasoDias = criarCalculoAtraso();
   const titulos =
@@ -156,6 +167,7 @@ export const resumoEmpresa = ({
       comAgendamento: 0,
       semAgendamento: 0,
       semAgendamentoAcionados: acionados ? 0 : null,
+      acionados: acionados ? 0 : null,
       pagaram: 0,
       pagaramSoErp: 0,
     },
@@ -166,7 +178,7 @@ export const resumoEmpresa = ({
       vencidoPeriodo: 0,
       aVencerPeriodo: 0,
     },
-    recebido: { erp: 0, soErp: 0 },
+    recebido: { erp: 0, soErp: 0, cobrador: 0 },
     inadimplencia: inadimplenciaDe(titulos, { atrasoDias }),
     previsao: {
       de: janelaValida ? prevDe : null,
@@ -194,6 +206,10 @@ export const resumoEmpresa = ({
     );
 
     r.clientes.total++;
+    if (acionados?.has(documento)) {
+      r.clientes.acionados = (r.clientes.acionados ?? 0) + 1;
+    }
+    r.recebido.cobrador += registradoPorCliente.get(documento) ?? 0;
     if (vencido > 0) {
       r.clientes.emAtraso++;
       if (!comCobrador) r.clientes.semCobrador++;
@@ -279,6 +295,29 @@ export const resumoEmpresa = ({
   r.previsao.total =
     r.previsao.parcelas + r.previsao.acordo + r.previsao.agendados;
   return r;
+};
+
+/** Resumo de cada loja (aba Por loja do Resumo Geral): a MESMA conta da
+ * empresa, so com os titulos da loja. Agrupa a base numa passada so (sem
+ * filtrar a base inteira uma vez por loja). Valores das lojas somam o da
+ * empresa; contagem de clientes nao: quem comprou em mais de uma loja conta
+ * em cada uma (~3% da base em 25/11). */
+export const resumoPorLoja = (
+  args: Omit<Parameters<typeof resumoEmpresa>[0], "lojasExcluidas">,
+): Map<string, ResumoEmpresa> => {
+  const porLoja = new Map<string, Collection[]>();
+  args.collections.forEach((c) => {
+    const loja = c.nome_da_loja;
+    if (!loja || !loja.trim()) return;
+    const lista = porLoja.get(loja);
+    if (lista) lista.push(c);
+    else porLoja.set(loja, [c]);
+  });
+  const out = new Map<string, ResumoEmpresa>();
+  porLoja.forEach((titulos, loja) =>
+    out.set(loja, resumoEmpresa({ ...args, collections: titulos })),
+  );
+  return out;
 };
 
 /** Lojas presentes na base (para o filtro do painel), em ordem alfabetica. */

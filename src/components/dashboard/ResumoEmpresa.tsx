@@ -421,12 +421,14 @@ export const CardPrevisao: React.FC<{ r: Resumo }> = ({ r }) => {
   );
 };
 
-/** 3a. Recebido (empresa): o que entrou no periodo, pela baixa do ERP. */
-const CardRecebidoEmpresa: React.FC<{
+/** 3a. Recebido (empresa ou loja): o que entrou no periodo, pela baixa do
+ * ERP. "Pelos cobradores" e "acionados" saem do mesmo recorte (r), entao
+ * acompanham o filtro de loja. */
+export const CardRecebidoEmpresa: React.FC<{
   r: Resumo;
-  registradoCobradores: { valor: number; loading?: boolean };
-  acionados: Set<string> | null;
-}> = ({ r, registradoCobradores, acionados }) => (
+  /** Registros dos cobradores ainda carregando. */
+  registradoCarregando?: boolean;
+}> = ({ r, registradoCarregando = false }) => (
   <CardSimples
     icon={Banknote}
     titulo="Recebido"
@@ -436,19 +438,18 @@ const CardRecebidoEmpresa: React.FC<{
     frase="entrou no período"
     pilulas={[
       {
-        valor: registradoCobradores.loading
-          ? "…"
-          : fmtValorCurto(registradoCobradores.valor),
+        valor: registradoCarregando ? "…" : fmtValorCurto(r.recebido.cobrador),
         rotulo: "pelos cobradores",
         tom: "gray",
-        loading: registradoCobradores.loading,
+        loading: registradoCarregando,
         hint: "Registrado pelos cobradores no app. Já está dentro do total — não somar.",
       },
       {
-        valor: acionados ? fmtNum(acionados.size) : "…",
+        valor:
+          r.clientes.acionados === null ? "…" : fmtNum(r.clientes.acionados),
         rotulo: "clientes acionados",
         tom: "gray",
-        loading: !acionados,
+        loading: r.clientes.acionados === null,
         hint: "Clientes diferentes que algum cobrador ligou, mandou mensagem ou visitou no período",
       },
     ]}
@@ -617,15 +618,17 @@ const ResumoEmpresa: React.FC<{
   acionados: Set<string> | null;
   /** Clientes com pagamento registrado por algum cobrador no periodo. */
   registradosCobrador: Set<string>;
-  /** Total registrado por todos os cobradores no periodo. */
-  registradoCobradores: { valor: number; loading?: boolean };
+  /** Valor registrado pelos cobradores no periodo, por cliente. */
+  registradoPorCliente: Map<string, number>;
+  registradoCarregando?: boolean;
 }> = ({
   dateFrom,
   dateTo,
   today,
   acionados,
   registradosCobrador,
-  registradoCobradores,
+  registradoPorCliente,
+  registradoCarregando = false,
 }) => {
   const { collections, scheduledVisits, acordoAtivoOverdueMap } =
     useCollection();
@@ -649,6 +652,7 @@ const ResumoEmpresa: React.FC<{
         lojasExcluidas,
         acionados,
         registradosCobrador,
+        registradoPorCliente,
       }),
     [
       collections,
@@ -660,6 +664,7 @@ const ResumoEmpresa: React.FC<{
       lojasExcluidas,
       acionados,
       registradosCobrador,
+      registradoPorCliente,
     ],
   );
 
@@ -700,8 +705,7 @@ const ResumoEmpresa: React.FC<{
           <CardPrevisao r={r} />
           <CardRecebidoEmpresa
             r={r}
-            registradoCobradores={registradoCobradores}
-            acionados={acionados}
+            registradoCarregando={registradoCarregando}
           />
           <CardCarteira r={r} empresa />
         </div>

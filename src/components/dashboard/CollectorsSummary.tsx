@@ -328,8 +328,10 @@ const CollectorsSummary: React.FC = () => {
     collectorId: string;
     valor: number;
     data: string;
+    /** Cliente (para o recorte por loja do Resumo Geral). */
+    documento: string;
   };
-  const CHAVE_ATRIBUICOES = "atribuicoesVigentes|todas";
+  const CHAVE_ATRIBUICOES = "atribuicoesVigentes|todas|doc";
   const [atribuicoesEstado, setAtribuicoesEstado] = useState<
     AtribuicaoAprovada[] | null
   >(() => lerCacheTela<AtribuicaoAprovada[]>(CHAVE_ATRIBUICOES)?.valor ?? null);
@@ -344,7 +346,7 @@ const CollectorsSummary: React.FC = () => {
     buscarComCacheTela(CHAVE_ATRIBUICOES, async () => {
       const { data, error } = await supabase
         .from("atribuicoes_pagamento_vigentes")
-        .select("solicitado_por_id, valor_vigente, data_pagamento");
+        .select("solicitado_por_id, valor_vigente, data_pagamento, documento");
       if (error) throw error;
       return (data || [])
         .filter((r) => r.solicitado_por_id && r.data_pagamento)
@@ -352,6 +354,7 @@ const CollectorsSummary: React.FC = () => {
           collectorId: r.solicitado_por_id as string,
           valor: Number(r.valor_vigente) || 0,
           data: String(r.data_pagamento).slice(0, 10),
+          documento: r.documento ?? "",
         }));
     })
       .then((lista) => {
@@ -489,7 +492,12 @@ const CollectorsSummary: React.FC = () => {
   const buscaAcordoAte = dateTo > fimDoMes(today) ? dateTo : fimDoMes(today);
   const [acordoPagos, setAcordoPagos] = useState<{
     periodo: string;
-    linhas: { collectorId: string; valor: number; data: string }[];
+    linhas: {
+      collectorId: string;
+      valor: number;
+      data: string;
+      documento: string;
+    }[];
   } | null>(null);
   const periodoAtual = `${buscaAcordoDe}|${buscaAcordoAte}`;
   useEffect(() => {
@@ -501,11 +509,16 @@ const CollectorsSummary: React.FC = () => {
           collector_id: string | null;
           valor_pago: number | string;
           data_pagamento: string;
+          acordo_parcelas: {
+            acordos: { client_document: string } | null;
+          } | null;
         }>(
           (de, ate) =>
             supabase
               .from("acordo_pagamentos")
-              .select("collector_id, valor_pago, data_pagamento")
+              .select(
+                "collector_id, valor_pago, data_pagamento, acordo_parcelas(acordos(client_document))",
+              )
               .gte("data_pagamento", buscaAcordoDe)
               .lte("data_pagamento", buscaAcordoAte)
               .order("id")
@@ -519,6 +532,7 @@ const CollectorsSummary: React.FC = () => {
             collectorId: l.collector_id as string,
             valor: Number(l.valor_pago || 0),
             data: l.data_pagamento,
+            documento: l.acordo_parcelas?.acordos?.client_document ?? "",
           }));
         if (!cancelado) setAcordoPagos({ periodo, linhas });
       } catch (err) {
@@ -871,17 +885,35 @@ const CollectorsSummary: React.FC = () => {
     acionados.forEach((set) => set.forEach((d) => docs.add(d)));
     return docs;
   }, [acionados]);
-  const empresaRegistradoValor =
-    salePayments
-      .filter((p) => inPeriod(p.paymentDate))
-      .reduce((sum, p) => sum + valorRecebidoTotal(p), 0) +
-    atribuicoesAprovadas
-      .filter((a) => inPeriod(a.data))
-      .reduce((sum, a) => sum + a.valor, 0) +
-    (acordoPagosProntos ? acordoPagos!.linhas : []).reduce(
-      (sum, l) => (inPeriod(l.data) ? sum + l.valor : sum),
-      0,
-    );
+  // Registrado pelos cobradores no periodo, por cliente (pagamentos do app,
+  // atribuicoes aprovadas e pagamentos de acordo): o card Recebido da
+  // empresa soma so os clientes do recorte, entao segue o filtro de loja.
+  const registradoPorCliente = useMemo(() => {
+    const mapa = new Map<string, number>();
+    const soma = (doc: string | null | undefined, valor: number) => {
+      if (!doc) return;
+      mapa.set(doc, (mapa.get(doc) ?? 0) + valor);
+    };
+    salePayments.forEach((p) => {
+      if (inPeriod(p.paymentDate))
+        soma(p.clientDocument, valorRecebidoTotal(p));
+    });
+    atribuicoesAprovadas.forEach((a) => {
+      if (inPeriod(a.data)) soma(a.documento, a.valor);
+    });
+    (acordoPagosProntos ? acordoPagos!.linhas : []).forEach((l) => {
+      if (inPeriod(l.data)) soma(l.documento, l.valor);
+    });
+    return mapa;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    salePayments,
+    atribuicoesAprovadas,
+    acordoPagos,
+    acordoPagosProntos,
+    dateFrom,
+    dateTo,
+  ]);
 
   // Colapsa "Visao geral" sozinha na TRANSICAO pra 1 cobrador so (nao soca o
   // dedo do usuario: se ele reabrir manualmente enquanto ainda for so 1, o
@@ -1369,10 +1401,8 @@ const CollectorsSummary: React.FC = () => {
             today={today}
             acionados={empresaAcionados}
             registradosCobrador={empresaRegistrados}
-            registradoCobradores={{
-              valor: empresaRegistradoValor,
-              loading: !atribuicoesProntas || !acordoPagosProntos,
-            }}
+            registradoPorCliente={registradoPorCliente}
+            registradoCarregando={!atribuicoesProntas || !acordoPagosProntos}
           />
           <div className="border-t-2 border-gray-200 dark:border-dark-border" />
           {/* Filtro de cobrador aqui, como o de Loja na visao da empresa
