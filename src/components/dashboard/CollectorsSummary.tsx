@@ -32,6 +32,7 @@ import SummaryCard from "../common/SummaryCard";
 import ResumoEmpresa, {
   CardCarteira,
   CardClientes,
+  CardDesempenho,
   CardPrevisao,
 } from "./ResumoEmpresa";
 import {
@@ -1217,10 +1218,6 @@ const CollectorsSummary: React.FC = () => {
         ? "Nenhum cobrador"
         : `${allCollectors.length - excludedCollectorIds.size} de ${allCollectors.length} cobradores`;
 
-  // Legenda curta do periodo filtrado, pra lembrar o usuario o que "Vence no
-  // periodo" esta considerando sem precisar olhar o filtro la em cima.
-  const previstaPeriodHint =
-    activePreset === "all" ? "sem limite" : `${toBr(dateFrom)}–${toBr(dateTo)}`;
 
   // Atendimentos vem de uma busca a parte: enquanto carrega (ou se falhar)
   // nao mostra 0, que pareceria "nao atendeu ninguem".
@@ -1477,17 +1474,16 @@ const CollectorsSummary: React.FC = () => {
           acionados={empresaAcionados}
           registradosCobrador={empresaRegistrados}
           registradoCobradores={{
-            valor: fmtRecebido(empresaRegistradoValor),
+            valor: empresaRegistradoValor,
             loading: !atribuicoesProntas || !acordoPagosProntos,
           }}
-          periodo={previstaPeriodHint}
         />
-        <div className="border-t border-gray-100 dark:border-dark-border/40" />
+        <div className="border-t-2 border-gray-200 dark:border-dark-border" />
         <button
           onClick={() => setOverviewOpen((o) => !o)}
-          className="w-full flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-dark-text"
+          className="w-full flex items-center gap-2 text-base font-bold text-gray-900 dark:text-dark-text"
         >
-          <Gauge className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <Gauge className="h-5 w-5 text-blue-600 dark:text-blue-400" />
           {rows.length === 1
             ? "Visão geral do cobrador"
             : "Visão geral dos cobradores"}
@@ -1512,46 +1508,17 @@ const CollectorsSummary: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
             <CardClientes r={resumoCobradores} cobrador />
             <CardPrevisao r={resumoCobradores} />
-            <SummaryCard
-              icon={Gauge}
-              title="Desempenho"
-              value={fmtRecebido(totals.recebidoPeriodo)}
-              valueLoading={!atribuicoesProntas || !acordoPagosProntos}
-              valueTone="green"
-              caption={previstaPeriodHint}
-              rows={[
-                ...(metaGeral.meta > 0
-                  ? [
-                      {
-                        label: "Meta do mês",
-                        value: formatCurrency(metaGeral.meta, false),
-                      },
-                      !atribuicoesProntas
-                        ? { label: "P/ alcançar a meta", value: "…", loading: true }
-                        : metaGeral.meta - metaGeral.recebido > 0
-                        ? {
-                            label: "P/ alcançar a meta",
-                            value: formatCurrency(
-                              metaGeral.meta - metaGeral.recebido,
-                              false,
-                            ),
-                            tone: "amber" as const,
-                          }
-                        : { label: "Meta", value: "atingida", tone: "green" as const },
-                    ]
-                  : [{ label: "Meta do mês", value: "não definida" }]),
-                {
-                  label: "Pago direto (só baixa no ERP)",
-                  value: formatCurrency(resumoCobradores.recebido.soErp, false),
-                  hint: "Baixado no ERP no período, de clientes da carteira sem pagamento registrado pelo cobrador (pagou na loja, boleto, Pix)",
-                },
-                ...linhaAtendimentos(
-                  totals.clientesAtendidos,
-                  totals.clientesConversaram,
-                  totals.acionamentosQtd,
-                  rows.length > 0 && rows.every((r) => ehExterno(r.type)),
-                ),
-              ]}
+            <CardDesempenho
+              r={resumoCobradores}
+              recebido={totals.recebidoPeriodo}
+              loading={!atribuicoesProntas || !acordoPagosProntos}
+              meta={metaGeral.meta > 0 ? metaGeral : null}
+              atendimentos={linhaAtendimentos(
+                totals.clientesAtendidos,
+                totals.clientesConversaram,
+                totals.acionamentosQtd,
+                rows.length > 0 && rows.every((r) => ehExterno(r.type)),
+              )}
             />
             <CardCarteira r={resumoCobradores} />
           </div>
@@ -1627,49 +1594,35 @@ const CollectorsSummary: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <CardClientes r={row.resumo} cobrador />
                 <CardPrevisao r={row.resumo} />
-                <SummaryCard
-                  icon={Gauge}
-                  title="Desempenho"
-                  value={fmtRecebido(row.recebidoPeriodo)}
-                  valueLoading={!atribuicoesProntas || !acordoPagosProntos}
-                  valueTone="green"
-                  caption={previstaPeriodHint}
-                  rows={[
-                    ...linhaMeta(row.id),
-                    {
-                      label: "Pago direto (só baixa no ERP)",
-                      value: formatCurrency(row.resumo.recebido.soErp, false),
-                      hint: "Baixado no ERP no período, de clientes da carteira sem pagamento registrado pelo cobrador (pagou na loja, boleto, Pix)",
-                    },
-                    ...linhaAtendimentos(
-                      row.clientesAtendidos,
-                      row.clientesConversaram,
-                      row.acionamentosQtd,
-                      ehExterno(row.type),
-                    ),
-                  ]}
+                <CardDesempenho
+                  r={row.resumo}
+                  recebido={row.recebidoPeriodo}
+                  loading={!atribuicoesProntas || !acordoPagosProntos}
+                  meta={metaPorCobrador.get(row.id) ?? null}
+                  atendimentos={linhaAtendimentos(
+                    row.clientesAtendidos,
+                    row.clientesConversaram,
+                    row.acionamentosQtd,
+                    ehExterno(row.type),
+                  )}
                 />
                 <CardCarteira
                   r={row.resumo}
-                  extraRows={(isWalletCollectorType(row.type) &&
-                    !carteiraAuto.regrasPor.has(row.id)
+                  extraPilulas={
+                    isWalletCollectorType(row.type) &&
+                    !carteiraAuto.regrasPor.has(row.id) &&
+                    qtdSaidas(row.id) > 0
                       ? [
                           {
-                            label: "Saíram sem ação",
-                            value: qtdSaidasValor(row.id),
+                            texto: `${qtdSaidasValor(row.id)} saíram sem ação`,
+                            tom: "red" as const,
                             loading: movCarregando,
-                            tone:
-                              qtdSaidas(row.id) > 0
-                                ? ("red" as const)
-                                : undefined,
-                            onClick:
-                              qtdSaidas(row.id) > 0
-                                ? () => setSaidasCobradorId(row.id)
-                                : undefined,
+                            onClick: () => setSaidasCobradorId(row.id),
                             hint: "Clientes que passaram da faixa no período sem nenhuma ação do cobrador. Clique para ver e devolver.",
                           },
                         ]
-                      : [])}
+                      : []
+                  }
                 />
                 {carteiraAuto.regrasPor.has(row.id) &&
                   (() => {
