@@ -620,26 +620,28 @@ const CardVisual: React.FC<{
   );
 };
 
-/** 100 quadradinhos = R$ 100: os vermelhos sao os que nao foram pagos. */
+/** Uma barra = R$ 100: vermelho o que ficou sem pagar, verde o pago
+ * (25/11: o usuario preferiu barra aos 100 quadradinhos). */
 const CemReais: React.FC<{ parte: number }> = ({ parte }) => {
-  const vermelhos = Math.max(0, Math.min(100, Math.round(parte)));
+  const sem = Math.max(0, Math.min(100, parte));
   return (
-    <div className="flex flex-col items-center gap-1">
-      <div
-        className="grid grid-cols-10 gap-[2px]"
-        role="img"
-        aria-label={`${vermelhos} de cada 100 reais sem pagar`}
-      >
-        {Array.from({ length: 100 }, (_, i) => (
-          <span
-            key={i}
-            className={`h-2 w-2 rounded-[2px] ${i < vermelhos ? "bg-red-500" : "bg-green-300 dark:bg-green-800"}`}
-          />
-        ))}
+    <div
+      className="w-48 space-y-1"
+      role="img"
+      aria-label={`R$ ${Math.round(sem)} a cada R$ 100 sem pagar`}
+    >
+      <div className="flex h-4 rounded-full overflow-hidden bg-white dark:bg-dark-bg-secondary">
+        <div className="h-full bg-red-500" style={{ width: `${sem}%` }} />
+        <div
+          className="h-full bg-green-400 dark:bg-green-600 border-l-2 border-white dark:border-dark-bg"
+          style={{ width: `${100 - sem}%` }}
+        />
       </div>
-      <div className="text-[10px] font-medium text-gray-500 dark:text-dark-text-secondary">
-        R$ {vermelhos} a cada R$ 100
+      <div className="flex justify-between text-[10px] font-medium text-gray-500 dark:text-dark-text-secondary">
+        <span>R$ {Math.round(sem)} sem pagar</span>
+        <span>R$ {100 - Math.round(sem)} pago</span>
       </div>
+      <div className="text-center text-[10px] text-gray-400">a cada R$ 100</div>
     </div>
   );
 };
