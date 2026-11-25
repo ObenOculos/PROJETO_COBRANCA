@@ -44,6 +44,15 @@ const AppContent: React.FC = () => {
       }
       return "users";
     }
+    // "stores" (Desempenho Loja) virou a aba Por loja do Resumo Geral (25/11).
+    if (savedTab === "stores") {
+      try {
+        localStorage.setItem("resumoGeralAba", "loja");
+      } catch {
+        // sem storage: abre na Geral
+      }
+      return "collectors-summary";
+    }
     // "carteira-distribuicao" virou a aba Automatica da Atribuicao (16/11).
     if (savedTab === "carteira-distribuicao") {
       try {

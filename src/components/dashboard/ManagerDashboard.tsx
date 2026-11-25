@@ -16,7 +16,6 @@ import {
 import FilterBar from "../common/FilterBar";
 import { CollectionTable } from "./CollectionTable";
 import UserManagement from "./UserManagement";
-import EnhancedStoreManagement from "./EnhancedStoreManagement";
 import DatabaseUpload from "../admin/DatabaseUpload";
 import { ClientAssignment } from "../ClientAssignment";
 import VisitTracking from "./VisitTracking";
@@ -41,7 +40,6 @@ import { Notification } from "../../contexts/NotificationContext";
 // BANCO_DADOS exatamente, entao o resultado e identico ao escopo "all", so
 // que em duas buscas menores em vez de uma varredura da tabela inteira).
 const TABS_NEEDING_FULL_SCOPE = new Set([
-  "stores",
   "clients",
   "collectors-summary",
 ]);
@@ -77,7 +75,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     | "collections"
     | "collectors-summary"
     | "users"
-    | "stores"
     | "clients"
     | "visit-tracking"
     | "authorization"
@@ -506,9 +503,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
           </div>
         );
       }
-
-      case "stores":
-        return <EnhancedStoreManagement />;
 
       case "clients": {
         const abasAtribuicao: {

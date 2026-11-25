@@ -2,7 +2,6 @@ import {
   HandCoins,
   MapPin,
   Calendar,
-  Store,
   CircleCheckBig,
   ClipboardList,
   Settings,
@@ -78,12 +77,6 @@ export const navigationItems: NavItemConfig[] = [
     id: "clients",
     managerName: "Atribuição",
     managerIcon: Shuffle,
-    roles: ["manager"],
-  },
-  {
-    id: "stores",
-    managerName: "Desempenho Loja",
-    managerIcon: Store,
     roles: ["manager"],
   },
   {
