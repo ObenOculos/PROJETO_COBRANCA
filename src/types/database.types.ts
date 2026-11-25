@@ -2677,6 +2677,10 @@ export type Database = {
           tentativas: number;
         }[];
       };
+      clientes_acionados_periodo: {
+        Args: { p_inicio: string; p_fim: string };
+        Returns: { collector_id: string; documento: string }[];
+      };
       atribuicao_bloqueio_parcela: {
         Args: { p_id_parcela: number };
         Returns: string;

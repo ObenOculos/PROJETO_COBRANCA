@@ -27,6 +27,7 @@ import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { isCollectorType, UserType } from "../../types";
 import { useAtendimentosPeriodo } from "../../hooks/useAtendimentosPeriodo";
+import { useClientesAcionados } from "../../hooks/useClientesAcionados";
 import SummaryCard from "../common/SummaryCard";
 import ResumoEmpresa, {
   CardCarteira,
@@ -475,6 +476,7 @@ const CollectorsSummary: React.FC = () => {
   // Sem isto, a coluna "Realizadas" (scheduled_visits) era o unico sinal de
   // trabalho do cobrador de carteira -- e ela so conta contato que estava
   // agendado, o que quase nunca acontece na Fila de Cobranca.
+  const { acionados } = useClientesAcionados(dateFrom, dateTo);
   const { atendimentos, erro: atendimentosErro } = useAtendimentosPeriodo(
     dateFrom,
     dateTo,
@@ -748,15 +750,6 @@ const CollectorsSummary: React.FC = () => {
 
         const atend = atendimentos?.get(collector.id);
 
-        const resumo = resumoEmpresa({
-          collections: myCollections,
-          scheduledVisits,
-          acordoAtivoParcelas: acordoAtivoOverdueMap,
-          dateFrom,
-          dateTo,
-          today,
-          loja: "",
-        });
         const pagosDocs = new Set<string>();
         salePayments.forEach((p) => {
           if (
@@ -769,6 +762,17 @@ const CollectorsSummary: React.FC = () => {
           ) {
             pagosDocs.add(p.clientDocument);
           }
+        });
+        const resumo = resumoEmpresa({
+          collections: myCollections,
+          scheduledVisits,
+          acordoAtivoParcelas: acordoAtivoOverdueMap,
+          dateFrom,
+          dateTo,
+          today,
+          loja: "",
+          acionados: acionados ? (acionados.get(collector.id) ?? new Set()) : null,
+          registradosCobrador: pagosDocs,
         });
 
         const reincidentes: ReincidenteCliente[] = Array.from(
@@ -842,12 +846,22 @@ const CollectorsSummary: React.FC = () => {
     acordoPagosProntos,
     acordoAtivoOverdueMap,
     estornados,
+    acionados,
   ]);
 
   // Secao dos cobradores somada: a MESMA conta do painel Empresa sobre os
   // titulos dos cobradores marcados (cliente com 2 cobradores conta 1 vez).
   const resumoCobradores = useMemo(() => {
     const ids = new Set(rows.map((r) => r.id));
+    const registrados = new Set<string>();
+    rows.forEach((r) => r.pagosDocs.forEach((d) => registrados.add(d)));
+    let acionadosSel: Set<string> | null = null;
+    if (acionados) {
+      acionadosSel = new Set<string>();
+      rows.forEach((r) =>
+        acionados.get(r.id)?.forEach((d) => acionadosSel!.add(d)),
+      );
+    }
     return resumoEmpresa({
       collections: collections.filter((c) => !!c.user_id && ids.has(c.user_id)),
       scheduledVisits,
@@ -856,13 +870,54 @@ const CollectorsSummary: React.FC = () => {
       dateTo,
       today,
       loja: "",
+      acionados: acionadosSel,
+      registradosCobrador: registrados,
     });
-  }, [rows, collections, scheduledVisits, acordoAtivoOverdueMap, dateFrom, dateTo, today]);
-  const pagosCobradores = useMemo(() => {
+  }, [
+    rows,
+    collections,
+    scheduledVisits,
+    acordoAtivoOverdueMap,
+    dateFrom,
+    dateTo,
+    today,
+    acionados,
+  ]);
+
+  // Visao da empresa: TODOS os cobradores (nao so os marcados no filtro).
+  const empresaRegistrados = useMemo(() => {
     const docs = new Set<string>();
-    rows.forEach((r) => r.pagosDocs.forEach((d) => docs.add(d)));
-    return docs.size;
-  }, [rows]);
+    salePayments.forEach((p) => {
+      if (
+        inPeriod(p.paymentDate) &&
+        !p.estornoDe &&
+        !estornados.has(p.id) &&
+        valorRecebidoTotal(p) > 0 &&
+        p.clientDocument
+      ) {
+        docs.add(p.clientDocument);
+      }
+    });
+    return docs;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [salePayments, estornados, dateFrom, dateTo]);
+  const empresaAcionados = useMemo(() => {
+    if (!acionados) return null;
+    const docs = new Set<string>();
+    acionados.forEach((set) => set.forEach((d) => docs.add(d)));
+    return docs;
+  }, [acionados]);
+  const empresaRegistradoValor =
+    salePayments
+      .filter((p) => inPeriod(p.paymentDate))
+      .reduce((sum, p) => sum + valorRecebidoTotal(p), 0) +
+    atribuicoesAprovadas
+      .filter((a) => inPeriod(a.data))
+      .reduce((sum, a) => sum + a.valor, 0) +
+    (acordoPagosProntos ? acordoPagos!.linhas : []).reduce(
+      (sum, l) => (inPeriod(l.data) ? sum + l.valor : sum),
+      0,
+    );
 
   // Colapsa "Visao geral" sozinha na TRANSICAO pra 1 cobrador so (nao soca o
   // dedo do usuario: se ele reabrir manualmente enquanto ainda for so 1, o
@@ -1374,8 +1429,6 @@ const CollectorsSummary: React.FC = () => {
         </div>
       </div>
 
-      <ResumoEmpresa dateFrom={dateFrom} dateTo={dateTo} today={today} />
-
       {teamGoal && (
         <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border-2 border-indigo-100 dark:border-indigo-900/40 p-4 space-y-2">
           <div className="flex items-center justify-between">
@@ -1417,12 +1470,27 @@ const CollectorsSummary: React.FC = () => {
           (comeca fechada ao cair pra 1 so, ver efeito acima; o usuario pode
           abrir/fechar manualmente depois, em qualquer contagem). */}
       <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border-2 border-blue-100 dark:border-blue-900/40 p-4 space-y-3">
+        <ResumoEmpresa
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          today={today}
+          acionados={empresaAcionados}
+          registradosCobrador={empresaRegistrados}
+          registradoCobradores={{
+            valor: fmtRecebido(empresaRegistradoValor),
+            loading: !atribuicoesProntas || !acordoPagosProntos,
+          }}
+          periodo={previstaPeriodHint}
+        />
+        <div className="border-t border-gray-100 dark:border-dark-border/40" />
         <button
           onClick={() => setOverviewOpen((o) => !o)}
           className="w-full flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-dark-text"
         >
           <Gauge className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-          Visão geral
+          {rows.length === 1
+            ? "Visão geral do cobrador"
+            : "Visão geral dos cobradores"}
           <span className="text-xs font-normal text-gray-400 dark:text-dark-text-secondary">
             ({rows.length}{" "}
             {rows.length === 1 ? "cobrador" : "cobradores"})
@@ -1442,6 +1510,8 @@ const CollectorsSummary: React.FC = () => {
           // pediu mais destaque pro valor vencido -- separados de novo,
           // sem repetir "A vencer" nos dois (fica so dentro de Carteira).
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+            <CardClientes r={resumoCobradores} cobrador />
+            <CardPrevisao r={resumoCobradores} />
             <SummaryCard
               icon={Gauge}
               title="Desempenho"
@@ -1470,6 +1540,11 @@ const CollectorsSummary: React.FC = () => {
                         : { label: "Meta", value: "atingida", tone: "green" as const },
                     ]
                   : [{ label: "Meta do mês", value: "não definida" }]),
+                {
+                  label: "Pago direto (só baixa no ERP)",
+                  value: formatCurrency(resumoCobradores.recebido.soErp, false),
+                  hint: "Baixado no ERP no período, de clientes da carteira sem pagamento registrado pelo cobrador (pagou na loja, boleto, Pix)",
+                },
                 ...linhaAtendimentos(
                   totals.clientesAtendidos,
                   totals.clientesConversaram,
@@ -1478,18 +1553,7 @@ const CollectorsSummary: React.FC = () => {
                 ),
               ]}
             />
-            <CardPrevisao
-              r={resumoCobradores}
-              recebido={{
-                valor: fmtRecebido(totals.recebidoPeriodo),
-                loading: !atribuicoesProntas || !acordoPagosProntos,
-              }}
-            />
             <CardCarteira r={resumoCobradores} />
-            <CardClientes
-              r={resumoCobradores}
-              pagos={{ qtd: pagosCobradores }}
-            />
           </div>
         )}
       </div>
@@ -1561,6 +1625,8 @@ const CollectorsSummary: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <CardClientes r={row.resumo} cobrador />
+                <CardPrevisao r={row.resumo} />
                 <SummaryCard
                   icon={Gauge}
                   title="Desempenho"
@@ -1570,6 +1636,11 @@ const CollectorsSummary: React.FC = () => {
                   caption={previstaPeriodHint}
                   rows={[
                     ...linhaMeta(row.id),
+                    {
+                      label: "Pago direto (só baixa no ERP)",
+                      value: formatCurrency(row.resumo.recebido.soErp, false),
+                      hint: "Baixado no ERP no período, de clientes da carteira sem pagamento registrado pelo cobrador (pagou na loja, boleto, Pix)",
+                    },
                     ...linhaAtendimentos(
                       row.clientesAtendidos,
                       row.clientesConversaram,
@@ -1577,13 +1648,6 @@ const CollectorsSummary: React.FC = () => {
                       ehExterno(row.type),
                     ),
                   ]}
-                />
-                <CardPrevisao
-                  r={row.resumo}
-                  recebido={{
-                    valor: fmtRecebido(row.recebidoPeriodo),
-                    loading: !atribuicoesProntas || !acordoPagosProntos,
-                  }}
                 />
                 <CardCarteira
                   r={row.resumo}
@@ -1606,10 +1670,6 @@ const CollectorsSummary: React.FC = () => {
                           },
                         ]
                       : [])}
-                />
-                <CardClientes
-                  r={row.resumo}
-                  pagos={{ qtd: row.pagosDocs.size }}
                 />
                 {carteiraAuto.regrasPor.has(row.id) &&
                   (() => {

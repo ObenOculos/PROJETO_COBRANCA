@@ -17,12 +17,21 @@
 // Sem dupla contagem: com acordo ativo o cliente entra pelas parcelas do
 // acordo, nunca pelo titulo original (clientBalanceSplit); o agendamento soma
 // so o VENCIDO, e as duas primeiras linhas so o que ainda vai vencer.
+//
+// Recebido no periodo tem DUAS fontes (reuniao 25/11, "deixar claro"):
+//   baixa no ERP  -> valor_recebido das parcelas com data_de_recebimento no
+//                    periodo (mesma regra da Conferencia de recebimentos)
+//   cobrador      -> o que ele registrou no app (sale_payments)
+// Nao se somam: o pagamento registrado pelo cobrador tambem baixa no ERP. Por
+// isso o painel mostra a baixa do ERP SEM registro do cobrador a parte
+// (cliente que pagou direto na loja/banco).
 
 import { ScheduledVisit, Collection, SaleGroup } from "../types";
 import {
   AcordoAtivoOverdueMap,
   clientBalanceSplit,
   hasInstallmentBalance,
+  parcelaNoPeriodo,
 } from "./clientStatus";
 import { inadimplenciaDe, Inadimplencia } from "./inadimplencia";
 import { toYYYYMMDD } from "./dates";
@@ -38,12 +47,28 @@ export interface ResumoEmpresa {
     semCobrador: number;
     comAgendamento: number;
     semAgendamento: number;
+    /** Dos sem agendamento, quantos foram acionados no periodo (ligacao,
+     * WhatsApp, visita). null = acionamentos ainda carregando/indisponiveis. */
+    semAgendamentoAcionados: number | null;
+    /** Clientes que pagaram no periodo (registro do cobrador OU baixa no
+     * ERP) e, deles, os que so tem baixa no ERP. */
+    pagaram: number;
+    pagaramSoErp: number;
   };
   carteira: {
     vencido: number;
     aVencer: number;
     /** Saldo (vencido + a vencer) de clientes sem cobrador. */
     foraDaCobranca: number;
+    /** Recorte do periodo (vencimento dentro dele), por parcela. */
+    vencidoPeriodo: number;
+    aVencerPeriodo: number;
+  };
+  recebido: {
+    /** Baixado no ERP no periodo (todas as parcelas da base recortada). */
+    erp: number;
+    /** Desse, de clientes sem registro do cobrador no periodo. */
+    soErp: number;
   };
   inadimplencia: Inadimplencia;
   previsao: {
@@ -71,6 +96,8 @@ export const resumoEmpresa = ({
   dateTo,
   today,
   loja,
+  acionados = null,
+  registradosCobrador = new Set<string>(),
 }: {
   collections: Collection[];
   scheduledVisits: ScheduledVisit[];
@@ -80,6 +107,10 @@ export const resumoEmpresa = ({
   today: string;
   /** Recorte por loja (nome_da_loja da parcela); "" = todas. */
   loja: string;
+  /** Clientes acionados no periodo; null = carregando. */
+  acionados?: Set<string> | null;
+  /** Clientes com pagamento registrado pelo cobrador no periodo. */
+  registradosCobrador?: Set<string>;
 }): ResumoEmpresa => {
   const atrasoDias = criarCalculoAtraso();
   const titulos = loja
@@ -123,8 +154,18 @@ export const resumoEmpresa = ({
       semCobrador: 0,
       comAgendamento: 0,
       semAgendamento: 0,
+      semAgendamentoAcionados: acionados ? 0 : null,
+      pagaram: 0,
+      pagaramSoErp: 0,
     },
-    carteira: { vencido: 0, aVencer: 0, foraDaCobranca: 0 },
+    carteira: {
+      vencido: 0,
+      aVencer: 0,
+      foraDaCobranca: 0,
+      vencidoPeriodo: 0,
+      aVencerPeriodo: 0,
+    },
+    recebido: { erp: 0, soErp: 0 },
     inadimplencia: inadimplenciaDe(titulos, { atrasoDias }),
     previsao: {
       de: janelaValida ? prevDe : null,
@@ -156,7 +197,13 @@ export const resumoEmpresa = ({
       r.clientes.emAtraso++;
       if (!comCobrador) r.clientes.semCobrador++;
       else if (agendadoAberto.has(documento)) r.clientes.comAgendamento++;
-      else r.clientes.semAgendamento++;
+      else {
+        r.clientes.semAgendamento++;
+        if (acionados?.has(documento)) {
+          r.clientes.semAgendamentoAcionados =
+            (r.clientes.semAgendamentoAcionados ?? 0) + 1;
+        }
+      }
     } else if (aVencer > 0) {
       r.clientes.emDia++;
     } else {
@@ -166,6 +213,35 @@ export const resumoEmpresa = ({
     r.carteira.vencido += vencido;
     r.carteira.aVencer += aVencer;
     if (!comCobrador) r.carteira.foraDaCobranca += vencido + aVencer;
+
+    // Recorte do periodo (mesma regra do card Valores da Atribuicao) e
+    // recebido no periodo pela baixa do ERP.
+    let baixaErp = 0;
+    lista.forEach((c) => {
+      const parcela = parcelaNoPeriodo(c, dateFrom, dateTo);
+      if (parcela?.noPeriodo) {
+        if (parcela.vencida) r.carteira.vencidoPeriodo += parcela.saldo;
+        else r.carteira.aVencerPeriodo += parcela.saldo;
+      }
+      const receb = toYYYYMMDD(c.data_de_recebimento);
+      if (
+        receb &&
+        receb >= dateFrom &&
+        receb <= dateTo &&
+        (c.valor_recebido || 0) > 0
+      ) {
+        baixaErp += c.valor_recebido || 0;
+      }
+    });
+    const registrou = registradosCobrador.has(documento);
+    if (baixaErp > 0) {
+      r.recebido.erp += baixaErp;
+      if (!registrou) {
+        r.recebido.soErp += baixaErp;
+        r.clientes.pagaramSoErp++;
+      }
+    }
+    if (baixaErp > 0 || registrou) r.clientes.pagaram++;
 
     if (!janelaValida) return;
 

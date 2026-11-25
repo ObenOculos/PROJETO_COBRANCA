@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Building2, Users, Wallet, TrendingUp } from "lucide-react";
+import { Building2, Users, Wallet, TrendingUp, Banknote } from "lucide-react";
 import SummaryCard, { SummaryCardRow } from "../common/SummaryCard";
 import { useCollection } from "../../contexts/CollectionContext";
 import {
@@ -20,40 +20,54 @@ const toBr = (iso: string): string => {
 const clientesTxt = (n: number) =>
   `${fmtNum(n)} ${n === 1 ? "cliente" : "clientes"}`;
 
-// Os 3 cards abaixo sao os MESMOS no painel Empresa e na secao dos cobradores
-// (reuniao 25/11: "mesmo layout"). Empresa = base inteira; nos cobradores = so
-// os titulos da carteira deles (sem cobrador e sempre 0, e os quitados viram
+// Os cards abaixo sao os MESMOS na visao geral da empresa e na dos cobradores
+// (reuniao 25/11: "mesmo layout"). Empresa = base inteira; cobradores = so os
+// titulos da carteira deles (sem cobrador e sempre 0, e os quitados viram
 // "Pagaram no periodo").
+//
+// ORDEM (igual nas duas visoes, pedido de 25/11): da acao para o valor --
+//   1. Clientes   (quem precisa de acao agora)
+//   2. Previsao   (o que vai entrar)
+//   3. Recebido / Desempenho (o que ja entrou + acionamentos)
+//   4. Carteira   (o tamanho da divida; por ultimo)
 
 /** Clientes: cada cliente cai em uma linha so (as linhas somam o total). */
 export const CardClientes: React.FC<{
   r: Resumo;
-  /** Secao dos cobradores: clientes que pagaram no periodo (no lugar de
-   * Quitados). Sem isto = painel Empresa. */
-  pagos?: { qtd: number; loading?: boolean };
-}> = ({ r, pagos }) => {
+  /** Visao dos cobradores: "Pagaram no periodo" no lugar de Quitados e sem a
+   * linha "Sem cobrador" (sempre 0). */
+  cobrador?: boolean;
+}> = ({ r, cobrador = false }) => {
   const c = r.clientes;
-  const linhaFinal: SummaryCardRow = pagos
-    ? {
-        label: "Pagaram no período",
-        value: pagos.loading ? "…" : fmtNum(pagos.qtd),
-        loading: pagos.loading,
-        tone: pagos.qtd > 0 ? "green" : undefined,
-        hint: "Clientes com pagamento registrado pelo cobrador no período escolhido",
-      }
-    : {
-        label: "Quitados",
-        value: fmtNum(c.quitados),
-        hint: "Sem nenhum saldo em aberto",
-      };
+  const linhasFinais: SummaryCardRow[] = cobrador
+    ? [
+        {
+          label: "Pagaram no período",
+          value: fmtNum(c.pagaram),
+          tone: c.pagaram > 0 ? "green" : undefined,
+          hint: "Clientes com pagamento no período: registrado pelo cobrador ou baixado no ERP",
+        },
+        {
+          label: "↳ Só baixa no ERP",
+          value: fmtNum(c.pagaramSoErp),
+          hint: "Pagaram direto (loja, boleto, Pix) e o cobrador não registrou no app",
+        },
+      ]
+    : [
+        {
+          label: "Quitados",
+          value: fmtNum(c.quitados),
+          hint: "Sem nenhum saldo em aberto",
+        },
+      ];
   return (
     <SummaryCard
       icon={Users}
       title="Clientes"
-      value={fmtNum(pagos ? c.emAtraso + c.emDia : c.total)}
+      value={fmtNum(cobrador ? c.emAtraso + c.emDia : c.total)}
       valueTone="blue"
       caption={
-        pagos
+        cobrador
           ? "clientes com saldo na carteira, hoje"
           : "todos os clientes da base, hoje"
       }
@@ -64,7 +78,7 @@ export const CardClientes: React.FC<{
           tone: c.emAtraso > 0 ? "red" : undefined,
           hint: "Têm alguma parcela vencida",
         },
-        ...(pagos
+        ...(cobrador
           ? []
           : [
               {
@@ -75,13 +89,22 @@ export const CardClientes: React.FC<{
               },
             ]),
         {
-          label: pagos ? "↳ Sem agendamento" : "↳ Com cobrador, sem agendamento",
+          label: cobrador ? "↳ Sem agendamento" : "↳ Com cobrador, sem agendamento",
           value: fmtNum(c.semAgendamento),
           tone: c.semAgendamento > 0 ? "amber" : undefined,
           hint: "Nenhuma visita ou contato marcado: ação mais urgente",
         },
         {
-          label: pagos ? "↳ Agendados" : "↳ Com cobrador e agendados",
+          label: "      desses, acionados no período",
+          value:
+            c.semAgendamentoAcionados === null
+              ? "…"
+              : fmtNum(c.semAgendamentoAcionados),
+          loading: c.semAgendamentoAcionados === null,
+          hint: "Sem agendamento, mas o cobrador ligou, mandou mensagem ou visitou no período escolhido",
+        },
+        {
+          label: cobrador ? "↳ Agendados" : "↳ Com cobrador e agendados",
           value: fmtNum(c.comAgendamento),
           hint: "Têm visita ou contato marcado (inclui agendamento que já passou da data sem registro)",
         },
@@ -91,13 +114,14 @@ export const CardClientes: React.FC<{
           tone: c.emDia > 0 ? "green" : undefined,
           hint: "Têm saldo, mas nada vencido",
         },
-        linhaFinal,
+        ...linhasFinais,
       ]}
     />
   );
 };
 
-/** Carteira: o que os clientes devem hoje, vencido x a vencer. */
+/** Carteira: o que os clientes devem hoje (vencido x a vencer) e o recorte
+ * do periodo escolhido. */
 export const CardCarteira: React.FC<{
   r: Resumo;
   empresa?: boolean;
@@ -116,6 +140,17 @@ export const CardCarteira: React.FC<{
         tone: r.carteira.vencido > 0 ? "red" : undefined,
       },
       { label: "A vencer", value: fmtValor(r.carteira.aVencer) },
+      {
+        label: "No período: vencido",
+        value: fmtValor(r.carteira.vencidoPeriodo),
+        tone: r.carteira.vencidoPeriodo > 0 ? "red" : undefined,
+        hint: "Parcelas com vencimento dentro do período escolhido que já venceram",
+      },
+      {
+        label: "No período: a vencer",
+        value: fmtValor(r.carteira.aVencerPeriodo),
+        hint: "Parcelas com vencimento dentro do período escolhido que ainda vão vencer",
+      },
       ...(empresa
         ? [
             {
@@ -140,12 +175,9 @@ export const CardCarteira: React.FC<{
   />
 );
 
-/** Previsao de recebimento: de hoje ate o fim do periodo. Com `recebido`,
- * mostra tambem o que ja entrou no periodo (a receber x recebido). */
-export const CardPrevisao: React.FC<{
-  r: Resumo;
-  recebido?: { valor: string; loading?: boolean };
-}> = ({ r, recebido }) => {
+/** Previsao de recebimento: de hoje ate o fim do periodo. O que ja entrou
+ * fica no card seguinte (Recebido / Desempenho). */
+export const CardPrevisao: React.FC<{ r: Resumo }> = ({ r }) => {
   const p = r.previsao;
   const janelaTxt = !p.de
     ? "o período escolhido já passou"
@@ -173,15 +205,6 @@ export const CardPrevisao: React.FC<{
         },
       ]
     : [{ label: "A previsão olha de hoje em diante", value: "" }];
-  if (recebido) {
-    linhas.push({
-      label: "Já recebido no período",
-      value: recebido.valor,
-      loading: recebido.loading,
-      tone: "green",
-      hint: "O que entrou no período escolhido (mesmo valor do Desempenho)",
-    });
-  }
   return (
     <SummaryCard
       icon={TrendingUp}
@@ -194,17 +217,71 @@ export const CardPrevisao: React.FC<{
   );
 };
 
+/** Recebido no periodo da empresa -- mesmo lugar do Desempenho na visao dos
+ * cobradores. Duas fontes que NAO se somam: a baixa do ERP (tudo que entrou)
+ * ja inclui o que o cobrador registrou. */
+const CardRecebidoEmpresa: React.FC<{
+  r: Resumo;
+  periodo: string;
+  registradoCobradores: { valor: string; loading?: boolean };
+  acionados: Set<string> | null;
+}> = ({ r, periodo, registradoCobradores, acionados }) => (
+  <SummaryCard
+    icon={Banknote}
+    title="Recebido no período"
+    value={fmtValor(r.recebido.erp)}
+    valueTone="green"
+    caption={`baixa no ERP · ${periodo}`}
+    rows={[
+      {
+        label: "Registrado pelos cobradores",
+        value: registradoCobradores.valor,
+        loading: registradoCobradores.loading,
+        hint: "O que os cobradores registraram no app no período (inclui pago na loja atribuído e parcelas de acordo). Já está dentro da baixa do ERP — não somar.",
+      },
+      {
+        label: "Pago direto (só baixa no ERP)",
+        value: fmtValor(r.recebido.soErp),
+        hint: "Baixado no ERP no período, de clientes sem pagamento registrado por cobrador (pagou na loja, boleto, Pix)",
+      },
+      {
+        label: "Clientes acionados",
+        value: acionados ? fmtNum(acionados.size) : "…",
+        loading: !acionados,
+        hint: "Clientes diferentes que algum cobrador ligou, mandou mensagem ou visitou no período",
+      },
+    ]}
+  />
+);
+
 /**
- * Painel "Empresa" do Resumo (reuniao 25/11): a base inteira de clientes --
- * nao depende dos cobradores marcados no filtro. O periodo vale so para a
- * Previsao (de hoje ate o fim do periodo); Clientes e Carteira sao a situacao
- * de agora. Regras em filters/resumoEmpresa.
+ * Visao geral da empresa (reuniao 25/11): a base inteira de clientes -- nao
+ * depende dos cobradores marcados no filtro. Clientes e Carteira sao a
+ * situacao de agora (Carteira traz tambem o recorte do periodo); a Previsao
+ * vai de hoje ate o fim do periodo. Regras em filters/resumoEmpresa. Fica no
+ * mesmo quadro da visao geral dos cobradores (CollectorsSummary).
  */
 const ResumoEmpresa: React.FC<{
   dateFrom: string;
   dateTo: string;
   today: string;
-}> = ({ dateFrom, dateTo, today }) => {
+  /** Clientes acionados no periodo (todos os cobradores); null = carregando. */
+  acionados: Set<string> | null;
+  /** Clientes com pagamento registrado por algum cobrador no periodo. */
+  registradosCobrador: Set<string>;
+  /** Total registrado por todos os cobradores no periodo (ja formatado). */
+  registradoCobradores: { valor: string; loading?: boolean };
+  /** Legenda curta do periodo (ex.: "01/11/2026–30/11/2026"). */
+  periodo: string;
+}> = ({
+  dateFrom,
+  dateTo,
+  today,
+  acionados,
+  registradosCobrador,
+  registradoCobradores,
+  periodo,
+}) => {
   const { collections, scheduledVisits, acordoAtivoOverdueMap } =
     useCollection();
   const [loja, setLoja] = useState("");
@@ -221,6 +298,8 @@ const ResumoEmpresa: React.FC<{
         dateTo,
         today,
         loja,
+        acionados,
+        registradosCobrador,
       }),
     [
       collections,
@@ -230,15 +309,17 @@ const ResumoEmpresa: React.FC<{
       dateTo,
       today,
       loja,
+      acionados,
+      registradosCobrador,
     ],
   );
 
   return (
-    <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border-2 border-emerald-100 dark:border-emerald-900/40 p-4 space-y-3">
+    <div className="space-y-3">
       <div className="flex flex-col sm:flex-row sm:items-center gap-2">
         <div className="flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-dark-text">
           <Building2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-          Empresa
+          Visão geral da empresa
           <span className="text-xs font-normal text-gray-400 dark:text-dark-text-secondary">
             (todos os clientes, com ou sem cobrador)
           </span>
@@ -260,10 +341,16 @@ const ResumoEmpresa: React.FC<{
         </label>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         <CardClientes r={r} />
-        <CardCarteira r={r} empresa />
         <CardPrevisao r={r} />
+        <CardRecebidoEmpresa
+          r={r}
+          periodo={periodo}
+          registradoCobradores={registradoCobradores}
+          acionados={acionados}
+        />
+        <CardCarteira r={r} empresa />
       </div>
     </div>
   );
