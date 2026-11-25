@@ -474,6 +474,12 @@ const GraficoFaixas: React.FC<{
 
 const TOP_LINHAS = 5;
 
+// 25/11: a recuperacao divide pelo atraso de qualquer idade; com a divida
+// antiga crescendo, o % cai ao longo dos anos mesmo com o mesmo trabalho.
+// Decisao do usuario: manter a conta e deixar isso claro na tela.
+const NOTA_RECUPERACAO =
+  "Conta todo o atraso, inclusive a dívida antiga (+1 ano), que quase não volta. Em 2022 havia pouca dívida antiga, por isso os % daquela época são maiores.";
+
 const COR_NIVEL = {
   baixa: "bg-green-500",
   media: "bg-amber-400",
@@ -607,6 +613,8 @@ const CardVisual: React.FC<{
   corDetalhe: string;
   /** Mes que o numero grande mostra (o "ate" do intervalo). */
   mes: string;
+  /** Observacao curta no fim do "ver detalhes". */
+  nota?: string;
   hint: string;
 }> = ({
   icon: Icon,
@@ -621,6 +629,7 @@ const CardVisual: React.FC<{
   detalhes,
   corDetalhe,
   mes,
+  nota,
   hint,
 }) => {
   const [aberto, setAberto] = useState(false);
@@ -723,6 +732,12 @@ const CardVisual: React.FC<{
                   )}
                 </div>
               ))}
+              {nota && (
+                <div className="flex gap-1.5 pt-1 text-[11px] leading-snug text-gray-500 dark:text-dark-text-secondary">
+                  <Info className="h-3.5 w-3.5 shrink-0 mt-px" />
+                  <span>{nota}</span>
+                </div>
+              )}
             </div>
           )}
           <button
@@ -1038,7 +1053,8 @@ const AcompanhamentoInadimplencia: React.FC = () => {
   const notaRodape = [
     "Todos os títulos a prazo; cancelados, agrupados e renegociados ficam fora.",
     `Inadimplência: do que venceu nos últimos 12 meses, quanto está há ${INADIMPLENCIA_A_PARTIR_DIAS} dias ou mais sem pagar.`,
-    "Recuperação: do atraso que vinha do mês anterior, quanto foi pago no mês.",
+    "Recuperação: do atraso que vinha do mês anterior (de qualquer idade, inclusive a dívida antiga), quanto foi pago no mês. Com pouca dívida antiga (2022), o % era maior.",
+    'Os cards mostram o mês do "até"; o "de" muda o gráfico e as médias.',
     temRetrato
       ? "Meses com retrato diário mostram o que se via no dia; os demais são reconstruídos pelas datas de pagamento."
       : "Meses passados reconstruídos pelas datas de pagamento; daqui para frente há um retrato por dia.",
@@ -1099,6 +1115,7 @@ const AcompanhamentoInadimplencia: React.FC = () => {
           <input
             type="month"
             aria-label="De"
+            title="Muda o gráfico e as médias"
             value={intervalo.inicio}
             min={INADIMPLENCIA_MES_INICIAL}
             max={intervalo.fim}
@@ -1109,6 +1126,7 @@ const AcompanhamentoInadimplencia: React.FC = () => {
           <input
             type="month"
             aria-label="Até"
+            title="Os cards mostram este mês"
             value={intervalo.fim}
             min={intervalo.inicio}
             max={mesAtual}
@@ -1236,6 +1254,7 @@ const AcompanhamentoInadimplencia: React.FC = () => {
               }
               corDetalhe="bg-green-500"
               mes={mesDoCard}
+              nota={NOTA_RECUPERACAO}
               detalhes={detalhesRec}
               hint={`Do atraso que vinha de antes (${atual ? fmtValor(atual.atrasoInicioMes) : "—"}), foram pagos ${atual ? fmtValor(atual.recuperadoMes) : "—"} no mês. Média dos meses anteriores: ${formatarPct(mediaRec)}.`}
             />
@@ -1412,6 +1431,7 @@ const AcompanhamentoInadimplencia: React.FC = () => {
                 <div className="mt-3 space-y-3">
                   <GraficoLinha
                     titulo="Recuperação, mês a mês"
+                    subtitulo={NOTA_RECUPERACAO}
                     cor={{
                       linha: "stroke-green-600",
                       ponto: "fill-green-600",
