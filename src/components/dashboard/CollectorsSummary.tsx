@@ -10,7 +10,6 @@ import { buscarComCacheTela, lerCacheTela } from "../../utils/cacheTela";
 import {
   ClipboardList,
   Info,
-  Wallet,
   Users,
   CalendarClock,
   Repeat,
@@ -23,15 +22,21 @@ import {
   UserX,
   History,
   Shuffle,
-  Handshake,
-  CalendarCheck,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { isCollectorType, UserType } from "../../types";
 import { useAtendimentosPeriodo } from "../../hooks/useAtendimentosPeriodo";
 import SummaryCard from "../common/SummaryCard";
-import ResumoEmpresa from "./ResumoEmpresa";
+import ResumoEmpresa, {
+  CardCarteira,
+  CardClientes,
+  CardPrevisao,
+} from "./ResumoEmpresa";
+import {
+  resumoEmpresa,
+  ResumoEmpresa as ResumoClientes,
+} from "../../filters/resumoEmpresa";
 import { USER_TYPE_LABELS, isWalletCollectorType } from "../../config/profiles";
 import {
   isVisitOverdue,
@@ -54,7 +59,7 @@ import {
 } from "../../filters/priority";
 import { supabase } from "../../lib/supabase";
 import { fetchAllRows } from "../../utils/fetchAllRows";
-import { inadimplenciaDe, formatarInadimplencia } from "../../filters/inadimplencia";
+import { inadimplenciaDe } from "../../filters/inadimplencia";
 import { Collection, CollectorOverdueRange, SaleGroup } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
 import ContactScheduler from "./ContactScheduler";
@@ -110,6 +115,11 @@ interface CollectorRow {
   naoEncontradoQtd: number;
   naoEncontradoValor: number;
   reincidentes: ReincidenteCliente[];
+  // Mesma conta do painel Empresa (filters/resumoEmpresa), so com os
+  // titulos da carteira deste cobrador: Carteira, Previsao e Clientes.
+  resumo: ResumoClientes;
+  // Documentos dos clientes com pagamento do cobrador no periodo.
+  pagosDocs: Set<string>;
 }
 
 type PresetKey = PeriodoPreset;
@@ -137,13 +147,13 @@ type SortKey =
 const SORT_GETTERS: Record<SortKey, (row: CollectorRow) => number | string> =
   {
     name: (r) => r.name,
-    valorCarteira: (r) => r.valorCarteira,
+    valorCarteira: (r) => r.resumo.carteira.vencido + r.resumo.carteira.aVencer,
     vencidaValor: (r) => r.vencidaValor,
     previstaValor: (r) => r.previstaValor,
     aReceberValor: (r) => r.aReceberValor,
     recebidoPeriodo: (r) => r.recebidoPeriodo,
     emAtrasoVisitas: (r) => r.emAtrasoVisitas,
-    semAgendamentoClientes: (r) => r.semAgendamentoClientes,
+    semAgendamentoClientes: (r) => r.resumo.clientes.semAgendamento,
     clientesAtendidos: (r) => r.clientesAtendidos,
     agendadasQtd: (r) => r.agendadasQtd,
     realizadasQtd: (r) => r.realizadasQtd,
@@ -221,34 +231,6 @@ const atendimentoTexto = (visita: boolean) =>
       };
 const ehExterno = (type: UserType): boolean => type === "collector";
 
-/** Acordos de um cobrador (ou soma de varios) para o card Acordos. */
-interface ResumoAcordos {
-  ativosQtd: number;
-  ativosValor: number;
-  feitosQtd: number;
-  feitosValor: number;
-  cumpridosQtd: number;
-  cumpridosValor: number;
-  quebradosQtd: number;
-  quebradosValor: number;
-  recebido: number;
-}
-const resumoAcordosVazio = (): ResumoAcordos => ({
-  ativosQtd: 0,
-  ativosValor: 0,
-  feitosQtd: 0,
-  feitosValor: 0,
-  cumpridosQtd: 0,
-  cumpridosValor: 0,
-  quebradosQtd: 0,
-  quebradosValor: 0,
-  recebido: 0,
-});
-
-/** % de inadimplencia a partir dos componentes somados (nunca a media dos
- * percentuais de cada cobrador -- ver CollectorRow.inadVenceu/inadNaoPago). */
-const pctInad = (venceu: number, naoPago: number): number =>
-  venceu > 0 ? (naoPago / venceu) * 100 : 0;
 
 /** Faixas da Carteira Automatica como mini cards (pedido do usuario
  * 2026-11-17: melhor leitura que 1 frase corrida com "·"), lado a lado com o
@@ -325,7 +307,6 @@ const CollectorsSummary: React.FC = () => {
     managerCollectorLinks,
     collectorOverdueRanges,
     acordoAtivoOverdueMap,
-    acordos,
   } = useCollection();
   const { user: currentUser } = useAuth();
 
@@ -634,6 +615,18 @@ const CollectorsSummary: React.FC = () => {
 
   const isCollectorChecked = (id: string) => !excludedCollectorIds.has(id);
 
+  // Pagamentos que ja foram estornados (o estorno aponta para o original):
+  // o cliente nao conta como "pagou no periodo".
+  const estornados = useMemo(
+    () =>
+      new Set(
+        salePayments
+          .map((p) => p.estornoDe)
+          .filter((id): id is string => !!id),
+      ),
+    [salePayments],
+  );
+
   const rows = useMemo<CollectorRow[]>(() => {
     const collectors = allCollectors.filter(
       (c) => !excludedCollectorIds.has(c.id),
@@ -755,6 +748,29 @@ const CollectorsSummary: React.FC = () => {
 
         const atend = atendimentos?.get(collector.id);
 
+        const resumo = resumoEmpresa({
+          collections: myCollections,
+          scheduledVisits,
+          acordoAtivoParcelas: acordoAtivoOverdueMap,
+          dateFrom,
+          dateTo,
+          today,
+          loja: "",
+        });
+        const pagosDocs = new Set<string>();
+        salePayments.forEach((p) => {
+          if (
+            p.collectorId === collector.id &&
+            inPeriod(p.paymentDate) &&
+            !p.estornoDe &&
+            !estornados.has(p.id) &&
+            valorRecebidoTotal(p) > 0 &&
+            p.clientDocument
+          ) {
+            pagosDocs.add(p.clientDocument);
+          }
+        });
+
         const reincidentes: ReincidenteCliente[] = Array.from(
           remarcacoesPorCliente.entries(),
         )
@@ -794,6 +810,8 @@ const CollectorsSummary: React.FC = () => {
           naoEncontradoQtd,
           naoEncontradoValor,
           reincidentes,
+          resumo,
+          pagosDocs,
         };
       })
       .sort((a, b) => {
@@ -822,7 +840,29 @@ const CollectorsSummary: React.FC = () => {
     sortDir,
     acordoPagos,
     acordoPagosProntos,
+    acordoAtivoOverdueMap,
+    estornados,
   ]);
+
+  // Secao dos cobradores somada: a MESMA conta do painel Empresa sobre os
+  // titulos dos cobradores marcados (cliente com 2 cobradores conta 1 vez).
+  const resumoCobradores = useMemo(() => {
+    const ids = new Set(rows.map((r) => r.id));
+    return resumoEmpresa({
+      collections: collections.filter((c) => !!c.user_id && ids.has(c.user_id)),
+      scheduledVisits,
+      acordoAtivoParcelas: acordoAtivoOverdueMap,
+      dateFrom,
+      dateTo,
+      today,
+      loja: "",
+    });
+  }, [rows, collections, scheduledVisits, acordoAtivoOverdueMap, dateFrom, dateTo, today]);
+  const pagosCobradores = useMemo(() => {
+    const docs = new Set<string>();
+    rows.forEach((r) => r.pagosDocs.forEach((d) => docs.add(d)));
+    return docs.size;
+  }, [rows]);
 
   // Colapsa "Visao geral" sozinha na TRANSICAO pra 1 cobrador so (nao soca o
   // dedo do usuario: se ele reabrir manualmente enquanto ainda for so 1, o
@@ -1169,134 +1209,6 @@ const CollectorsSummary: React.FC = () => {
     ];
   };
 
-  // Acordos por cobrador (dono do acordo, acordos.collector_id). "Ativos" e a
-  // situacao de AGORA (nao depende do periodo); feitos pela data de criacao e
-  // cumpridos/quebrados/cancelados pela data em que foram fechados, dentro do
-  // periodo. Valor = valor negociado (termo do acordo, imutavel).
-  const acordosPorCobrador = useMemo(() => {
-    const dataLocal = (iso?: string | null) =>
-      iso ? todayLocalStr(new Date(iso)) : "";
-    const noPeriodo = (d: string) => !!d && d >= dateFrom && d <= dateTo;
-    const map = new Map<string, ResumoAcordos>();
-    acordos.forEach((a) => {
-      if (!map.has(a.collectorId)) map.set(a.collectorId, resumoAcordosVazio());
-      const r = map.get(a.collectorId)!;
-      const valor = Number(a.valorNegociado || 0);
-      if (a.status === "ativo") {
-        r.ativosQtd++;
-        r.ativosValor += valor;
-      }
-      if (noPeriodo(dataLocal(a.createdAt))) {
-        r.feitosQtd++;
-        r.feitosValor += valor;
-      }
-      if (a.status !== "ativo" && noPeriodo(dataLocal(a.resolvedAt))) {
-        if (a.status === "cumprido") {
-          r.cumpridosQtd++;
-          r.cumpridosValor += valor;
-        } else {
-          r.quebradosQtd++;
-          r.quebradosValor += valor;
-        }
-      }
-    });
-    return map;
-  }, [acordos, dateFrom, dateTo]);
-
-  const somaAcordos = (ids: string[]): ResumoAcordos => {
-    const t = resumoAcordosVazio();
-    ids.forEach((id) => {
-      const r = acordosPorCobrador.get(id);
-      if (r) {
-        (Object.keys(t) as (keyof ResumoAcordos)[]).forEach((k) => {
-          t[k] += r[k];
-        });
-      }
-      t.recebido += acordoRecebido(id, dateFrom, dateTo);
-    });
-    return t;
-  };
-
-  const qtdValor = (qtd: number, valor: number) =>
-    qtd > 0 ? `${fmtNum(qtd)} · ${formatCurrency(valor, false)}` : "0";
-
-  // Card Acordos (pedido do gestor 2026-11-19): acordos e o dinheiro que
-  // entrou neles. "Recebido em acordos" ja esta DENTRO do Desempenho (parte
-  // dele, nao soma de novo).
-  const cardAcordos = (r: ResumoAcordos) => (
-    <SummaryCard
-      icon={Handshake}
-      title="Acordos"
-      value={formatCurrency(r.ativosValor, false)}
-      valueTone="blue"
-      caption={`${fmtNum(r.ativosQtd)} ${r.ativosQtd === 1 ? "acordo ativo" : "acordos ativos"} agora`}
-      rows={[
-        {
-          label: "Feitos no período",
-          value: qtdValor(r.feitosQtd, r.feitosValor),
-        },
-        {
-          label: "Cumpridos",
-          value: qtdValor(r.cumpridosQtd, r.cumpridosValor),
-          tone: r.cumpridosQtd > 0 ? "green" : undefined,
-          hint: "Acordos quitados dentro do período",
-        },
-        {
-          label: "Quebrados/cancelados",
-          value: qtdValor(r.quebradosQtd, r.quebradosValor),
-          tone: r.quebradosQtd > 0 ? "red" : undefined,
-          hint: "Acordos fechados sem cumprir dentro do período",
-        },
-        {
-          label: "Recebido em acordos",
-          value: acordoPagosProntos ? formatCurrency(r.recebido, false) : "…",
-          loading: !acordoPagosProntos,
-          hint: "Parcelas de acordo pagas no período (no app ou na loja) — já está somado no Desempenho",
-        },
-      ]}
-    />
-  );
-
-  // Card Agendamentos: os mesmos numeros das colunas da Tabela (agendadas,
-  // realizadas, reagendadas, nao encontrado), por data efetiva no periodo.
-  // Valor = saldo do cliente gravado quando o agendamento foi feito.
-  const cardAgendamentos = (q: {
-    agendadasQtd: number;
-    agendadasValor: number;
-    realizadasQtd: number;
-    reagendadasQtd: number;
-    reagendadasValor: number;
-    naoEncontradoQtd: number;
-    naoEncontradoValor: number;
-    emAtrasoVisitas: number;
-  }) => (
-    <SummaryCard
-      icon={CalendarCheck}
-      title="Agendamentos"
-      value={fmtNum(q.agendadasQtd)}
-      valueTone="blue"
-      caption={`agendados no período · ${formatCurrency(q.agendadasValor, false)}`}
-      rows={[
-        { label: "Realizados", value: fmtNum(q.realizadasQtd) },
-        {
-          label: "Reagendados",
-          value: qtdValor(q.reagendadasQtd, q.reagendadasValor),
-          tone: q.reagendadasQtd > 0 ? "amber" : undefined,
-        },
-        {
-          label: "Não encontrado",
-          value: qtdValor(q.naoEncontradoQtd, q.naoEncontradoValor),
-        },
-        {
-          label: "Atrasados",
-          value: fmtNum(q.emAtrasoVisitas),
-          tone: q.emAtrasoVisitas > 0 ? "red" : undefined,
-          hint: "Agendamentos cuja data já passou sem registro (situação de agora, não do período escolhido)",
-        },
-      ]}
-    />
-  );
-
   return (
     <div className="space-y-4">
       <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-4 lg:p-5 space-y-3">
@@ -1314,17 +1226,16 @@ const CollectorsSummary: React.FC = () => {
               </button>
               {infoOpen && (
                 <div className="absolute z-20 mt-2 w-72 rounded-xl border border-blue-100 dark:border-blue-800/40 bg-blue-50 dark:bg-blue-900/20 px-4 py-3 text-xs font-normal normal-case text-blue-700 dark:text-blue-300 shadow-lg">
-                  <strong>Atrasados</strong> (visitas agendadas que já
-                  passaram da data) mostra a situação de agora. O resto —
-                  <strong> Carteira</strong>, <strong>Sem agendamento</strong>{" "}
-                  e <strong>Com atraso</strong> incluídos — vale para o
-                  período escolhido.
+                  <strong>Empresa</strong>: todos os clientes, com ou sem
+                  cobrador. Embaixo, os mesmos cards só com os cobradores
+                  marcados.
+                  <br />
+                  <strong>Clientes</strong> e <strong>Carteira</strong>: a
+                  situação de hoje. <strong>Previsão</strong>: o que vence de
+                  hoje até o fim do período escolhido.
                   <br />
                   <strong>Clientes atendidos</strong>: cada cliente conta uma
-                  vez, mesmo atendido várias vezes. Embaixo, com quantos o
-                  cobrador conseguiu conversar.
-                  <br />
-                  <strong>Feitos</strong>: só o que estava agendado.
+                  vez, mesmo atendido várias vezes.
                 </div>
               )}
             </div>
@@ -1530,7 +1441,7 @@ const CollectorsSummary: React.FC = () => {
           // Carteira e Vencido ja foram unidos num card so, mas o gestor
           // pediu mais destaque pro valor vencido -- separados de novo,
           // sem repetir "A vencer" nos dois (fica so dentro de Carteira).
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
             <SummaryCard
               icon={Gauge}
               title="Desempenho"
@@ -1567,61 +1478,18 @@ const CollectorsSummary: React.FC = () => {
                 ),
               ]}
             />
-            <SummaryCard
-              icon={Wallet}
-              title="Carteira"
-              value={formatCurrency(totals.valorCarteira, false)}
-              caption="valor total no período"
-              rows={[
-                {
-                  label: "A vencer",
-                  value: formatCurrency(totals.previstaValor, false),
-                },
-                {
-                  label: "% inadimplente",
-                  value: formatarInadimplencia(
-                    pctInad(totals.inadVenceu, totals.inadNaoPago),
-                    totals.inadVenceu,
-                  ),
-                  hint: "Últimos 12 meses (regra de mercado) — não é o período escolhido no filtro",
-                },
-              ]}
+            <CardPrevisao
+              r={resumoCobradores}
+              recebido={{
+                valor: fmtRecebido(totals.recebidoPeriodo),
+                loading: !atribuicoesProntas || !acordoPagosProntos,
+              }}
             />
-            <SummaryCard
-              icon={Wallet}
-              title="Vencido"
-              value={formatCurrency(totals.vencidaValor, false)}
-              valueTone="red"
-              caption="valor vencido no período"
-              rows={[
-                {
-                  label: "Sem agendamento",
-                  value: fmtNum(totals.semAgendamentoClientes),
-                  tone: totals.semAgendamentoClientes > 0 ? "amber" : undefined,
-                  hint: "Toda a carteira do período (vencida ou a vencer) sem próxima visita marcada — não é só quem está vencido",
-                },
-              ]}
+            <CardCarteira r={resumoCobradores} />
+            <CardClientes
+              r={resumoCobradores}
+              pagos={{ qtd: pagosCobradores }}
             />
-            <SummaryCard
-              icon={Users}
-              title="Número de clientes"
-              value={fmtNum(totals.clientesCarteira)}
-              valueTone="blue"
-              caption="clientes com vencimento no período"
-              rows={[
-                {
-                  label: "Com atraso",
-                  value: fmtNum(totals.clientesComAtraso),
-                  tone: totals.clientesComAtraso > 0 ? "red" : undefined,
-                },
-                {
-                  label: "Em dia",
-                  value: fmtNum(totals.clientesCarteira - totals.clientesComAtraso),
-                },
-              ]}
-            />
-            {cardAcordos(somaAcordos(rows.map((r) => r.id)))}
-            {cardAgendamentos(totals)}
           </div>
         )}
       </div>
@@ -1710,25 +1578,16 @@ const CollectorsSummary: React.FC = () => {
                     ),
                   ]}
                 />
-                <SummaryCard
-                  icon={Wallet}
-                  title="Carteira"
-                  value={formatCurrency(row.valorCarteira, false)}
-                  caption="valor total no período"
-                  rows={[
-                    {
-                      label: "A vencer",
-                      value: formatCurrency(row.previstaValor, false),
-                    },
-                    {
-                      label: "% inadimplente",
-                      value: formatarInadimplencia(
-                        pctInad(row.inadVenceu, row.inadNaoPago),
-                        row.inadVenceu,
-                      ),
-                      hint: "Últimos 12 meses (regra de mercado) — não é o período escolhido no filtro",
-                    },
-                    ...(isWalletCollectorType(row.type) &&
+                <CardPrevisao
+                  r={row.resumo}
+                  recebido={{
+                    valor: fmtRecebido(row.recebidoPeriodo),
+                    loading: !atribuicoesProntas || !acordoPagosProntos,
+                  }}
+                />
+                <CardCarteira
+                  r={row.resumo}
+                  extraRows={(isWalletCollectorType(row.type) &&
                     !carteiraAuto.regrasPor.has(row.id)
                       ? [
                           {
@@ -1746,46 +1605,12 @@ const CollectorsSummary: React.FC = () => {
                             hint: "Clientes que passaram da faixa no período sem nenhuma ação do cobrador. Clique para ver e devolver.",
                           },
                         ]
-                      : []),
-                  ]}
+                      : [])}
                 />
-                <SummaryCard
-                  icon={Wallet}
-                  title="Vencido"
-                  value={formatCurrency(row.vencidaValor, false)}
-                  valueTone="red"
-                  caption="valor vencido no período"
-                  rows={[
-                    {
-                      label: "Sem agendamento",
-                      value: fmtNum(row.semAgendamentoClientes),
-                      tone: row.semAgendamentoClientes > 0 ? "amber" : undefined,
-                      hint: "Toda a carteira do período (vencida ou a vencer) sem próxima visita marcada — não é só quem está vencido",
-                    },
-                  ]}
+                <CardClientes
+                  r={row.resumo}
+                  pagos={{ qtd: row.pagosDocs.size }}
                 />
-                <SummaryCard
-                  icon={Users}
-                  title="Número de clientes"
-                  value={fmtNum(row.clientesCarteira)}
-                  valueTone="blue"
-                  caption="clientes com vencimento no período"
-                  rows={[
-                    {
-                      label: "Com atraso",
-                      value: fmtNum(row.clientesComAtraso),
-                      tone: row.clientesComAtraso > 0 ? "red" : undefined,
-                    },
-                    {
-                      label: "Em dia",
-                      value: fmtNum(row.clientesCarteira - row.clientesComAtraso),
-                    },
-                  ]}
-                />
-                {/* Externo nao faz acordo (perfis de carteira, config/profiles). */}
-                {isWalletCollectorType(row.type) &&
-                  cardAcordos(somaAcordos([row.id]))}
-                {cardAgendamentos(row)}
                 {carteiraAuto.regrasPor.has(row.id) &&
                   (() => {
                     const regras = carteiraAuto.regrasPor.get(row.id) ?? [];
@@ -2096,17 +1921,16 @@ const CollectorsSummary: React.FC = () => {
                   </td>
                   <td className="px-3 py-3 text-right whitespace-nowrap border-l border-gray-100 dark:border-dark-border/40">
                     <div className="font-semibold">
-                      {formatCurrency(row.valorCarteira, false)}
+                      {formatCurrency(
+                        row.resumo.carteira.vencido + row.resumo.carteira.aVencer,
+                        false,
+                      )}
                     </div>
                     <div className="text-[10px] text-red-500 dark:text-red-400">
-                      {formatCurrency(row.vencidaValor, false)} vencido
+                      {formatCurrency(row.resumo.carteira.vencido, false)} vencido
                     </div>
                     <div className="text-[10px] text-gray-400 dark:text-dark-text-secondary">
-                      {formatCurrency(
-                        row.previstaValor + row.aReceberValor,
-                        false,
-                      )}{" "}
-                      a vencer
+                      {formatCurrency(row.resumo.carteira.aVencer, false)} a vencer
                     </div>
                   </td>
                   <td className="px-3 py-3 text-right whitespace-nowrap">
@@ -2187,7 +2011,7 @@ const CollectorsSummary: React.FC = () => {
                     )}
                   </td>
                   <td className="px-3 py-3 text-right whitespace-nowrap font-semibold">
-                    {fmtNum(row.semAgendamentoClientes)}
+                    {fmtNum(row.resumo.clientes.semAgendamento)}
                   </td>
                 </tr>
               ))}
