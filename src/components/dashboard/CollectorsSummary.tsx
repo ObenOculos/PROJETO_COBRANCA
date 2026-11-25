@@ -1513,7 +1513,8 @@ const CollectorsSummary: React.FC = () => {
                     qtdSaidas(row.id) > 0
                       ? [
                           {
-                            texto: `${qtdSaidasValor(row.id)} saíram sem ação`,
+                            valor: qtdSaidasValor(row.id),
+                            rotulo: "saíram sem ação",
                             tom: "red" as const,
                             loading: movCarregando,
                             onClick: () => setSaidasCobradorId(row.id),

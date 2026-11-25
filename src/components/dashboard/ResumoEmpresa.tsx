@@ -57,8 +57,10 @@ const clientesTxt = (n: number) =>
 type Tema = "red" | "indigo" | "blue" | "green" | "slate";
 type TomPilula = "red" | "amber" | "green" | "gray";
 
+/** Quadrinho do card: numero em cima, rotulo curto embaixo. */
 export interface Pilula {
-  texto: string;
+  valor: string;
+  rotulo: string;
   tom: TomPilula;
   hint?: string;
   loading?: boolean;
@@ -149,18 +151,26 @@ export const CardSimples: React.FC<{
       <div className="text-sm text-gray-700 dark:text-dark-text">{frase}</div>
 
       {pilulas.length > 0 && (
-        // Etiquetas lado a lado (25/11: empilhadas deixavam o card alto e o
-        // vizinho com um vazio estranho).
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {pilulas.map((p) => (
+        // Grade fixa de 2 colunas (25/11: etiquetas soltas quebravam em
+        // varias linhas e o card ficava alto). Numero em cima, rotulo
+        // embaixo; item impar no fim vira retangulo da largura toda.
+        <div className="mt-2 grid grid-cols-2 gap-1">
+          {pilulas.map((p, i) => (
             <div
-              key={p.texto}
+              key={p.rotulo}
               title={p.hint}
               onClick={p.onClick}
               role={p.onClick ? "button" : undefined}
-              className={`rounded-md px-2 py-1 text-xs font-semibold whitespace-nowrap ${PILULA[p.tom]} ${p.loading ? "animate-pulse" : ""} ${p.onClick ? "cursor-pointer hover:opacity-90" : ""}`}
+              className={`min-w-0 rounded-md px-2 py-1 ${PILULA[p.tom]} ${pilulas.length % 2 === 1 && i === pilulas.length - 1 ? "col-span-2" : ""} ${p.onClick ? "cursor-pointer hover:opacity-90" : ""}`}
             >
-              {p.texto}
+              <div
+                className={`text-sm font-bold leading-tight truncate ${p.loading ? "animate-pulse" : ""}`}
+              >
+                {p.valor}
+              </div>
+              <div className="text-[10px] font-medium leading-tight truncate opacity-90">
+                {p.rotulo}
+              </div>
             </div>
           ))}
         </div>
@@ -229,13 +239,15 @@ export const CardClientes: React.FC<{ r: Resumo; cobrador?: boolean }> = ({
     ? [
         {
           qtd: c.emDia,
-          texto: `${fmtNum(c.emDia)} em dia`,
+          valor: fmtNum(c.emDia),
+          rotulo: "em dia",
           tom: "green",
           hint: "Têm saldo, mas nada vencido",
         },
         {
           qtd: c.emAtraso,
-          texto: `${fmtNum(c.emAtraso)} em atraso`,
+          valor: fmtNum(c.emAtraso),
+          rotulo: "em atraso",
           tom: "red",
           hint: "Têm alguma parcela vencida",
         },
@@ -243,25 +255,29 @@ export const CardClientes: React.FC<{ r: Resumo; cobrador?: boolean }> = ({
     : [
         {
           qtd: c.quitados,
-          texto: `${fmtNum(c.quitados)} quitados`,
+          valor: fmtNum(c.quitados),
+          rotulo: "quitados",
           tom: "gray",
           hint: "Sem nenhum saldo em aberto",
         },
         {
           qtd: c.emDia,
-          texto: `${fmtNum(c.emDia)} em dia`,
+          valor: fmtNum(c.emDia),
+          rotulo: "em dia",
           tom: "green",
           hint: "Têm saldo, mas nada vencido",
         },
         {
           qtd: atrasoComCobrador,
-          texto: `${fmtNum(atrasoComCobrador)} atraso com cobrador`,
+          valor: fmtNum(atrasoComCobrador),
+          rotulo: "atraso com cobrador",
           tom: "amber",
           hint: "Têm parcela vencida e estão na carteira de um cobrador",
         },
         {
           qtd: c.semCobrador,
-          texto: `${fmtNum(c.semCobrador)} atraso sem cobrador`,
+          valor: fmtNum(c.semCobrador),
+          rotulo: "atraso sem cobrador",
           tom: "red",
           hint: "Têm parcela vencida e não estão na carteira de nenhum cobrador: precisam ser incluídos",
         },
@@ -340,13 +356,13 @@ export const CardPrevisao: React.FC<{ r: Resumo }> = ({ r }) => {
       pilulas={
         p.de
           ? [
-              { valor: p.parcelas, txt: "em parcelas", n: p.parcelasClientes },
-              { valor: p.acordo, txt: "de acordos", n: p.acordoClientes },
-              { valor: p.agendados, txt: "de agendados", n: p.agendadosClientes },
+              { valor: p.parcelas, txt: "parcelas", n: p.parcelasClientes },
+              { valor: p.acordo, txt: "acordos", n: p.acordoClientes },
+              { valor: p.agendados, txt: "agendados (vencido)", n: p.agendadosClientes },
             ]
-              .filter((x) => x.valor > 0)
               .map((x) => ({
-                texto: `${fmtValorCurto(x.valor)} ${x.txt}`,
+                valor: fmtValorCurto(x.valor),
+                rotulo: x.txt,
                 tom: "gray" as const,
                 hint: `${fmtValor(x.valor)} · ${clientesTxt(x.n)}`,
               }))
@@ -392,17 +408,17 @@ const CardRecebidoEmpresa: React.FC<{
     frase="entrou no período"
     pilulas={[
       {
-        texto: registradoCobradores.loading
-          ? "… pelos cobradores"
-          : `${fmtValorCurto(registradoCobradores.valor)} pelos cobradores`,
+        valor: registradoCobradores.loading
+          ? "…"
+          : fmtValorCurto(registradoCobradores.valor),
+        rotulo: "pelos cobradores",
         tom: "gray",
         loading: registradoCobradores.loading,
         hint: "Registrado pelos cobradores no app. Já está dentro do total — não somar.",
       },
       {
-        texto: acionados
-          ? `${fmtNum(acionados.size)} clientes acionados`
-          : "… clientes acionados",
+        valor: acionados ? fmtNum(acionados.size) : "…",
+        rotulo: "clientes acionados",
         tom: "gray",
         loading: !acionados,
         hint: "Clientes diferentes que algum cobrador ligou, mandou mensagem ou visitou no período",
@@ -432,23 +448,21 @@ export const CardDesempenho: React.FC<{
   const pilulas: Pilula[] = meta
     ? [
         {
-          texto: loading
-            ? "… da meta"
-            : pct >= 100
-              ? "Meta do mês batida!"
-              : `${pct.toFixed(0)}% da meta do mês`,
+          valor: loading ? "…" : `${pct.toFixed(0)}%`,
+          rotulo: pct >= 100 ? "meta do mês batida!" : "da meta do mês",
           tom: loading ? "gray" : pct >= 100 ? "green" : pct >= 70 ? "amber" : "red",
           loading,
           hint: `${fmtValor(meta.recebido)} de ${fmtValor(meta.meta)} no mês atual`,
         },
       ]
-    : [{ texto: "Sem meta definida", tom: "gray" }];
+    : [{ valor: "—", rotulo: "sem meta definida", tom: "gray" }];
   // 1a linha de atendimentos = clientes acionados (ou visitados, externo):
   // vira etiqueta, como no card Recebido da empresa.
   const [clientesAtend, ...outrosAtend] = atendimentos;
   if (clientesAtend) {
     pilulas.push({
-      texto: `${clientesAtend.value} ${clientesAtend.label.toLowerCase()}`,
+      valor: clientesAtend.value,
+      rotulo: clientesAtend.label.toLowerCase(),
       tom: "gray",
       loading: clientesAtend.loading,
       hint: clientesAtend.hint,
@@ -503,17 +517,23 @@ export const CardCarteira: React.FC<{
       frase={empresa ? "os clientes devem hoje" : "os clientes da carteira devem hoje"}
       pilulas={[
         {
-          texto: `${fmtValorCurto(r.carteira.vencido)} vencido`,
+          valor: fmtValorCurto(r.carteira.vencido),
+          rotulo: "vencido",
           tom: r.carteira.vencido > 0 ? "red" : "green",
           hint: fmtValor(r.carteira.vencido),
         },
         {
-          texto: `${fmtValorCurto(r.carteira.aVencer)} a vencer`,
+          valor: fmtValorCurto(r.carteira.aVencer),
+          rotulo: "a vencer",
           tom: "gray",
           hint: fmtValor(r.carteira.aVencer),
         },
         {
-          texto: `Inadimplência ${formatarInadimplencia(r.inadimplencia.pct, r.inadimplencia.venceu)}`,
+          valor: formatarInadimplencia(
+            r.inadimplencia.pct,
+            r.inadimplencia.venceu,
+          ),
+          rotulo: "inadimplência",
           tom: "gray",
           hint: "Do que venceu nos últimos 12 meses há mais de 30 dias, quanto não foi pago (regra de mercado)",
         },
