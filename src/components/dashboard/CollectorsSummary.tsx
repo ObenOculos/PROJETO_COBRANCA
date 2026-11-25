@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Gauge,
   Users,
+  Store,
   UserX,
   Shuffle,
 } from "lucide-react";
@@ -26,6 +27,8 @@ import { isCollectorType, UserType } from "../../types";
 import { useAtendimentosPeriodo } from "../../hooks/useAtendimentosPeriodo";
 import { useClientesAcionados } from "../../hooks/useClientesAcionados";
 import FiltroMultiplo from "../common/FiltroMultiplo";
+import SortTh from "../common/SortTh";
+import ResumoPorLoja from "./ResumoPorLoja";
 import ResumoEmpresa, {
   CardCarteira,
   CardClientes,
@@ -175,32 +178,6 @@ const TONE_ATENDIMENTO = "bg-indigo-50/70 dark:bg-indigo-900/10";
 // Atribuicao de Cobradores). "Mes atual" e o padrao pedido pelo gestor.
 
 /** dd/mm/aaaa a partir de uma string YYYY-MM-DD, sem passar por Date (ver CLAUDE.md). */
-/** Titulo de coluna clicavel pra ordenar a tabela, com seta indicando a
- * coluna/direcao ativa. */
-const SortTh: React.FC<{
-  active: boolean;
-  dir: "asc" | "desc";
-  onClick: () => void;
-  className?: string;
-  title?: string;
-  children: React.ReactNode;
-}> = ({ active, dir, onClick, className = "", title, children }) => (
-  <th
-    onClick={onClick}
-    title={title}
-    className={`cursor-pointer select-none hover:text-gray-600 dark:hover:text-dark-text ${className}`}
-  >
-    <span className="inline-flex items-center gap-0.5">
-      {children}
-      {active &&
-        (dir === "desc" ? (
-          <ChevronDown className="h-3 w-3" />
-        ) : (
-          <ChevronUp className="h-3 w-3" />
-        ))}
-    </span>
-  </th>
-);
 
 const fmtNum = (n: number): string => n.toLocaleString("pt-BR");
 
@@ -404,11 +381,10 @@ const CollectorsSummary: React.FC = () => {
   const [cobradorAberto, setCobradorAberto] = useState<string | null>(null);
   // Abas do Resumo Geral (25/11): Geral (empresa + cobradores somados) e
   // Por cobrador (uma linha por cobrador). A ultima aba aberta fica salva.
-  const [aba, setAba] = useState<"geral" | "cobrador">(() =>
-    localStorage.getItem("resumoGeralAba") === "cobrador"
-      ? "cobrador"
-      : "geral",
-  );
+  const [aba, setAba] = useState<"geral" | "cobrador" | "loja">(() => {
+    const salva = localStorage.getItem("resumoGeralAba");
+    return salva === "cobrador" || salva === "loja" ? salva : "geral";
+  });
   useEffect(() => {
     localStorage.setItem("resumoGeralAba", aba);
   }, [aba]);
@@ -1269,8 +1245,9 @@ const CollectorsSummary: React.FC = () => {
                   com ou sem cobrador) e, embaixo, os mesmos cards só com os
                   cobradores marcados.
                   <br />
-                  <strong>Por cobrador</strong>: uma linha por cobrador, para
-                  comparar.
+                  <strong>Por cobrador</strong> e <strong>Por loja</strong>: uma
+                  linha cada, para comparar; clique na linha para ver os
+                  detalhes.
                   <br />
                   <strong>Clientes</strong> e <strong>Carteira</strong>: a
                   situação de hoje. <strong>Previsão</strong>: o que vence de
@@ -1288,6 +1265,7 @@ const CollectorsSummary: React.FC = () => {
               [
                 ["geral", "Geral", Gauge],
                 ["cobrador", "Por cobrador", Users],
+                ["loja", "Por loja", Store],
               ] as const
             ).map(([id, rotulo, Icone]) => (
               <button
@@ -2031,6 +2009,18 @@ const CollectorsSummary: React.FC = () => {
             </div>
           }
         </>
+      )}
+
+      {aba === "loja" && (
+        <ResumoPorLoja
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          today={today}
+          acionados={empresaAcionados}
+          registradosCobrador={empresaRegistrados}
+          registradoPorCliente={registradoPorCliente}
+          registradoCarregando={!atribuicoesProntas || !acordoPagosProntos}
+        />
       )}
 
       {saidasCobrador && (
