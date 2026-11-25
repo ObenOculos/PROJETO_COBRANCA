@@ -2,7 +2,6 @@ import React, { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
 import {
   Store,
-  AlertTriangle,
   Download,
   BarChart3,
   Building,
@@ -15,16 +14,12 @@ import {
   Search,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
-import {
-  formatCurrency,
-  formatCurrencyCompact,
-  criarCalculoAtraso,
-} from "../../utils/formatters";
+import { formatCurrency, criarCalculoAtraso } from "../../utils/formatters";
 import Pagination from "../common/Pagination";
 import FilterBar from "../common/FilterBar";
 import { ClientGroup, Collection, FilterOptions } from "../../types";
 import ClientDetailModal from "./ClientDetailModal";
-import { countVendas, resolveSaleKey } from "../../filters/sales";
+import { resolveSaleKey } from "../../filters/sales";
 import { documentoCombina } from "../../filters/documento";
 import { clientKey } from "../../filters/clientStatus";
 import { todayLocalStr } from "../../config/visitStatus";
@@ -406,109 +401,12 @@ const EnhancedStoreManagement: React.FC = () => {
     return filtered;
   }, [storeStats, sortBy, sortOrder]);
 
-  // Calculate overview statistics
-  const overviewStats = useMemo(() => {
-    const totalStores = storeStats.length;
-    const assignedStores = storeStats.filter(
-      (s) => s.collectors.length > 0,
-    ).length;
-    const unassignedStores = totalStores - assignedStores;
-    // Fichas/Vendas: contagem global por cliente (mesma regra de Cobrança e
-    // Atribuição). Antes somava o total por loja (s.totalCollections) e
-    // duplicava vendas espalhadas em mais de uma loja.
-    const totalSales = countVendas(sourceCollections);
-    // Títulos/parcelas: total de linhas da fonte (já sem cancelados e filtrado).
-    // Clientes distintos (documento) na fonte filtrada — global, sem duplicar
-    // clientes que aparecem em mais de uma loja.
-    const totalClients = new Set(
-      sourceCollections.map((c) => c.documento).filter((d): d is string => !!d),
-    ).size;
-    // Composicao da carteira inteira (soma dos valores, nao media das
-    // lojas): as partes somam o vendido e o % sai da mesma passada.
-    const comp = composicaoCarteira(sourceCollections, {
-      janelaDias: janelaInad,
-      atrasoDias,
-    });
-
-    return {
-      totalStores,
-      assignedStores,
-      unassignedStores,
-      totalSales,
-      totalClients,
-      comp,
-    };
-  }, [storeStats, sourceCollections, janelaInad, atrasoDias]);
-
-  // Card unico do topo: as partes do vendido, na ordem da barra.
-  const compTopo = overviewStats.comp;
-  const inadTopo = compTopo.inadimplencia;
-  const partesTopo: {
-    id: string;
-    label: string;
-    valor: number;
-    barra: string;
-    texto: string;
-    dica: string;
-    /** Parte do saldo em aberto: vai dentro do "Em aberto" na legenda,
-     * como no card da loja (Em aberto com o vencido dentro). */
-    emAberto?: boolean;
-  }[] = [
-    {
-      id: "recebido",
-      label: "Recebido",
-      valor: Math.max(0, compTopo.recebido),
-      barra: "bg-green-500",
-      texto: "text-green-600 dark:text-green-400",
-      dica: "Já entrou",
-    },
-    {
-      id: "desconto",
-      label: "Desconto",
-      valor: compTopo.desconto,
-      barra: "bg-gray-300 dark:bg-gray-600",
-      texto: "text-gray-600 dark:text-dark-text-secondary",
-      dica: "Abatido nas negociações: não entra e não é dívida",
-    },
-    // Em aberto = a vencer + vencido, igual ao card da loja. O "não pago"
-    // da inadimplência fica só na frase do %, como na barra do card da loja
-    // (o "em atraso até 30 dias" separado só atrapalhava -- usuário, 16/11).
-    {
-      id: "aVencer",
-      label: "a vencer",
-      valor: compTopo.aVencer,
-      barra: "bg-blue-300 dark:bg-blue-700",
-      texto: "text-gray-700 dark:text-dark-text",
-      dica: "Em aberto, ainda não venceu",
-      emAberto: true,
-    },
-    {
-      id: "vencido",
-      label: "vencido",
-      valor: compTopo.vencido,
-      barra: "bg-red-500",
-      texto: "text-red-600 dark:text-red-400",
-      dica: "Em aberto, com vencimento já passado (qualquer atraso)",
-      emAberto: true,
-    },
-  ];
-  const legendaParte = (p: (typeof partesTopo)[number], dentro = false) => (
-    <div
-      key={p.id}
-      className={`flex items-center justify-between gap-2 min-w-0 ${dentro ? "pl-3" : ""}`}
-      title={p.dica}
-    >
-      <span className="flex items-center gap-1.5 min-w-0 text-gray-600 dark:text-dark-text-secondary">
-        <span className={`h-2 w-2 rounded-full shrink-0 ${p.barra}`} />
-        <span className="truncate">{p.label}</span>
-      </span>
-      {/* Sem % por parte: ao lado do % da inadimplencia, a fatia do
-          vendido (outra base) confundia. */}
-      <span className={`font-semibold shrink-0 ${p.texto}`}>
-        {formatCurrency(p.valor)}
-      </span>
-    </div>
-  );
+  // Os totais da empresa (clientes, carteira, inadimplencia) ficam no
+  // Resumo, com filtro de loja (25/11, opcao A): esta tela so compara as
+  // lojas entre si.
+  const lojasSemCobrador = storeStats.filter(
+    (s) => s.collectors.length === 0,
+  ).length;
 
   const exportStoreData = () => {
     // Headers with better formatting
@@ -632,166 +530,6 @@ const EnhancedStoreManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* Resumo executivo — 3 cards temáticos (Carteira · Financeiro · Performance).
-          Todos os totais respeitam os filtros ativos. */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
-        {/* Card: Carteira (volume) */}
-        <div className="bg-white dark:bg-dark-bg-secondary p-4 sm:p-5 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm hover:shadow-md transition-all duration-300">
-          <div className="flex items-center justify-between gap-2 mb-4">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl shrink-0">
-                <Building className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400" />
-              </div>
-              <h3 className="text-sm font-bold text-gray-900 dark:text-dark-text tracking-tight">
-                Carteira
-              </h3>
-            </div>
-            {overviewStats.unassignedStores > 0 ? (
-              <span className="text-[9px] sm:text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.5 rounded-md tracking-wide border border-amber-200 dark:border-amber-900/30 shrink-0">
-                {overviewStats.unassignedStores} sem cobrador
-              </span>
-            ) : (
-              <span className="text-[9px] sm:text-[10px] font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-1.5 py-0.5 rounded-md tracking-wide border border-green-200 dark:border-green-900/30 shrink-0">
-                OK
-              </span>
-            )}
-          </div>
-          <div className="grid grid-cols-3 gap-x-4 gap-y-3">
-            {[
-              { label: "Lojas", value: overviewStats.totalStores },
-              { label: "Clientes", value: overviewStats.totalClients },
-              { label: "Vendas", value: overviewStats.totalSales },
-            ].map((s) => (
-              <div key={s.label} className="min-w-0">
-                <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide truncate">
-                  {s.label}
-                </p>
-                <p className="text-lg sm:text-xl font-bold text-gray-900 dark:text-dark-text tracking-tight truncate">
-                  {s.value.toLocaleString("pt-BR")}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Card único: inadimplência + para onde foi o que foi vendido.
-            As partes somam o Vendido (filters/inadimplencia:
-            composicaoCarteira) e a parte "Inadimplente" é exatamente o
-            "não pago" do % -- antes Financeiro e Inadimplência mostravam o
-            mesmo dinheiro em cortes diferentes (16/11). */}
-        <div className="md:col-span-2 bg-white dark:bg-dark-bg-secondary p-4 sm:p-5 rounded-2xl border border-gray-100 dark:border-dark-border shadow-sm hover:shadow-md transition-all duration-300">
-          <div className="flex items-center gap-2.5 mb-3">
-            <div className="p-2 bg-red-50 dark:bg-red-900/20 rounded-xl shrink-0">
-              <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 dark:text-red-400" />
-            </div>
-            <h3 className="text-sm font-bold text-gray-900 dark:text-dark-text tracking-tight">
-              Inadimplência e carteira
-            </h3>
-            {recorteInad !== "filtro" && (
-              <div className="ml-auto flex bg-gray-100 dark:bg-dark-bg rounded-md p-0.5 shrink-0">
-                {(
-                  [
-                    ["janela", "12 meses"],
-                    ["tudo", "Tudo"],
-                  ] as const
-                ).map(([id, label]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setPeriodoInad(id)}
-                    className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors ${
-                      periodoInad === id
-                        ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
-                        : "text-gray-500 dark:text-dark-text-secondary hover:text-gray-800"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* O % e de onde ele sai -- mesmas palavras do card da loja
-              ("não pago de ... esperado") e a linha do recorte do modal. */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-4">
-            <p
-              className={`text-3xl font-extrabold tracking-tight ${inadTopo.venceu > 0 ? COR_NIVEL[nivelInadimplencia(inadTopo.pct)].text : "text-gray-400 dark:text-dark-text-secondary"}`}
-            >
-              {formatarInadimplencia(inadTopo.pct, inadTopo.venceu)}
-            </p>
-            <div className="flex-1 min-w-[220px]">
-              <p
-                className="text-sm text-gray-600 dark:text-dark-text-secondary"
-                title="Esperado: o que já deveria ter sido pago (parcelas vencidas há mais de 30 dias). Não pago: o que disso ainda não entrou."
-              >
-                {inadTopo.venceu > 0 ? (
-                  <>
-                    <span className="font-semibold text-red-600 dark:text-red-400">
-                      {formatCurrencyCompact(inadTopo.naoPago)}
-                    </span>{" "}
-                    não pago de {formatCurrencyCompact(inadTopo.venceu)}{" "}
-                    esperado
-                  </>
-                ) : (
-                  <>
-                    Nada venceu há mais de {INADIMPLENCIA_CORTE_DIAS} dias: por
-                    enquanto é só atraso
-                  </>
-                )}
-              </p>
-              <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary tracking-wide">
-                {descricaoRecorteInadimplencia(recorteInad)}
-              </p>
-            </div>
-          </div>
-
-          {/* Vendido dividido em partes que somam o total */}
-          <div className="flex justify-between gap-2 text-[11px] mb-1">
-            <span className="font-semibold text-gray-500 dark:text-dark-text-secondary">
-              Vendido
-            </span>
-            <span className="font-bold text-gray-900 dark:text-dark-text">
-              {formatCurrency(compTopo.vendido)}
-            </span>
-          </div>
-          <div className="flex w-full h-3 rounded-full overflow-hidden bg-gray-100 dark:bg-dark-bg mb-3">
-            {partesTopo.map((p) =>
-              p.valor > 0 && compTopo.vendido > 0 ? (
-                <div
-                  key={p.id}
-                  className={p.barra}
-                  style={{ width: `${(p.valor / compTopo.vendido) * 100}%` }}
-                  title={`${p.label}: ${formatCurrency(p.valor)}`}
-                />
-              ) : null,
-            )}
-          </div>
-          {/* Legenda na forma do card da loja: Recebido ao lado de Em
-              aberto, e dentro do Em aberto as partes dele. */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-[11px] font-medium">
-            <div className="space-y-1">
-              {partesTopo
-                .filter((p) => !p.emAberto)
-                .map((p) => legendaParte(p))}
-            </div>
-            <div className="space-y-1">
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-semibold text-gray-700 dark:text-dark-text">
-                  Em aberto
-                </span>
-                <span className="font-bold text-amber-600 dark:text-amber-400">
-                  {formatCurrency(compTopo.emAberto)}
-                </span>
-              </div>
-              {partesTopo
-                .filter((p) => p.emAberto)
-                .map((p) => legendaParte(p, true))}
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Barra de filtros unificada (busca por loja/cliente/cidade + status,
           cobrador, vencimento, lançamento, valor — refina a fonte das lojas) */}
       <FilterBar
@@ -804,10 +542,51 @@ const EnhancedStoreManagement: React.FC = () => {
 
       {/* Controles de lista: contagem + ordenação */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-1">
-        <span className="text-sm font-medium text-gray-500 dark:text-dark-text-secondary">
-          {filteredAndSortedStores.length}{" "}
-          {filteredAndSortedStores.length === 1 ? "loja" : "lojas"}
-        </span>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="text-sm font-medium text-gray-500 dark:text-dark-text-secondary">
+            {filteredAndSortedStores.length}{" "}
+            {filteredAndSortedStores.length === 1 ? "loja" : "lojas"}
+            {lojasSemCobrador > 0 && (
+              <span className="ml-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
+                · {lojasSemCobrador} sem cobrador
+              </span>
+            )}
+          </span>
+          {/* Recorte da inadimplencia dos cards (o filtro de vencimento
+              prevalece). */}
+          {recorteInad !== "filtro" ? (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-gray-500 dark:text-dark-text-secondary">
+                Inadimplência:
+              </span>
+              <div className="flex bg-gray-100 dark:bg-dark-bg rounded-md p-0.5">
+                {(
+                  [
+                    ["janela", "12 meses"],
+                    ["tudo", "Tudo"],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setPeriodoInad(id)}
+                    className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors ${
+                      periodoInad === id
+                        ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
+                        : "text-gray-500 dark:text-dark-text-secondary hover:text-gray-800"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <span className="text-xs text-gray-500 dark:text-dark-text-secondary">
+              {descricaoRecorteInadimplencia(recorteInad)}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <div className="relative">
             <BarChart3 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
@@ -1243,7 +1022,11 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
         count: n,
       }))
       .sort((a, b) =>
-        a.id === SEM_COBRADOR ? 1 : b.id === SEM_COBRADOR ? -1 : b.count - a.count,
+        a.id === SEM_COBRADOR
+          ? 1
+          : b.id === SEM_COBRADOR
+            ? -1
+            : b.count - a.count,
       );
   }, [debtors, userNames]);
 
@@ -1268,9 +1051,7 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({
   // getClientGroups tem cache no contexto).
   const abrirFicha = (d: StoreDebtor) => {
     if (!d.document) return;
-    const grupo = getClientGroups().find(
-      (g) => g.document === d.document,
-    );
+    const grupo = getClientGroups().find((g) => g.document === d.document);
     if (grupo) setFicha(grupo);
   };
 
