@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { ChevronDown, ChevronUp, Download, Search, Store } from "lucide-react";
+import { Download, Search, Store, Users } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
 import { Collection } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
@@ -26,8 +26,7 @@ import {
 // Aba "Por loja" do Resumo Geral (25/11): substitui a antiga Desempenho Loja.
 // Mesma conta da visao da empresa (resumoPorLoja), em Tabela (uma linha por
 // loja, para comparar) ou Cards (os 4 cards de cada loja) -- chave ao lado do
-// Exportar, compartilhada com a aba Por cobrador. "Quem deve" abre ali mesmo,
-// sem modal.
+// Exportar, compartilhada com a aba Por cobrador. "Quem deve" abre em modal.
 
 const fmtNum = (n: number): string => n.toLocaleString("pt-BR");
 const fmtValor = (n: number): string => formatCurrency(n, false);
@@ -89,7 +88,7 @@ const ResumoPorLoja: React.FC<{
   const { collections, scheduledVisits, acordoAtivoOverdueMap, users } =
     useCollection();
   const [busca, setBusca] = useState("");
-  // Loja com o "Quem deve" aberto.
+  // Loja com o modal "Quem deve" aberto.
   const [quemDeve, setQuemDeve] = useState<string | null>(null);
   // Padrao: pior inadimplencia primeiro.
   const [chave, setChave] = useState<Chave>("inadimplencia");
@@ -249,23 +248,20 @@ const ResumoPorLoja: React.FC<{
 
   const th = "px-3 py-2.5 text-right whitespace-nowrap";
 
-  const botaoQuemDeve = (loja: string) => {
-    const aberto = quemDeve === loja;
-    return (
-      <button
-        type="button"
-        onClick={() => setQuemDeve(aberto ? null : loja)}
-        className="inline-flex items-center gap-0.5 text-[11px] font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400"
-      >
-        Quem deve
-        {aberto ? (
-          <ChevronUp className="h-3.5 w-3.5" />
-        ) : (
-          <ChevronDown className="h-3.5 w-3.5" />
-        )}
-      </button>
-    );
-  };
+  const botaoQuemDeve = (loja: string) => (
+    <button
+      type="button"
+      onClick={() => setQuemDeve(loja)}
+      title="Clientes da loja com saldo: abre a lista"
+      className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400"
+    >
+      <Users className="h-3.5 w-3.5" />
+      Quem deve
+    </button>
+  );
+  const lojaQuemDeve = quemDeve
+    ? linhas.find((l) => l.loja === quemDeve)
+    : undefined;
 
   const nomesCobradores = (l: LinhaLoja) =>
     l.cobradores.length === 0
@@ -368,9 +364,6 @@ const ResumoPorLoja: React.FC<{
                   />
                   <CardCarteira r={l.r} empresa />
                 </div>
-                {quemDeve === l.loja && (
-                  <QuemDeveLoja titulos={l.titulos} userNames={userNames} />
-                )}
               </div>
             );
           })}
@@ -452,7 +445,6 @@ const ResumoPorLoja: React.FC<{
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-dark-border/20 text-gray-700 dark:text-dark-text">
               {visiveis.map((l, i) => {
-                const aberta = quemDeve === l.loja;
                 const c = l.r.clientes;
                 const inad = l.r.inadimplencia;
                 const nomes = nomesCobradores(l);
@@ -537,16 +529,6 @@ const ResumoPorLoja: React.FC<{
                         {formatarInadimplencia(inad.pct, inad.venceu)}
                       </td>
                     </tr>
-                    {aberta && (
-                      <tr className="bg-blue-50/40 dark:bg-blue-900/5">
-                        <td colSpan={8} className="px-3 pb-4 pt-1">
-                          <QuemDeveLoja
-                            titulos={l.titulos}
-                            userNames={userNames}
-                          />
-                        </td>
-                      </tr>
-                    )}
                   </React.Fragment>
                 );
               })}
@@ -563,6 +545,14 @@ const ResumoPorLoja: React.FC<{
             </tbody>
           </table>
         </div>
+      )}
+      {lojaQuemDeve && (
+        <QuemDeveLoja
+          loja={lojaQuemDeve.loja}
+          titulos={lojaQuemDeve.titulos}
+          userNames={userNames}
+          onClose={() => setQuemDeve(null)}
+        />
       )}
       <p className="px-1 text-[11px] text-gray-400 dark:text-dark-text-secondary">
         Os valores das lojas somam o total da empresa. O número de clientes não:
