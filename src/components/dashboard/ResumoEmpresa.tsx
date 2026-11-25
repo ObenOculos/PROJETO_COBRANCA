@@ -585,7 +585,7 @@ const ResumoEmpresa: React.FC<{
           <select
             value={loja}
             onChange={(e) => setLoja(e.target.value)}
-            className="px-2 py-1.5 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-sm text-gray-900 dark:text-dark-text"
+            className="w-56 px-2 py-1.5 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-sm text-gray-900 dark:text-dark-text truncate"
           >
             <option value="">Todas</option>
             {lojas.map((l) => (

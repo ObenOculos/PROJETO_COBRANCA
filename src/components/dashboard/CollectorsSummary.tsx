@@ -1434,9 +1434,10 @@ const CollectorsSummary: React.FC = () => {
             <div className="relative" ref={collectorMenuRef}>
               <button
                 onClick={() => setCollectorMenuOpen((v) => !v)}
-                className="flex items-center gap-1 px-2 py-1.5 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-sm text-gray-900 dark:text-dark-text touch-manipulation"
+                // w-56: mesma largura do filtro de Loja da empresa (25/11).
+                className="w-56 flex items-center justify-between gap-1 px-2 py-1.5 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-sm text-gray-900 dark:text-dark-text touch-manipulation"
               >
-                {collectorFilterLabel}
+                <span className="truncate">{collectorFilterLabel}</span>
                 <ChevronDown className="h-3.5 w-3.5" />
               </button>
 
