@@ -154,3 +154,28 @@ export const formatarPp = (v: number): string =>
       maximumFractionDigits: 1,
     },
   )} p.p.`;
+
+/** Abaixo disto (em p.p.) a inadimplencia conta como "estavel". */
+export const TENDENCIA_LIMIAR_PP = 0.3;
+
+export type Tendencia = "melhorou" | "estavel" | "piorou";
+
+/** Inadimplencia: cair e bom. */
+export const tendenciaInadimplencia = (varPp: number | null): Tendencia =>
+  varPp == null || Math.abs(varPp) < TENDENCIA_LIMIAR_PP
+    ? "estavel"
+    : varPp < 0
+      ? "melhorou"
+      : "piorou";
+
+/** Recuperacao do mes contra a media dos meses fechados: subir e bom
+ * (margem de 10% da media para nao oscilar por pouco). */
+export const tendenciaRecuperacao = (
+  atual: number,
+  mediaMeses: number,
+): Tendencia =>
+  mediaMeses <= 0 || Math.abs(atual - mediaMeses) < mediaMeses * 0.1
+    ? "estavel"
+    : atual > mediaMeses
+      ? "melhorou"
+      : "piorou";

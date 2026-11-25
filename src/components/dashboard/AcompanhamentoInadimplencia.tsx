@@ -1,9 +1,17 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  ChevronDown,
+  ChevronUp,
   Hourglass,
+  Info,
+  Minus,
   RotateCcw,
   Store,
+  TrendingDown,
+  TrendingUp,
   Users,
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
@@ -11,12 +19,13 @@ import { useCollection } from "../../contexts/CollectionContext";
 import { buscarComCacheTela, lerCacheTela } from "../../utils/cacheTela";
 import { formatCurrency } from "../../utils/formatters";
 import FiltroMultiplo from "../common/FiltroMultiplo";
-import { CardSimples } from "./ResumoEmpresa";
-import { INADIMPLENCIA_A_PARTIR_DIAS } from "../../filters/inadimplencia";
+import {
+  INADIMPLENCIA_A_PARTIR_DIAS,
+  nivelInadimplencia,
+} from "../../filters/inadimplencia";
 import {
   FAIXAS_ATRASO,
   PontoInadimplencia,
-  atrasoPorIdade,
   atrasoTotal,
   formatarPct,
   formatarPp,
@@ -24,8 +33,10 @@ import {
   pctInadimplencia,
   pctRecuperacao,
   pontoDaRpc,
-  rotuloDia,
   rotuloMes,
+  Tendencia,
+  tendenciaInadimplencia,
+  tendenciaRecuperacao,
   variacaoPp,
 } from "../../filters/inadimplenciaHistorico";
 
@@ -120,17 +131,15 @@ function useHistorico(
 // Grafico de linha (uma serie so -- o titulo do quadro nomeia a serie).
 // ---------------------------------------------------------------------------
 
-const W = 600;
-const H = 200;
 const M = { top: 14, right: 16, bottom: 26, left: 44 };
-// Faixas ocupa a largura toda: proporcao mais larga, para o texto nao
+// Os graficos ocupam a largura toda: proporcao larga, para o texto nao
 // crescer junto com o grafico.
 const WF = 1200;
 const HF = 260;
 
 const GraficoLinha: React.FC<{
   titulo: string;
-  subtitulo: string;
+  subtitulo?: string;
   pontos: { rotulo: string; valor: number; dica: string[] }[];
   /** Cor da linha (classe stroke-/fill-). */
   cor: { linha: string; ponto: string };
@@ -142,8 +151,8 @@ const GraficoLinha: React.FC<{
   const passo = teto <= 5 ? 1 : teto <= 10 ? 2 : 5;
   const ticks: number[] = [];
   for (let t = 0; t <= teto; t += passo) ticks.push(t);
-  const iw = W - M.left - M.right;
-  const ih = H - M.top - M.bottom;
+  const iw = WF - M.left - M.right;
+  const ih = HF - M.top - M.bottom;
   const x = (i: number) =>
     M.left + (pontos.length <= 1 ? iw / 2 : (i / (pontos.length - 1)) * iw);
   const y = (v: number) => M.top + ih - (v / teto) * ih;
@@ -161,12 +170,14 @@ const GraficoLinha: React.FC<{
       <div className="text-sm font-semibold text-gray-900 dark:text-dark-text">
         {titulo}
       </div>
-      <div className="text-xs text-gray-500 dark:text-dark-text-secondary">
-        {subtitulo}
-      </div>
+      {subtitulo && (
+        <div className="text-xs text-gray-500 dark:text-dark-text-secondary">
+          {subtitulo}
+        </div>
+      )}
       <div className="relative mt-2">
         <svg
-          viewBox={`0 0 ${W} ${H}`}
+          viewBox={`0 0 ${WF} ${HF}`}
           className="w-full h-auto"
           role="img"
           aria-label={`${titulo}: ${pontos.map((p) => `${p.rotulo} ${formatarPct(p.valor)}`).join(", ")}`}
@@ -176,7 +187,7 @@ const GraficoLinha: React.FC<{
             <g key={t}>
               <line
                 x1={M.left}
-                x2={W - M.right}
+                x2={WF - M.right}
                 y1={y(t)}
                 y2={y(t)}
                 className="stroke-gray-200 dark:stroke-dark-border"
@@ -198,7 +209,7 @@ const GraficoLinha: React.FC<{
               <text
                 key={p.rotulo}
                 x={x(i)}
-                y={H - 8}
+                y={HF - 8}
                 textAnchor="middle"
                 className="fill-gray-500 dark:fill-gray-400 text-[11px]"
               >
@@ -253,7 +264,7 @@ const GraficoLinha: React.FC<{
           <div
             className="pointer-events-none absolute top-0 z-10 rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg px-2.5 py-1.5 text-xs shadow-md"
             style={{
-              left: `${(x(hover) / W) * 100}%`,
+              left: `${(x(hover) / WF) * 100}%`,
               transform: `translateX(${hover > pontos.length / 2 ? "-105%" : "5%"})`,
             }}
           >
@@ -438,6 +449,226 @@ const GraficoFaixas: React.FC<{
 
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Blocos visuais (25/11: o gestor e leigo -- entender pelo visual, cor,
+// icone, barra e seta; texto so como rotulo curto, explicacao na dica).
+// ---------------------------------------------------------------------------
+
+const TOP_LINHAS = 5;
+
+const COR_NIVEL = {
+  baixa: "bg-green-500",
+  media: "bg-amber-400",
+  alta: "bg-red-500",
+} as const;
+
+const ESTILO_TENDENCIA: Record<
+  Tendencia,
+  { rotulo: string; fundo: string; texto: string; circulo: string }
+> = {
+  melhorou: {
+    rotulo: "Melhorou",
+    fundo:
+      "bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800",
+    texto: "text-green-700 dark:text-green-400",
+    circulo: "bg-green-500 text-white",
+  },
+  estavel: {
+    rotulo: "Estável",
+    fundo:
+      "bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800",
+    texto: "text-amber-700 dark:text-amber-400",
+    circulo: "bg-amber-400 text-white",
+  },
+  piorou: {
+    rotulo: "Piorou",
+    fundo: "bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800",
+    texto: "text-red-700 dark:text-red-400",
+    circulo: "bg-red-500 text-white",
+  },
+};
+
+/** Seta no sentido do numero: na inadimplencia, melhorar e DESCER. */
+const SetaTendencia: React.FC<{
+  tendencia: Tendencia;
+  /** "menor" = quanto menor melhor (inadimplencia); "maior" = recuperacao. */
+  melhor?: "menor" | "maior";
+  pequena?: boolean;
+}> = ({ tendencia, melhor = "menor", pequena = false }) => {
+  const e = ESTILO_TENDENCIA[tendencia];
+  const Icone =
+    tendencia === "estavel"
+      ? Minus
+      : (tendencia === "melhorou") === (melhor === "menor")
+        ? ArrowDown
+        : ArrowUp;
+  return (
+    <span
+      className={`inline-flex items-center justify-center rounded-full ${e.circulo} ${pequena ? "h-5 w-5" : "h-6 w-6"}`}
+      title={e.rotulo}
+      aria-label={e.rotulo}
+    >
+      <Icone className={pequena ? "h-3 w-3" : "h-4 w-4"} strokeWidth={3} />
+    </span>
+  );
+};
+
+/** A resposta do mes, grande: Melhorou / Estavel / Piorou. */
+const Veredito: React.FC<{
+  tendencia: Tendencia;
+  carregando: boolean;
+  hint?: string;
+}> = ({ tendencia, carregando, hint }) => {
+  const e = ESTILO_TENDENCIA[tendencia];
+  const Icone =
+    tendencia === "melhorou"
+      ? TrendingDown
+      : tendencia === "piorou"
+        ? TrendingUp
+        : Minus;
+  return (
+    <div
+      className={`flex items-center gap-3 rounded-2xl border-2 px-4 py-3 ${carregando ? "bg-gray-50 border-gray-200 dark:bg-dark-bg dark:border-dark-border animate-pulse" : e.fundo}`}
+      title={hint}
+    >
+      <span
+        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${carregando ? "bg-gray-200 dark:bg-dark-border" : e.circulo}`}
+      >
+        {!carregando && <Icone className="h-6 w-6" strokeWidth={2.5} />}
+      </span>
+      <div>
+        <div
+          className={`text-2xl font-extrabold leading-tight ${carregando ? "text-gray-300" : e.texto}`}
+        >
+          {carregando ? "…" : e.rotulo}
+        </div>
+        <div className="text-xs text-gray-500 dark:text-dark-text-secondary">
+          desde o mês passado
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const TEMA_CARD = {
+  red: {
+    faixa: "border-t-red-400 dark:border-t-red-500/70",
+    numero: "text-red-600 dark:text-red-400",
+    icone: "text-red-600 dark:text-red-400",
+  },
+  green: {
+    faixa: "border-t-green-400 dark:border-t-green-500/70",
+    numero: "text-green-600 dark:text-green-400",
+    icone: "text-green-600 dark:text-green-400",
+  },
+} as const;
+
+/** Card: titulo + seta, numero grande, e o desenho ao lado. */
+const CardVisual: React.FC<{
+  icon: React.ElementType;
+  titulo: string;
+  tema: keyof typeof TEMA_CARD;
+  tendencia: Tendencia;
+  carregando: boolean;
+  numero: string;
+  detalhe: string;
+  hint: string;
+  children: React.ReactNode;
+}> = ({
+  icon: Icon,
+  titulo,
+  tema,
+  tendencia,
+  carregando,
+  numero,
+  detalhe,
+  hint,
+  children,
+}) => {
+  const t = TEMA_CARD[tema];
+  return (
+    <div
+      className={`min-w-0 rounded-xl border border-gray-200 border-t-4 ${t.faixa} dark:border-dark-border bg-gray-100 dark:bg-dark-bg px-4 py-3`}
+      title={hint}
+    >
+      <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-600 dark:text-dark-text-secondary">
+        <Icon className={`h-4 w-4 ${t.icone}`} />
+        {titulo}
+        {!carregando && (
+          <span className="ml-auto">
+            <SetaTendencia
+              tendencia={tendencia}
+              melhor={tema === "green" ? "maior" : "menor"}
+            />
+          </span>
+        )}
+      </div>
+      <div className="mt-1 flex items-center gap-4">
+        <div className="min-w-0">
+          <div
+            className={`text-4xl font-extrabold leading-tight ${t.numero} ${carregando ? "animate-pulse" : ""}`}
+          >
+            {carregando ? "…" : numero}
+          </div>
+          <div className="text-sm text-gray-600 dark:text-dark-text-secondary">
+            {carregando ? "" : detalhe}
+          </div>
+        </div>
+        <div className="ml-auto shrink-0">{!carregando && children}</div>
+      </div>
+    </div>
+  );
+};
+
+/** 100 quadradinhos = R$ 100: os vermelhos sao os que nao foram pagos. */
+const CemReais: React.FC<{ parte: number }> = ({ parte }) => {
+  const vermelhos = Math.max(0, Math.min(100, Math.round(parte)));
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div
+        className="grid grid-cols-10 gap-[2px]"
+        role="img"
+        aria-label={`${vermelhos} de cada 100 reais sem pagar`}
+      >
+        {Array.from({ length: 100 }, (_, i) => (
+          <span
+            key={i}
+            className={`h-2 w-2 rounded-[2px] ${i < vermelhos ? "bg-red-500" : "bg-green-300 dark:bg-green-800"}`}
+          />
+        ))}
+      </div>
+      <div className="text-[10px] font-medium text-gray-500 dark:text-dark-text-secondary">
+        R$ {vermelhos} a cada R$ 100
+      </div>
+    </div>
+  );
+};
+
+/** Barras horizontais curtas para comparar (ex.: este mes x media). */
+const Comparacao: React.FC<{
+  itens: { rotulo: string; valor: number; cor: string }[];
+}> = ({ itens }) => {
+  const max = Math.max(...itens.map((i) => i.valor), 0.0001);
+  return (
+    <div className="w-40 space-y-1.5">
+      {itens.map((i) => (
+        <div key={i.rotulo}>
+          <div className="flex justify-between text-[10px] font-medium text-gray-500 dark:text-dark-text-secondary">
+            <span>{i.rotulo}</span>
+            <span>{formatarPct(i.valor)}</span>
+          </div>
+          <div className="h-3 rounded-full bg-white dark:bg-dark-bg-secondary overflow-hidden">
+            <div
+              className={`h-full rounded-full ${i.cor}`}
+              style={{ width: `${(i.valor / max) * 100}%` }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 const AcompanhamentoInadimplencia: React.FC = () => {
   const { users } = useCollection();
   const [meses, setMeses] = useState<number>(() => {
@@ -450,6 +681,8 @@ const AcompanhamentoInadimplencia: React.FC = () => {
       : "loja",
   );
   const [lojasExcluidas, setLojasExcluidas] = useState<Set<string>>(new Set());
+  const [verTodos, setVerTodos] = useState(false);
+  const [mais, setMais] = useState(false);
 
   useEffect(() => {
     localStorage.setItem("inadimplenciaMeses", String(meses));
@@ -504,31 +737,39 @@ const AcompanhamentoInadimplencia: React.FC = () => {
     const hoje = dias[dias.length - 1];
     const antes = dias.length > 1 ? dias[dias.length - 2] : null;
     const chaves = [...new Set(fonte.map((p) => p.chave))];
-    return chaves
-      .filter(
-        (k) =>
-          agrupar !== "loja" ||
-          lojasExcluidas.size === 0 ||
-          (k != null && !lojasExcluidas.has(k)),
-      )
-      .map((k) => {
-        const h = fonte.find((p) => p.chave === k && p.dia === hoje);
-        const a = antes
-          ? fonte.find((p) => p.chave === k && p.dia === antes)
-          : undefined;
-        return { chave: k, hoje: h, antes: a };
-      })
-      .filter(
-        (
-          l,
-        ): l is {
-          chave: string | null;
-          hoje: PontoInadimplencia;
-          antes: PontoInadimplencia | undefined;
-        } => !!l.hoje && atrasoTotal(l.hoje) + l.hoje.venceu > 0,
-      )
-      .sort((x, y) => pctInadimplencia(y.hoje) - pctInadimplencia(x.hoje));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return (
+      chaves
+        .filter(
+          (k) =>
+            agrupar !== "loja" ||
+            lojasExcluidas.size === 0 ||
+            (k != null && !lojasExcluidas.has(k)),
+        )
+        .map((k) => {
+          const h = fonte.find((p) => p.chave === k && p.dia === hoje);
+          const a = antes
+            ? fonte.find((p) => p.chave === k && p.dia === antes)
+            : undefined;
+          return { chave: k, hoje: h, antes: a };
+        })
+        .filter(
+          (
+            l,
+          ): l is {
+            chave: string | null;
+            hoje: PontoInadimplencia;
+            antes: PontoInadimplencia | undefined;
+          } => !!l.hoje && atrasoTotal(l.hoje) + l.hoje.venceu > 0,
+        )
+        // Loja: maior inadimplencia primeiro. Cobrador: menor recuperacao
+        // primeiro -- a carteira dele e so de atrasados, entao a inadimplencia
+        // e sempre alta e nao compara o trabalho (25/11).
+        .sort((x, y) =>
+          agrupar === "loja"
+            ? pctInadimplencia(y.hoje) - pctInadimplencia(x.hoje)
+            : pctRecuperacao(x.hoje) - pctRecuperacao(y.hoje),
+        )
+    );
   }, [agrupar, porLoja.dados, porCobrador.dados, lojasExcluidas]);
 
   const carregando = !empresa.dados && !empresa.erro;
@@ -538,14 +779,32 @@ const AcompanhamentoInadimplencia: React.FC = () => {
   const varInad = atual
     ? variacaoPp(pctHoje, anterior ? pctInadimplencia(anterior) : null)
     : null;
+  const tendInad = tendenciaInadimplencia(varInad);
+  const recHoje = atual ? pctRecuperacao(atual) : 0;
   // Media da recuperacao so dos meses FECHADOS (o atual ainda esta correndo).
   const mediaRec = media(serie.slice(0, -1).map(pctRecuperacao));
-  const idade = atual
-    ? atrasoPorIdade(atual)
-    : { ate90: 0, ate365: 0, maisDeAno: 0 };
-  const totalAtraso = atual ? atrasoTotal(atual) : 0;
-  const totalAtrasoAntes = anterior ? atrasoTotal(anterior) : null;
+  const tendRec = tendenciaRecuperacao(recHoje, mediaRec);
   const temRetrato = serie.some((p) => p.fonte === "retrato");
+  const maxRecLinhas = Math.max(
+    ...(linhas ?? []).map((l) => pctRecuperacao(l.hoje)),
+    0.0001,
+  );
+  const linhasVisiveis = linhas
+    ? verTodos
+      ? linhas
+      : linhas.slice(0, TOP_LINHAS)
+    : null;
+
+  // Explicacao so na dica do (i): a tela fala pelo visual (pedido 25/11).
+  const notaRodape = [
+    "Todos os títulos a prazo; cancelados, agrupados e renegociados ficam fora.",
+    `Inadimplência: do que venceu nos últimos 12 meses, quanto está há ${INADIMPLENCIA_A_PARTIR_DIAS} dias ou mais sem pagar.`,
+    "Recuperação: do atraso que vinha do mês anterior, quanto foi pago no mês.",
+    temRetrato
+      ? "Meses com retrato diário mostram o que se via no dia; os demais são reconstruídos pelas datas de pagamento."
+      : "Meses passados reconstruídos pelas datas de pagamento; daqui para frente há um retrato por dia.",
+    "Por cobrador: quem tem a carteira hoje.",
+  ].join("\n");
 
   return (
     <div className="space-y-4">
@@ -584,12 +843,18 @@ const AcompanhamentoInadimplencia: React.FC = () => {
             </button>
           ))}
         </div>
+        <span
+          className="ml-auto text-gray-400 hover:text-gray-600 dark:hover:text-dark-text cursor-help"
+          title={notaRodape}
+          aria-label={notaRodape}
+        >
+          <Info className="h-4 w-4" />
+        </span>
       </div>
 
       {erro && (
         <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 px-3 py-2 text-sm text-red-700 dark:text-red-400">
-          Não foi possível carregar a inadimplência. Recarregue a página; se
-          continuar, avise o suporte.
+          Não foi possível carregar a inadimplência. Recarregue a página.
         </div>
       )}
 
@@ -599,153 +864,105 @@ const AcompanhamentoInadimplencia: React.FC = () => {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <CardSimples
+          {/* 1) A resposta primeiro: melhorou / estavel / piorou. */}
+          <Veredito
+            tendencia={tendInad}
+            carregando={carregando}
+            hint={
+              varInad != null
+                ? `Inadimplência ${formatarPct(pctHoje)} hoje × ${formatarPct(pctHoje - varInad)} no fim do mês passado (${formatarPp(varInad)}).`
+                : undefined
+            }
+          />
+
+          {/* 2) Dois cards visuais; 3) divida antiga a parte. */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <CardVisual
               icon={AlertTriangle}
               titulo="Inadimplência"
               tema="red"
-              numero={carregando ? "…" : formatarPct(pctHoje)}
-              numeroLoading={carregando}
-              frase={`do que venceu nos últimos 12 meses não foi pago (atraso de ${INADIMPLENCIA_A_PARTIR_DIAS} dias ou mais)`}
-              pilulas={
-                atual
-                  ? [
-                      {
-                        valor: fmtCurto(atual.naoPago),
-                        rotulo: "Não pago",
-                        tom: "red",
-                      },
-                      {
-                        valor: fmtCurto(atual.venceu),
-                        rotulo: "Venceu em 12 meses",
-                        tom: "gray",
-                      },
-                      ...(varInad != null
-                        ? [
-                            {
-                              valor: formatarPp(varInad),
-                              rotulo: "desde o fim do mês passado",
-                              tom: (varInad > 0.05
-                                ? "red"
-                                : varInad < -0.05
-                                  ? "green"
-                                  : "gray") as "red" | "green" | "gray",
-                              hint: "Pontos percentuais: subir é ruim, cair é bom.",
-                            },
-                          ]
-                        : []),
-                    ]
-                  : []
-              }
-            />
-            <CardSimples
+              tendencia={tendInad}
+              carregando={carregando}
+              numero={formatarPct(pctHoje)}
+              hint={`De cada R$ 100 que venceram nos últimos 12 meses, R$ ${Math.round(pctHoje)} estão sem pagar.`}
+              detalhe={atual ? `${fmtCurto(atual.naoPago)} sem pagar` : ""}
+            >
+              <CemReais parte={pctHoje} />
+            </CardVisual>
+            <CardVisual
               icon={RotateCcw}
               titulo="Recuperação"
               tema="green"
-              numero={
-                carregando
-                  ? "…"
-                  : formatarPct(atual ? pctRecuperacao(atual) : 0)
-              }
-              numeroLoading={carregando}
-              frase={`do atraso que vinha de antes foi pago neste mês (até ${atual ? rotuloDia(atual.dia) : "hoje"})`}
-              pilulas={
-                atual
-                  ? [
-                      {
-                        valor: fmtCurto(atual.recuperadoMes),
-                        rotulo: "Recuperado no mês",
-                        tom: "green",
-                      },
-                      {
-                        valor: fmtCurto(atual.atrasoInicioMes),
-                        rotulo: "Atraso no início do mês",
-                        tom: "gray",
-                      },
-                      {
-                        valor: formatarPct(mediaRec),
-                        rotulo: `Média dos ${Math.max(serie.length - 1, 0)} meses anteriores`,
-                        tom: "gray",
-                        hint: "Recuperação média dos meses já fechados (o mês atual ainda está correndo).",
-                      },
-                    ]
-                  : []
-              }
-            />
-            <CardSimples
-              icon={Hourglass}
-              titulo="Atraso acumulado"
-              tema="slate"
-              numero={carregando ? "…" : fmtCurto(totalAtraso)}
-              numeroHint={fmtValor(totalAtraso)}
-              numeroLoading={carregando}
-              frase={
-                totalAtrasoAntes != null
-                  ? `em atraso hoje, de qualquer idade (${totalAtraso >= totalAtrasoAntes ? "+" : "−"}${fmtCurto(Math.abs(totalAtraso - totalAtrasoAntes))} no mês)`
-                  : "em atraso hoje, de qualquer idade"
-              }
-              pilulas={
-                atual
-                  ? [
-                      {
-                        valor: fmtCurto(idade.ate90),
-                        rotulo: "Até 90 dias",
-                        tom: "amber",
-                      },
-                      {
-                        valor: fmtCurto(idade.ate365),
-                        rotulo: "91 dias a 1 ano",
-                        tom: "amber",
-                      },
-                      {
-                        valor: fmtCurto(idade.maisDeAno),
-                        rotulo: "Mais de 1 ano",
-                        tom: "red",
-                      },
-                    ]
-                  : []
-              }
-            />
+              tendencia={tendRec}
+              carregando={carregando}
+              numero={atual ? fmtCurto(atual.recuperadoMes) : "—"}
+              hint={`Do atraso que vinha de antes (${atual ? fmtValor(atual.atrasoInicioMes) : "—"}), foram pagos ${atual ? fmtValor(atual.recuperadoMes) : "—"} neste mês (${formatarPct(recHoje)}). Média dos meses anteriores: ${formatarPct(mediaRec)}.`}
+              detalhe={`${formatarPct(recHoje)} do atraso`}
+            >
+              <Comparacao
+                itens={[
+                  {
+                    rotulo: "este mês",
+                    valor: recHoje,
+                    cor: "bg-green-500",
+                  },
+                  {
+                    rotulo: "média",
+                    valor: mediaRec,
+                    cor: "bg-gray-300 dark:bg-gray-600",
+                  },
+                ]}
+              />
+            </CardVisual>
           </div>
 
-          {serie.length > 0 && (
-            <>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                <GraficoLinha
-                  titulo="Inadimplência, mês a mês"
-                  subtitulo="Quanto menor, melhor. No fim de cada mês."
-                  cor={{ linha: "stroke-red-500", ponto: "fill-red-500" }}
-                  pontos={serie.map((p, i) => ({
-                    rotulo: rotulos[i],
-                    valor: pctInadimplencia(p),
-                    dica: [
-                      `Não pago: ${fmtValor(p.naoPago)}`,
-                      `Venceu em 12 meses: ${fmtValor(p.venceu)}`,
-                    ],
-                  }))}
-                />
-                <GraficoLinha
-                  titulo="Recuperação, mês a mês"
-                  subtitulo="Quanto maior, melhor. Do atraso no início de cada mês."
-                  cor={{ linha: "stroke-green-600", ponto: "fill-green-600" }}
-                  pontos={serie.map((p, i) => ({
-                    rotulo: rotulos[i],
-                    valor: pctRecuperacao(p),
-                    dica: [
-                      `Recuperado: ${fmtValor(p.recuperadoMes)}`,
-                      `Atraso no início: ${fmtValor(p.atrasoInicioMes)}`,
-                    ],
-                  }))}
-                />
-              </div>
-              <GraficoFaixas serie={serie} rotulos={rotulos} />
-            </>
+          {atual && atual.faixas.d365_mais > 0 && (
+            <div
+              className="flex items-center gap-2 rounded-lg bg-gray-100 dark:bg-dark-bg px-3 py-2 text-sm text-gray-600 dark:text-dark-text-secondary"
+              title="Atraso com mais de 1 ano: difícil de recuperar, acompanhado à parte do trabalho do mês."
+            >
+              <Hourglass className="h-4 w-4 text-gray-400" />
+              <span>Dívida antiga</span>
+              <span className="text-xs text-gray-400">+1 ano</span>
+              <span className="ml-auto font-semibold text-gray-700 dark:text-dark-text">
+                {fmtCurto(atual.faixas.d365_mais)}
+              </span>
+            </div>
           )}
 
+          {serie.length > 0 && (
+            <GraficoLinha
+              titulo="Inadimplência, mês a mês"
+              cor={{ linha: "stroke-red-500", ponto: "fill-red-500" }}
+              pontos={serie.map((p, i) => ({
+                rotulo: rotulos[i],
+                valor: pctInadimplencia(p),
+                dica: [
+                  `Não pago: ${fmtValor(p.naoPago)}`,
+                  `Venceu em 12 meses: ${fmtValor(p.venceu)}`,
+                ],
+              }))}
+            />
+          )}
+
+          {/* 4) Lista curta: as piores primeiro, barra + seta. */}
           <div className="rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg-secondary">
             <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-gray-200 dark:border-dark-border">
               <span className="text-sm font-semibold text-gray-900 dark:text-dark-text">
-                Quem está pior agora
+                Quem está pior
+              </span>
+              <span className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-dark-text-secondary">
+                {agrupar === "loja" ? (
+                  <>
+                    <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
+                    inadimplência
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="h-3.5 w-3.5 text-green-600" />
+                    recuperação no mês
+                  </>
+                )}
               </span>
               <div
                 className="ml-auto flex bg-gray-100 dark:bg-dark-bg rounded-lg p-0.5"
@@ -775,111 +992,119 @@ const AcompanhamentoInadimplencia: React.FC = () => {
                 ))}
               </div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="bg-gray-50 dark:bg-dark-bg text-xs text-gray-500 dark:text-dark-text-secondary">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-medium">
-                      {agrupar === "loja" ? "Loja" : "Cobrador (de hoje)"}
-                    </th>
-                    <th className="px-3 py-2 text-right font-medium">
-                      Inadimplência
-                    </th>
-                    <th className="px-3 py-2 text-right font-medium">
-                      Desde o mês passado
-                    </th>
-                    <th className="px-3 py-2 text-right font-medium">
-                      Recuperação no mês
-                    </th>
-                    <th className="px-3 py-2 text-right font-medium">
-                      Atraso acumulado
-                    </th>
-                    <th className="px-3 py-2 text-right font-medium">
-                      Mais de 1 ano
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-dark-border">
-                  {!linhas ? (
-                    <tr>
-                      <td
-                        colSpan={6}
-                        className="px-3 py-6 text-center text-gray-400 animate-pulse"
-                      >
-                        Carregando…
-                      </td>
-                    </tr>
-                  ) : linhas.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={6}
-                        className="px-3 py-6 text-center text-gray-400"
-                      >
-                        Nada em atraso.
-                      </td>
-                    </tr>
-                  ) : (
-                    linhas.map((l) => {
-                      const pct = pctInadimplencia(l.hoje);
-                      const v = variacaoPp(
-                        pct,
-                        l.antes ? pctInadimplencia(l.antes) : null,
-                      );
-                      return (
-                        <tr
-                          key={l.chave ?? "-"}
-                          className="hover:bg-gray-50 dark:hover:bg-dark-bg"
-                        >
-                          <td className="px-3 py-2 text-gray-900 dark:text-dark-text">
-                            {agrupar === "loja"
-                              ? (l.chave ?? "Sem loja")
-                              : nomeCobrador(l.chave)}
-                          </td>
-                          <td className="px-3 py-2 text-right font-semibold text-gray-900 dark:text-dark-text">
-                            {formatarPct(pct)}
-                          </td>
-                          <td
-                            className={`px-3 py-2 text-right ${
-                              v == null
-                                ? "text-gray-400"
-                                : v > 0.05
-                                  ? "text-red-600 dark:text-red-400"
-                                  : v < -0.05
-                                    ? "text-green-600 dark:text-green-400"
-                                    : "text-gray-500"
-                            }`}
-                          >
-                            {v == null
-                              ? "—"
-                              : `${v > 0.05 ? "↑" : v < -0.05 ? "↓" : ""} ${formatarPp(v)}`}
-                          </td>
-                          <td className="px-3 py-2 text-right text-gray-700 dark:text-dark-text">
-                            {formatarPct(pctRecuperacao(l.hoje))}
-                          </td>
-                          <td className="px-3 py-2 text-right text-gray-700 dark:text-dark-text">
-                            {fmtValor(atrasoTotal(l.hoje))}
-                          </td>
-                          <td className="px-3 py-2 text-right text-gray-700 dark:text-dark-text">
-                            {fmtValor(l.hoje.faixas.d365_mais)}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+            <div className="divide-y divide-gray-100 dark:divide-dark-border">
+              {!linhasVisiveis ? (
+                <div className="px-3 py-6 text-center text-sm text-gray-400 animate-pulse">
+                  Carregando…
+                </div>
+              ) : linhasVisiveis.length === 0 ? (
+                <div className="px-3 py-6 text-center text-sm text-gray-400">
+                  Nada em atraso.
+                </div>
+              ) : (
+                linhasVisiveis.map((l) => {
+                  const pct = pctInadimplencia(l.hoje);
+                  const v = variacaoPp(
+                    pct,
+                    l.antes ? pctInadimplencia(l.antes) : null,
+                  );
+                  const nome =
+                    agrupar === "loja"
+                      ? (l.chave ?? "Sem loja")
+                      : nomeCobrador(l.chave);
+                  const rec = pctRecuperacao(l.hoje);
+                  const porLojaLinha = agrupar === "loja";
+                  const largura = porLojaLinha
+                    ? Math.min(pct, 100)
+                    : (rec / maxRecLinhas) * 100;
+                  return (
+                    <div
+                      key={l.chave ?? "-"}
+                      className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)_auto] sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto] items-center gap-3 px-3 py-2"
+                      title={`${nome}: inadimplência ${formatarPct(pct)}${v != null ? ` (${formatarPp(v)} no mês)` : ""} · recuperação ${formatarPct(pctRecuperacao(l.hoje))} · atraso ${fmtValor(atrasoTotal(l.hoje))} · +1 ano ${fmtValor(l.hoje.faixas.d365_mais)}`}
+                    >
+                      <span className="truncate text-sm text-gray-900 dark:text-dark-text">
+                        {nome}
+                      </span>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="h-2.5 flex-1 rounded-full bg-gray-100 dark:bg-dark-bg overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${porLojaLinha ? COR_NIVEL[nivelInadimplencia(pct)] : "bg-green-500"}`}
+                            style={{ width: `${largura}%` }}
+                          />
+                        </div>
+                        <span className="w-12 text-right text-sm font-semibold text-gray-900 dark:text-dark-text">
+                          {porLojaLinha
+                            ? formatarPct(pct, 0)
+                            : formatarPct(rec)}
+                        </span>
+                      </div>
+                      {porLojaLinha ? (
+                        <SetaTendencia
+                          tendencia={tendenciaInadimplencia(v)}
+                          pequena
+                        />
+                      ) : (
+                        <RotateCcw className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
+            {linhas && linhas.length > TOP_LINHAS && (
+              <button
+                type="button"
+                onClick={() => setVerTodos((x) => !x)}
+                className="w-full flex items-center justify-center gap-1 px-3 py-2 text-xs font-semibold text-blue-600 dark:text-blue-400 border-t border-gray-100 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg"
+              >
+                {verTodos ? "ver menos" : `ver todos (${linhas.length})`}
+                {verTodos ? (
+                  <ChevronUp className="h-3.5 w-3.5" />
+                ) : (
+                  <ChevronDown className="h-3.5 w-3.5" />
+                )}
+              </button>
+            )}
           </div>
 
-          <p className="text-xs text-gray-500 dark:text-dark-text-secondary">
-            Todos os títulos a prazo. Cancelados, agrupados e renegociados ficam
-            fora.
-            {temRetrato
-              ? " Meses com retrato diário mostram o que se via no dia; os demais são reconstruídos pelas datas de pagamento."
-              : " Os meses passados são reconstruídos pelas datas de pagamento; a partir de agora o sistema guarda um retrato por dia."}
-            {agrupar === "cobrador" &&
-              " Por cobrador, o atraso é de quem tem a carteira hoje."}
-          </p>
+          {/* Resto em "mais graficos": recuperacao e idade do atraso. */}
+          {serie.length > 0 && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setMais((x) => !x)}
+                className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400"
+              >
+                {mais ? "menos gráficos" : "mais gráficos"}
+                {mais ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </button>
+              {mais && (
+                <div className="mt-3 space-y-3">
+                  <GraficoLinha
+                    titulo="Recuperação, mês a mês"
+                    cor={{
+                      linha: "stroke-green-600",
+                      ponto: "fill-green-600",
+                    }}
+                    pontos={serie.map((p, i) => ({
+                      rotulo: rotulos[i],
+                      valor: pctRecuperacao(p),
+                      dica: [
+                        `Recuperado: ${fmtValor(p.recuperadoMes)}`,
+                        `Atraso no início: ${fmtValor(p.atrasoInicioMes)}`,
+                      ],
+                    }))}
+                  />
+                  <GraficoFaixas serie={serie} rotulos={rotulos} />
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>
