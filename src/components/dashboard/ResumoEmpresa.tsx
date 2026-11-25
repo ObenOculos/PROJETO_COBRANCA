@@ -138,14 +138,16 @@ export const CardSimples: React.FC<{
       <div className="text-sm text-gray-700 dark:text-dark-text">{frase}</div>
 
       {pilulas.length > 0 && (
-        <div className="mt-2 space-y-1.5">
+        // Etiquetas lado a lado (25/11: empilhadas deixavam o card alto e o
+        // vizinho com um vazio estranho).
+        <div className="mt-2 flex flex-wrap gap-1.5">
           {pilulas.map((p) => (
             <div
               key={p.texto}
               title={p.hint}
               onClick={p.onClick}
               role={p.onClick ? "button" : undefined}
-              className={`rounded-lg px-2.5 py-1.5 text-sm font-semibold ${PILULA[p.tom]} ${p.loading ? "animate-pulse" : ""} ${p.onClick ? "cursor-pointer hover:opacity-90" : ""}`}
+              className={`rounded-md px-2 py-1 text-xs font-semibold whitespace-nowrap ${PILULA[p.tom]} ${p.loading ? "animate-pulse" : ""} ${p.onClick ? "cursor-pointer hover:opacity-90" : ""}`}
             >
               {p.texto}
             </div>
@@ -300,6 +302,21 @@ export const CardPrevisao: React.FC<{ r: Resumo }> = ({ r }) => {
       numero={p.de ? fmtValorCurto(p.total) : "—"}
       numeroHint={p.de ? fmtValor(p.total) : undefined}
       frase={frase}
+      pilulas={
+        p.de
+          ? [
+              { valor: p.parcelas, txt: "em parcelas", n: p.parcelasClientes },
+              { valor: p.acordo, txt: "de acordos", n: p.acordoClientes },
+              { valor: p.agendados, txt: "de agendados", n: p.agendadosClientes },
+            ]
+              .filter((x) => x.valor > 0)
+              .map((x) => ({
+                texto: `${fmtValorCurto(x.valor)} ${x.txt}`,
+                tom: "gray" as const,
+                hint: `${fmtValor(x.valor)} · ${clientesTxt(x.n)}`,
+              }))
+          : []
+      }
       detalhes={
         p.de
           ? [
@@ -347,17 +364,20 @@ const CardRecebidoEmpresa: React.FC<{
         loading: registradoCobradores.loading,
         hint: "Registrado pelos cobradores no app. Já está dentro do total — não somar.",
       },
+      {
+        texto: acionados
+          ? `${fmtNum(acionados.size)} clientes acionados`
+          : "… clientes acionados",
+        tom: "gray",
+        loading: !acionados,
+        hint: "Clientes diferentes que algum cobrador ligou, mandou mensagem ou visitou no período",
+      },
     ]}
     detalhes={[
       {
         label: "Pagaram na loja sem o cobrador",
         value: fmtValor(r.recebido.soErp),
         hint: "Baixado no ERP, de clientes sem pagamento registrado por cobrador",
-      },
-      {
-        label: "Clientes acionados",
-        value: acionados ? fmtNum(acionados.size) : "…",
-        loading: !acionados,
       },
     ]}
   />
@@ -388,6 +408,17 @@ export const CardDesempenho: React.FC<{
         },
       ]
     : [{ texto: "Sem meta definida", tom: "gray" }];
+  // 1a linha de atendimentos = clientes acionados (ou visitados, externo):
+  // vira etiqueta, como no card Recebido da empresa.
+  const [clientesAtend, ...outrosAtend] = atendimentos;
+  if (clientesAtend) {
+    pilulas.push({
+      texto: `${clientesAtend.value} ${clientesAtend.label.toLowerCase()}`,
+      tom: "gray",
+      loading: clientesAtend.loading,
+      hint: clientesAtend.hint,
+    });
+  }
   return (
     <CardSimples
       icon={Gauge}
@@ -413,7 +444,7 @@ export const CardDesempenho: React.FC<{
           value: fmtValor(r.recebido.soErp),
           hint: "Baixado no ERP no período, de clientes da carteira sem registro do cobrador",
         },
-        ...atendimentos,
+        ...outrosAtend,
       ]}
     />
   );
