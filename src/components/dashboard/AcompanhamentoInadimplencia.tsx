@@ -5,6 +5,8 @@ import {
   ArrowDown,
   ArrowUp,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   Hourglass,
   Info,
@@ -613,6 +615,9 @@ const CardVisual: React.FC<{
   corDetalhe: string;
   /** Mes que o numero grande mostra (o "ate" do intervalo). */
   mes: string;
+  /** Setas do mes (undefined = seta apagada). */
+  onMesAnterior?: () => void;
+  onMesSeguinte?: () => void;
   /** Observacao curta no fim do "ver detalhes". */
   nota?: string;
   hint: string;
@@ -629,6 +634,8 @@ const CardVisual: React.FC<{
   detalhes,
   corDetalhe,
   mes,
+  onMesAnterior,
+  onMesSeguinte,
   nota,
   hint,
 }) => {
@@ -646,13 +653,37 @@ const CardVisual: React.FC<{
         {titulo}
         {/* 25/11: deixar claro de que mes e o numero (o "ate"); o "de" so
             muda a media e o grafico. */}
+        {/* 25/11: setas para ver o mes passado (ou outro) sem mexer no
+            "ate" -- o gestor perguntava por que o % nao mudava. */}
         {!carregando && mes && (
-          <span
-            className="ml-auto inline-flex items-center gap-1 rounded-full bg-white dark:bg-dark-bg-secondary border border-gray-200 dark:border-dark-border px-2 py-0.5 text-[11px] font-semibold text-gray-600 dark:text-dark-text-secondary"
-            title="Mês mostrado no número grande (o fim do intervalo)"
-          >
-            <CalendarRange className="h-3 w-3" />
-            {mes}
+          <span className="ml-auto inline-flex items-center rounded-full bg-white dark:bg-dark-bg-secondary border border-gray-200 dark:border-dark-border text-[11px] font-semibold text-gray-600 dark:text-dark-text-secondary">
+            <button
+              type="button"
+              onClick={onMesAnterior}
+              disabled={!onMesAnterior}
+              aria-label="Mês anterior"
+              title="Mês anterior"
+              className="rounded-l-full px-1 py-0.5 hover:text-blue-600 disabled:opacity-30 disabled:hover:text-inherit touch-manipulation"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+            <span
+              className="inline-flex items-center gap-1 py-0.5"
+              title="Mês mostrado no número grande (o fim do intervalo)"
+            >
+              <CalendarRange className="h-3 w-3" />
+              {mes}
+            </span>
+            <button
+              type="button"
+              onClick={onMesSeguinte}
+              disabled={!onMesSeguinte}
+              aria-label="Mês seguinte"
+              title="Mês seguinte"
+              className="rounded-r-full px-1 py-0.5 hover:text-blue-600 disabled:opacity-30 disabled:hover:text-inherit touch-manipulation"
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
           </span>
         )}
       </div>
@@ -790,6 +821,21 @@ const AcompanhamentoInadimplencia: React.FC = () => {
       return novo;
     });
   };
+  // Setas do card: anda o intervalo inteiro um mes (mesmo tamanho), sem
+  // passar do mes atual nem do inicio da base.
+  const andarMes = (n: number) => {
+    setPreset("personalizado");
+    setIntervalo((atual) => {
+      const fim = somarMeses(atual.fim, n);
+      const inicio = somarMeses(atual.inicio, n);
+      return {
+        fim,
+        inicio: inicio < INADIMPLENCIA_MES_INICIAL ? INADIMPLENCIA_MES_INICIAL : inicio,
+      };
+    });
+  };
+  const podeVoltar = intervalo.fim > INADIMPLENCIA_MES_INICIAL;
+  const podeAvancar = intervalo.fim < mesAtual;
   const [agrupar, setAgrupar] = useState<Agrupar>(() =>
     localStorage.getItem("inadimplenciaAgrupar") === "cobrador"
       ? "cobrador"
@@ -1216,6 +1262,8 @@ const AcompanhamentoInadimplencia: React.FC = () => {
               }
               corDetalhe="bg-red-400"
               mes={mesDoCard}
+              onMesAnterior={podeVoltar ? () => andarMes(-1) : undefined}
+              onMesSeguinte={podeAvancar ? () => andarMes(1) : undefined}
               detalhes={detalhesInad}
               hint={`De cada R$ 100 que venceram nos últimos 12 meses, R$ ${Math.round(pctHoje)} estão sem pagar.`}
             />
@@ -1254,6 +1302,8 @@ const AcompanhamentoInadimplencia: React.FC = () => {
               }
               corDetalhe="bg-green-500"
               mes={mesDoCard}
+              onMesAnterior={podeVoltar ? () => andarMes(-1) : undefined}
+              onMesSeguinte={podeAvancar ? () => andarMes(1) : undefined}
               nota={NOTA_RECUPERACAO}
               detalhes={detalhesRec}
               hint={`Do atraso que vinha de antes (${atual ? fmtValor(atual.atrasoInicioMes) : "—"}), foram pagos ${atual ? fmtValor(atual.recuperadoMes) : "—"} no mês. Média dos meses anteriores: ${formatarPct(mediaRec)}.`}
