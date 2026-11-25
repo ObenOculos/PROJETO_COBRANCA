@@ -10,7 +10,6 @@ import { buscarComCacheTela, lerCacheTela } from "../../utils/cacheTela";
 import {
   ClipboardList,
   Info,
-  Users,
   CalendarClock,
   Repeat,
   ChevronDown,
@@ -178,11 +177,6 @@ const TONE_ATENDIMENTO = "bg-indigo-50/70 dark:bg-indigo-900/10";
 // Atribuicao de Cobradores). "Mes atual" e o padrao pedido pelo gestor.
 
 /** dd/mm/aaaa a partir de uma string YYYY-MM-DD, sem passar por Date (ver CLAUDE.md). */
-const toBr = (iso: string): string => {
-  const [y, m, d] = iso.split("-");
-  return `${d}/${m}/${y}`;
-};
-
 /** Titulo de coluna clicavel pra ordenar a tabela, com seta indicando a
  * coluna/direcao ativa. */
 const SortTh: React.FC<{
@@ -1334,65 +1328,9 @@ const CollectorsSummary: React.FC = () => {
             </button>
           ))}
 
-          <div className="relative" ref={collectorMenuRef}>
-            <button
-              onClick={() => setCollectorMenuOpen((v) => !v)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors touch-manipulation ${
-                excludedCollectorIds.size > 0
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 dark:bg-dark-bg text-gray-600 dark:text-dark-text-secondary hover:bg-gray-200 dark:hover:bg-dark-border"
-              }`}
-            >
-              <Users className="h-3.5 w-3.5" />
-              {collectorFilterLabel}
-              <ChevronDown className="h-3.5 w-3.5" />
-            </button>
-
-            {collectorMenuOpen && (
-              <div className="absolute z-20 mt-1 w-64 max-h-80 overflow-y-auto rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg-secondary shadow-lg p-2">
-                <button
-                  onClick={toggleSelectAll}
-                  className="w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                >
-                  {excludedCollectorIds.size === 0
-                    ? "Desmarcar todos"
-                    : "Selecionar todos"}
-                </button>
-                <div className="my-1 border-t border-gray-100 dark:border-dark-border/40" />
-                {allCollectors.map((c) => (
-                  <label
-                    key={c.id}
-                    className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-bg cursor-pointer"
-                  >
-                    <span
-                      className={`flex items-center justify-center h-4 w-4 rounded border ${
-                        isCollectorChecked(c.id)
-                          ? "bg-blue-600 border-blue-600"
-                          : "border-gray-300 dark:border-dark-border"
-                      }`}
-                    >
-                      {isCollectorChecked(c.id) && (
-                        <Check className="h-3 w-3 text-white" />
-                      )}
-                    </span>
-                    <input
-                      type="checkbox"
-                      className="hidden"
-                      checked={isCollectorChecked(c.id)}
-                      onChange={() => toggleCollector(c.id)}
-                    />
-                    {c.name}
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-gray-100 dark:border-dark-border/40">
-          <span className="text-xs font-medium text-gray-500 dark:text-dark-text-secondary">
-            Período personalizado:
-          </span>
+          {/* Datas na mesma linha dos atalhos (25/11: o rotulo "Periodo
+              personalizado" e o texto "(de ... ate ...)" repetiam as datas). */}
+          <span className="hidden sm:block h-5 w-px bg-gray-200 dark:bg-dark-border mx-1" />
           <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-dark-text-secondary">
             De
             <input
@@ -1418,11 +1356,6 @@ const CollectorsSummary: React.FC = () => {
               className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-xs text-gray-700 dark:text-dark-text"
             />
           </label>
-          <span className="text-[11px] text-gray-400 dark:text-dark-text-secondary">
-            {activePreset === "all"
-              ? "(sem filtro de período — todos os registros)"
-              : `(${toBr(dateFrom)} até ${toBr(dateTo)})`}
-          </span>
         </div>
       </div>
 
@@ -1479,24 +1412,75 @@ const CollectorsSummary: React.FC = () => {
           }}
         />
         <div className="border-t-2 border-gray-200 dark:border-dark-border" />
-        <button
-          onClick={() => setOverviewOpen((o) => !o)}
-          className="w-full flex items-center gap-2 text-base font-bold text-gray-900 dark:text-dark-text"
-        >
-          <Gauge className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-          {rows.length === 1
-            ? "Visão geral do cobrador"
-            : "Visão geral dos cobradores"}
-          <span className="text-xs font-normal text-gray-400 dark:text-dark-text-secondary">
-            ({rows.length}{" "}
-            {rows.length === 1 ? "cobrador" : "cobradores"})
-          </span>
-          {overviewOpen ? (
-            <ChevronUp className="h-3.5 w-3.5 ml-auto text-gray-400" />
-          ) : (
-            <ChevronDown className="h-3.5 w-3.5 ml-auto text-gray-400" />
-          )}
-        </button>
+        {/* Filtro de cobrador aqui, como o de Loja na visao da empresa
+            (25/11): cada filtro fica junto do bloco que ele muda. */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <button
+            onClick={() => setOverviewOpen((o) => !o)}
+            className="flex items-center gap-2 text-base font-bold text-gray-900 dark:text-dark-text"
+          >
+            <Gauge className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            {rows.length === 1
+              ? "Visão geral do cobrador"
+              : "Visão geral dos cobradores"}
+            {overviewOpen ? (
+              <ChevronUp className="h-4 w-4 text-gray-400" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-gray-400" />
+            )}
+          </button>
+          <div className="sm:ml-auto flex items-center gap-1.5 text-sm text-gray-700 dark:text-dark-text-secondary">
+            Cobrador
+            <div className="relative" ref={collectorMenuRef}>
+              <button
+                onClick={() => setCollectorMenuOpen((v) => !v)}
+                className="flex items-center gap-1 px-2 py-1.5 rounded-lg border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-bg text-sm text-gray-900 dark:text-dark-text touch-manipulation"
+              >
+                {collectorFilterLabel}
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+
+              {collectorMenuOpen && (
+                <div className="absolute right-0 z-20 mt-1 w-64 max-h-80 overflow-y-auto rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg-secondary shadow-lg p-2">
+                  <button
+                    onClick={toggleSelectAll}
+                    className="w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                  >
+                    {excludedCollectorIds.size === 0
+                      ? "Desmarcar todos"
+                      : "Selecionar todos"}
+                  </button>
+                  <div className="my-1 border-t border-gray-100 dark:border-dark-border/40" />
+                  {allCollectors.map((c) => (
+                    <label
+                      key={c.id}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-gray-700 dark:text-dark-text hover:bg-gray-50 dark:hover:bg-dark-bg cursor-pointer"
+                    >
+                      <span
+                        className={`flex items-center justify-center h-4 w-4 rounded border ${
+                          isCollectorChecked(c.id)
+                            ? "bg-blue-600 border-blue-600"
+                            : "border-gray-300 dark:border-dark-border"
+                        }`}
+                      >
+                        {isCollectorChecked(c.id) && (
+                          <Check className="h-3 w-3 text-white" />
+                        )}
+                      </span>
+                      <input
+                        type="checkbox"
+                        className="hidden"
+                        checked={isCollectorChecked(c.id)}
+                        onChange={() => toggleCollector(c.id)}
+                      />
+                      {c.name}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
 
         {overviewOpen && (
           // Pedido do usuario (2026-11-17): o mais simples possivel -- 4
