@@ -53,7 +53,7 @@ const clientesTxt = (n: number) =>
 // Recebido/Desempenho -> Carteira (Carteira por ultimo, pedido do usuario).
 // ---------------------------------------------------------------------------
 
-type Tema = "red" | "blue" | "green" | "slate";
+type Tema = "red" | "indigo" | "blue" | "green" | "slate";
 type TomPilula = "red" | "amber" | "green" | "gray";
 
 export interface Pilula {
@@ -72,6 +72,13 @@ const TEMA: Record<Tema, { faixa: string; numero: string; icone: string }> = {
     faixa: "border-t-red-400 dark:border-t-red-500/70",
     numero: "text-red-600 dark:text-red-400",
     icone: "text-red-600 dark:text-red-400",
+  },
+  // Clientes (25/11: nao repetir o azul da Previsao; indigo ja e do projeto,
+  // na Meta da equipe).
+  indigo: {
+    faixa: "border-t-indigo-400 dark:border-t-indigo-500/70",
+    numero: "text-indigo-600 dark:text-indigo-400",
+    icone: "text-indigo-600 dark:text-indigo-400",
   },
   blue: {
     faixa: "border-t-blue-400 dark:border-t-blue-500/70",
@@ -244,7 +251,7 @@ export const CardClientes: React.FC<{ r: Resumo; cobrador?: boolean }> = ({
     <CardSimples
       icon={Users}
       titulo="Clientes"
-      tema="blue"
+      tema="indigo"
       numero={fmtNum(base)}
       frase={
         cobrador
@@ -473,6 +480,11 @@ export const CardCarteira: React.FC<{
           hint: fmtValor(r.carteira.vencido),
         },
         {
+          texto: `${fmtValorCurto(r.carteira.aVencer)} a vencer`,
+          tom: "gray",
+          hint: fmtValor(r.carteira.aVencer),
+        },
+        {
           texto: `Inadimplência ${formatarInadimplencia(r.inadimplencia.pct, r.inadimplencia.venceu)}`,
           tom: "gray",
           hint: "Do que venceu nos últimos 12 meses há mais de 30 dias, quanto não foi pago (regra de mercado)",
@@ -480,6 +492,7 @@ export const CardCarteira: React.FC<{
         ...extraPilulas,
       ]}
       detalhes={[
+        { label: "Vencido", value: fmtValor(r.carteira.vencido) },
         { label: "A vencer", value: fmtValor(r.carteira.aVencer) },
         {
           label: "Venceu no período",
