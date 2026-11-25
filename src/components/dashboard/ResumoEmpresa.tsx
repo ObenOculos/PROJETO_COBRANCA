@@ -17,7 +17,10 @@ import {
   lojasDaBase,
   ResumoEmpresa as Resumo,
 } from "../../filters/resumoEmpresa";
-import { formatarInadimplencia } from "../../filters/inadimplencia";
+import {
+  formatarInadimplencia,
+  INADIMPLENCIA_A_PARTIR_DIAS,
+} from "../../filters/inadimplencia";
 import { PERIODO_TUDO_ATE } from "../../filters/periodo";
 import { formatCurrency } from "../../utils/formatters";
 
@@ -570,7 +573,7 @@ export const CardCarteira: React.FC<{
           ),
           rotulo: "inadimplência",
           tom: "gray",
-          hint: "Do que venceu nos últimos 12 meses há mais de 30 dias, quanto não foi pago (regra de mercado)",
+          hint: `Do que venceu nos últimos 12 meses, com ${INADIMPLENCIA_A_PARTIR_DIAS} dias ou mais de atraso, quanto não foi pago`,
         },
         ...extraPilulas,
       ]}

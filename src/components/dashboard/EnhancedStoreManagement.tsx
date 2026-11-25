@@ -27,7 +27,7 @@ import {
   composicaoCarteira,
   descricaoRecorteInadimplencia,
   formatarInadimplencia,
-  INADIMPLENCIA_CORTE_DIAS,
+  INADIMPLENCIA_A_PARTIR_DIAS,
   janelaDoRecorte,
   nivelInadimplencia,
   NivelInadimplencia,
@@ -103,7 +103,7 @@ interface StoreStats {
   inadNaoPago: number;
   /** inadNaoPago / dueAmount (%) -- filters/inadimplencia. */
   inadimplencia: number;
-  /** Saldo vencido ha ate 30 dias: atraso, ainda nao inadimplencia. */
+  /** Saldo vencido abaixo do corte: atraso, ainda nao inadimplencia. */
   atrasoRecente: number;
   averageTicket: number;
   clientsCount: number;
@@ -636,7 +636,7 @@ const EnhancedStoreManagement: React.FC = () => {
             store.inadimplencia,
             store.dueAmount,
           );
-          const inadDica = `Inadimplência: ${formatCurrency(store.inadNaoPago)} não pago de ${formatCurrency(store.dueAmount)} esperado (atraso > ${INADIMPLENCIA_CORTE_DIAS} dias)`;
+          const inadDica = `Inadimplência: ${formatCurrency(store.inadNaoPago)} não pago de ${formatCurrency(store.dueAmount)} esperado (atraso de ${INADIMPLENCIA_A_PARTIR_DIAS} dias ou mais)`;
           const temVencido = store.overdueAmount > 0.01;
           const aVencerLoja = Math.max(
             0,
@@ -819,7 +819,7 @@ const EnhancedStoreManagement: React.FC = () => {
                   >
                     {store.dueAmount > 0
                       ? "Inadimplência"
-                      : `Nada venceu há mais de ${INADIMPLENCIA_CORTE_DIAS} dias`}
+                      : `Nada com ${INADIMPLENCIA_A_PARTIR_DIAS} dias ou mais de atraso`}
                   </p>
                   <div className="w-full bg-gray-100 dark:bg-dark-bg rounded-full h-1.5">
                     <div

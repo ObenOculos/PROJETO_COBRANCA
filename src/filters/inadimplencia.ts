@@ -7,8 +7,10 @@
 //   inadimplencia % = saldo em aberto das parcelas com atraso > CORTE
 //                     / valor original das parcelas com atraso > CORTE
 //
-// - Corte (INADIMPLENCIA_CORTE_DIAS = 30): parcela vencida ha ate 30 dias e
-//   "atraso", nao inadimplencia -- aparece a parte (atrasoRecente).
+// - Corte: inadimplente a partir de INADIMPLENCIA_A_PARTIR_DIAS = 3 dias de
+//   atraso (gestor, 25/11; antes 30). Vencida ha 1..2 dias e "atraso", nao
+//   inadimplencia -- aparece a parte (atrasoRecente). Internamente a conta e
+//   "atraso > INADIMPLENCIA_CORTE_DIAS" (= a partir de - 1).
 // - Periodo: por padrao os vencimentos dos ultimos 12 meses
 //   (INADIMPLENCIA_JANELA_DIAS). Sem janela, o historico de anos ja pagos
 //   dilui o numero (16/11: 13,3% no historico todo x 20,3% em 12 meses).
@@ -23,7 +25,8 @@
 import { Collection } from "../types";
 import { calculateOverdueDays } from "../utils/formatters";
 
-export const INADIMPLENCIA_CORTE_DIAS = 30;
+export const INADIMPLENCIA_A_PARTIR_DIAS = 3;
+export const INADIMPLENCIA_CORTE_DIAS = INADIMPLENCIA_A_PARTIR_DIAS - 1;
 export const INADIMPLENCIA_JANELA_DIAS = 365;
 
 export interface Inadimplencia {
@@ -164,15 +167,17 @@ export const janelaDoRecorte = (r: RecorteInadimplencia): number | null =>
 export const descricaoRecorteInadimplencia = (
   r: RecorteInadimplencia,
   corteDias = INADIMPLENCIA_CORTE_DIAS,
-): string =>
-  r === "filtro"
-    ? `atraso > ${corteDias} dias · vencimentos do filtro`
+): string => {
+  const atraso = `atraso de ${corteDias + 1} dias ou mais`;
+  return r === "filtro"
+    ? `${atraso} · vencimentos do filtro`
     : r === "tudo"
-      ? `atraso > ${corteDias} dias · todo o histórico`
-      : `atraso > ${corteDias} dias · vencimentos dos últimos ${Math.round(INADIMPLENCIA_JANELA_DIAS / 30.4)} meses`;
+      ? `${atraso} · todo o histórico`
+      : `${atraso} · vencimentos dos últimos ${Math.round(INADIMPLENCIA_JANELA_DIAS / 30.4)} meses`;
+};
 
 /** Percentual para exibir: "—" quando nada venceu alem do corte no recorte
- * (ex.: periodo recente, so com atraso de ate 30 dias) -- 0% enganaria. */
+ * (ex.: periodo recente, so com atraso abaixo do corte) -- 0% enganaria. */
 export const formatarInadimplencia = (
   pct: number,
   venceu: number,
