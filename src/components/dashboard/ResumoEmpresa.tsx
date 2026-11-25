@@ -120,7 +120,11 @@ export const CardSimples: React.FC<{
   numeroLoading?: boolean;
   frase: string;
   pilulas?: Pilula[];
+  /** 4 = quadrinhos numa linha so (card da largura toda, sm+). */
+  colunas?: 2 | 4;
   detalhes?: SummaryCardRow[];
+  /** Conteudo livre dentro do "ver detalhes" (ex.: faixas da regra). */
+  detalhesExtra?: React.ReactNode;
 }> = ({
   icon: Icon,
   titulo,
@@ -130,7 +134,9 @@ export const CardSimples: React.FC<{
   numeroLoading = false,
   frase,
   pilulas = [],
+  colunas = 2,
   detalhes = [],
+  detalhesExtra,
 }) => {
   const [aberto, setAberto] = useState(false);
   const t = TEMA[tema];
@@ -154,14 +160,16 @@ export const CardSimples: React.FC<{
         // Grade fixa de 2 colunas (25/11: etiquetas soltas quebravam em
         // varias linhas e o card ficava alto). Numero em cima, rotulo
         // embaixo; item impar no fim vira retangulo da largura toda.
-        <div className="mt-2 grid grid-cols-2 gap-1">
+        <div
+          className={`mt-2 grid grid-cols-2 gap-1 ${colunas === 4 ? "sm:grid-cols-4" : ""}`}
+        >
           {pilulas.map((p, i) => (
             <div
               key={p.rotulo}
               title={p.hint}
               onClick={p.onClick}
               role={p.onClick ? "button" : undefined}
-              className={`min-w-0 rounded-md px-2 py-1 ${PILULA[p.tom]} ${pilulas.length % 2 === 1 && i === pilulas.length - 1 ? "col-span-2" : ""} ${p.onClick ? "cursor-pointer hover:opacity-90" : ""}`}
+              className={`min-w-0 rounded-md px-2 py-1 ${PILULA[p.tom]} ${pilulas.length % 2 === 1 && i === pilulas.length - 1 ? `col-span-2 ${colunas === 4 ? "sm:col-span-1" : ""}` : ""} ${p.onClick ? "cursor-pointer hover:opacity-90" : ""}`}
             >
               <div
                 className={`text-sm font-bold leading-tight truncate ${p.loading ? "animate-pulse" : ""}`}
@@ -176,7 +184,7 @@ export const CardSimples: React.FC<{
         </div>
       )}
 
-      {detalhes.length > 0 && (
+      {(detalhes.length > 0 || detalhesExtra) && (
         <div className="mt-auto pt-2">
           {aberto && (
             <div className="mb-1.5 space-y-1 border-t border-gray-300 dark:border-dark-border/60 pt-2">
@@ -197,6 +205,7 @@ export const CardSimples: React.FC<{
                   </span>
                 </div>
               ))}
+              {detalhesExtra}
             </div>
           )}
           <button

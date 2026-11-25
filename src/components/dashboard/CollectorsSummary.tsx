@@ -26,13 +26,13 @@ import { useAuth } from "../../contexts/AuthContext";
 import { isCollectorType, UserType } from "../../types";
 import { useAtendimentosPeriodo } from "../../hooks/useAtendimentosPeriodo";
 import { useClientesAcionados } from "../../hooks/useClientesAcionados";
-import SummaryCard from "../common/SummaryCard";
 import FiltroMultiplo from "../common/FiltroMultiplo";
 import ResumoEmpresa, {
   CardCarteira,
   CardClientes,
   CardDesempenho,
   CardPrevisao,
+  CardSimples,
 } from "./ResumoEmpresa";
 import {
   resumoEmpresa,
@@ -1531,61 +1531,63 @@ const CollectorsSummary: React.FC = () => {
                     const mov = movCarteira.get(row.id);
                     return (
                       <div className="sm:col-span-2">
-                        <SummaryCard
+                        {/* Mesmo modelo dos outros cards (25/11): numero
+                            grande + quadrinhos (4 numa linha, card largo);
+                            as faixas da regra ficam no "ver detalhes". */}
+                        <CardSimples
                           icon={Shuffle}
-                          title="Carteira automática"
-                          value={fmtNum(vaoSair.length)}
-                          valueTone={vaoSair.length > 0 ? "red" : "neutral"}
-                          caption={`vão sair da carteira em até ${URGENTE_SAIDA_CARTEIRA_DIAS} dias`}
-                          rows={[
-                            ...(vaoSair.length > 0
-                              ? [
-                                  {
-                                    label: "Vencido de quem vai sair",
-                                    value: formatCurrency(
-                                      vaoSair.reduce(
-                                        (s, v) => s + v.vencido,
-                                        0,
-                                      ),
-                                      false,
-                                    ),
-                                    tone: "red" as const,
-                                    onClick: () =>
+                          titulo="Carteira automática"
+                          tema="red"
+                          numero={fmtNum(vaoSair.length)}
+                          frase={`vão sair da carteira em até ${URGENTE_SAIDA_CARTEIRA_DIAS} dias`}
+                          colunas={4}
+                          pilulas={[
+                            {
+                              valor: formatCurrency(
+                                vaoSair.reduce((s, v) => s + v.vencido, 0),
+                                false,
+                              ),
+                              rotulo: "vencido de quem vai sair",
+                              tom: vaoSair.length > 0 ? "red" : "gray",
+                              onClick:
+                                vaoSair.length > 0
+                                  ? () =>
                                       setExpandedVaoSair((cur) =>
                                         cur === row.id ? null : row.id,
-                                      ),
-                                    hint: "Clique para ver os clientes",
-                                  },
-                                ]
-                              : []),
+                                      )
+                                  : undefined,
+                              hint:
+                                vaoSair.length > 0
+                                  ? "Clique para ver os clientes"
+                                  : undefined,
+                            },
                             {
-                              label: "Entraram no período",
-                              value: movCarregando
+                              valor: movCarregando
                                 ? "…"
                                 : mov
                                   ? fmtNum(mov.entraram)
                                   : "—",
+                              rotulo: "entraram no período",
+                              tom: "gray",
                               loading: movCarregando,
-                              hint: "Data em que o cliente foi atribuído ao cobrador — não é o vencimento da parcela, por isso pode não ter relação com o valor Vencido deste card",
+                              hint: "Data em que o cliente foi atribuído ao cobrador — não é o vencimento da parcela",
                             },
                             {
-                              label: "Saíram no período",
-                              value: movCarregando
+                              valor: movCarregando
                                 ? "…"
                                 : mov
                                   ? fmtNum(mov.sairam)
                                   : "—",
+                              rotulo: "saíram no período",
+                              tom: "gray",
                               loading: movCarregando,
                               hint: "Data em que o cliente deixou de ser do cobrador — não é o vencimento da parcela",
                             },
                             {
-                              label: "Saíram sem ação",
-                              value: qtdSaidasValor(row.id),
+                              valor: qtdSaidasValor(row.id),
+                              rotulo: "saíram sem ação",
+                              tom: qtdSaidas(row.id) > 0 ? "red" : "gray",
                               loading: movCarregando,
-                              tone:
-                                qtdSaidas(row.id) > 0
-                                  ? ("red" as const)
-                                  : undefined,
                               onClick:
                                 qtdSaidas(row.id) > 0
                                   ? () => setSaidasCobradorId(row.id)
@@ -1593,7 +1595,7 @@ const CollectorsSummary: React.FC = () => {
                               hint: "Clientes que passaram da faixa no período sem nenhuma ação do cobrador. Clique para ver e devolver.",
                             },
                           ]}
-                          aside={<FaixasAlcance regras={regras} />}
+                          detalhesExtra={<FaixasAlcance regras={regras} />}
                         />
                         {expandedVaoSair === row.id && vaoSair.length > 0 && (
                           <ul className="mt-1.5 rounded-lg bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-800/30 px-3 py-2 text-xs text-red-800 dark:text-red-300 space-y-0.5 max-h-56 overflow-y-auto">
