@@ -575,7 +575,7 @@ const CardVisual: React.FC<{
     `${Math.max(0, Math.min(100, (v / escala) * 100))}%`;
   return (
     <div
-      className={`min-w-0 rounded-xl border-t-4 ${t.faixa} bg-gray-100 dark:bg-dark-bg px-4 pt-3 pb-2.5`}
+      className={`min-w-0 rounded-xl border border-gray-200 dark:border-dark-border border-t-4 ${t.faixa} bg-gray-100 dark:bg-dark-bg px-4 pt-3 pb-2.5`}
       title={hint}
     >
       <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-600 dark:text-dark-text-secondary">

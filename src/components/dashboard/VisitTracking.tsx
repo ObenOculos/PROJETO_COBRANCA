@@ -982,7 +982,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
             >
               <button
                 onClick={handleExportToExcel}
-                className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-xl transition-all shadow-sm whitespace-nowrap shrink-0"
+                className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-white dark:bg-dark-bg border border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/60 text-gray-700 dark:text-dark-text text-sm font-medium rounded-xl transition-all whitespace-nowrap shrink-0"
               >
                 <FileDown className="h-3.5 w-3.5" />
                 <span>Exportar</span>
@@ -1340,9 +1340,9 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
             ))}
             <button
               onClick={clearAllFilters}
-              className="ml-auto text-[10px] font-bold text-red-500 hover:text-red-600 hover:underline px-2 transition-colors"
+              className="ml-auto text-[11px] font-medium text-gray-500 hover:text-gray-800 dark:text-dark-text-secondary dark:hover:text-dark-text hover:underline px-2 transition-colors"
             >
-              Limpar Todos
+              Limpar filtros
             </button>
           </div>
         )}
@@ -1369,8 +1369,17 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {Object.entries(groupedVisits).map(([collectorId, visits]) => {
+          // Um painel so com linhas (26/11, hierarquia visual): antes cada
+          // cobrador era um card alto com lixeira vermelha cheia -- a acao
+          // destrutiva era o elemento mais chamativo da tela. Cobrador sem
+          // visita vai para o fim, apagado.
+          <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border overflow-hidden divide-y divide-gray-100 dark:divide-dark-border/60">
+            {Object.entries(groupedVisits)
+              .sort(
+                ([, a], [, b]) =>
+                  (b.length > 0 ? 1 : 0) - (a.length > 0 ? 1 : 0),
+              )
+              .map(([collectorId, visits]) => {
               const collectorName = getCollectorName(collectorId);
               const isExpanded = expandedCollectors.has(collectorId);
 
@@ -1394,69 +1403,65 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
               );
 
               return (
-                <div
-                  key={collectorId}
-                  className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border overflow-hidden transition-all duration-300"
-                >
+                <div key={collectorId}>
                   {/* Linha: cabeçalho + barra de exclusão lateral (estilo Cobranças) */}
                   <div className="flex items-stretch">
                     {/* Header do cobrador — Estilo Refinado e Responsivo */}
                     <div
-                      className="flex-1 min-w-0 p-4 sm:p-6 cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-bg transition-colors flex items-center justify-between"
+                      className={`flex-1 min-w-0 px-4 py-3 sm:px-5 cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-bg transition-colors flex items-center justify-between gap-3 ${visits.length === 0 ? "opacity-60" : ""}`}
                       onClick={() => toggleCollectorExpansion(collectorId)}
                     >
-                      <div className="flex items-center gap-3 sm:gap-4">
-                        <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center border border-blue-100 dark:border-blue-900/30 shrink-0">
-                          <User className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 dark:text-blue-400" />
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="h-8 w-8 rounded-full bg-gray-100 dark:bg-dark-bg flex items-center justify-center shrink-0">
+                          <User className="h-4 w-4 text-gray-500 dark:text-dark-text-secondary" />
                         </div>
                         <div className="min-w-0">
-                          <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-dark-text tracking-tight truncate">
+                          <h3 className="text-sm font-semibold text-gray-900 dark:text-dark-text truncate">
                             {collectorName}
                           </h3>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <p className="text-xs font-medium text-gray-400 dark:text-dark-text-secondary tracking-wider shrink-0">
-                              {visits.length}{" "}
-                              {visits.length === 1 ? "Visita" : "Visitas"}
-                            </p>
-                            {/* Color Dots Summary — Novo */}
-                            <div className="flex items-center gap-1.5 ml-1 border-l border-gray-200 dark:border-dark-border pl-2">
-                              {statusCounts.agendada > 0 && (
-                                <div
-                                  className="flex items-center gap-1"
-                                  title={`${statusCounts.agendada} Agendadas`}
-                                >
-                                  <div className="h-1.5 w-1.5 rounded-full bg-blue-500"></div>
-                                  <span className="text-[10px] font-bold text-blue-500">
-                                    {statusCounts.agendada}
-                                  </span>
-                                </div>
-                              )}
-                              {statusCounts.realizada > 0 && (
-                                <div
-                                  className="flex items-center gap-1"
-                                  title={`${statusCounts.realizada} Realizadas`}
-                                >
-                                  <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
-                                  <span className="text-[10px] font-bold text-green-500">
-                                    {statusCounts.realizada}
-                                  </span>
-                                </div>
-                              )}
-                              {statusCounts.overdue > 0 && (
-                                <div
-                                  className="flex items-center gap-1"
-                                  title={`${statusCounts.overdue} Atrasadas`}
-                                >
-                                  <div className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse"></div>
-                                  <span className="text-[10px] font-bold text-red-500">
-                                    {statusCounts.overdue}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
+                          <p className="mt-0.5 text-xs text-gray-500 dark:text-dark-text-secondary tabular-nums truncate">
+                            <span className="font-semibold text-gray-700 dark:text-dark-text">
+                              {visits.length}
+                            </span>{" "}
+                            {visits.length === 1 ? "visita" : "visitas"}
+                            {statusCounts.agendada > 0 &&
+                              ` · ${statusCounts.agendada} agendada${statusCounts.agendada === 1 ? "" : "s"}`}
+                            {statusCounts.realizada > 0 &&
+                              ` · ${statusCounts.realizada} realizada${statusCounts.realizada === 1 ? "" : "s"}`}
+                            {statusCounts.overdue > 0 && (
+                              <span className="font-semibold text-red-600 dark:text-red-400">
+                                {` · ${statusCounts.overdue} atrasada${statusCounts.overdue === 1 ? "" : "s"}`}
+                              </span>
+                            )}
+                          </p>
                         </div>
                       </div>
+                      {/* Proporcao das visitas (mesma ideia da barra de
+                          partes do Resumo Geral). */}
+                      {visits.length > 0 && (
+                        <div
+                          className="hidden md:flex ml-auto h-1.5 w-40 gap-0.5 overflow-hidden rounded-full bg-gray-100 dark:bg-dark-border"
+                          title={`${statusCounts.realizada || 0} realizadas · ${statusCounts.agendada || 0} agendadas · ${statusCounts.overdue || 0} atrasadas`}
+                        >
+                          {(
+                            [
+                              ["realizada", "bg-green-500"],
+                              ["agendada", "bg-blue-400"],
+                              ["overdue", "bg-red-500"],
+                            ] as const
+                          ).map(([k, cor]) =>
+                            statusCounts[k] > 0 ? (
+                              <div
+                                key={k}
+                                className={`h-full ${cor}`}
+                                style={{
+                                  width: `${(statusCounts[k] / visits.length) * 100}%`,
+                                }}
+                              />
+                            ) : null,
+                          )}
+                        </div>
+                      )}
                       <div className="flex items-center gap-2 sm:gap-4">
                         {/* So pra cobrador externo (visita presencial) -- o
                         de carteira (interno/terceirizado/jurídico) agenda
@@ -1464,30 +1469,33 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                         Cobrador (ContactScheduler), não por aqui: abrir o
                         VisitScheduler pra eles criaria um agendamento
                         channel="presencial" por engano. */}
-                        {user?.type === "manager" &&
-                          collectorTypeById[collectorId] === "collector" && (
+                        {/* Espaco fixo do botao: as barras ficam alinhadas
+                            com ou sem "Nova visita". */}
+                        {user?.type === "manager" && (
+                          <div className="flex sm:w-28 justify-end">
+                            {collectorTypeById[collectorId] === "collector" && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               setSelectedCollectorForScheduler(collectorId);
                               setShowSchedulerModal(true);
                             }}
-                            className="flex items-center justify-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all shadow-sm shrink-0"
+                            className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-white dark:bg-dark-bg border border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/60 text-gray-700 dark:text-dark-text rounded-lg transition-all shrink-0"
                             title="Nova Visita"
                           >
-                            <Calendar className="h-4 w-4" />
+                            <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                             <span className="hidden sm:inline text-xs font-semibold">
-                              Nova Visita
+                              Nova visita
                             </span>
                           </button>
+                            )}
+                          </div>
                         )}
-                        <div className="bg-gray-100 dark:bg-dark-bg p-2 rounded-xl border border-gray-200 dark:border-dark-border">
-                          {isExpanded ? (
-                            <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
-                          )}
-                        </div>
+                        {isExpanded ? (
+                          <ChevronUp className="h-4 w-4 text-gray-400" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-gray-400" />
+                        )}
                       </div>
                     </div>
                     {user?.type === "manager" &&
@@ -1507,10 +1515,10 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                     ?.name || "Cobrador",
                               });
                             }}
-                            className={`flex items-center justify-center w-12 transition-colors flex-shrink-0 self-stretch ${
+                            className={`flex items-center justify-center w-11 transition-colors flex-shrink-0 self-stretch ${
                               hasPending
-                                ? "bg-red-500 text-white hover:bg-red-600 cursor-pointer"
-                                : "bg-gray-100 dark:bg-dark-bg text-gray-300 dark:text-gray-600 cursor-not-allowed"
+                                ? "text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer"
+                                : "text-gray-200 dark:text-gray-700 cursor-not-allowed"
                             }`}
                             title={
                               hasPending
@@ -1518,7 +1526,7 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
                                 : "Nenhuma visita pendente para limpar"
                             }
                           >
-                            <Trash2 className="h-5 w-5" />
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         );
                       })()}
@@ -2189,101 +2197,62 @@ const VisitTracking: React.FC<VisitTrackingProps> = ({ onClose }) => {
   return (
     <>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-4 sm:p-5">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-xl shrink-0">
-                <Calendar className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+        {/* Header (26/11): mesmo formato do Resumo Geral -- titulo a
+            esquerda, abas em controle segmentado a direita. */}
+        <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border border-gray-200 dark:border-dark-border p-4 lg:p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <h2 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-dark-text flex items-center">
+              <Calendar className="h-5 w-5 lg:h-6 lg:w-6 mr-2 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+              Acompanhamento de Visitas
+            </h2>
+            <div className="flex items-center gap-2">
+              <div className="grid grid-cols-2 gap-0.5 sm:flex bg-gray-100 dark:bg-dark-bg rounded-lg p-0.5">
+                {(
+                  [
+                    ["visits", "Visitas", Calendar, 0, "red"],
+                    ["cancellations", "Cancelamentos", AlertTriangle, pendingRequests.length, "red"],
+                    ...(user?.type === "manager"
+                      ? ([["scheduledDates", "Datas Programadas", CalendarClock, 0, "red"]] as const)
+                      : []),
+                    ["reincidentes", "Reincidentes", RefreshCw, reincidentes.length, "amber"],
+                  ] as const
+                ).map(([id, rotulo, Icone, qtd, tom]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setActiveTab(id)}
+                    className={`flex items-center justify-center whitespace-nowrap px-3 py-2 sm:py-1.5 rounded-md text-sm font-semibold transition-all touch-manipulation ${
+                      activeTab === id
+                        ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
+                        : "text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
+                    }`}
+                  >
+                    <Icone className="h-4 w-4 mr-1.5" />
+                    {rotulo}
+                    {qtd > 0 && (
+                      <span
+                        className={`ml-1.5 rounded-full px-1.5 text-[10px] font-bold tabular-nums ${
+                          tom === "red"
+                            ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                            : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                        }`}
+                      >
+                        {qtd}
+                      </span>
+                    )}
+                  </button>
+                ))}
               </div>
-              <div className="min-w-0">
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-dark-text tracking-tight leading-none truncate">
-                  Acompanhamento de Visitas
-                </h2>
-                <p className="text-[10px] font-semibold text-gray-400 dark:text-dark-text-secondary mt-1 tracking-wide truncate">
-                  Gestão estratégica de rotas e cancelamentos
-                </p>
-              </div>
-            </div>
-
-            {/* Ação de Fechar */}
-            {onClose && (
-              <button
-                onClick={onClose}
-                className="p-2.5 text-gray-400 hover:text-gray-900 dark:hover:text-dark-text bg-gray-100 dark:bg-dark-bg border border-gray-200 dark:border-dark-border rounded-xl transition-all shrink-0"
-                title="Fechar"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            )}
-          </div>
-
-          {/* Navegação por Tabs — Estilo Unificado e Scrollable Mobile com padding para evitar corte de shadow/ring */}
-          <div className="mt-6 flex items-center gap-2 overflow-x-auto pt-1 pb-3 sm:overflow-visible -mx-2 px-2 scrollbar-hide">
-            <button
-              onClick={() => setActiveTab("visits")}
-              className={`flex items-center justify-center px-6 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all shrink-0 ${
-                activeTab === "visits"
-                  ? "bg-blue-600 text-white shadow-md shadow-blue-500/10"
-                  : "bg-white dark:bg-dark-bg text-gray-500 dark:text-dark-text-secondary border border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
-              }`}
-            >
-              <Calendar className="h-4 w-4 mr-2" />
-              Visitas
-            </button>
-            <button
-              onClick={() => setActiveTab("cancellations")}
-              className={`flex items-center justify-center px-6 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all shrink-0 relative ${
-                activeTab === "cancellations"
-                  ? "bg-blue-600 text-white shadow-md shadow-blue-500/10"
-                  : "bg-white dark:bg-dark-bg text-gray-500 dark:text-dark-text-secondary border border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
-              }`}
-            >
-              <AlertTriangle className="h-4 w-4 mr-2" />
-              Cancelamentos
-              {pendingRequests.length > 0 && (
-                <span className="ml-2 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-[10px] px-1.5 py-0.5 rounded-md font-bold">
-                  {pendingRequests.length}
-                </span>
-              )}
-            </button>
-
-            {user?.type === "manager" && (
-              <button
-                onClick={() => setActiveTab("scheduledDates")}
-                className={`flex items-center justify-center px-6 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all shrink-0 ${
-                  activeTab === "scheduledDates"
-                    ? "bg-blue-600 text-white shadow-md shadow-blue-500/10"
-                    : "bg-white dark:bg-dark-bg text-gray-500 dark:text-dark-text-secondary border border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
-                }`}
-              >
-                <CalendarClock className="h-4 w-4 mr-2" />
-                Datas Programadas
-              </button>
-            )}
-
-            <button
-              onClick={() => setActiveTab("reincidentes")}
-              className={`flex items-center justify-center px-6 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all shrink-0 relative ${
-                activeTab === "reincidentes"
-                  ? "bg-blue-600 text-white shadow-md shadow-blue-500/10"
-                  : "bg-white dark:bg-dark-bg text-gray-500 dark:text-dark-text-secondary border border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/50"
-              }`}
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Reincidentes
-              {reincidentes.length > 0 && (
-                <span
-                  className={`ml-2 px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
-                    activeTab === "reincidentes"
-                      ? "bg-white/20 text-white"
-                      : "bg-amber-100 text-amber-700"
-                  }`}
+              {onClose && (
+                <button
+                  onClick={onClose}
+                  className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-dark-text rounded-lg transition-all shrink-0"
+                  title="Fechar"
                 >
-                  {reincidentes.length}
-                </span>
+                  <X className="h-5 w-5" />
+                </button>
               )}
-            </button>
+            </div>
           </div>
         </div>
 

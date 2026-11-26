@@ -35,9 +35,11 @@ em vez de deixar quebrar).
 
 ## Caixas e agrupamento (Gestalt)
 
-- No máximo **2 níveis de caixa**: painel branco → card cinza (`bg-gray-100`,
-  sem borda lateral). Dentro do card, agrupe por **espaço e linha fina**, não
-  por mais caixas.
+- No máximo **2 níveis de caixa**: painel branco → card cinza (`bg-gray-100`).
+  Dentro do card, agrupe por **espaço e linha fina**, não por mais caixas.
+- Todo card tem **borda fina e discreta** (`border border-gray-200
+  dark:border-dark-border`): sem ela, o card solto no fundo da página (sem
+  painel branco por trás) fica difícil de ler (usuário, 26/11).
 - Proximidade: o que se soma ou se compara fica junto; "↪ desses, ..." recuado
   embaixo da linha de que faz parte.
 - Card de largura toda (faixa): número à esquerda (`lg:w-56`) e o visual à

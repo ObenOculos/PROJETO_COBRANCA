@@ -67,21 +67,21 @@ const SummaryCard: React.FC<{
   detalhes = [],
 }) => {
   const [detalhesAbertos, setDetalhesAbertos] = useState(false);
+  // Hierarquia visual (26/11, skill design-painel): o numero grande e o
+  // ponto focal, em tinta neutra; "blue" era so identidade e virou neutro.
+  // Vermelho/verde ficam porque dizem estado (ruim/bom).
   const valueClasses: Record<string, string> = {
     neutral: "text-gray-900 dark:text-dark-text",
     red: "text-red-600 dark:text-red-400",
-    green: "text-green-600 dark:text-green-400",
-    blue: "text-blue-600 dark:text-blue-400",
+    green: "text-green-700 dark:text-green-400",
+    blue: "text-gray-900 dark:text-dark-text",
   };
-  // Linha com alerta ganha um "chip" de fundo colorido no valor, nao so a
-  // cor do texto -- e o que mais ajuda a achar rapido o que esta ruim num
-  // card com varias linhas (pedido do usuario 2026-11-17: contraste).
+  // Linha com alerta: so a cor do texto em negrito (26/11 -- o chip de
+  // fundo em toda linha competia com o numero principal).
   const rowClasses: Record<string, string> = {
-    red: "text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-1.5 rounded",
-    amber:
-      "text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-1.5 rounded",
-    green:
-      "text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-1.5 rounded",
+    red: "text-red-600 dark:text-red-400",
+    amber: "text-amber-600 dark:text-amber-400",
+    green: "text-green-700 dark:text-green-400",
   };
   const renderRow = (r: SummaryCardRow) => (
     <div
@@ -145,12 +145,12 @@ const SummaryCard: React.FC<{
             )}
           </div>
           <div
-            className={`${compact ? "mt-0.5 text-xl" : "mt-1 text-2xl"} font-bold truncate ${valueLoading ? "animate-pulse" : ""} ${valueClasses[valueTone]}`}
+            className={`${compact ? "mt-0.5 text-xl" : "mt-1 text-3xl"} font-extrabold tracking-tight truncate ${valueLoading ? "animate-pulse" : ""} ${valueClasses[valueTone]}`}
           >
             {value}
           </div>
           {caption && (
-            <div className="text-[11px] text-gray-400 dark:text-dark-text-secondary truncate">
+            <div className="text-xs text-gray-500 dark:text-dark-text-secondary truncate">
               {caption}
             </div>
           )}
@@ -160,7 +160,7 @@ const SummaryCard: React.FC<{
       {children}
       {rows.length > 0 && (
         <div
-          className={`border-t border-gray-300 dark:border-dark-border/60 ${compact ? "mt-1.5 pt-1.5 space-y-0.5" : "mt-2 pt-2 space-y-1"}`}
+          className={`border-t border-gray-200 dark:border-dark-border/60 ${compact ? "mt-1.5 pt-1.5 space-y-0.5" : "mt-2 pt-2 space-y-1"}`}
         >
           {rows.map(renderRow)}
         </div>
@@ -178,7 +178,7 @@ const SummaryCard: React.FC<{
               e.stopPropagation();
               setDetalhesAbertos((v) => !v);
             }}
-            className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400"
+            className="inline-flex items-center gap-0.5 text-[11px] font-medium text-gray-500 hover:text-gray-800 dark:text-dark-text-secondary dark:hover:text-dark-text"
           >
             {detalhesAbertos ? "menos detalhes" : "ver detalhes"}
             {detalhesAbertos ? (

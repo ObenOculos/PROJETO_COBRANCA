@@ -177,7 +177,7 @@ export const CardSimples: React.FC<{
       : "grid-cols-2";
   return (
     <div
-      className={`min-w-0 flex flex-col rounded-xl border-t-4 ${t.faixa} bg-gray-100 dark:bg-dark-bg px-4 pt-3 pb-2.5`}
+      className={`min-w-0 flex flex-col rounded-xl border border-gray-200 dark:border-dark-border border-t-4 ${t.faixa} bg-gray-100 dark:bg-dark-bg px-4 pt-3 pb-2.5`}
     >
       <div className={lado ? "lg:flex lg:items-center lg:gap-8" : ""}>
         <div className={lado ? "lg:w-56 lg:shrink-0" : ""}>
