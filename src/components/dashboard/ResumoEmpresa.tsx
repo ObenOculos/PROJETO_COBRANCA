@@ -118,7 +118,9 @@ const TEMA: Record<Tema, { faixa: string; numero: string; icone: string }> = {
 };
 
 /** (i) que abre uma explicacao curta (clique; fecha ao clicar fora). */
-const InfoDica: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const InfoDica: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [aberta, setAberta] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => {

@@ -16,13 +16,10 @@ import {
   Users,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
-import {
-  Agrupar,
-  useHistorico,
-} from "../../hooks/useInadimplenciaHistorico";
+import { Agrupar, useHistorico } from "../../hooks/useInadimplenciaHistorico";
 import { formatCurrency } from "../../utils/formatters";
 import { todayLocalStr } from "../../config/visitStatus";
-import { Pilula } from "./ResumoEmpresa";
+import { InfoDica, Pilula } from "./ResumoEmpresa";
 import { METRICA } from "../common/pilulaEstilo";
 import FiltroMultiplo from "../common/FiltroMultiplo";
 import {
@@ -544,13 +541,12 @@ const CardVisual: React.FC<{
   /** De quando e o numero grande (o "ate" do intervalo): "fim de out/26",
    * "hoje", "out/26"... */
   mes: string;
-  /** Dica da etiqueta do mes. */
-  mesDica: string;
   /** De quem e o numero, ao lado do titulo ("empresa inteira"). */
   escopo?: string;
-  /** Observacao curta no fim do "ver detalhes". */
-  nota?: string;
-  hint: string;
+  /** Explicacao atras do (i) do canto, aberta no clique (26/11: igual aos
+   * cards do Resumo; antes ficava espalhada em dicas de passar o mouse no
+   * card, na etiqueta e numa nota no fim do "ver detalhes"). */
+  info: React.ReactNode;
 }> = ({
   icon: Icon,
   titulo,
@@ -564,10 +560,8 @@ const CardVisual: React.FC<{
   detalhes,
   corDetalhe,
   mes,
-  mesDica,
   escopo,
-  nota,
-  hint,
+  info,
 }) => {
   const [aberto, setAberto] = useState(false);
   const t = TEMA_CARD[tema];
@@ -576,7 +570,6 @@ const CardVisual: React.FC<{
   return (
     <div
       className={`min-w-0 rounded-xl border border-gray-200 dark:border-dark-border border-t-4 ${t.faixa} bg-gray-100 dark:bg-dark-bg px-4 pt-3 pb-2.5`}
-      title={hint}
     >
       <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-600 dark:text-dark-text-secondary">
         <Icon className={`h-4 w-4 ${t.icone}`} />
@@ -592,14 +585,14 @@ const CardVisual: React.FC<{
             As setas sairam: repetiam o campo "Ate" e faziam o numero parecer
             do intervalo inteiro, quando e a foto de um dia so. */}
         {!carregando && mes && (
-          <span
-            className="ml-auto inline-flex items-center gap-1 rounded-full bg-white dark:bg-dark-bg-secondary border border-gray-200 dark:border-dark-border px-2 py-0.5 text-[11px] font-semibold text-gray-600 dark:text-dark-text-secondary"
-            title={mesDica}
-          >
+          <span className="ml-auto inline-flex items-center gap-1 text-[11px] font-medium text-gray-500 dark:text-dark-text-secondary">
             <CalendarRange className="h-3 w-3" />
             {mes}
           </span>
         )}
+        <span className={!carregando && mes ? "" : "ml-auto"}>
+          <InfoDica>{info}</InfoDica>
+        </span>
       </div>
       <div
         className={`mt-1 text-4xl font-extrabold leading-tight tracking-tight text-gray-900 dark:text-dark-text ${carregando ? "animate-pulse" : ""}`}
@@ -677,12 +670,6 @@ const CardVisual: React.FC<{
                   )}
                 </div>
               ))}
-              {nota && (
-                <div className="flex gap-1.5 pt-1 text-[11px] leading-snug text-gray-500 dark:text-dark-text-secondary">
-                  <Info className="h-3.5 w-3.5 shrink-0 mt-px" />
-                  <span>{nota}</span>
-                </div>
-              )}
             </div>
           )}
           <button
@@ -1171,9 +1158,16 @@ const AcompanhamentoInadimplencia: React.FC = () => {
               }
               corDetalhe="bg-red-400"
               mes={fotoDoCard}
-              mesDica={`Foto ${fotoDoCard === "hoje" ? "de hoje" : `do ${fotoDoCard}`}: das parcelas que venceram nos 12 meses antes desse dia, quanto estava sem pagar. Para ver outro mês, mude o "Até" acima; o "De" muda só o gráfico e as médias. Para um período (ex.: ago a out), use o Resumo Geral.`}
               detalhes={detalhesInad}
-              hint={`De cada R$ 100 que venceram nos últimos 12 meses, R$ ${Math.round(pctHoje)} estão sem pagar.`}
+              info={
+                <>
+                  Foto {fotoDoCard === "hoje" ? "de hoje" : `do ${fotoDoCard}`}:
+                  de cada R$ 100 que venceram nos 12 meses antes, R${" "}
+                  {Math.round(pctHoje)} estavam sem pagar. Outro mês: mude o{" "}
+                  <strong>Até</strong>. Um período (ex.: ago a out): veja no{" "}
+                  <strong>Geral</strong>.
+                </>
+              }
             />
             <CardVisual
               icon={RotateCcw}
@@ -1211,10 +1205,18 @@ const AcompanhamentoInadimplencia: React.FC = () => {
               }
               corDetalhe="bg-green-500"
               mes={mesDoCard}
-              mesDica={`Do atraso que vinha de antes de ${mesDoCard.split(" ")[0]}, quanto foi pago dentro do mês. Para ver outro mês, mude o "Até" acima. Para um período (ex.: ago a out), use o Resumo Geral.`}
-              nota={`${lojasExcluidas.size === 0 ? "Empresa inteira" : "Lojas do filtro"}, inclusive clientes sem cobrador (no Resumo Geral, a parte dos cobradores conta só a carteira deles, por isso o % muda). ${NOTA_RECUPERACAO}`}
               detalhes={detalhesRec}
-              hint={`Do atraso que vinha de antes (${atual ? fmtValor(atual.atrasoInicioMes) : "—"}), foram pagos ${atual ? fmtValor(atual.recuperadoMes) : "—"} no mês. Média dos meses anteriores: ${formatarPct(mediaRec)}.`}
+              info={
+                <>
+                  Do atraso de antes de {mesDoCard.split(" ")[0]}, quanto foi
+                  pago no mês. Conta{" "}
+                  {escopoCards === "empresa inteira"
+                    ? "a empresa inteira"
+                    : "as lojas do filtro"}
+                  , inclusive cliente sem cobrador e a dívida antiga (+1 ano) —
+                  por isso difere do % dos cobradores.
+                </>
+              }
             />
           </div>
 
