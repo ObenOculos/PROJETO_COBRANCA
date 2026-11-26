@@ -241,7 +241,10 @@ export const CardSimples: React.FC<{
                   onClick={r.onClick}
                   className={`flex items-baseline justify-between gap-2 text-xs ${r.onClick ? "cursor-pointer" : ""}`}
                 >
-                  <span className="text-gray-600 dark:text-dark-text-secondary truncate">
+                  {/* "↪ ..." = parte da linha de cima: recuada (26/11). */}
+                  <span
+                    className={`text-gray-600 dark:text-dark-text-secondary truncate ${r.label.startsWith("↪") ? "pl-3" : ""}`}
+                  >
                     {r.label}
                   </span>
                   <span
@@ -390,7 +393,7 @@ export const CardClientes: React.FC<{
         {
           label: cobrador
             ? "Atraso sem agendamento, mas acionados"
-            : "   desses, acionados no período",
+            : "↪ desses, acionados no período",
           value:
             c.semAgendamentoAcionados === null
               ? "…"
