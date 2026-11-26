@@ -71,7 +71,9 @@ const clientesTxt = (n: number) =>
 // ORDEM (gestor, 26/11): Carteira -> Inadimplencia -> Previsao -> Recebido,
 // e Clientes numa faixa larga embaixo. Nos cobradores a 2a posicao e a
 // Recuperacao (a carteira do cobrador so tem atrasado, a inadimplencia dele
-// sai sempre alta) e Recebido vira Desempenho.
+// sai sempre alta). O card de valor recebido se chama "Recebido" na empresa
+// e nos cobradores (pedido do usuario 26/11; antes "Desempenho" nos
+// cobradores). Por dentro continua o CardDesempenho (meta e acionados).
 // ---------------------------------------------------------------------------
 
 type Tema = "red" | "indigo" | "blue" | "green" | "slate";
@@ -625,7 +627,7 @@ export const CardDesempenho: React.FC<{
   return (
     <CardSimples
       icon={Gauge}
-      titulo="Desempenho"
+      titulo="Recebido"
       tema="green"
       numero={loading ? "…" : fmtValorCurto(recebido)}
       numeroHint={fmtValor(recebido)}
