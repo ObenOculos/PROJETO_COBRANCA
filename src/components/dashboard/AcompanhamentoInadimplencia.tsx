@@ -17,9 +17,11 @@ import {
   TrendingUp,
   Users,
 } from "lucide-react";
-import { supabase } from "../../lib/supabase";
 import { useCollection } from "../../contexts/CollectionContext";
-import { buscarComCacheTela, lerCacheTela } from "../../utils/cacheTela";
+import {
+  Agrupar,
+  useHistorico,
+} from "../../hooks/useInadimplenciaHistorico";
 import { formatCurrency } from "../../utils/formatters";
 import { todayLocalStr } from "../../config/visitStatus";
 import { Pilula } from "./ResumoEmpresa";
@@ -42,7 +44,6 @@ import {
   media,
   pctInadimplencia,
   pctRecuperacao,
-  pontoDaRpc,
   rotuloMes,
   Tendencia,
   tendenciaInadimplencia,
@@ -75,77 +76,6 @@ const fmtCurto = (v: number): string => {
     return `R$ ${(v / 1e3).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} mil`;
   return fmtValor(v);
 };
-
-type Agrupar = "loja" | "cobrador";
-
-const buscarHistorico = async (
-  inicio: string,
-  fim: string,
-  lojas: string[] | null,
-  agrupar: Agrupar | null,
-): Promise<PontoInadimplencia[]> => {
-  // Meses passados vem guardados no banco (inadimplencia_retrato); so o dia
-  // de hoje e calculado na hora. Resposta pequena: 1 linha por mes (ou por
-  // mes x loja/cobrador), sem titulos.
-  const { data, error } = await supabase.rpc("inadimplencia_historico", {
-    p_inicio: `${inicio}-01`,
-    p_fim: `${fim}-01`,
-    ...(lojas ? { p_lojas: lojas } : {}),
-    ...(agrupar ? { p_agrupar: agrupar } : {}),
-  });
-  if (error) throw error;
-  return (data ?? []).map(pontoDaRpc);
-};
-
-/** Busca com o cache de tela (voltar para a aba nao refaz a consulta). */
-function useHistorico(
-  inicio: string,
-  fim: string,
-  lojas: string[] | null,
-  agrupar: Agrupar | null,
-  ativo = true,
-): { dados: PontoInadimplencia[] | null; erro: boolean } {
-  const chave = `inadimplenciaHistorico|${inicio}|${fim}|${agrupar ?? ""}|${lojas ? [...lojas].sort().join(",") : "*"}`;
-  const [estado, setEstado] = useState<{
-    chave: string;
-    dados: PontoInadimplencia[];
-  } | null>(() => {
-    const c = lerCacheTela<PontoInadimplencia[]>(chave);
-    return c ? { chave, dados: c.valor } : null;
-  });
-  const [erro, setErro] = useState(false);
-
-  useEffect(() => {
-    if (!ativo) return;
-    let cancelado = false;
-    setErro(false);
-    const c = lerCacheTela<PontoInadimplencia[]>(chave);
-    if (c) {
-      setEstado({ chave, dados: c.valor });
-      if (c.fresco) return;
-    }
-    buscarComCacheTela(chave, () =>
-      buscarHistorico(inicio, fim, lojas, agrupar),
-    )
-      .then((dados) => {
-        if (!cancelado) setEstado({ chave, dados });
-      })
-      .catch((e) => {
-        console.error("Erro ao buscar o histórico da inadimplência:", e);
-        if (!cancelado) setErro(true);
-      });
-    return () => {
-      cancelado = true;
-    };
-    // `chave` ja carrega intervalo/lojas/agrupar.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chave, ativo]);
-
-  return {
-    dados: estado && estado.chave === chave ? estado.dados : null,
-    erro,
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Grafico de linha (uma serie so -- o titulo do quadro nomeia a serie).

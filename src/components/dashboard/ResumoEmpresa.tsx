@@ -1,6 +1,10 @@
 import React, { useMemo, useState } from "react";
 import {
+  AlertTriangle,
+  ArrowRight,
   Building2,
+  CalendarRange,
+  RotateCcw,
   Users,
   Wallet,
   TrendingUp,
@@ -23,6 +27,14 @@ import {
   INADIMPLENCIA_A_PARTIR_DIAS,
 } from "../../filters/inadimplencia";
 import { PERIODO_TUDO_ATE } from "../../filters/periodo";
+import {
+  formatarPct,
+  pctInadimplencia,
+} from "../../filters/inadimplenciaHistorico";
+import {
+  somarPontos,
+  useMesPassadoPorLoja,
+} from "../../hooks/useInadimplenciaHistorico";
 import { formatCurrency } from "../../utils/formatters";
 
 const fmtNum = (n: number): string => n.toLocaleString("pt-BR");
@@ -54,8 +66,10 @@ const clientesTxt = (n: number) =>
 // Os NOMES dos cards sao os da reuniao (Clientes, Previsao, Desempenho,
 // Carteira, Inadimplencia) -- nao trocar.
 //
-// ORDEM (igual na empresa e nos cobradores): Clientes -> Previsao ->
-// Recebido/Desempenho -> Carteira (Carteira por ultimo, pedido do usuario).
+// ORDEM (gestor, 26/11): Carteira -> Inadimplencia -> Previsao -> Recebido,
+// e Clientes numa faixa larga embaixo. Nos cobradores a 2a posicao e a
+// Recuperacao (a carteira do cobrador so tem atrasado, a inadimplencia dele
+// sai sempre alta) e Recebido vira Desempenho.
 // ---------------------------------------------------------------------------
 
 type Tema = "red" | "indigo" | "blue" | "green" | "slate";
@@ -117,6 +131,18 @@ export const CardSimples: React.FC<{
   detalhes?: SummaryCardRow[];
   /** Conteudo livre dentro do "ver detalhes" (ex.: faixas da regra). */
   detalhesExtra?: React.ReactNode;
+  /** Logo abaixo da frase (ex.: barra com o mes passado). */
+  extra?: React.ReactNode;
+  /** Etiqueta no canto do titulo (ex.: mes do numero). */
+  etiqueta?: string;
+  /** Link ao lado do "ver detalhes" (ex.: abrir a aba Inadimplencia). */
+  acao?: { rotulo: string; onClick: () => void };
+  /** Faixa larga e baixa (Clientes, 26/11): numero a esquerda e quadrinhos
+   * numa linha so a direita (lg+). */
+  faixa?: boolean;
+  /** Faixa num espaco estreito (card de cada cobrador/loja): numero em
+   * cima e quadrinhos numa linha so embaixo. */
+  faixaEmpilhada?: boolean;
 }> = ({
   icon: Icon,
   titulo,
@@ -129,31 +155,54 @@ export const CardSimples: React.FC<{
   colunas = 2,
   detalhes = [],
   detalhesExtra,
+  extra,
+  etiqueta,
+  acao,
+  faixa = false,
+  faixaEmpilhada = false,
 }) => {
   const [aberto, setAberto] = useState(false);
+  const lado = faixa && !faixaEmpilhada;
   const t = TEMA[tema];
+  const cols = faixa ? 4 : colunas;
+  const temDetalhes = detalhes.length > 0 || !!detalhesExtra;
   return (
     <div
       className={`min-w-0 flex flex-col rounded-xl border border-gray-200 border-t-4 ${t.faixa} dark:border-dark-border bg-gray-100 dark:bg-dark-bg px-4 py-3`}
     >
-      <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-600 dark:text-dark-text-secondary">
-        <Icon className={`h-4 w-4 ${t.icone}`} />
-        {titulo}
-      </div>
-      <div
-        title={numeroHint}
-        className={`mt-1 text-3xl font-extrabold leading-tight truncate ${t.numero} ${numeroLoading ? "animate-pulse" : ""}`}
-      >
-        {numero}
-      </div>
-      <div className="text-sm text-gray-700 dark:text-dark-text">{frase}</div>
+      <div className={lado ? "lg:flex lg:items-center lg:gap-6" : ""}>
+        <div className={lado ? "lg:w-56 lg:shrink-0" : ""}>
+          <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-600 dark:text-dark-text-secondary">
+            <Icon className={`h-4 w-4 ${t.icone}`} />
+            {titulo}
+            {etiqueta && (
+              <span
+                className="ml-auto inline-flex items-center gap-1 rounded-full bg-white dark:bg-dark-bg-secondary border border-gray-200 dark:border-dark-border px-2 py-0.5 text-[11px] font-semibold"
+                title="Mês do número grande"
+              >
+                <CalendarRange className="h-3 w-3" />
+                {etiqueta}
+              </span>
+            )}
+          </div>
+          <div
+            title={numeroHint}
+            className={`mt-1 text-3xl font-extrabold leading-tight truncate ${t.numero} ${numeroLoading ? "animate-pulse" : ""}`}
+          >
+            {numero}
+          </div>
+          <div className="text-sm text-gray-700 dark:text-dark-text">
+            {frase}
+          </div>
+        </div>
+        {extra}
 
       {pilulas.length > 0 && (
         // Grade fixa de 2 colunas (25/11: etiquetas soltas quebravam em
         // varias linhas e o card ficava alto). Numero em cima, rotulo
         // embaixo; item impar no fim vira retangulo da largura toda.
         <div
-          className={`mt-2 grid grid-cols-2 gap-1 ${colunas === 4 ? "sm:grid-cols-4" : ""}`}
+          className={`mt-2 grid grid-cols-2 gap-1 ${cols === 4 ? (faixa && pilulas.length === 3 ? "sm:grid-cols-3" : "sm:grid-cols-4") : ""} ${lado ? "lg:mt-0 lg:flex-1" : ""}`}
         >
           {pilulas.map((p, i) => (
             <div
@@ -161,7 +210,7 @@ export const CardSimples: React.FC<{
               title={p.hint}
               onClick={p.onClick}
               role={p.onClick ? "button" : undefined}
-              className={`min-w-0 rounded-md px-2 py-1 ${PILULA[p.tom]} ${pilulas.length % 2 === 1 && i === pilulas.length - 1 ? `col-span-2 ${colunas === 4 ? "sm:col-span-1" : ""}` : ""} ${p.onClick ? "cursor-pointer hover:opacity-90" : ""}`}
+              className={`min-w-0 rounded-md px-2 py-1 ${PILULA[p.tom]} ${pilulas.length % 2 === 1 && i === pilulas.length - 1 ? `col-span-2 ${cols === 4 ? "sm:col-span-1" : ""}` : ""} ${p.onClick ? "cursor-pointer hover:opacity-90" : ""}`}
             >
               <div
                 className={`text-sm font-bold leading-tight truncate ${p.loading ? "animate-pulse" : ""}`}
@@ -176,9 +225,11 @@ export const CardSimples: React.FC<{
         </div>
       )}
 
-      {(detalhes.length > 0 || detalhesExtra) && (
+      </div>
+
+      {(temDetalhes || acao) && (
         <div className="mt-auto pt-2">
-          {aberto && (
+          {temDetalhes && aberto && (
             <div className="mb-1.5 space-y-1 border-t border-gray-300 dark:border-dark-border/60 pt-2">
               {detalhes.map((r) => (
                 <div
@@ -200,18 +251,34 @@ export const CardSimples: React.FC<{
               {detalhesExtra}
             </div>
           )}
-          <button
-            type="button"
-            onClick={() => setAberto((v) => !v)}
-            className="inline-flex items-center gap-0.5 text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400"
-          >
-            {aberto ? "menos detalhes" : "ver detalhes"}
-            {aberto ? (
-              <ChevronUp className="h-3.5 w-3.5" />
+          <div className="flex items-center justify-between gap-3">
+            {temDetalhes ? (
+              <button
+                type="button"
+                onClick={() => setAberto((v) => !v)}
+                className="inline-flex items-center gap-0.5 text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400"
+              >
+                {aberto ? "menos detalhes" : "ver detalhes"}
+                {aberto ? (
+                  <ChevronUp className="h-3.5 w-3.5" />
+                ) : (
+                  <ChevronDown className="h-3.5 w-3.5" />
+                )}
+              </button>
             ) : (
-              <ChevronDown className="h-3.5 w-3.5" />
+              <span />
             )}
-          </button>
+            {acao && (
+              <button
+                type="button"
+                onClick={acao.onClick}
+                className="inline-flex items-center gap-0.5 text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400"
+              >
+                {acao.rotulo}
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -228,10 +295,13 @@ export const CardSimples: React.FC<{
  * total"), na ordem dele: quitados, em dia, atraso com cobrador, atraso sem
  * cobrador. Cada cliente cai em uma parte so (filters/resumoEmpresa). O
  * "sem agendamento" e os acionados detalham o atraso com cobrador. */
-export const CardClientes: React.FC<{ r: Resumo; cobrador?: boolean }> = ({
-  r,
-  cobrador = false,
-}) => {
+export const CardClientes: React.FC<{
+  r: Resumo;
+  cobrador?: boolean;
+  /** Faixa larga embaixo dos outros cards (gestor, 26/11). */
+  faixa?: boolean;
+  faixaEmpilhada?: boolean;
+}> = ({ r, cobrador = false, faixa = false, faixaEmpilhada = false }) => {
   const c = r.clientes;
   const atrasoComCobrador = c.emAtraso - c.semCobrador;
   // Na carteira do cobrador nao ha quitado (quem quita sai da carteira) nem
@@ -301,6 +371,8 @@ export const CardClientes: React.FC<{ r: Resumo; cobrador?: boolean }> = ({
       numero={fmtNum(total)}
       frase={cobrador ? "clientes com saldo na carteira" : "clientes no total"}
       pilulas={partes}
+      faixa={faixa}
+      faixaEmpilhada={faixaEmpilhada}
       detalhes={[
         // No cobrador o com/sem agendamento ja esta nos quadrinhos.
         ...(cobrador
@@ -556,15 +628,6 @@ export const CardCarteira: React.FC<{
           tom: "gray",
           hint: fmtValor(r.carteira.aVencer),
         },
-        {
-          valor: formatarInadimplencia(
-            r.inadimplencia.pct,
-            r.inadimplencia.venceu,
-          ),
-          rotulo: "inadimplência",
-          tom: "gray",
-          hint: `Do que venceu nos últimos 12 meses, com ${INADIMPLENCIA_A_PARTIR_DIAS} dias ou mais de atraso, quanto não foi pago`,
-        },
         ...extraPilulas,
       ]}
       detalhes={[
@@ -594,6 +657,167 @@ export const CardCarteira: React.FC<{
   );
 };
 
+/** Barra cinza com o valor e um tracinho de referencia (mes passado) --
+ * mesmo visual dos cards da aba Inadimplencia. */
+const BarraReferencia: React.FC<{
+  pct: number;
+  escala: number;
+  referencia: number | null | undefined;
+  rotulo: string;
+  cor: string;
+}> = ({ pct, escala, referencia, rotulo, cor }) => {
+  const pos = (v: number) =>
+    `${Math.max(0, Math.min(100, (v / escala) * 100))}%`;
+  return (
+    <div className="relative mt-2 mb-4">
+      <div className="h-3 rounded-full bg-gray-300/70 dark:bg-dark-border overflow-hidden">
+        <div
+          className={`h-full rounded-full ${cor}`}
+          style={{ width: pos(pct) }}
+        />
+      </div>
+      {referencia != null && (
+        <div
+          className="absolute top-[-3px] flex flex-col items-center -translate-x-1/2"
+          style={{ left: pos(referencia) }}
+          title={`${rotulo}: ${formatarPct(referencia)}`}
+        >
+          <span className="h-[18px] w-0.5 rounded bg-gray-700 dark:bg-gray-200" />
+          <span className="mt-0.5 whitespace-nowrap text-[10px] text-gray-500 dark:text-dark-text-secondary">
+            {rotulo}{" "}
+            <strong className="text-gray-700 dark:text-dark-text">
+              {formatarPct(referencia)}
+            </strong>
+          </span>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/** 2. Inadimplencia (empresa/loja, 26/11): o numero que era um quadrinho da
+ * Carteira, agora com card proprio e o mes passado na barra. */
+export const CardInadimplencia: React.FC<{
+  r: Resumo;
+  /** % no fim do mes passado (RPC); null/undefined = sem tracinho. */
+  mesPassado?: number | null;
+  onVerMesAMes?: () => void;
+}> = ({ r, mesPassado, onVerMesAMes }) => {
+  const i = r.inadimplencia;
+  return (
+    <CardSimples
+      icon={AlertTriangle}
+      titulo="Inadimplência"
+      tema="red"
+      numero={formatarInadimplencia(i.pct, i.venceu)}
+      frase="do que venceu não foi pago"
+      extra={
+        <BarraReferencia
+          pct={i.pct}
+          escala={100}
+          referencia={mesPassado}
+          rotulo="mês passado"
+          cor="bg-red-500"
+        />
+      }
+      pilulas={[
+        {
+          valor: fmtValorCurto(i.naoPago),
+          rotulo: "sem pagar",
+          tom: "red",
+          hint: fmtValor(i.naoPago),
+        },
+        {
+          valor: fmtValorCurto(i.venceu),
+          rotulo: "venceu em 12 meses",
+          tom: "gray",
+          hint: fmtValor(i.venceu),
+        },
+      ]}
+      detalhes={[
+        {
+          label: "Sem pagar",
+          value: fmtValor(i.naoPago),
+          hint: `Atraso de ${INADIMPLENCIA_A_PARTIR_DIAS} dias ou mais, de parcelas que venceram nos últimos 12 meses`,
+        },
+        { label: "Venceu em 12 meses", value: fmtValor(i.venceu) },
+        {
+          label: `Atrasado há menos de ${INADIMPLENCIA_A_PARTIR_DIAS} dias`,
+          value: fmtValor(i.atrasoRecente),
+          hint: "Ainda não conta como inadimplência",
+        },
+      ]}
+      acao={
+        onVerMesAMes ? { rotulo: "mês a mês", onClick: onVerMesAMes } : undefined
+      }
+    />
+  );
+};
+
+/** Numeros do card Recuperacao (RPC inadimplencia_historico). */
+export interface DadosRecuperacao {
+  pct: number;
+  recuperado: number;
+  base: number;
+  mesPassado: number | null;
+  /** "nov/26 até hoje" */
+  mes: string;
+}
+
+/** 2. Recuperacao (cobradores, 26/11): do atraso que vinha de antes do mes,
+ * quanto voltou. */
+export const CardRecuperacao: React.FC<{
+  d: DadosRecuperacao | null;
+  onVerMesAMes?: () => void;
+}> = ({ d, onVerMesAMes }) => {
+  const escala = d
+    ? Math.max(10, Math.ceil(Math.max(d.pct, d.mesPassado ?? 0) / 10) * 10)
+    : 10;
+  return (
+    <CardSimples
+      icon={RotateCcw}
+      titulo="Recuperação"
+      tema="green"
+      etiqueta={d?.mes}
+      numero={d ? formatarPct(d.pct) : "…"}
+      numeroLoading={!d}
+      frase="do atraso foi pago no mês"
+      extra={
+        d ? (
+          <BarraReferencia
+            pct={d.pct}
+            escala={escala}
+            referencia={d.mesPassado}
+            rotulo="mês passado"
+            cor="bg-green-500"
+          />
+        ) : undefined
+      }
+      pilulas={
+        d
+          ? [
+              {
+                valor: fmtValorCurto(d.recuperado),
+                rotulo: "recuperados no mês",
+                tom: "green",
+                hint: fmtValor(d.recuperado),
+              },
+              {
+                valor: fmtValorCurto(d.base),
+                rotulo: "em atraso no início",
+                tom: "gray",
+                hint: fmtValor(d.base),
+              },
+            ]
+          : []
+      }
+      acao={
+        onVerMesAMes ? { rotulo: "mês a mês", onClick: onVerMesAMes } : undefined
+      }
+    />
+  );
+};
+
 /**
  * Visao geral da empresa (reuniao 25/11): a base inteira de clientes -- nao
  * depende dos cobradores marcados no filtro. Regras em filters/resumoEmpresa.
@@ -610,6 +834,8 @@ const ResumoEmpresa: React.FC<{
   /** Valor registrado pelos cobradores no periodo, por cliente. */
   registradoPorCliente: Map<string, number>;
   registradoCarregando?: boolean;
+  /** Abre a aba Inadimplencia (link "mes a mes" do card). */
+  onVerInadimplencia?: () => void;
 }> = ({
   dateFrom,
   dateTo,
@@ -618,6 +844,7 @@ const ResumoEmpresa: React.FC<{
   registradosCobrador,
   registradoPorCliente,
   registradoCarregando = false,
+  onVerInadimplencia,
 }) => {
   const { collections, scheduledVisits, acordoAtivoOverdueMap } =
     useCollection();
@@ -657,6 +884,19 @@ const ResumoEmpresa: React.FC<{
     ],
   );
 
+  // Tracinho "mes passado" do card Inadimplencia: fim do mes passado das
+  // lojas do filtro (guardado no banco, mesma regra).
+  const mesPassadoLojas = useMesPassadoPorLoja(today.slice(0, 7), aberta);
+  const inadMesPassado = useMemo(() => {
+    if (!mesPassadoLojas) return null;
+    const p = somarPontos(
+      [...mesPassadoLojas.entries()]
+        .filter(([loja]) => !lojasExcluidas.has(loja))
+        .map(([, ponto]) => ponto),
+    );
+    return p && p.venceu > 0 ? pctInadimplencia(p) : null;
+  }, [mesPassadoLojas, lojasExcluidas]);
+
   return (
     <div className="space-y-3">
       <div className="flex flex-col sm:flex-row sm:items-center gap-2">
@@ -690,13 +930,20 @@ const ResumoEmpresa: React.FC<{
 
       {aberta && (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-          <CardClientes r={r} />
+          <CardCarteira r={r} empresa />
+          <CardInadimplencia
+            r={r}
+            mesPassado={inadMesPassado}
+            onVerMesAMes={onVerInadimplencia}
+          />
           <CardPrevisao r={r} />
           <CardRecebidoEmpresa
             r={r}
             registradoCarregando={registradoCarregando}
           />
-          <CardCarteira r={r} empresa />
+          <div className="col-span-full">
+            <CardClientes r={r} faixa />
+          </div>
         </div>
       )}
     </div>

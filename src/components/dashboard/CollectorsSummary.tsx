@@ -1,4 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   PERIODO_PRESETS,
   PeriodoPreset,
@@ -32,8 +38,19 @@ import ResumoEmpresa, {
   CardClientes,
   CardDesempenho,
   CardPrevisao,
+  CardRecuperacao,
   CardSimples,
+  DadosRecuperacao,
 } from "./ResumoEmpresa";
+import {
+  somarPontos,
+  useHistorico,
+} from "../../hooks/useInadimplenciaHistorico";
+import {
+  pctRecuperacao,
+  rotuloMes,
+  somarMeses,
+} from "../../filters/inadimplenciaHistorico";
 import {
   resumoEmpresa,
   ResumoEmpresa as ResumoClientes,
@@ -792,6 +809,44 @@ const CollectorsSummary: React.FC<{
     acionados,
   ]);
 
+  // Card Recuperacao dos cobradores (gestor, 26/11): mes do fim do periodo
+  // (no maximo o mes atual) x mes anterior, da RPC por cobrador. A mesma
+  // consulta serve a visao geral e cada cobrador.
+  const mesRecuperacao = (dateTo < today ? dateTo : today).slice(0, 7);
+  const recPorCobrador = useHistorico(
+    somarMeses(mesRecuperacao, -1),
+    mesRecuperacao,
+    null,
+    "cobrador",
+    aba === "geral" || aba === "cobrador",
+  );
+  const recuperacaoDe = useCallback(
+    (ids: string[]): DadosRecuperacao | null => {
+      if (!recPorCobrador.dados) return null;
+      const set = new Set(ids);
+      const dias = [...new Set(recPorCobrador.dados.map((p) => p.dia))].sort();
+      const doDia = (dia: string | undefined) =>
+        somarPontos(
+          recPorCobrador.dados!.filter(
+            (p) => p.dia === dia && p.chave != null && set.has(p.chave),
+          ),
+        );
+      const ult = dias[dias.length - 1];
+      const atual = doDia(ult);
+      const ant = dias.length > 1 ? doDia(dias[dias.length - 2]) : null;
+      if (!atual) return null;
+      return {
+        pct: pctRecuperacao(atual),
+        recuperado: atual.recuperadoMes,
+        base: atual.atrasoInicioMes,
+        mesPassado: ant && ant.atrasoInicioMes > 0 ? pctRecuperacao(ant) : null,
+        mes:
+          ult === today ? `${rotuloMes(ult)} até hoje` : rotuloMes(ult),
+      };
+    },
+    [recPorCobrador.dados, today],
+  );
+
   // Secao dos cobradores somada: a MESMA conta do painel Empresa sobre os
   // titulos dos cobradores marcados (cliente com 2 cobradores conta 1 vez).
   const resumoCobradores = useMemo(() => {
@@ -1315,6 +1370,7 @@ const CollectorsSummary: React.FC<{
             registradosCobrador={empresaRegistrados}
             registradoPorCliente={registradoPorCliente}
             registradoCarregando={!atribuicoesProntas || !acordoPagosProntos}
+            onVerInadimplencia={() => setAba("inadimplencia")}
           />
           <div className="border-t-2 border-gray-200 dark:border-dark-border" />
           {/* Filtro de cobrador aqui, como o de Loja na visao da empresa
@@ -1357,7 +1413,11 @@ const CollectorsSummary: React.FC<{
             // pediu mais destaque pro valor vencido -- separados de novo,
             // sem repetir "A vencer" nos dois (fica so dentro de Carteira).
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-              <CardClientes r={resumoCobradores} cobrador />
+              <CardCarteira r={resumoCobradores} />
+              <CardRecuperacao
+                d={recuperacaoDe(rows.map((r) => r.id))}
+                onVerMesAMes={() => setAba("inadimplencia")}
+              />
               <CardPrevisao r={resumoCobradores} />
               <CardDesempenho
                 r={resumoCobradores}
@@ -1371,7 +1431,9 @@ const CollectorsSummary: React.FC<{
                   rows.length > 0 && rows.every((r) => ehExterno(r.type)),
                 )}
               />
-              <CardCarteira r={resumoCobradores} />
+              <div className="col-span-full">
+                <CardClientes r={resumoCobradores} cobrador faixa />
+              </div>
             </div>
           )}
         </div>
@@ -1467,20 +1529,6 @@ const CollectorsSummary: React.FC<{
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <CardClientes r={row.resumo} cobrador />
-                    <CardPrevisao r={row.resumo} />
-                    <CardDesempenho
-                      r={row.resumo}
-                      recebido={row.recebidoPeriodo}
-                      loading={!atribuicoesProntas || !acordoPagosProntos}
-                      meta={metaPorCobrador.get(row.id) ?? null}
-                      atendimentos={linhaAtendimentos(
-                        row.clientesAtendidos,
-                        row.clientesConversaram,
-                        row.acionamentosQtd,
-                        ehExterno(row.type),
-                      )}
-                    />
                     <CardCarteira
                       r={row.resumo}
                       extraPilulas={
@@ -1500,6 +1548,23 @@ const CollectorsSummary: React.FC<{
                           : []
                       }
                     />
+                    <CardRecuperacao d={recuperacaoDe([row.id])} />
+                    <CardPrevisao r={row.resumo} />
+                    <CardDesempenho
+                      r={row.resumo}
+                      recebido={row.recebidoPeriodo}
+                      loading={!atribuicoesProntas || !acordoPagosProntos}
+                      meta={metaPorCobrador.get(row.id) ?? null}
+                      atendimentos={linhaAtendimentos(
+                        row.clientesAtendidos,
+                        row.clientesConversaram,
+                        row.acionamentosQtd,
+                        ehExterno(row.type),
+                      )}
+                    />
+                    <div className="sm:col-span-2">
+                      <CardClientes r={row.resumo} cobrador faixa faixaEmpilhada />
+                    </div>
                     {carteiraAuto.regrasPor.has(row.id) &&
                       (() => {
                         const regras = carteiraAuto.regrasPor.get(row.id) ?? [];

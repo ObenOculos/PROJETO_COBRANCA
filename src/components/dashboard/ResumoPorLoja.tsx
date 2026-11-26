@@ -14,11 +14,14 @@ import {
   nivelInadimplencia,
 } from "../../filters/inadimplencia";
 import SortTh from "../common/SortTh";
+import { useMesPassadoPorLoja } from "../../hooks/useInadimplenciaHistorico";
+import { pctInadimplencia } from "../../filters/inadimplenciaHistorico";
 import ModoVisualizacao, { Modo } from "../common/ModoVisualizacao";
 import QuemDeveLoja from "./QuemDeveLoja";
 import {
   CardCarteira,
   CardClientes,
+  CardInadimplencia,
   CardPrevisao,
   CardRecebidoEmpresa,
 } from "./ResumoEmpresa";
@@ -88,6 +91,15 @@ const ResumoPorLoja: React.FC<{
   const { collections, scheduledVisits, acordoAtivoOverdueMap, users } =
     useCollection();
   const [busca, setBusca] = useState("");
+  // Tracinho "mes passado" do card Inadimplencia (so no modo Cards).
+  const mesPassadoLojas = useMesPassadoPorLoja(
+    today.slice(0, 7),
+    modo === "cards",
+  );
+  const inadMesPassado = (loja: string): number | null => {
+    const p = mesPassadoLojas?.get(loja);
+    return p && p.venceu > 0 ? pctInadimplencia(p) : null;
+  };
   // Loja com o modal "Quem deve" aberto.
   const [quemDeve, setQuemDeve] = useState<string | null>(null);
   // Padrao: pior inadimplencia primeiro.
@@ -356,13 +368,19 @@ const ResumoPorLoja: React.FC<{
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <CardClientes r={l.r} />
+                  <CardCarteira r={l.r} empresa />
+                  <CardInadimplencia
+                    r={l.r}
+                    mesPassado={inadMesPassado(l.loja)}
+                  />
                   <CardPrevisao r={l.r} />
                   <CardRecebidoEmpresa
                     r={l.r}
                     registradoCarregando={registradoCarregando}
                   />
-                  <CardCarteira r={l.r} empresa />
+                  <div className="sm:col-span-2">
+                    <CardClientes r={l.r} faixa faixaEmpilhada />
+                  </div>
                 </div>
               </div>
             );
