@@ -2,7 +2,6 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import {
@@ -410,7 +409,6 @@ const CollectorsSummary: React.FC<{
   // VALOR PADRAO muda: comeca fechada quando sobra 1 só (ver efeito abaixo,
   // apos `rows`), porque af os totais seriam identicos ao card/linha unica.
   const [overviewOpen, setOverviewOpen] = useState(true);
-  const prevSingleRef = useRef(false);
   // Conjunto dos EXCLUIDOS (nao dos selecionados). Vazio = nada excluido =
   // todos aparecem; cheio (todo allCollectors) = todos excluidos = nenhum
   // aparece. Essa inversao deixa representar os 3 estados (todos/parcial/
@@ -934,16 +932,9 @@ const CollectorsSummary: React.FC<{
     dateTo,
   ]);
 
-  // Colapsa "Visao geral" sozinha na TRANSICAO pra 1 cobrador so (nao soca o
-  // dedo do usuario: se ele reabrir manualmente enquanto ainda for so 1, o
-  // efeito nao roda de novo — só reage a mudanca de "nao-1" pra "1").
-  useEffect(() => {
-    const isSingleNow = rows.length === 1;
-    if (isSingleNow && !prevSingleRef.current) {
-      setOverviewOpen(false);
-    }
-    prevSingleRef.current = isSingleNow;
-  }, [rows.length]);
+  // 26/11: saiu o efeito que recolhia a "Visao geral dos cobradores" ao
+  // filtrar 1 cobrador so -- na aba Geral ela e o unico lugar desse
+  // cobrador, e o usuario via o painel fechar ao escolher no filtro.
 
   // Cards globais: soma simples dos cobradores visiveis no momento (respeita
   // filtro de cobrador E de periodo, porque reusa `rows` ja filtrado/calculado
@@ -1353,9 +1344,7 @@ const CollectorsSummary: React.FC<{
       {/* Visao geral: soma de todos os cobradores visiveis no momento. Fica
           visivel nos dois modos (Cards e Tabela), conforme pedido. O
           cabecalho (com o botao de colapsar) e sempre o mesmo, com 1
-          cobrador ou com varios — só o valor PADRAO de `overviewOpen` muda
-          (comeca fechada ao cair pra 1 so, ver efeito acima; o usuario pode
-          abrir/fechar manualmente depois, em qualquer contagem). */}
+          cobrador ou com varios; so o usuario abre/fecha. */}
       {aba === "geral" && (
         <div className="bg-white dark:bg-dark-bg-secondary rounded-2xl shadow-sm border-2 border-blue-100 dark:border-blue-900/40 p-4 space-y-3">
           <ResumoEmpresa
