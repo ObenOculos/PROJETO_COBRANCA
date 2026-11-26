@@ -112,6 +112,11 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   // Aba do Resumo Geral (Geral / Por cobrador / Por loja / Inadimplencia),
   // aqui em cima para decidir se precisa da carga completa.
   const [resumoAba, setResumoAba] = useState<AbaResumoGeral>(lerAbaResumoGeral);
+  // 26/11: depois da 1a vez, o Resumo (CollectorsSummary) fica montado e so
+  // e escondido ao ir para Visitas, Conferencia ou a aba Inadimplencia. Antes
+  // ele era desmontado e, na volta, refazia todas as contas sobre a base
+  // inteira (~3 s de tela travada a cada volta).
+  const [resumoMontado, setResumoMontado] = useState(false);
   const mudarResumoAba = (aba: AbaResumoGeral) => {
     setResumoAba(aba);
     salvarAbaResumoGeral(aba);
@@ -324,6 +329,14 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
+  const mostrarResumo =
+    activeTab === "collectors-summary" &&
+    summaryView === "resumo" &&
+    resumoAba !== "inadimplencia";
+  useEffect(() => {
+    if (mostrarResumo && !loadingSettledCollections) setResumoMontado(true);
+  }, [mostrarResumo, loadingSettledCollections]);
+
   const renderTabContent = () => {
     // Segurar e melhor do que exibir total subestimado: sem os clientes
     // quitados, os numeros dessas telas ficam menores do que a realidade.
@@ -516,9 +529,15 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                 );
               })}
             </div>
+            {(resumoMontado || mostrarResumo) && (
+              <div className={mostrarResumo ? "" : "hidden"}>
+                <CollectorsSummary aba={resumoAba} onAba={mudarResumoAba} />
+              </div>
+            )}
             {summaryView === "resumo" ? (
-              resumoAba === "inadimplencia" ? (
-                // Leve: so o cabecalho + a aba (sem montar o Resumo).
+              resumoAba === "inadimplencia" && (
+                // Leve: so o cabecalho + a aba (nao monta o Resumo se ele
+                // ainda nao foi aberto -- sem a carga da base inteira).
                 <div className="space-y-4">
                   <CabecalhoResumoGeral
                     aba={resumoAba}
@@ -526,8 +545,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                   />
                   <AcompanhamentoInadimplencia />
                 </div>
-              ) : (
-                <CollectorsSummary aba={resumoAba} onAba={mudarResumoAba} />
               )
             ) : summaryView === "acompanhamento" ? (
               <VisitTracking />

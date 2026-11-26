@@ -469,60 +469,75 @@ const CollectorsSummary: React.FC<{
   const buscaAcordoDe =
     dateFrom < inicioDoMes(today) ? dateFrom : inicioDoMes(today);
   const buscaAcordoAte = dateTo > fimDoMes(today) ? dateTo : fimDoMes(today);
+  type LinhaAcordoPago = {
+    collectorId: string;
+    valor: number;
+    data: string;
+    documento: string;
+  };
+  const periodoAtual = `${buscaAcordoDe}|${buscaAcordoAte}`;
+  // Cache de tela (26/11): era a unica busca do Resumo sem cache -- cada
+  // volta a pagina refazia a consulta paginada e o Recebido/meta ficavam em
+  // "…" ate chegar. Agora a volta mostra o guardado na hora.
+  const chaveAcordoPagos = `acordoPagos|${periodoAtual}`;
   const [acordoPagos, setAcordoPagos] = useState<{
     periodo: string;
-    linhas: {
-      collectorId: string;
-      valor: number;
-      data: string;
-      documento: string;
-    }[];
-  } | null>(null);
-  const periodoAtual = `${buscaAcordoDe}|${buscaAcordoAte}`;
+    linhas: LinhaAcordoPago[];
+  } | null>(() => {
+    const c = lerCacheTela<LinhaAcordoPago[]>(chaveAcordoPagos);
+    return c ? { periodo: periodoAtual, linhas: c.valor } : null;
+  });
   useEffect(() => {
     let cancelado = false;
-    const periodo = `${buscaAcordoDe}|${buscaAcordoAte}`;
-    (async () => {
-      try {
-        const brutas = await fetchAllRows<{
-          collector_id: string | null;
-          valor_pago: number | string;
-          data_pagamento: string;
-          acordo_parcelas: {
-            acordos: { client_document: string } | null;
-          } | null;
-        }>(
-          (de, ate) =>
-            supabase
-              .from("acordo_pagamentos")
-              .select(
-                "collector_id, valor_pago, data_pagamento, acordo_parcelas(acordos(client_document))",
-              )
-              .gte("data_pagamento", buscaAcordoDe)
-              .lte("data_pagamento", buscaAcordoAte)
-              .order("id")
-              .range(de, ate),
-          () => cancelado,
-        );
-        // data_pagamento e sempre YYYY-MM-DD (coluna date).
-        const linhas = brutas
-          .filter((l) => !!l.collector_id)
-          .map((l) => ({
-            collectorId: l.collector_id as string,
-            valor: Number(l.valor_pago || 0),
-            data: l.data_pagamento,
-            documento: l.acordo_parcelas?.acordos?.client_document ?? "",
-          }));
+    const periodo = periodoAtual;
+    const cache = lerCacheTela<LinhaAcordoPago[]>(chaveAcordoPagos);
+    if (cache) {
+      setAcordoPagos({ periodo, linhas: cache.valor });
+      if (cache.fresco) return;
+    }
+    buscarComCacheTela(chaveAcordoPagos, async () => {
+      const brutas = await fetchAllRows<{
+        collector_id: string | null;
+        valor_pago: number | string;
+        data_pagamento: string;
+        acordo_parcelas: {
+          acordos: { client_document: string } | null;
+        } | null;
+      }>(
+        (de, ate) =>
+          supabase
+            .from("acordo_pagamentos")
+            .select(
+              "collector_id, valor_pago, data_pagamento, acordo_parcelas(acordos(client_document))",
+            )
+            .gte("data_pagamento", buscaAcordoDe)
+            .lte("data_pagamento", buscaAcordoAte)
+            .order("id")
+            .range(de, ate),
+      );
+      // data_pagamento e sempre YYYY-MM-DD (coluna date).
+      return brutas
+        .filter((l) => !!l.collector_id)
+        .map((l) => ({
+          collectorId: l.collector_id as string,
+          valor: Number(l.valor_pago || 0),
+          data: l.data_pagamento,
+          documento: l.acordo_parcelas?.acordos?.client_document ?? "",
+        }));
+    })
+      .then((linhas) => {
         if (!cancelado) setAcordoPagos({ periodo, linhas });
-      } catch (err) {
+      })
+      .catch((err) => {
         console.error("Erro ao buscar pagamentos de acordo:", err);
-        if (!cancelado) setAcordoPagos({ periodo, linhas: [] });
-      }
-    })();
+        if (!cancelado && !cache) setAcordoPagos({ periodo, linhas: [] });
+      });
     return () => {
       cancelado = true;
     };
-  }, [buscaAcordoDe, buscaAcordoAte]);
+    // `chaveAcordoPagos` ja carrega o periodo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chaveAcordoPagos]);
   const acordoPagosProntos = acordoPagos?.periodo === periodoAtual;
   /** Recebido em acordo por cobrador no intervalo [de, ate]. */
   const acordoRecebido = (
