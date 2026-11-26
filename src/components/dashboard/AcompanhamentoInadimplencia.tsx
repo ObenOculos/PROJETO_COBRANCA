@@ -89,10 +89,12 @@ const HF = 260;
 const GraficoLinha: React.FC<{
   titulo: string;
   subtitulo?: string;
+  /** Controles no canto do cabecalho (ex.: intervalo dos graficos). */
+  acoes?: React.ReactNode;
   pontos: { rotulo: string; valor: number; dica: string[] }[];
   /** Cor da linha (classe stroke-/fill-). */
   cor: { linha: string; ponto: string };
-}> = ({ titulo, subtitulo, pontos, cor }) => {
+}> = ({ titulo, subtitulo, acoes, pontos, cor }) => {
   const [hover, setHover] = useState<number | null>(null);
   const max = Math.max(...pontos.map((p) => p.valor), 0);
   // Teto "redondo" para o eixo: 5, 10, 15, 20, 25, 30...
@@ -116,8 +118,11 @@ const GraficoLinha: React.FC<{
 
   return (
     <div className="min-w-0 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg-secondary p-3">
-      <div className="text-sm font-semibold text-gray-900 dark:text-dark-text">
-        {titulo}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="text-sm font-semibold text-gray-900 dark:text-dark-text">
+          {titulo}
+        </div>
+        {acoes && <div className="ml-auto">{acoes}</div>}
       </div>
       {subtitulo && (
         <div className="text-xs text-gray-500 dark:text-dark-text-secondary">
@@ -705,6 +710,14 @@ const CardVisual: React.FC<{
   );
 };
 
+type IntervaloGrafico = "ano" | "12" | "24" | "tudo";
+const INTERVALOS_GRAFICO: [IntervaloGrafico, string][] = [
+  ["ano", "Este ano"],
+  ["12", "12 meses"],
+  ["24", "24 meses"],
+  ["tudo", "Tudo"],
+];
+
 const AcompanhamentoInadimplencia: React.FC<{
   /** Periodo do Resumo Geral (o mesmo das outras abas, 26/11). */
   dateFrom: string;
@@ -738,6 +751,13 @@ const AcompanhamentoInadimplencia: React.FC<{
   const [lojasExcluidas, setLojasExcluidas] = useState<Set<string>>(new Set());
   const [verTodos, setVerTodos] = useState(false);
   const [mais, setMais] = useState(false);
+  // Intervalo proprio dos graficos (26/11, usuario: com o filtro da pagina
+  // em "Mes atual" o grafico ficava com um ponto so). Padrao: o ano atual;
+  // em janeiro e fevereiro (1-2 pontos) abre nos ultimos 12 meses. Sempre
+  // termina no mes atual. O filtro da pagina segue nos cards e na tabela.
+  const [intervaloGrafico, setIntervaloGrafico] = useState<IntervaloGrafico>(
+    () => (Number(today.slice(5, 7)) <= 2 ? "12" : "ano"),
+  );
 
   useEffect(() => {
     localStorage.setItem("inadimplenciaAgrupar", agrupar);
@@ -797,15 +817,56 @@ const AcompanhamentoInadimplencia: React.FC<{
     agrupar === "cobrador",
   );
 
+  const mesHoje = today.slice(0, 7);
+  const inicioGrafico = (() => {
+    const i =
+      intervaloGrafico === "ano"
+        ? `${mesHoje.slice(0, 4)}-01`
+        : intervaloGrafico === "tudo"
+          ? INADIMPLENCIA_MES_INICIAL
+          : somarMeses(mesHoje, -(Number(intervaloGrafico) - 1));
+    return i < INADIMPLENCIA_MES_INICIAL ? INADIMPLENCIA_MES_INICIAL : i;
+  })();
+  const historicoGrafico = useHistorico(
+    inicioGrafico,
+    mesHoje,
+    lojasFiltro,
+    null,
+  );
+  const serieGrafico = historicoGrafico.dados ?? [];
+  const rotulosGrafico = serieGrafico.map((p) =>
+    p.dia === today ? "hoje" : rotuloMes(p.dia),
+  );
+  const controleGrafico = (
+    <div
+      className="flex flex-wrap items-center gap-1"
+      role="group"
+      aria-label="Meses dos gráficos"
+    >
+      {INTERVALOS_GRAFICO.map(([id, rotulo]) => (
+        <button
+          key={id}
+          type="button"
+          onClick={() => setIntervaloGrafico(id)}
+          aria-pressed={intervaloGrafico === id}
+          className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors touch-manipulation ${
+            intervaloGrafico === id
+              ? "bg-blue-600 text-white"
+              : "bg-gray-100 dark:bg-dark-bg text-gray-600 dark:text-dark-text-secondary hover:bg-gray-200 dark:hover:bg-dark-border"
+          }`}
+        >
+          {rotulo}
+        </button>
+      ))}
+    </div>
+  );
+
   const serieTodos = empresa.dados ?? [];
   const serie = serieTodos.filter((p) => p.dia.slice(0, 7) >= intervalo.inicio);
   const atual = serie[serie.length - 1];
   const anterior =
     serieTodos.length > 1 ? serieTodos[serieTodos.length - 2] : null;
   const hoje = todayLocalStr();
-  const rotulos = serie.map((p) =>
-    p.dia === hoje ? "hoje" : rotuloMes(p.dia),
-  );
 
   const nomeCobrador = (id: string | null) =>
     id
@@ -1211,12 +1272,13 @@ const AcompanhamentoInadimplencia: React.FC<{
             </div>
           )}
 
-          {serie.length > 0 && (
+          {serieGrafico.length > 0 && (
             <GraficoLinha
               titulo="Inadimplência, mês a mês"
+              acoes={controleGrafico}
               cor={{ linha: "stroke-red-500", ponto: "fill-red-500" }}
-              pontos={serie.map((p, i) => ({
-                rotulo: rotulos[i],
+              pontos={serieGrafico.map((p, i) => ({
+                rotulo: rotulosGrafico[i],
                 valor: pctInadimplencia(p),
                 dica: [
                   `Não pago: ${fmtValor(p.naoPago)}`,
@@ -1350,7 +1412,7 @@ const AcompanhamentoInadimplencia: React.FC<{
           </div>
 
           {/* Resto em "mais graficos": recuperacao e idade do atraso. */}
-          {serie.length > 0 && (
+          {serieGrafico.length > 0 && (
             <div>
               <button
                 type="button"
@@ -1373,8 +1435,8 @@ const AcompanhamentoInadimplencia: React.FC<{
                       linha: "stroke-green-600",
                       ponto: "fill-green-600",
                     }}
-                    pontos={serie.map((p, i) => ({
-                      rotulo: rotulos[i],
+                    pontos={serieGrafico.map((p, i) => ({
+                      rotulo: rotulosGrafico[i],
                       valor: pctRecuperacao(p),
                       dica: [
                         `Recuperado: ${fmtValor(p.recuperadoMes)}`,
@@ -1382,7 +1444,10 @@ const AcompanhamentoInadimplencia: React.FC<{
                       ],
                     }))}
                   />
-                  <GraficoFaixas serie={serie} rotulos={rotulos} />
+                  <GraficoFaixas
+                    serie={serieGrafico}
+                    rotulos={rotulosGrafico}
+                  />
                 </div>
               )}
             </div>

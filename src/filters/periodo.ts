@@ -9,13 +9,16 @@
 // hoje+N), mas quase tudo no Resumo olha para tras (recebido, acionados,
 // inadimplencia, recuperacao). Agora os atalhos sao: Mes atual, Hoje, 7 dias
 // e 15 dias PARA TRAS (contando hoje), Mes passado e Tudo. Para o futuro, as
-// datas de/ate continuam livres.
+// datas de/ate continuam livres. 26/11: + Ano atual (1/jan a 31/dez, como o
+// Mes atual vai ate o fim do mes) e Ano passado.
 export type PeriodoPreset =
   | "month-atual"
   | "today"
   | "7d"
   | "15d"
   | "mes-passado"
+  | "ano-atual"
+  | "ano-passado"
   | "all";
 
 export const PERIODO_PRESETS: { key: PeriodoPreset; label: string }[] = [
@@ -24,6 +27,8 @@ export const PERIODO_PRESETS: { key: PeriodoPreset; label: string }[] = [
   { key: "7d", label: "7 dias" },
   { key: "15d", label: "15 dias" },
   { key: "mes-passado", label: "Mês passado" },
+  { key: "ano-atual", label: "Ano atual" },
+  { key: "ano-passado", label: "Ano passado" },
   { key: "all", label: "Tudo" },
 ];
 
@@ -72,6 +77,12 @@ export const periodoDoPreset = (
       const fimPassado = addDiasStr(inicioDoMes(hoje), -1);
       return { de: inicioDoMes(fimPassado), ate: fimPassado };
     }
+    case "ano-atual":
+      return { de: `${hoje.slice(0, 4)}-01-01`, ate: `${hoje.slice(0, 4)}-12-31` };
+    case "ano-passado": {
+      const ano = String(Number(hoje.slice(0, 4)) - 1);
+      return { de: `${ano}-01-01`, ate: `${ano}-12-31` };
+    }
     case "all":
       return { de: PERIODO_TUDO_DE, ate: PERIODO_TUDO_ATE };
   }
@@ -81,6 +92,7 @@ export const periodoDoPreset = (
 export const dicaDoPreset = (key: PeriodoPreset, hoje: string): string => {
   if (key === "all") return "Todo o histórico";
   const { de, ate } = periodoDoPreset(key, hoje);
+  if (key === "ano-atual" || key === "ano-passado") return de.slice(0, 4);
   const br = (s: string) => `${s.slice(8, 10)}/${s.slice(5, 7)}`;
   return de === ate ? br(de) : `${br(de)} a ${br(ate)}`;
 };

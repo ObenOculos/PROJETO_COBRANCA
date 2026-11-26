@@ -140,6 +140,12 @@ export const rotuloMes = (dia: string): string => {
  * histórico". Usado pelos cards do Resumo Geral e da aba Inadimplencia. */
 export const rotuloPeriodo = (de: string, ate: string, hoje: string): string => {
   if (de <= PERIODO_TUDO_DE) return "todo o histórico";
+  // Ano inteiro (ou o ano atual ate hoje): "2025", "2026 até hoje".
+  if (de.endsWith("-01-01") && de.slice(0, 4) === ate.slice(0, 4)) {
+    if (ate.endsWith("-12-31")) return de.slice(0, 4);
+    if (ate === hoje && de.slice(0, 4) === hoje.slice(0, 4) && ate.slice(5, 7) !== "01")
+      return `${de.slice(0, 4)} até hoje`;
+  }
   const diaUm = de.endsWith("-01");
   if (diaUm && ate === hoje && de.slice(0, 7) === hoje.slice(0, 7))
     return `${rotuloMes(de)} até hoje`;
