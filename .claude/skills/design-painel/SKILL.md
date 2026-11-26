@@ -22,6 +22,10 @@ calmo, não some.
 Frase de apoio do número: `text-sm text-gray-500`, uma linha (encurte o texto
 em vez de deixar quebrar).
 
+Explicação ("por que esse número é diferente", "de quem é") **não vai como
+parágrafo no card**: vai no ícone (i) do canto (`info` do `CardSimples`), em
+1–2 frases curtas (usuário, 26/11).
+
 ## Cor
 
 - **Cor do assunto** (identidade do card): só no ícone do título e na borda
