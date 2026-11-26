@@ -32,47 +32,43 @@ export const buscarHistorico = async (
   return (data ?? []).map(pontoDaRpc);
 };
 
-/** Busca com o cache de tela (voltar para a aba nao refaz a consulta). */
-export function useHistorico(
-  inicio: string,
-  fim: string,
-  lojas: string[] | null,
-  agrupar: Agrupar | null,
-  ativo = true,
-): { dados: PontoInadimplencia[] | null; erro: boolean } {
-  const chave = `inadimplenciaHistorico|${inicio}|${fim}|${agrupar ?? ""}|${lojas ? [...lojas].sort().join(",") : "*"}`;
-  const [estado, setEstado] = useState<{
-    chave: string;
-    dados: PontoInadimplencia[];
-  } | null>(() => {
-    const c = lerCacheTela<PontoInadimplencia[]>(chave);
-    return c ? { chave, dados: c.valor } : null;
-  });
+/** Consulta com o cache de tela (voltar para a aba nao refaz a consulta).
+ * `chave` identifica a consulta inteira (parametros inclusos). */
+function useConsultaCache<T>(
+  chave: string,
+  buscar: () => Promise<T>,
+  ativo: boolean,
+  rotuloErro: string,
+): { dados: T | null; erro: boolean } {
+  const [estado, setEstado] = useState<{ chave: string; dados: T } | null>(
+    () => {
+      const c = lerCacheTela<T>(chave);
+      return c ? { chave, dados: c.valor } : null;
+    },
+  );
   const [erro, setErro] = useState(false);
 
   useEffect(() => {
     if (!ativo) return;
     let cancelado = false;
     setErro(false);
-    const c = lerCacheTela<PontoInadimplencia[]>(chave);
+    const c = lerCacheTela<T>(chave);
     if (c) {
       setEstado({ chave, dados: c.valor });
       if (c.fresco) return;
     }
-    buscarComCacheTela(chave, () =>
-      buscarHistorico(inicio, fim, lojas, agrupar),
-    )
+    buscarComCacheTela(chave, buscar)
       .then((dados) => {
         if (!cancelado) setEstado({ chave, dados });
       })
       .catch((e) => {
-        console.error("Erro ao buscar o histórico da inadimplência:", e);
+        console.error(rotuloErro, e);
         if (!cancelado) setErro(true);
       });
     return () => {
       cancelado = true;
     };
-    // `chave` ja carrega intervalo/lojas/agrupar.
+    // `chave` ja carrega todos os parametros de `buscar`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chave, ativo]);
 
@@ -80,6 +76,74 @@ export function useHistorico(
     dados: estado && estado.chave === chave ? estado.dados : null,
     erro,
   };
+}
+
+const chaveLojas = (lojas: string[] | null) =>
+  lojas ? [...lojas].sort().join(",") : "*";
+
+/** Historico mes a mes (RPC inadimplencia_historico). */
+export function useHistorico(
+  inicio: string,
+  fim: string,
+  lojas: string[] | null,
+  agrupar: Agrupar | null,
+  ativo = true,
+): { dados: PontoInadimplencia[] | null; erro: boolean } {
+  return useConsultaCache(
+    `inadimplenciaHistorico|${inicio}|${fim}|${agrupar ?? ""}|${chaveLojas(lojas)}`,
+    () => buscarHistorico(inicio, fim, lojas, agrupar),
+    ativo,
+    "Erro ao buscar o histórico da inadimplência:",
+  );
+}
+
+/** Inadimplencia e recuperacao de um periodo qualquer (RPC
+ * inadimplencia_periodo, 26/11): a mesma conta dos cards do Resumo Geral
+ * (filters/inadimplencia), feita no banco porque a aba Inadimplencia nao
+ * carrega a base inteira. */
+export interface InadimplenciaPeriodo {
+  venceu: number;
+  naoPago: number;
+  atrasoRecente: number;
+  /** null = periodo ainda nao comecou (sem recuperacao). */
+  baseRecuperacao: number | null;
+  recuperado: number | null;
+  /** Fim do periodo limitado a hoje. */
+  ateEfetivo: string;
+}
+
+const num = (v: number | string | null | undefined): number =>
+  Number(v ?? 0) || 0;
+
+export function useInadimplenciaPeriodo(
+  de: string,
+  ate: string,
+  lojas: string[] | null,
+  ativo = true,
+): { dados: InadimplenciaPeriodo | null; erro: boolean } {
+  return useConsultaCache(
+    `inadimplenciaPeriodo|${de}|${ate}|${chaveLojas(lojas)}`,
+    async () => {
+      const { data, error } = await supabase.rpc("inadimplencia_periodo", {
+        p_de: de,
+        p_ate: ate,
+        ...(lojas ? { p_lojas: lojas } : {}),
+      });
+      if (error) throw error;
+      const l = data?.[0];
+      return {
+        venceu: num(l?.venceu),
+        naoPago: num(l?.nao_pago),
+        atrasoRecente: num(l?.atraso_recente),
+        baseRecuperacao:
+          l?.base_recuperacao == null ? null : num(l.base_recuperacao),
+        recuperado: l?.recuperado == null ? null : num(l.recuperado),
+        ateEfetivo: String(l?.ate_efetivo ?? ate),
+      };
+    },
+    ativo && !!de && !!ate && de <= ate,
+    "Erro ao buscar a inadimplência do período:",
+  );
 }
 
 /** Soma pontos (varias lojas/cobradores do mesmo dia) num ponto so. */

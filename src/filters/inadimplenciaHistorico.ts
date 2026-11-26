@@ -13,6 +13,8 @@
 // - Recuperacao: do saldo em atraso no inicio do mes, quanto foi pago ate o
 //   fim do mes (no mes corrente, ate hoje). Mede so a cobranca.
 
+import { fimDoMes, PERIODO_TUDO_DE } from "./periodo";
+
 export interface PontoInadimplencia {
   /** Ultimo dia do mes (ou hoje, no mes corrente). YYYY-MM-DD. */
   dia: string;
@@ -133,6 +135,23 @@ export const rotuloMes = (dia: string): string => {
   return `${MESES[Number(m) - 1]}/${a.slice(2)}`;
 };
 
+/** Rotulo curto de um periodo [de, ate] (ate ja limitado a hoje):
+ * "nov/26 até hoje", "out/26", "ago–out/26", "01/08 a 15/10", "todo o
+ * histórico". Usado pelos cards do Resumo Geral e da aba Inadimplencia. */
+export const rotuloPeriodo = (de: string, ate: string, hoje: string): string => {
+  if (de <= PERIODO_TUDO_DE) return "todo o histórico";
+  const diaUm = de.endsWith("-01");
+  if (diaUm && ate === hoje && de.slice(0, 7) === hoje.slice(0, 7))
+    return `${rotuloMes(de)} até hoje`;
+  if (diaUm && ate === fimDoMes(ate)) {
+    if (de.slice(0, 7) === ate.slice(0, 7)) return rotuloMes(de);
+    return de.slice(0, 4) === ate.slice(0, 4)
+      ? `${rotuloMes(de).split("/")[0]}–${rotuloMes(ate)}`
+      : `${rotuloMes(de)}–${rotuloMes(ate)}`;
+  }
+  return de === ate ? rotuloDia(de) : `${rotuloDia(de)} a ${rotuloDia(ate)}`;
+};
+
 /** "25/11" a partir de YYYY-MM-DD. */
 export const rotuloDia = (dia: string): string => {
   const [, m, d] = dia.split("-");
@@ -181,14 +200,13 @@ export const tendenciaRecuperacao = (
       : "piorou";
 
 // ---------------------------------------------------------------------------
-// Intervalo da aba (25/11): meses no formato YYYY-MM (sem Date: evita fuso).
+// Meses no formato YYYY-MM (sem Date: evita fuso). Desde 26/11 o intervalo
+// da aba vem do periodo do Resumo Geral (usePeriodoResumo).
 // ---------------------------------------------------------------------------
 
 /** Primeiro mes do "Tudo": a base comeca em jan/2021 e o 1o ano so forma a
  * janela de 12 meses. */
 export const INADIMPLENCIA_MES_INICIAL = "2022-01";
-
-export type PresetIntervalo = "12" | "24" | "tudo" | "personalizado";
 
 /** "2026-11" + n meses (n pode ser negativo). */
 export const somarMeses = (ym: string, n: number): string => {
@@ -196,15 +214,3 @@ export const somarMeses = (ym: string, n: number): string => {
   const total = a * 12 + (m - 1) + n;
   return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, "0")}`;
 };
-
-/** Intervalo de um atalho, terminando no mes corrente. */
-export const intervaloDoPreset = (
-  preset: Exclude<PresetIntervalo, "personalizado">,
-  mesAtual: string,
-): { inicio: string; fim: string } => ({
-  inicio:
-    preset === "tudo"
-      ? INADIMPLENCIA_MES_INICIAL
-      : somarMeses(mesAtual, -(Number(preset) - 1)),
-  fim: mesAtual,
-});

@@ -7,7 +7,6 @@ import {
   ChevronDown,
   ChevronUp,
   Hourglass,
-  Info,
   Minus,
   RotateCcw,
   Store,
@@ -16,7 +15,11 @@ import {
   Users,
 } from "lucide-react";
 import { useCollection } from "../../contexts/CollectionContext";
-import { Agrupar, useHistorico } from "../../hooks/useInadimplenciaHistorico";
+import {
+  Agrupar,
+  useHistorico,
+  useInadimplenciaPeriodo,
+} from "../../hooks/useInadimplenciaHistorico";
 import { formatCurrency } from "../../utils/formatters";
 import { todayLocalStr } from "../../config/visitStatus";
 import { InfoDica, Pilula } from "./ResumoEmpresa";
@@ -25,24 +28,24 @@ import FiltroMultiplo from "../common/FiltroMultiplo";
 import {
   INADIMPLENCIA_A_PARTIR_DIAS,
   nivelInadimplencia,
+  formatarInadimplencia,
+  periodoAnterior,
 } from "../../filters/inadimplencia";
 import {
   FAIXAS_ATRASO,
   INADIMPLENCIA_MES_INICIAL,
-  PresetIntervalo,
-  intervaloDoPreset,
   somarMeses,
   PontoInadimplencia,
   atrasoTotal,
   formatarPct,
   formatarPp,
-  media,
   pctInadimplencia,
   pctRecuperacao,
   rotuloMes,
   Tendencia,
   tendenciaInadimplencia,
   variacaoPp,
+  rotuloPeriodo,
 } from "../../filters/inadimplenciaHistorico";
 
 // Aba "Inadimplencia" do Resumo Geral (item 93, 25/11): a cobranca esta
@@ -527,6 +530,8 @@ const CardVisual: React.FC<{
   carregando: boolean;
   /** Valor em % (numero grande e tamanho da barra). */
   pct: number;
+  /** Texto do numero grande no lugar do % (ex.: "—" sem base). */
+  numeroTexto?: string;
   /** Onde fica o tracinho, em %; null = sem tracinho. */
   referencia: number | null;
   rotuloReferencia: string;
@@ -553,6 +558,7 @@ const CardVisual: React.FC<{
   tema,
   carregando,
   pct,
+  numeroTexto,
   referencia,
   rotuloReferencia,
   escala,
@@ -597,7 +603,7 @@ const CardVisual: React.FC<{
       <div
         className={`mt-1 text-4xl font-extrabold leading-tight tracking-tight text-gray-900 dark:text-dark-text ${carregando ? "animate-pulse" : ""}`}
       >
-        {carregando ? "…" : formatarPct(pct)}
+        {carregando ? "…" : (numeroTexto ?? formatarPct(pct))}
       </div>
       <div className="relative mt-2 mb-4">
         <div className="h-3 rounded-full bg-gray-300/70 dark:bg-dark-border overflow-hidden">
@@ -690,38 +696,31 @@ const CardVisual: React.FC<{
   );
 };
 
-const AcompanhamentoInadimplencia: React.FC = () => {
+const AcompanhamentoInadimplencia: React.FC<{
+  /** Periodo do Resumo Geral (o mesmo das outras abas, 26/11). */
+  dateFrom: string;
+  dateTo: string;
+  today: string;
+}> = ({ dateFrom, dateTo, today }) => {
   const { users } = useCollection();
-  const mesAtual = todayLocalStr().slice(0, 7);
-  // Intervalo do grafico (25/11): 12 / 24 meses, Tudo ou de/ate. Os cards
-  // mostram o ULTIMO mes do intervalo. O atalho escolhido fica salvo; o
-  // personalizado volta para 12 meses ao reabrir.
-  const [preset, setPreset] = useState<PresetIntervalo>(() => {
-    const salvo = localStorage.getItem("inadimplenciaIntervalo");
-    return salvo === "24" || salvo === "tudo" ? salvo : "12";
-  });
-  const [intervalo, setIntervalo] = useState(() =>
-    intervaloDoPreset(preset === "personalizado" ? "12" : preset, mesAtual),
-  );
-  const escolherPreset = (p: Exclude<PresetIntervalo, "personalizado">) => {
-    setPreset(p);
-    setIntervalo(intervaloDoPreset(p, mesAtual));
-    localStorage.setItem("inadimplenciaIntervalo", p);
-  };
-  const mudarMes = (campo: "inicio" | "fim", valor: string) => {
-    if (!/^\d{4}-\d{2}$/.test(valor)) return;
-    setPreset("personalizado");
-    setIntervalo((atual) => {
-      const novo = { ...atual, [campo]: valor };
-      // Mantem inicio <= fim <= mes atual.
-      if (novo.fim > mesAtual) novo.fim = mesAtual;
-      if (novo.inicio > novo.fim) {
-        if (campo === "inicio") novo.fim = novo.inicio;
-        else novo.inicio = novo.fim;
-      }
-      return novo;
-    });
-  };
+  // 26/11 (usuario: "mesmo filtro do Geral"): o periodo vem do Resumo. O
+  // grafico vai do mes do "De" ao mes do "Ate" (no maximo o mes atual; nunca
+  // antes do inicio da base) e os cards mostram o mes do "Ate". Atalhos
+  // curtos (Hoje, 7 dias...) dao um mes so no grafico -- escolha do usuario.
+  const intervalo = useMemo(() => {
+    const mesAtual = today.slice(0, 7);
+    const fimDatas = (dateTo < today ? dateTo : today).slice(0, 7);
+    const fim =
+      fimDatas < INADIMPLENCIA_MES_INICIAL ? INADIMPLENCIA_MES_INICIAL : fimDatas;
+    const inicioDatas = dateFrom.slice(0, 7);
+    const inicio =
+      inicioDatas < INADIMPLENCIA_MES_INICIAL
+        ? INADIMPLENCIA_MES_INICIAL
+        : inicioDatas > fim
+          ? fim
+          : inicioDatas;
+    return { inicio, fim: fim > mesAtual ? mesAtual : fim };
+  }, [dateFrom, dateTo, today]);
   const [agrupar, setAgrupar] = useState<Agrupar>(() =>
     localStorage.getItem("inadimplenciaAgrupar") === "cobrador"
       ? "cobrador"
@@ -755,11 +754,29 @@ const AcompanhamentoInadimplencia: React.FC = () => {
       ? null
       : lojas.filter((l) => !lojasExcluidas.has(l));
 
-  const empresa = useHistorico(
-    intervalo.inicio,
-    intervalo.fim,
+  // Um mes antes do inicio, para o "vs. mes passado" e o veredito existirem
+  // mesmo com um mes so no grafico (Mes atual, Hoje, 7 dias...).
+  const consultaDe =
+    intervalo.inicio > INADIMPLENCIA_MES_INICIAL
+      ? somarMeses(intervalo.inicio, -1)
+      : intervalo.inicio;
+  const empresa = useHistorico(consultaDe, intervalo.fim, lojasFiltro, null);
+
+  // Cards (26/11, usuario: "conta do periodo, igual ao Geral"): das parcelas
+  // que venceram no periodo, quanto segue sem pagar; e a recuperacao do
+  // periodo (tracinho: periodo anterior do mesmo tamanho). RPC
+  // inadimplencia_periodo, mesma regra de filters/inadimplencia.
+  const ateEfetivo = dateTo < today ? dateTo : today;
+  const periodoAtual = useInadimplenciaPeriodo(dateFrom, dateTo, lojasFiltro);
+  const antPeriodo =
+    dateFrom && dateFrom <= ateEfetivo
+      ? periodoAnterior(dateFrom, ateEfetivo)
+      : null;
+  const periodoAnt = useInadimplenciaPeriodo(
+    antPeriodo?.de ?? "",
+    antPeriodo?.ate ?? "",
     lojasFiltro,
-    null,
+    !!antPeriodo,
   );
   const porCobrador = useHistorico(
     mesAnteriorFim,
@@ -769,9 +786,11 @@ const AcompanhamentoInadimplencia: React.FC = () => {
     agrupar === "cobrador",
   );
 
-  const serie = empresa.dados ?? [];
+  const serieTodos = empresa.dados ?? [];
+  const serie = serieTodos.filter((p) => p.dia.slice(0, 7) >= intervalo.inicio);
   const atual = serie[serie.length - 1];
-  const anterior = serie.length > 1 ? serie[serie.length - 2] : null;
+  const anterior =
+    serieTodos.length > 1 ? serieTodos[serieTodos.length - 2] : null;
   const hoje = todayLocalStr();
   const rotulos = serie.map((p) =>
     p.dia === hoje ? "hoje" : rotuloMes(p.dia),
@@ -826,22 +845,31 @@ const AcompanhamentoInadimplencia: React.FC = () => {
   }, [agrupar, porLoja.dados, porCobrador.dados, lojasExcluidas]);
 
   const carregando = !empresa.dados && !empresa.erro;
-  const erro = empresa.erro;
+  const erro = empresa.erro || periodoAtual.erro;
+  const pi = periodoAtual.dados;
+  const carregandoPeriodo = !pi && !periodoAtual.erro;
+  const inadPeriodoPct = pi && pi.venceu > 0 ? (pi.naoPago / pi.venceu) * 100 : 0;
+  const pctRec = (d: typeof pi): number | null =>
+    d && d.baseRecuperacao != null && d.baseRecuperacao > 0.01
+      ? ((d.recuperado ?? 0) / d.baseRecuperacao) * 100
+      : null;
+  const recPeriodo = pctRec(pi);
+  const recAnterior = pctRec(periodoAnt.dados);
+  const escalaRecPeriodo = Math.max(
+    10,
+    Math.ceil(Math.max(recPeriodo ?? 0, recAnterior ?? 0) / 10) * 10,
+  );
+  const rotuloDoPeriodo = rotuloPeriodo(
+    dateFrom,
+    pi?.ateEfetivo ?? ateEfetivo,
+    today,
+  );
 
   const pctHoje = atual ? pctInadimplencia(atual) : 0;
   const varInad = atual
     ? variacaoPp(pctHoje, anterior ? pctInadimplencia(anterior) : null)
     : null;
   const tendInad = tendenciaInadimplencia(varInad);
-  const recHoje = atual ? pctRecuperacao(atual) : 0;
-  // Media da recuperacao so dos meses FECHADOS (o atual ainda esta correndo).
-  const mediaRec = media(serie.slice(0, -1).map(pctRecuperacao));
-  const mediaValorRec = media(serie.slice(0, -1).map((p) => p.recuperadoMes));
-  // Recuperacao e pequena (~2%): barra de 0 a 10% (ou a dezena acima).
-  const escalaRec = Math.max(
-    10,
-    Math.ceil(Math.max(recHoje, mediaRec) / 10) * 10,
-  );
   const temRetrato = serie.some((p) => p.fonte === "retrato");
   const maxRecLinhas = Math.max(
     ...(linhas ?? []).map((l) => pctRecuperacao(l.hoje)),
@@ -901,17 +929,11 @@ const AcompanhamentoInadimplencia: React.FC = () => {
     p.dia === hoje ? "hoje" : rotuloMes(p.dia);
   const escopoCards =
     lojasExcluidas.size === 0 ? "empresa inteira" : "lojas do filtro";
-  // 26/11: a inadimplencia e a FOTO de um dia (fim do mes do "Ate", ou
-  // hoje); a recuperacao e o que entrou ao longo desse mes.
+  // Foto de 12 meses no fim do mes do "Ate" (ou hoje): tracinho do card.
   const fotoDoCard = atual
     ? atual.dia === hoje
       ? "hoje"
       : `fim de ${rotuloMes(atual.dia)}`
-    : "";
-  const mesDoCard = atual
-    ? atual.dia === hoje
-      ? `${rotuloMes(atual.dia)} até hoje`
-      : rotuloMes(atual.dia)
     : "";
 
   const detalhesInad = atual
@@ -1018,69 +1040,10 @@ const AcompanhamentoInadimplencia: React.FC = () => {
             }}
           />
         </div>
-        <div
-          className="flex bg-gray-100 dark:bg-dark-bg rounded-lg p-0.5"
-          role="group"
-          aria-label="Intervalo do gráfico"
-        >
-          {(
-            [
-              ["12", "12 meses"],
-              ["24", "24 meses"],
-              ["tudo", "Tudo"],
-            ] as const
-          ).map(([id, rotulo]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => escolherPreset(id)}
-              aria-pressed={preset === id}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all touch-manipulation ${
-                preset === id
-                  ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
-                  : "text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
-              }`}
-            >
-              {rotulo}
-            </button>
-          ))}
-        </div>
-        <div
-          className={`flex items-center gap-1 rounded-lg px-1.5 py-0.5 text-xs ${
-            preset === "personalizado"
-              ? "bg-blue-50 ring-1 ring-blue-200 dark:bg-blue-900/20 dark:ring-blue-800"
-              : ""
-          }`}
-        >
-          <CalendarRange className="h-4 w-4 text-gray-400" />
-          <input
-            type="month"
-            aria-label="De"
-            title="Muda o gráfico e as médias"
-            value={intervalo.inicio}
-            min={INADIMPLENCIA_MES_INICIAL}
-            max={intervalo.fim}
-            onChange={(e) => mudarMes("inicio", e.target.value)}
-            className="px-1.5 py-1 rounded-md border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-xs text-gray-700 dark:text-dark-text"
-          />
-          <span className="text-gray-400">–</span>
-          <input
-            type="month"
-            aria-label="Até"
-            title="Os cards mostram este mês"
-            value={intervalo.fim}
-            min={intervalo.inicio}
-            max={mesAtual}
-            onChange={(e) => mudarMes("fim", e.target.value)}
-            className="px-1.5 py-1 rounded-md border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-xs text-gray-700 dark:text-dark-text"
-          />
-        </div>
-        <span
-          className="ml-auto text-gray-400 hover:text-gray-600 dark:hover:text-dark-text cursor-help"
-          title={notaRodape}
-          aria-label={notaRodape}
-        >
-          <Info className="h-4 w-4" />
+        <span className="ml-auto">
+          <InfoDica>
+            <span className="whitespace-pre-line">{notaRodape}</span>
+          </InfoDica>
         </span>
       </div>
 
@@ -1114,58 +1077,51 @@ const AcompanhamentoInadimplencia: React.FC = () => {
               titulo="Inadimplência"
               escopo={escopoCards}
               tema="red"
-              carregando={carregando}
-              pct={pctHoje}
-              referencia={anterior ? pctInadimplencia(anterior) : null}
-              rotuloReferencia="mês passado"
+              carregando={carregandoPeriodo}
+              pct={inadPeriodoPct}
+              numeroTexto={
+                pi ? formatarInadimplencia(inadPeriodoPct, pi.venceu) : undefined
+              }
+              referencia={atual ? pctHoje : null}
+              rotuloReferencia="12 meses"
               escala={100}
               pilulas={
-                atual
+                pi
                   ? [
                       {
-                        valor: fmtCurto(atual.naoPago),
+                        valor: fmtCurto(pi.naoPago),
                         rotulo: "sem pagar",
                         tom: "red",
-                        hint: fmtValor(atual.naoPago),
+                        hint: fmtValor(pi.naoPago),
                       },
                       {
-                        valor: fmtCurto(atual.venceu),
-                        rotulo: "venceu em 12 meses",
+                        valor: fmtCurto(pi.venceu),
+                        rotulo: "venceu no período",
                         tom: "gray",
-                        hint: fmtValor(atual.venceu),
+                        hint: fmtValor(pi.venceu),
                       },
-                      {
-                        valor:
-                          varInad == null
-                            ? "—"
-                            : tendInad === "estavel"
-                              ? "igual"
-                              : formatarPp(varInad),
-                        rotulo: "vs. mês passado",
-                        tom:
-                          tendInad === "piorou"
-                            ? "red"
-                            : tendInad === "melhorou"
-                              ? "green"
-                              : "gray",
-                        hint:
-                          varInad != null && anterior
-                            ? `Mês passado: ${formatarPct(pctInadimplencia(anterior))}`
-                            : undefined,
-                      },
+                      ...(pi.atrasoRecente > 0.01
+                        ? [
+                            {
+                              valor: fmtCurto(pi.atrasoRecente),
+                              rotulo: "atraso < 3 dias",
+                              tom: "gray" as const,
+                              hint: `${fmtValor(pi.atrasoRecente)} venceram há 1 ou 2 dias: ainda não contam como inadimplência`,
+                            },
+                          ]
+                        : []),
                     ]
                   : []
               }
               corDetalhe="bg-red-400"
-              mes={fotoDoCard}
+              mes={rotuloDoPeriodo}
               detalhes={detalhesInad}
               info={
                 <>
-                  Foto {fotoDoCard === "hoje" ? "de hoje" : `do ${fotoDoCard}`}:
-                  de cada R$ 100 que venceram nos 12 meses antes, R${" "}
-                  {Math.round(pctHoje)} estavam sem pagar. Outro mês: mude o{" "}
-                  <strong>Até</strong>. Um período (ex.: ago a out): veja no{" "}
-                  <strong>Geral</strong>.
+                  Das parcelas que <strong>venceram no período</strong>, quanto
+                  segue sem pagar (atraso de 3 dias ou mais). O tracinho é a
+                  dos <strong>últimos 12 meses</strong>
+                  {fotoDoCard === "hoje" ? "" : ` (${fotoDoCard})`}.
                 </>
               }
             />
@@ -1174,47 +1130,42 @@ const AcompanhamentoInadimplencia: React.FC = () => {
               titulo="Recuperação"
               escopo={escopoCards}
               tema="green"
-              carregando={carregando}
-              pct={recHoje}
-              referencia={mediaRec > 0 ? mediaRec : null}
-              rotuloReferencia="média"
-              escala={escalaRec}
+              carregando={carregandoPeriodo}
+              pct={recPeriodo ?? 0}
+              numeroTexto={recPeriodo == null ? "—" : undefined}
+              referencia={recAnterior}
+              rotuloReferencia="período anterior"
+              escala={escalaRecPeriodo}
               pilulas={
-                atual
+                pi && recPeriodo != null
                   ? [
                       {
-                        valor: fmtCurto(atual.recuperadoMes),
-                        rotulo: "recuperados no mês",
+                        valor: fmtCurto(pi.recuperado ?? 0),
+                        rotulo: "recuperados",
                         tom: "green",
-                        hint: fmtValor(atual.recuperadoMes),
+                        hint: fmtValor(pi.recuperado ?? 0),
                       },
                       {
-                        valor: fmtCurto(atual.atrasoInicioMes),
-                        rotulo: "em atraso no início",
+                        valor: fmtCurto(pi.baseRecuperacao ?? 0),
+                        rotulo: "em atraso antes",
                         tom: "gray",
-                        hint: fmtValor(atual.atrasoInicioMes),
-                      },
-                      {
-                        valor: fmtCurto(mediaValorRec),
-                        rotulo: `média/mês · ${formatarPct(mediaRec)}`,
-                        tom: "gray",
-                        hint: `Média dos meses fechados do período: ${fmtValor(mediaValorRec)} por mês (${formatarPct(mediaRec)} do atraso).`,
+                        hint: fmtValor(pi.baseRecuperacao ?? 0),
                       },
                     ]
                   : []
               }
               corDetalhe="bg-green-500"
-              mes={mesDoCard}
+              mes={rotuloDoPeriodo}
               detalhes={detalhesRec}
               info={
                 <>
-                  Do atraso de antes de {mesDoCard.split(" ")[0]}, quanto foi
-                  pago no mês. Conta{" "}
+                  Do atraso de <strong>antes do período</strong>, quanto foi
+                  pago nele. O tracinho é o período anterior, do mesmo tamanho.
+                  Conta{" "}
                   {escopoCards === "empresa inteira"
                     ? "a empresa inteira"
                     : "as lojas do filtro"}
-                  , inclusive cliente sem cobrador e a dívida antiga (+1 ano) —
-                  por isso difere do % dos cobradores.
+                  , inclusive cliente sem cobrador e a dívida antiga (+1 ano).
                 </>
               }
             />

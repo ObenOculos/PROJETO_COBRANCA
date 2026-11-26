@@ -2723,6 +2723,17 @@ export type Database = {
           recuperado_mes: number;
         }[];
       };
+      inadimplencia_periodo: {
+        Args: { p_de: string; p_ate: string; p_lojas?: string[] };
+        Returns: {
+          venceu: number;
+          nao_pago: number;
+          atraso_recente: number;
+          base_recuperacao: number | null;
+          recuperado: number | null;
+          ate_efetivo: string;
+        }[];
+      };
       atribuicao_bloqueio_parcela: {
         Args: { p_id_parcela: number };
         Returns: string;

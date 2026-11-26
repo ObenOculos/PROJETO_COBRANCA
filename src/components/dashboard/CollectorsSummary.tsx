@@ -4,13 +4,11 @@ import React, {
   useState,
 } from "react";
 import {
-  PERIODO_PRESETS,
-  PeriodoPreset,
-  dicaDoPreset,
   fimDoMes,
   inicioDoMes,
-  periodoDoPreset,
 } from "../../filters/periodo";
+import { PeriodoResumo } from "../../hooks/usePeriodoResumo";
+import FiltroPeriodoResumo from "./FiltroPeriodoResumo";
 import { buscarComCacheTela, lerCacheTela } from "../../utils/cacheTela";
 import {
   CalendarClock,
@@ -129,7 +127,6 @@ interface CollectorRow {
   pagosDocs: Set<string>;
 }
 
-type PresetKey = PeriodoPreset;
 
 // Chaves pelas quais a tabela/cards podem ser ordenados (clicando no titulo
 // da coluna). "reincidentesQtd" nao e campo direto de CollectorRow (e o
@@ -282,7 +279,9 @@ const FaixasAlcance: React.FC<{ regras: CollectorOverdueRange[] }> = ({
 const CollectorsSummary: React.FC<{
   aba: AbaResumoGeral;
   onAba: (aba: AbaResumoGeral) => void;
-}> = ({ aba, onAba: setAba }) => {
+  /** Periodo do Resumo, o mesmo em todas as abas (ManagerDashboard). */
+  periodo: PeriodoResumo;
+}> = ({ aba, onAba: setAba, periodo }) => {
   const {
     users,
     collections,
@@ -296,8 +295,7 @@ const CollectorsSummary: React.FC<{
   const { user: currentUser } = useAuth();
 
   const today = todayLocalStr();
-  const [dateFrom, setDateFrom] = useState(inicioDoMes(today));
-  const [dateTo, setDateTo] = useState(fimDoMes(today));
+  const { dateFrom, dateTo } = periodo;
 
   // Item 66, etapa 3: pagamento que o cliente fez na loja/banco, atribuido ao
   // cobrador (pedido dele ou excecao do gestor), credita no "Recebido no
@@ -362,9 +360,6 @@ const CollectorsSummary: React.FC<{
   // Recebido so aparece com as duas buscas prontas (pago na loja e acordo).
   const fmtRecebido = (v: number): string =>
     atribuicoesProntas && acordoPagosProntos ? formatCurrency(v, false) : "…";
-  const [activePreset, setActivePreset] = useState<PresetKey | "">(
-    "month-atual",
-  );
   const [expandedReincidente, setExpandedReincidente] = useState<string | null>(
     null,
   );
@@ -421,13 +416,6 @@ const CollectorsSummary: React.FC<{
       // demais comecam do maior valor (desc, "pior"/"mais" primeiro).
       setSortDir(key === "name" ? "asc" : "desc");
     }
-  };
-
-  const applyPreset = (key: PresetKey) => {
-    setActivePreset(key);
-    const { de, ate } = periodoDoPreset(key, today);
-    setDateFrom(de);
-    setDateTo(ate);
   };
 
   const inPeriod = (dateStr: string | undefined | null): boolean =>
@@ -1228,55 +1216,7 @@ const CollectorsSummary: React.FC<{
   return (
     <div className="space-y-4">
       <CabecalhoResumoGeral aba={aba} onAba={setAba}>
-        {/* A aba Inadimplencia tem janela propria (12 meses de vencimento):
-            o periodo nao se aplica a ela. */}
-        {aba !== "inadimplencia" && (
-          <div className="flex flex-wrap items-center gap-2">
-            {PERIODO_PRESETS.map((preset) => (
-              <button
-                key={preset.key}
-                onClick={() => applyPreset(preset.key)}
-                title={dicaDoPreset(preset.key, today)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors touch-manipulation ${
-                  activePreset === preset.key
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 dark:bg-dark-bg text-gray-600 dark:text-dark-text-secondary hover:bg-gray-200 dark:hover:bg-dark-border"
-                }`}
-              >
-                {preset.label}
-              </button>
-            ))}
-
-            {/* Datas na mesma linha dos atalhos (25/11: o rotulo "Periodo
-              personalizado" e o texto "(de ... ate ...)" repetiam as datas). */}
-            <span className="hidden sm:block h-5 w-px bg-gray-200 dark:bg-dark-border mx-1" />
-            <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-dark-text-secondary">
-              De
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => {
-                  setDateFrom(e.target.value);
-                  setActivePreset("");
-                }}
-                className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-xs text-gray-700 dark:text-dark-text"
-              />
-            </label>
-            <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-dark-text-secondary">
-              Até
-              <input
-                type="date"
-                value={dateTo}
-                min={dateFrom}
-                onChange={(e) => {
-                  setDateTo(e.target.value);
-                  setActivePreset("");
-                }}
-                className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-xs text-gray-700 dark:text-dark-text"
-              />
-            </label>
-          </div>
-        )}
+        <FiltroPeriodoResumo periodo={periodo} today={today} />
       </CabecalhoResumoGeral>
 
       {aba === "geral" && teamGoal && (

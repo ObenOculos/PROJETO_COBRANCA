@@ -27,12 +27,11 @@ import {
   formatarInadimplencia,
   INADIMPLENCIA_A_PARTIR_DIAS,
 } from "../../filters/inadimplencia";
+import { PERIODO_TUDO_ATE } from "../../filters/periodo";
 import {
-  fimDoMes,
-  PERIODO_TUDO_ATE,
-  PERIODO_TUDO_DE,
-} from "../../filters/periodo";
-import { formatarPct, rotuloMes } from "../../filters/inadimplenciaHistorico";
+  formatarPct,
+  rotuloPeriodo,
+} from "../../filters/inadimplenciaHistorico";
 import { formatCurrency } from "../../utils/formatters";
 
 const fmtNum = (n: number): string => n.toLocaleString("pt-BR");
@@ -793,23 +792,6 @@ const BarraReferencia: React.FC<{
       )}
     </div>
   );
-};
-
-/** Rotulo curto do periodo efetivo (fim no maximo hoje): "nov/26 até hoje",
- * "out/26", "ago–out/26", "01/08 a 15/10", "todo o histórico". */
-const rotuloPeriodo = (de: string, ate: string, hoje: string): string => {
-  if (de <= PERIODO_TUDO_DE) return "todo o histórico";
-  const mes = (s: string) => rotuloMes(s);
-  const diaUm = de.endsWith("-01");
-  if (diaUm && ate === hoje && de.slice(0, 7) === hoje.slice(0, 7))
-    return `${mes(de)} até hoje`;
-  if (diaUm && ate === fimDoMes(ate)) {
-    if (de.slice(0, 7) === ate.slice(0, 7)) return mes(de);
-    return de.slice(0, 4) === ate.slice(0, 4)
-      ? `${mes(de).split("/")[0]}–${mes(ate)}`
-      : `${mes(de)}–${mes(ate)}`;
-  }
-  return de === ate ? toBr(de) : `${toBr(de)} a ${toBr(ate)}`;
 };
 
 /** 2. Inadimplencia (empresa/loja, 26/11): segue o filtro de datas -- das

@@ -21,6 +21,8 @@ import { ClientAssignment } from "../ClientAssignment";
 import VisitTracking from "./VisitTracking";
 import CollectorsSummary from "./CollectorsSummary";
 import AcompanhamentoInadimplencia from "./AcompanhamentoInadimplencia";
+import FiltroPeriodoResumo from "./FiltroPeriodoResumo";
+import { usePeriodoResumo } from "../../hooks/usePeriodoResumo";
 import CabecalhoResumoGeral, {
   AbaResumoGeral,
   lerAbaResumoGeral,
@@ -33,6 +35,7 @@ import AcordoConfiguracaoPadrao from "./AcordoConfiguracaoPadrao";
 import CarteiraDistribuicao from "./CarteiraDistribuicao";
 import TabTransition from "../common/TabTransition";
 import { useCollection } from "../../contexts/CollectionContext";
+import { todayLocalStr } from "../../config/visitStatus";
 import { FilterOptions } from "../../types";
 import { CollectionTableRef } from "./CollectionTable";
 import VendasAguardandoConferencia from "./VendasAguardandoConferencia";
@@ -113,6 +116,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   // Aba do Resumo Geral (Geral / Por cobrador / Por loja / Inadimplencia),
   // aqui em cima para decidir se precisa da carga completa.
   const [resumoAba, setResumoAba] = useState<AbaResumoGeral>(lerAbaResumoGeral);
+  // Periodo do Resumo Geral, o mesmo em todas as abas (26/11).
+  const hojeResumo = todayLocalStr();
+  const periodoResumo = usePeriodoResumo(hojeResumo);
   // 26/11: depois da 1a vez, o Resumo (CollectorsSummary) fica montado e so
   // e escondido ao ir para Visitas, Conferencia ou a aba Inadimplencia. Antes
   // ele era desmontado e, na volta, refazia todas as contas sobre a base
@@ -564,7 +570,11 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
             {carregandoTudo && telaCarregandoTudo}
             {(resumoMontado || (mostrarResumo && !carregandoTudo)) && (
               <div className={mostrarResumo ? "" : "hidden"}>
-                <CollectorsSummary aba={resumoAba} onAba={mudarResumoAba} />
+                <CollectorsSummary
+                  aba={resumoAba}
+                  onAba={mudarResumoAba}
+                  periodo={periodoResumo}
+                />
               </div>
             )}
             {summaryView === "resumo" ? (
@@ -572,11 +582,17 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                 // Leve: so o cabecalho + a aba (nao monta o Resumo se ele
                 // ainda nao foi aberto -- sem a carga da base inteira).
                 <div className="space-y-4">
-                  <CabecalhoResumoGeral
-                    aba={resumoAba}
-                    onAba={mudarResumoAba}
+                  <CabecalhoResumoGeral aba={resumoAba} onAba={mudarResumoAba}>
+                    <FiltroPeriodoResumo
+                      periodo={periodoResumo}
+                      today={hojeResumo}
+                    />
+                  </CabecalhoResumoGeral>
+                  <AcompanhamentoInadimplencia
+                    dateFrom={periodoResumo.dateFrom}
+                    dateTo={periodoResumo.dateTo}
+                    today={hojeResumo}
                   />
-                  <AcompanhamentoInadimplencia />
                 </div>
               )
             ) : summaryView === "acompanhamento" ? (
