@@ -170,7 +170,8 @@ export const CardSimples: React.FC<{
     <div
       className={`min-w-0 flex flex-col rounded-xl border border-gray-200 border-t-4 ${t.faixa} dark:border-dark-border bg-gray-100 dark:bg-dark-bg px-4 py-3`}
     >
-      <div className={lado ? "lg:flex lg:items-center lg:gap-6" : ""}>
+      {/* Faixa: quadrinhos com a mesma altura do bloco do numero (26/11). */}
+      <div className={lado ? "lg:flex lg:items-stretch lg:gap-6" : ""}>
         <div className={lado ? "lg:w-56 lg:shrink-0" : ""}>
           <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-600 dark:text-dark-text-secondary">
             <Icon className={`h-4 w-4 ${t.icone}`} />
@@ -210,14 +211,16 @@ export const CardSimples: React.FC<{
               title={p.hint}
               onClick={p.onClick}
               role={p.onClick ? "button" : undefined}
-              className={`min-w-0 rounded-md px-2 py-1 ${PILULA[p.tom]} ${pilulas.length % 2 === 1 && i === pilulas.length - 1 ? `col-span-2 ${cols === 4 ? "sm:col-span-1" : ""}` : ""} ${p.onClick ? "cursor-pointer hover:opacity-90" : ""}`}
+              className={`min-w-0 rounded-md px-2 py-1 ${lado ? "lg:flex lg:flex-col lg:justify-center lg:px-3" : ""} ${PILULA[p.tom]} ${pilulas.length % 2 === 1 && i === pilulas.length - 1 ? `col-span-2 ${cols === 4 ? "sm:col-span-1" : ""}` : ""} ${p.onClick ? "cursor-pointer hover:opacity-90" : ""}`}
             >
               <div
-                className={`text-sm font-bold leading-tight truncate ${p.loading ? "animate-pulse" : ""}`}
+                className={`text-sm font-bold leading-tight truncate ${lado ? "lg:text-2xl" : ""} ${p.loading ? "animate-pulse" : ""}`}
               >
                 {p.valor}
               </div>
-              <div className="text-[10px] font-medium leading-tight truncate opacity-90">
+              <div
+                className={`text-[10px] font-medium leading-tight truncate opacity-90 ${lado ? "lg:text-xs lg:mt-0.5" : ""}`}
+              >
                 {p.rotulo}
               </div>
             </div>
