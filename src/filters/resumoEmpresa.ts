@@ -34,13 +34,14 @@ import {
   parcelaNoPeriodo,
 } from "./clientStatus";
 import {
-  inadimplenciaDe,
+  inadimplenciaFotoEm,
   Inadimplencia,
   periodoAnterior,
   recuperacaoDe,
   Recuperacao,
 } from "./inadimplencia";
 import { toYYYYMMDD } from "./dates";
+import { addDiasStr } from "./periodo";
 import { criarCalculoAtraso } from "../utils/formatters";
 import { isVisitOpen } from "../config/visitStatus";
 
@@ -85,12 +86,13 @@ export interface ResumoEmpresa {
      * baixa no ERP. */
     cobrador: number;
   };
-  /** Inadimplencia do PERIODO (26/11): das parcelas que venceram dentro do
-   * filtro de datas, quanto segue sem pagar hoje. */
+  /** NUMERO OFICIAL (26/11, etapa 1): foto de 12 meses no ultimo dia do
+   * periodo (o "Ate", no maximo hoje) -- inadimplenciaFotoEm. */
   inadimplencia: Inadimplencia;
-  /** % dos ultimos 12 meses (o numero da aba Inadimplencia), referencia na
-   * barra do card. */
-  inadimplencia12mPct: number | null;
+  /** Dia da foto (YYYY-MM-DD). */
+  inadimplenciaDia: string;
+  /** % da foto no fim do mes anterior ao dia (referencia na barra). */
+  inadimplenciaAnteriorPct: number | null;
   /** Recuperacao do periodo (filters/inadimplencia, recuperacaoDe); null =
    * periodo ainda nao comecou. */
   recuperacao: Recuperacao | null;
@@ -169,10 +171,16 @@ export const resumoEmpresa = ({
     if (!atual || d < atual) proximoAgendamento.set(v.clientDocument, d);
   });
 
-  // Inadimplencia e recuperacao seguem o filtro de datas (26/11). As
-  // referencias da barra: 12 meses (inadimplencia) e periodo anterior de
-  // mesmo tamanho (recuperacao).
-  const inad12m = inadimplenciaDe(titulos, { atrasoDias });
+  // Inadimplencia (26/11, etapa 1): a foto de 12 meses no ultimo dia do
+  // periodo -- o mesmo numero do grafico da aba Inadimplencia; referencia =
+  // foto do fim do mes anterior. Recuperacao: a do periodo; referencia =
+  // periodo anterior de mesmo tamanho.
+  const diaFoto = dateTo && dateTo < today ? dateTo : today;
+  const inadFoto = inadimplenciaFotoEm(titulos, diaFoto);
+  const inadAnterior = inadimplenciaFotoEm(
+    titulos,
+    addDiasStr(`${diaFoto.slice(0, 7)}-01`, -1),
+  );
   const recuperacao = recuperacaoDe(titulos, dateFrom, dateTo, today);
   let recuperacaoAnteriorPct: number | null = null;
   if (recuperacao) {
@@ -210,12 +218,10 @@ export const resumoEmpresa = ({
       aVencerPeriodo: 0,
     },
     recebido: { erp: 0, soErp: 0, cobrador: 0 },
-    inadimplencia: inadimplenciaDe(titulos, {
-      atrasoDias,
-      vencimentoDe: dateFrom,
-      vencimentoAte: dateTo,
-    }),
-    inadimplencia12mPct: inad12m.venceu > 0 ? inad12m.pct : null,
+    inadimplencia: inadFoto,
+    inadimplenciaDia: diaFoto,
+    inadimplenciaAnteriorPct:
+      inadAnterior.venceu > 0 ? inadAnterior.pct : null,
     recuperacao,
     recuperacaoAnteriorPct,
     previsao: {

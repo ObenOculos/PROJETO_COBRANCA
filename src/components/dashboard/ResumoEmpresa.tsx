@@ -30,6 +30,8 @@ import {
 import { PERIODO_TUDO_ATE, PERIODO_TUDO_DE } from "../../filters/periodo";
 import {
   formatarPct,
+  rotuloDia,
+  rotuloFoto,
   rotuloPeriodo,
 } from "../../filters/inadimplenciaHistorico";
 import { formatCurrency } from "../../utils/formatters";
@@ -794,9 +796,11 @@ const BarraReferencia: React.FC<{
   );
 };
 
-/** 2. Inadimplencia (empresa/loja, 26/11): segue o filtro de datas -- das
- * parcelas que venceram no periodo, quanto segue sem pagar hoje. Tracinho:
- * os ultimos 12 meses (o numero da aba Inadimplencia). */
+/** 2. Inadimplencia (empresa/loja). NUMERO OFICIAL (26/11, etapa 1): a foto
+ * de 12 meses no ultimo dia do periodo -- das parcelas que venceram nos 12
+ * meses antes desse dia, quanto estava sem pagar. E o mesmo numero do
+ * grafico da aba Inadimplencia. Tracinho: a foto do fim do mes anterior. A
+ * recuperacao (quadrinho verde) e a do periodo. */
 export const CardInadimplencia: React.FC<{
   r: Resumo;
   onVerMesAMes?: () => void;
@@ -805,25 +809,21 @@ export const CardInadimplencia: React.FC<{
   const rec = r.recuperacao && r.recuperacao.base > 0.01 ? r.recuperacao : null;
   const periodo = r.recuperacao
     ? rotuloPeriodo(r.recuperacao.de, r.recuperacao.ate, r.hoje)
-    : undefined;
+    : null;
   return (
     <CardSimples
       icon={AlertTriangle}
       titulo="Inadimplência"
       tema="red"
-      etiqueta={periodo}
+      etiqueta={rotuloFoto(r.inadimplenciaDia, r.hoje)}
       numero={formatarInadimplencia(i.pct, i.venceu)}
-      frase={
-        i.venceu > 0
-          ? "do que venceu no período não foi pago"
-          : "nada venceu no período (3+ dias)"
-      }
+      frase="do que venceu em 12 meses não foi pago"
       extra={
         <BarraReferencia
           pct={i.venceu > 0 ? i.pct : 0}
           escala={100}
-          referencia={r.inadimplencia12mPct}
-          rotulo="12 meses"
+          referencia={r.inadimplenciaAnteriorPct}
+          rotulo="mês anterior"
           cor="bg-red-500"
         />
       }
@@ -836,7 +836,7 @@ export const CardInadimplencia: React.FC<{
         },
         {
           valor: fmtValorCurto(i.venceu),
-          rotulo: "venceu no período",
+          rotulo: "venceu em 12 meses",
           tom: "gray",
           hint: fmtValor(i.venceu),
         },
@@ -844,17 +844,19 @@ export const CardInadimplencia: React.FC<{
           ? [
               {
                 valor: formatarPct(rec.pct),
-                rotulo: "recuperação",
+                rotulo: "recuperação no período",
                 tom: "green" as const,
-                hint: `${fmtValor(rec.recuperado)} pagos de ${fmtValor(rec.base)} que estavam em atraso antes do período`,
+                hint: `${periodo ?? "Período"}: ${fmtValor(rec.recuperado)} pagos de ${fmtValor(rec.base)} que estavam em atraso antes`,
               },
             ]
           : []),
       ]}
       info={
         <>
-          Conta só as parcelas que <strong>venceram no período</strong> do
-          filtro. O tracinho é o dos <strong>últimos 12 meses</strong>.{" "}
+          Foto {rotuloFoto(r.inadimplenciaDia, r.hoje) === "hoje" ? "de hoje" : `do dia ${rotuloDia(r.inadimplenciaDia)}`}
+          : das parcelas que venceram nos <strong>12 meses</strong> antes,
+          quanto estava sem pagar (atraso de {INADIMPLENCIA_A_PARTIR_DIAS} dias
+          ou mais). O tracinho é a do fim do mês anterior.{" "}
           <strong>Recuperação</strong>: do atraso de antes do período, quanto
           foi pago nele.
         </>
@@ -863,26 +865,26 @@ export const CardInadimplencia: React.FC<{
         {
           label: "Sem pagar",
           value: fmtValor(i.naoPago),
-          hint: `Atraso de ${INADIMPLENCIA_A_PARTIR_DIAS} dias ou mais, de parcelas que venceram no período`,
+          hint: `Atraso de ${INADIMPLENCIA_A_PARTIR_DIAS} dias ou mais, de parcelas que venceram nos 12 meses antes da foto`,
         },
-        { label: "Venceu no período", value: fmtValor(i.venceu) },
+        { label: "Venceu em 12 meses", value: fmtValor(i.venceu) },
         {
           label: `Atrasado há menos de ${INADIMPLENCIA_A_PARTIR_DIAS} dias`,
           value: fmtValor(i.atrasoRecente),
           hint: "Ainda não conta como inadimplência",
         },
-        ...(r.inadimplencia12mPct != null
+        ...(r.inadimplenciaAnteriorPct != null
           ? [
               {
-                label: "Inadimplência dos últimos 12 meses",
-                value: formatarPct(r.inadimplencia12mPct),
+                label: "Fim do mês anterior",
+                value: formatarPct(r.inadimplenciaAnteriorPct),
               },
             ]
           : []),
         ...(rec
           ? [
               {
-                label: "Recuperado no período",
+                label: `Recuperado no período${periodo ? ` (${periodo})` : ""}`,
                 value: fmtValor(rec.recuperado),
               },
               {
@@ -979,7 +981,7 @@ export const CardRecuperacao: React.FC<{
                 valor: formatarInadimplencia(inad.pct, inad.venceu),
                 rotulo: "inadimplência",
                 tom: "gray" as const,
-                hint: `${fmtValor(inad.naoPago)} sem pagar de ${fmtValor(inad.venceu)} que venceram no período (só a carteira). Alta porque a carteira só recebe cliente atrasado.`,
+                hint: `${fmtValor(inad.naoPago)} sem pagar de ${fmtValor(inad.venceu)} que venceram em 12 meses (só a carteira). Alta porque a carteira só recebe cliente atrasado.`,
               },
             ]
           : []

@@ -64,7 +64,7 @@ import {
 } from "../../filters/priority";
 import { supabase } from "../../lib/supabase";
 import { fetchAllRows } from "../../utils/fetchAllRows";
-import { inadimplenciaDe } from "../../filters/inadimplencia";
+import { inadimplenciaFotoEm } from "../../filters/inadimplencia";
 import { Collection, CollectorOverdueRange, SaleGroup } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
 import ContactScheduler from "./ContactScheduler";
@@ -591,11 +591,11 @@ const CollectorsSummary: React.FC<{
         const myCollections = collections.filter(
           (c) => c.user_id === collector.id,
         );
-        // Segue o filtro de datas, como o card (26/11).
-        const inad = inadimplenciaDe(myCollections, {
-          vencimentoDe: dateFrom,
-          vencimentoAte: dateTo,
-        });
+        // Numero oficial: foto de 12 meses no ultimo dia do periodo (26/11).
+        const inad = inadimplenciaFotoEm(
+          myCollections,
+          dateTo && dateTo < today ? dateTo : today,
+        );
 
         const clientesCarteiraSet = new Set<string>();
         // Cliente com pelo menos 1 titulo vencido (dentro do periodo) entra

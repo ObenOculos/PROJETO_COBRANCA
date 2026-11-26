@@ -48,12 +48,6 @@ export interface OpcoesInadimplencia {
   /** Dias de atraso de um vencimento. Padrao: calculateOverdueDays; telas
    * que somam a carteira inteira passam criarCalculoAtraso() (cache). */
   atrasoDias?: (vencimento: string | null | undefined) => number;
-  /** Recorte por vencimento (YYYY-MM-DD, inclusivo) do filtro de periodo da
-   * tela (26/11: "os dois acompanham o filtro"). Com ele a janela de 12
-   * meses nao vale: "das parcelas que venceram no periodo, quanto segue sem
-   * pagar hoje". */
-  vencimentoDe?: string;
-  vencimentoAte?: string;
 }
 
 const saldoAberto = (c: Collection) =>
@@ -67,30 +61,67 @@ export const inadimplenciaDe = (
     janelaDias = INADIMPLENCIA_JANELA_DIAS,
     corteDias = INADIMPLENCIA_CORTE_DIAS,
     atrasoDias = calculateOverdueDays,
-    vencimentoDe,
-    vencimentoAte,
   }: OpcoesInadimplencia = {},
 ): Inadimplencia => {
-  const recorte = !!(vencimentoDe || vencimentoAte);
   let venceu = 0;
   let naoPago = 0;
   let atrasoRecente = 0;
   titulos.forEach((c) => {
-    if (recorte) {
-      const v = c.data_vencimento?.slice(0, 10);
-      if (!v) return;
-      if (vencimentoDe && v < vencimentoDe) return;
-      if (vencimentoAte && v > vencimentoAte) return;
-    }
     const atraso = atrasoDias(c.data_vencimento);
     if (atraso <= 0) return;
-    if (!recorte && janelaDias != null && atraso > janelaDias) return;
+    if (janelaDias != null && atraso > janelaDias) return;
     const aberto = saldoAberto(c);
     if (atraso <= corteDias) {
       if (aberto > 0.01) atrasoRecente += aberto;
       return;
     }
     venceu += Number(c.valor_original || 0);
+    if (aberto > 0.01) naoPago += aberto;
+  });
+  return {
+    venceu,
+    naoPago,
+    pct: venceu > 0 ? (naoPago / venceu) * 100 : 0,
+    atrasoRecente,
+  };
+};
+
+// ---------------------------------------------------------------------------
+// FOTO de 12 meses num dia (26/11, etapa 1: NUMERO OFICIAL da inadimplencia
+// no Resumo e na aba -- um nome, uma conta). Mesma regra da RPC
+// inadimplencia_calculo (migrations 20261125000003/20261126000004):
+//   no dia D, das parcelas que venceram entre D-365 e D-3, quanto estava
+//   sem pagar em D.
+//   aberto em D = original - desconto, se a baixa foi depois de D;
+//                 original - recebido - desconto, se nao ha data ou foi ate D
+// Com D = hoje da o mesmo que inadimplenciaDe() sem recorte. Comparavel mes
+// a mes (o grafico da aba e esta conta no fim de cada mes).
+// ---------------------------------------------------------------------------
+
+export const inadimplenciaFotoEm = (
+  titulos: Collection[],
+  dia: string,
+): Inadimplencia => {
+  const de = addDiasStr(dia, -INADIMPLENCIA_JANELA_DIAS);
+  const ateInad = addDiasStr(dia, -INADIMPLENCIA_A_PARTIR_DIAS);
+  let venceu = 0;
+  let naoPago = 0;
+  let atrasoRecente = 0;
+  titulos.forEach((c) => {
+    const v = c.data_vencimento?.slice(0, 10);
+    if (!v || v < de || v >= dia) return;
+    const original = Number(c.valor_original || 0);
+    const desconto = Number(c.desconto || 0);
+    const pago = c.data_de_recebimento?.slice(0, 10) || null;
+    const aberto =
+      !pago || pago <= dia
+        ? Math.max(original - Number(c.valor_recebido || 0) - desconto, 0)
+        : original - desconto;
+    if (v > ateInad) {
+      if (aberto > 0.01) atrasoRecente += aberto;
+      return;
+    }
+    venceu += original;
     if (aberto > 0.01) naoPago += aberto;
   });
   return {

@@ -46,6 +46,7 @@ import {
   Tendencia,
   tendenciaInadimplencia,
   variacaoPp,
+  rotuloFoto,
   rotuloPeriodo,
 } from "../../filters/inadimplenciaHistorico";
 
@@ -920,7 +921,6 @@ const AcompanhamentoInadimplencia: React.FC<{
   const erro = empresa.erro || periodoAtual.erro;
   const pi = periodoAtual.dados;
   const carregandoPeriodo = !pi && !periodoAtual.erro;
-  const inadPeriodoPct = pi && pi.venceu > 0 ? (pi.naoPago / pi.venceu) * 100 : 0;
   const pctRec = (d: typeof pi): number | null =>
     d && d.baseRecuperacao != null && d.baseRecuperacao > 0.01
       ? ((d.recuperado ?? 0) / d.baseRecuperacao) * 100
@@ -1002,11 +1002,7 @@ const AcompanhamentoInadimplencia: React.FC<{
   const escopoCards =
     lojasExcluidas.size === 0 ? "empresa inteira" : "lojas do filtro";
   // Foto de 12 meses no fim do mes do "Ate" (ou hoje): tracinho do card.
-  const fotoDoCard = atual
-    ? atual.dia === hoje
-      ? "hoje"
-      : `fim de ${rotuloMes(atual.dia)}`
-    : "";
+  const fotoDoCard = atual ? rotuloFoto(atual.dia, today) : "";
 
   const detalhesInad = atual
     ? [
@@ -1144,56 +1140,48 @@ const AcompanhamentoInadimplencia: React.FC<{
 
           {/* 2) Dois cards visuais; 3) divida antiga a parte. */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {/* NUMERO OFICIAL (26/11, etapa 1): a foto de 12 meses no fim do
+                mes do "Ate" (ou hoje) -- o mesmo ponto do grafico. */}
             <CardVisual
               icon={AlertTriangle}
               titulo="Inadimplência"
               escopo={escopoCards}
               tema="red"
-              carregando={carregandoPeriodo}
-              pct={inadPeriodoPct}
+              carregando={carregando}
+              pct={pctHoje}
               numeroTexto={
-                pi ? formatarInadimplencia(inadPeriodoPct, pi.venceu) : undefined
+                atual ? formatarInadimplencia(pctHoje, atual.venceu) : undefined
               }
-              referencia={atual ? pctHoje : null}
-              rotuloReferencia="12 meses"
+              referencia={anterior ? pctInadimplencia(anterior) : null}
+              rotuloReferencia="mês anterior"
               escala={100}
               pilulas={
-                pi
+                atual
                   ? [
                       {
-                        valor: fmtCurto(pi.naoPago),
+                        valor: fmtCurto(atual.naoPago),
                         rotulo: "sem pagar",
                         tom: "red",
-                        hint: fmtValor(pi.naoPago),
+                        hint: fmtValor(atual.naoPago),
                       },
                       {
-                        valor: fmtCurto(pi.venceu),
-                        rotulo: "venceu no período",
+                        valor: fmtCurto(atual.venceu),
+                        rotulo: "venceu em 12 meses",
                         tom: "gray",
-                        hint: fmtValor(pi.venceu),
+                        hint: fmtValor(atual.venceu),
                       },
-                      ...(pi.atrasoRecente > 0.01
-                        ? [
-                            {
-                              valor: fmtCurto(pi.atrasoRecente),
-                              rotulo: "atraso < 3 dias",
-                              tom: "gray" as const,
-                              hint: `${fmtValor(pi.atrasoRecente)} venceram há 1 ou 2 dias: ainda não contam como inadimplência`,
-                            },
-                          ]
-                        : []),
                     ]
                   : []
               }
               corDetalhe="bg-red-400"
-              mes={rotuloDoPeriodo}
+              mes={fotoDoCard}
               detalhes={detalhesInad}
               info={
                 <>
-                  Das parcelas que <strong>venceram no período</strong>, quanto
-                  segue sem pagar (atraso de 3 dias ou mais). O tracinho é a
-                  dos <strong>últimos 12 meses</strong>
-                  {fotoDoCard === "hoje" ? "" : ` (${fotoDoCard})`}.
+                  Foto {fotoDoCard === "hoje" ? "de hoje" : `do ${fotoDoCard}`}:
+                  das parcelas que venceram nos <strong>12 meses</strong> antes,
+                  quanto estava sem pagar (atraso de 3 dias ou mais). É o mesmo
+                  número do gráfico abaixo e do Geral.
                 </>
               }
             />

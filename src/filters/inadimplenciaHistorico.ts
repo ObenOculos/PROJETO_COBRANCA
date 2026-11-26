@@ -158,6 +158,14 @@ export const rotuloPeriodo = (de: string, ate: string, hoje: string): string => 
   return de === ate ? rotuloDia(de) : `${rotuloDia(de)} a ${rotuloDia(ate)}`;
 };
 
+/** De quando e a foto de 12 meses: "hoje", "fim de out/26" ou "em 15/10". */
+export const rotuloFoto = (dia: string, hoje: string): string =>
+  dia >= hoje
+    ? "hoje"
+    : dia === fimDoMes(dia)
+      ? `fim de ${rotuloMes(dia)}`
+      : `em ${rotuloDia(dia)}`;
+
 /** "25/11" a partir de YYYY-MM-DD. */
 export const rotuloDia = (dia: string): string => {
   const [, m, d] = dia.split("-");
