@@ -133,6 +133,75 @@ export const inadimplenciaFotoEm = (
 };
 
 // ---------------------------------------------------------------------------
+// SAFRA de 30 dias de um periodo (26/11, etapa 2): o jeito de mercado de
+// comparar periodos. "Venceu no periodo, sem pagar HOJE" nao compara (o mes
+// recente sempre parece pior so por ter tido menos tempo); aqui cada parcela
+// e olhada no MESMO prazo -- 30 dias depois do vencimento.
+//   safra % = das parcelas que venceram no periodo ha 30+ dias, quanto
+//             estava sem pagar no 30o dia depois do vencimento
+//   aberto no dia X = original - desconto, se a baixa foi depois de X;
+//                     original - recebido - desconto, se nao ha data ou ate X
+// As que venceram ha menos de 30 dias ainda estao "no prazo": ficam a parte
+// (valor que venceu e quanto segue aberto hoje). Mesma regra da RPC
+// inadimplencia_periodo (migration 20261126000006).
+// ---------------------------------------------------------------------------
+
+export const SAFRA_DIAS = 30;
+
+export interface Safra {
+  /** Valor original das parcelas do periodo vencidas ha SAFRA_DIAS+ dias. */
+  venceu: number;
+  /** Delas, o que estava sem pagar no dia vencimento + SAFRA_DIAS. */
+  semPagar: number;
+  /** semPagar / venceu * 100 (0 sem base). */
+  pct: number;
+  /** Parcelas do periodo vencidas ha menos de SAFRA_DIAS dias. */
+  noPrazoVenceu: number;
+  /** Delas, o que segue aberto hoje. */
+  noPrazoAberto: number;
+}
+
+export const safraDe = (
+  titulos: Collection[],
+  de: string,
+  ate: string,
+  hoje: string,
+): Safra => {
+  const maturadoAte = addDiasStr(hoje, -SAFRA_DIAS);
+  let venceu = 0;
+  let semPagar = 0;
+  let noPrazoVenceu = 0;
+  let noPrazoAberto = 0;
+  titulos.forEach((c) => {
+    const v = c.data_vencimento?.slice(0, 10);
+    if (!v || v < de || v > ate || v >= hoje) return;
+    const original = Number(c.valor_original || 0);
+    const desconto = Number(c.desconto || 0);
+    const resto = Math.max(
+      original - Number(c.valor_recebido || 0) - desconto,
+      0,
+    );
+    if (v > maturadoAte) {
+      noPrazoVenceu += original;
+      if (resto > 0.01) noPrazoAberto += resto;
+      return;
+    }
+    const pago = c.data_de_recebimento?.slice(0, 10) || null;
+    const corte = addDiasStr(v, SAFRA_DIAS);
+    const aberto = !pago || pago <= corte ? resto : original - desconto;
+    venceu += original;
+    if (aberto > 0.01) semPagar += aberto;
+  });
+  return {
+    venceu,
+    semPagar,
+    pct: venceu > 0 ? (semPagar / venceu) * 100 : 0,
+    noPrazoVenceu,
+    noPrazoAberto,
+  };
+};
+
+// ---------------------------------------------------------------------------
 // Recuperacao de um periodo (26/11: acompanha o filtro de datas da tela).
 //
 // MESMA regra da RPC (inadimplencia_calculo, migration 20261125000003), so

@@ -31,6 +31,7 @@ import {
   nivelInadimplencia,
   formatarInadimplencia,
   periodoAnterior,
+  SAFRA_DIAS,
 } from "../../filters/inadimplencia";
 import {
   FAIXAS_ATRASO,
@@ -1170,6 +1171,18 @@ const AcompanhamentoInadimplencia: React.FC<{
                         tom: "gray",
                         hint: fmtValor(atual.venceu),
                       },
+                      ...(pi && pi.safraVenceu > 0
+                        ? [
+                            {
+                              valor: formatarPct(
+                                (pi.safraSemPagar / pi.safraVenceu) * 100,
+                              ),
+                              rotulo: `período · ${SAFRA_DIAS} dias`,
+                              tom: "gray" as const,
+                              hint: `Safra de ${SAFRA_DIAS} dias (${rotuloDoPeriodo}): ${fmtValor(pi.safraSemPagar)} de ${fmtValor(pi.safraVenceu)} ficaram sem pagar ${SAFRA_DIAS} dias depois de vencer${pi.noPrazoVenceu > 0 ? `. ${fmtValor(pi.noPrazoVenceu)} venceram há menos de ${SAFRA_DIAS} dias e ainda estão no prazo` : ""}`,
+                            },
+                          ]
+                        : []),
                     ]
                   : []
               }
@@ -1181,7 +1194,11 @@ const AcompanhamentoInadimplencia: React.FC<{
                   Foto {fotoDoCard === "hoje" ? "de hoje" : `do ${fotoDoCard}`}:
                   das parcelas que venceram nos <strong>12 meses</strong> antes,
                   quanto estava sem pagar (atraso de 3 dias ou mais). É o mesmo
-                  número do gráfico abaixo e do Geral.
+                  número do gráfico abaixo e do Geral.{" "}
+                  <strong>Período · {SAFRA_DIAS} dias</strong>: das parcelas
+                  que venceram no período, quanto ficou sem pagar{" "}
+                  {SAFRA_DIAS} dias depois de vencer — serve para comparar um
+                  período com outro.
                 </>
               }
             />

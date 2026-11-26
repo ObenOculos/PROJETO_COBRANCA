@@ -110,6 +110,12 @@ export interface InadimplenciaPeriodo {
   recuperado: number | null;
   /** Fim do periodo limitado a hoje. */
   ateEfetivo: string;
+  /** Safra de 30 dias (etapa 2): vencidas no periodo ha 30+ dias e o que
+   * estava sem pagar 30 dias depois; e as ainda no prazo. */
+  safraVenceu: number;
+  safraSemPagar: number;
+  noPrazoVenceu: number;
+  noPrazoAberto: number;
 }
 
 const num = (v: number | string | null | undefined): number =>
@@ -139,6 +145,10 @@ export function useInadimplenciaPeriodo(
           l?.base_recuperacao == null ? null : num(l.base_recuperacao),
         recuperado: l?.recuperado == null ? null : num(l.recuperado),
         ateEfetivo: String(l?.ate_efetivo ?? ate),
+        safraVenceu: num(l?.safra_venceu),
+        safraSemPagar: num(l?.safra_sem_pagar),
+        noPrazoVenceu: num(l?.no_prazo_venceu),
+        noPrazoAberto: num(l?.no_prazo_aberto),
       };
     },
     ativo && !!de && !!ate && de <= ate,

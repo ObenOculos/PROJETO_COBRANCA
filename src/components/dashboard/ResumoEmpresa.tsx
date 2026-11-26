@@ -26,6 +26,7 @@ import {
 import {
   formatarInadimplencia,
   INADIMPLENCIA_A_PARTIR_DIAS,
+  SAFRA_DIAS,
 } from "../../filters/inadimplencia";
 import { PERIODO_TUDO_ATE, PERIODO_TUDO_DE } from "../../filters/periodo";
 import {
@@ -810,6 +811,7 @@ export const CardInadimplencia: React.FC<{
   const periodo = r.recuperacao
     ? rotuloPeriodo(r.recuperacao.de, r.recuperacao.ate, r.hoje)
     : null;
+  const sf = r.safra;
   return (
     <CardSimples
       icon={AlertTriangle}
@@ -840,6 +842,16 @@ export const CardInadimplencia: React.FC<{
           tom: "gray",
           hint: fmtValor(i.venceu),
         },
+        ...(sf.venceu > 0
+          ? [
+              {
+                valor: formatarPct(sf.pct),
+                rotulo: `período · ${SAFRA_DIAS} dias`,
+                tom: "gray" as const,
+                hint: `Safra de ${SAFRA_DIAS} dias${periodo ? ` (${periodo})` : ""}: das parcelas que venceram no período, ${fmtValor(sf.semPagar)} de ${fmtValor(sf.venceu)} ficaram sem pagar ${SAFRA_DIAS} dias depois de vencer${sf.noPrazoVenceu > 0 ? `. ${fmtValor(sf.noPrazoVenceu)} venceram há menos de ${SAFRA_DIAS} dias e ainda estão no prazo` : ""}`,
+              },
+            ]
+          : []),
         ...(rec
           ? [
               {
@@ -857,6 +869,9 @@ export const CardInadimplencia: React.FC<{
           : das parcelas que venceram nos <strong>12 meses</strong> antes,
           quanto estava sem pagar (atraso de {INADIMPLENCIA_A_PARTIR_DIAS} dias
           ou mais). O tracinho é a do fim do mês anterior.{" "}
+          <strong>Período · {SAFRA_DIAS} dias</strong>: das parcelas que
+          venceram no período, quanto ficou sem pagar {SAFRA_DIAS} dias depois
+          de vencer — serve para comparar um período com outro.{" "}
           <strong>Recuperação</strong>: do atraso de antes do período, quanto
           foi pago nele.
         </>
@@ -878,6 +893,23 @@ export const CardInadimplencia: React.FC<{
               {
                 label: "Fim do mês anterior",
                 value: formatarPct(r.inadimplenciaAnteriorPct),
+              },
+            ]
+          : []),
+        ...(sf.venceu > 0
+          ? [
+              {
+                label: `Período: sem pagar aos ${SAFRA_DIAS} dias`,
+                value: `${fmtValor(sf.semPagar)} de ${fmtValor(sf.venceu)}`,
+              },
+            ]
+          : []),
+        ...(sf.noPrazoVenceu > 0
+          ? [
+              {
+                label: `Período: ainda no prazo (< ${SAFRA_DIAS} dias)`,
+                value: `${fmtValor(sf.noPrazoAberto)} de ${fmtValor(sf.noPrazoVenceu)}`,
+                hint: `Venceram há menos de ${SAFRA_DIAS} dias: entram na conta do período quando completarem ${SAFRA_DIAS} dias`,
               },
             ]
           : []),

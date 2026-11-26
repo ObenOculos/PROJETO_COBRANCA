@@ -2732,6 +2732,10 @@ export type Database = {
           base_recuperacao: number | null;
           recuperado: number | null;
           ate_efetivo: string;
+          safra_venceu: number;
+          safra_sem_pagar: number;
+          no_prazo_venceu: number;
+          no_prazo_aberto: number;
         }[];
       };
       atribuicao_bloqueio_parcela: {

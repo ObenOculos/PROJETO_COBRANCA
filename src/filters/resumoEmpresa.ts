@@ -36,6 +36,8 @@ import {
 import {
   inadimplenciaFotoEm,
   Inadimplencia,
+  safraDe,
+  Safra,
   periodoAnterior,
   recuperacaoDe,
   Recuperacao,
@@ -93,6 +95,8 @@ export interface ResumoEmpresa {
   inadimplenciaDia: string;
   /** % da foto no fim do mes anterior ao dia (referencia na barra). */
   inadimplenciaAnteriorPct: number | null;
+  /** Safra de 30 dias do periodo (etapa 2): compara periodos. */
+  safra: Safra;
   /** Recuperacao do periodo (filters/inadimplencia, recuperacaoDe); null =
    * periodo ainda nao comecou. */
   recuperacao: Recuperacao | null;
@@ -222,6 +226,7 @@ export const resumoEmpresa = ({
     inadimplenciaDia: diaFoto,
     inadimplenciaAnteriorPct:
       inadAnterior.venceu > 0 ? inadAnterior.pct : null,
+    safra: safraDe(titulos, dateFrom, dateTo, today),
     recuperacao,
     recuperacaoAnteriorPct,
     previsao: {
