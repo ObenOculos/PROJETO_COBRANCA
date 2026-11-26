@@ -333,6 +333,20 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
+  // Abas da Atribuicao ja abertas (ficam montadas). A Manual so conta como
+  // aberta depois da base carregada (ela precisa dos titulos todos).
+  const [atribuicaoVisitadas, setAtribuicaoVisitadas] = useState({
+    manual: false,
+    automatica: false,
+  });
+  useEffect(() => {
+    if (activeTab !== "clients") return;
+    if (atribuicaoView === "manual" && loadingSettledCollections) return;
+    setAtribuicaoVisitadas((v) =>
+      v[atribuicaoView] ? v : { ...v, [atribuicaoView]: true },
+    );
+  }, [activeTab, atribuicaoView, loadingSettledCollections]);
+
   const mostrarResumo =
     activeTab === "collectors-summary" &&
     summaryView === "resumo" &&
@@ -344,34 +358,43 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   const renderTabContent = () => {
     // Segurar e melhor do que exibir total subestimado: sem os clientes
     // quitados, os numeros dessas telas ficam menores do que a realidade.
-    if (needsFullScope && loadingSettledCollections) {
-      return (
-        <div className="flex items-center justify-center py-16">
-          <div className="text-center">
-            <div className="flex items-center justify-center space-x-2 mb-3">
-              <div
-                className="w-2.5 h-2.5 bg-gray-400 rounded-full animate-bounce"
-                style={{ animationDelay: "0ms" }}
-              />
-              <div
-                className="w-2.5 h-2.5 bg-gray-400 rounded-full animate-bounce"
-                style={{ animationDelay: "150ms" }}
-              />
-              <div
-                className="w-2.5 h-2.5 bg-gray-400 rounded-full animate-bounce"
-                style={{ animationDelay: "300ms" }}
-              />
-            </div>
-            <p className="text-gray-600 dark:text-dark-text-secondary text-sm font-medium">
-              Carregando todos os registros
-              {fullScopeReason ? ` ${fullScopeReason}` : ""}...
-            </p>
-            <p className="text-gray-400 dark:text-dark-text-secondary text-xs mt-1">
-              Pode levar alguns segundos — é uma base grande.
-            </p>
+    const telaCarregandoTudo = (
+      <div className="flex items-center justify-center py-16">
+        <div className="text-center">
+          <div className="flex items-center justify-center space-x-2 mb-3">
+            <div
+              className="w-2.5 h-2.5 bg-gray-400 rounded-full animate-bounce"
+              style={{ animationDelay: "0ms" }}
+            />
+            <div
+              className="w-2.5 h-2.5 bg-gray-400 rounded-full animate-bounce"
+              style={{ animationDelay: "150ms" }}
+            />
+            <div
+              className="w-2.5 h-2.5 bg-gray-400 rounded-full animate-bounce"
+              style={{ animationDelay: "300ms" }}
+            />
           </div>
+          <p className="text-gray-600 dark:text-dark-text-secondary text-sm font-medium">
+            Carregando todos os registros
+            {fullScopeReason ? ` ${fullScopeReason}` : ""}...
+          </p>
+          <p className="text-gray-400 dark:text-dark-text-secondary text-xs mt-1">
+            Pode levar alguns segundos — é uma base grande.
+          </p>
         </div>
-      );
+      </div>
+    );
+    const carregandoTudo = needsFullScope && loadingSettledCollections;
+    // 26/11: Atribuicao e Cobradores mostram a barra de abas durante a carga
+    // da base -- antes a tela inteira virava "Carregando" e quem queria a
+    // Automatica (ou a Conferencia) tinha de esperar a Manual (ou o Resumo).
+    if (
+      carregandoTudo &&
+      activeTab !== "clients" &&
+      activeTab !== "collectors-summary"
+    ) {
+      return telaCarregandoTudo;
     }
 
     switch (activeTab) {
@@ -533,7 +556,8 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                 );
               })}
             </div>
-            {(resumoMontado || mostrarResumo) && (
+            {carregandoTudo && telaCarregandoTudo}
+            {(resumoMontado || (mostrarResumo && !carregandoTudo)) && (
               <div className={mostrarResumo ? "" : "hidden"}>
                 <CollectorsSummary aba={resumoAba} onAba={mudarResumoAba} />
               </div>
@@ -551,7 +575,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                 </div>
               )
             ) : summaryView === "acompanhamento" ? (
-              <VisitTracking />
+              !carregandoTudo && <VisitTracking />
             ) : (
               <ConferenciaRecebimentos />
             )}
@@ -596,17 +620,28 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                 );
               })}
             </div>
-            {atribuicaoView === "manual" ? (
-              <ClientAssignment
-                key={assignmentPreset?.nonce}
-                initialAssignmentFilter={assignmentPreset?.status}
-                onViewClient={(clientIdentifier) => {
-                  setFilters({ search: clientIdentifier });
-                  setActiveTab("collections");
-                }}
-              />
-            ) : (
-              <CarteiraDistribuicao />
+            {/* 26/11: Manual e Automatica ficam montadas depois da 1a vez
+                (so escondidas) -- trocar entre elas nao refaz as contas nem
+                as buscas. */}
+            {atribuicaoView === "manual" && carregandoTudo && telaCarregandoTudo}
+            {((atribuicaoView === "manual" && !carregandoTudo) ||
+              atribuicaoVisitadas.manual) && (
+              <div className={atribuicaoView === "manual" ? "" : "hidden"}>
+                <ClientAssignment
+                  key={assignmentPreset?.nonce}
+                  initialAssignmentFilter={assignmentPreset?.status}
+                  onViewClient={(clientIdentifier) => {
+                    setFilters({ search: clientIdentifier });
+                    setActiveTab("collections");
+                  }}
+                />
+              </div>
+            )}
+            {(atribuicaoView === "automatica" ||
+              atribuicaoVisitadas.automatica) && (
+              <div className={atribuicaoView === "automatica" ? "" : "hidden"}>
+                <CarteiraDistribuicao />
+              </div>
             )}
           </div>
         );

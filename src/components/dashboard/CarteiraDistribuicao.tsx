@@ -19,6 +19,11 @@ import {
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { supabase } from "../../lib/supabase";
+import {
+  gravarCacheTela,
+  invalidarCacheTela,
+  lerCacheTela,
+} from "../../utils/cacheTela";
 import { useCollection } from "../../contexts/CollectionContext";
 import { CobradorOptions } from "../common/CobradorOptions";
 import EditorCoberturaLoja from "./EditorCoberturaLoja";
@@ -676,6 +681,14 @@ const FilaDoCobrador: React.FC<{
  * aplicar). Regras de quem entra/sai: migrations 20261106000007 e 0008
  * (varias regras por cobrador, sem sobreposicao).
  */
+const CACHE = {
+  lojas: "distribuicao|lojas",
+  porCobrador: "distribuicao|carteiraPorCobrador",
+  ultimaRodada: "distribuicao|ultimaRodada",
+  ultimaBaixa: "distribuicao|ultimaBaixaPorLoja",
+  mapa: "distribuicao|mapa",
+} as const;
+
 const CarteiraDistribuicao: React.FC = () => {
   const {
     users,
@@ -687,7 +700,12 @@ const CarteiraDistribuicao: React.FC = () => {
     definirCoberturaLoja,
   } = useCollection();
 
-  const [lojas, setLojas] = useState<LojaCarteira[]>([]);
+  // Cache de tela (26/11): as 5 consultas da tela (0,2-1 s cada no banco)
+  // eram refeitas a cada abertura. Agora a volta mostra o guardado na hora e
+  // so busca de novo depois de 2 min (ou apos aplicar a distribuicao).
+  const [lojas, setLojas] = useState<LojaCarteira[]>(
+    () => lerCacheTela<LojaCarteira[]>(CACHE.lojas)?.valor ?? [],
+  );
   const [lojasErro, setLojasErro] = useState("");
   // Rascunho por linha: chave = id da regra, ou "novo:<cobrador>" para a
   // regra que esta sendo adicionada.
@@ -704,8 +722,9 @@ const CarteiraDistribuicao: React.FC = () => {
   // null = carregando; "erro" = sem a contagem (so nao mostra).
   const [carteiraPorCobrador, setCarteiraPorCobrador] = useState<
     Map<string, number> | null | "erro"
-  >(null);
+  >(() => lerCacheTela<Map<string, number>>(CACHE.porCobrador)?.valor ?? null);
   useEffect(() => {
+    if (lerCacheTela(CACHE.porCobrador)?.fresco) return;
     void (async () => {
       const { data, error } = await supabase.rpc("carteira_por_cobrador");
       if (error) {
@@ -713,13 +732,13 @@ const CarteiraDistribuicao: React.FC = () => {
         setCarteiraPorCobrador("erro");
         return;
       }
-      setCarteiraPorCobrador(
-        new Map(
-          ((data ?? []) as { collector_id: string; clientes_em_aberto: number }[]).map(
-            (r) => [r.collector_id, r.clientes_em_aberto],
-          ),
+      const mapa = new Map(
+        ((data ?? []) as { collector_id: string; clientes_em_aberto: number }[]).map(
+          (r) => [r.collector_id, r.clientes_em_aberto],
         ),
       );
+      setCarteiraPorCobrador(mapa);
+      gravarCacheTela(CACHE.porCobrador, mapa);
     })();
   }, []);
   const carteiraTexto = (collectorId: string) => {
@@ -730,13 +749,17 @@ const CarteiraDistribuicao: React.FC = () => {
   };
 
   // Ultima rodada da distribuicao automatica (resumo do topo).
-  const [ultimaRodada, setUltimaRodada] = useState<{
+  type UltimaRodada = {
     em: string;
     atribuidos: number;
     retirados: number;
     erro: string | null;
-  } | null>(null);
+  };
+  const [ultimaRodada, setUltimaRodada] = useState<UltimaRodada | null>(
+    () => lerCacheTela<UltimaRodada>(CACHE.ultimaRodada)?.valor ?? null,
+  );
   useEffect(() => {
+    if (lerCacheTela(CACHE.ultimaRodada)?.fresco) return;
     void (async () => {
       const { data, error } = await supabase
         .from("distribuicao_execucoes")
@@ -748,12 +771,14 @@ const CarteiraDistribuicao: React.FC = () => {
         clientes_atribuidos?: number;
         clientes_retirados?: number;
       };
-      setUltimaRodada({
+      const rodada = {
         em: data[0].executado_em,
         atribuidos: r.clientes_atribuidos ?? 0,
         retirados: r.clientes_retirados ?? 0,
         erro: data[0].erro,
-      });
+      };
+      setUltimaRodada(rodada);
+      gravarCacheTela(CACHE.ultimaRodada, rodada);
     })();
   }, []);
   const secaoSimularRef = useRef<HTMLDivElement>(null);
@@ -788,6 +813,7 @@ const CarteiraDistribuicao: React.FC = () => {
   });
 
   useEffect(() => {
+    if (lerCacheTela(CACHE.lojas)?.fresco) return;
     void (async () => {
       const { data, error } = await supabase.rpc("lojas_carteira");
       if (error) {
@@ -798,6 +824,7 @@ const CarteiraDistribuicao: React.FC = () => {
         return;
       }
       setLojas((data ?? []) as LojaCarteira[]);
+      gravarCacheTela(CACHE.lojas, (data ?? []) as LojaCarteira[]);
     })();
   }, []);
 
@@ -807,21 +834,26 @@ const CarteiraDistribuicao: React.FC = () => {
   // mostra o aviso.
   const [ultimaBaixaPorLoja, setUltimaBaixaPorLoja] = useState<
     Map<string, string | null>
-  >(new Map());
+  >(
+    () =>
+      lerCacheTela<Map<string, string | null>>(CACHE.ultimaBaixa)?.valor ??
+      new Map(),
+  );
   useEffect(() => {
+    if (lerCacheTela(CACHE.ultimaBaixa)?.fresco) return;
     void (async () => {
       const { data, error } = await supabase.rpc("lojas_ultima_baixa_externa");
       if (error) {
         console.warn("Atualização das lojas indisponível:", error.message);
         return;
       }
-      setUltimaBaixaPorLoja(
-        new Map(
-          ((data ?? []) as { loja: string; ultima_baixa: string | null }[]).map(
-            (l) => [l.loja, l.ultima_baixa],
-          ),
+      const mapa = new Map(
+        ((data ?? []) as { loja: string; ultima_baixa: string | null }[]).map(
+          (l) => [l.loja, l.ultima_baixa],
         ),
       );
+      setUltimaBaixaPorLoja(mapa);
+      gravarCacheTela(CACHE.ultimaBaixa, mapa);
     })();
   }, []);
 
@@ -1108,17 +1140,18 @@ const CarteiraDistribuicao: React.FC = () => {
   // 24/11: vem do banco (carteira_mapa, migration 20261124000002). Antes
   // era calculado sobre as parcelas do navegador, que o gestor nao carrega
   // inteiras (item 8) -- todas as casas da cobertura apareciam com 0.
-  const [mapaCarteira, setMapaCarteira] = useState<
-    {
-      loja: string;
-      atraso: number;
-      cobrador_id: string | null;
-      /** Situacao "Aguardando ..." (ex.: Aguardando Juridico): fora da
-       * distribuicao de proposito (migration 20261124000004). */
-      aguardando?: string | null;
-      clientes: number;
-    }[] | null
-  >(null);
+  type ItemMapa = {
+    loja: string;
+    atraso: number;
+    cobrador_id: string | null;
+    /** Situacao "Aguardando ..." (ex.: Aguardando Juridico): fora da
+     * distribuicao de proposito (migration 20261124000004). */
+    aguardando?: string | null;
+    clientes: number;
+  };
+  const [mapaCarteira, setMapaCarteira] = useState<ItemMapa[] | null>(
+    () => lerCacheTela<ItemMapa[]>(CACHE.mapa)?.valor ?? null,
+  );
   const [mapaErro, setMapaErro] = useState(false);
   const carregarMapa = React.useCallback(async () => {
     const { data, error } = await supabase.rpc("carteira_mapa");
@@ -1129,17 +1162,11 @@ const CarteiraDistribuicao: React.FC = () => {
     }
     setMapaErro(false);
     // jsonb (migration 20261124000003): linhas cortariam em 1.000.
-    setMapaCarteira(
-      (data ?? []) as {
-        loja: string;
-        atraso: number;
-        cobrador_id: string | null;
-        aguardando?: string | null;
-        clientes: number;
-      }[],
-    );
+    setMapaCarteira((data ?? []) as ItemMapa[]);
+    gravarCacheTela(CACHE.mapa, (data ?? []) as ItemMapa[]);
   }, []);
   useEffect(() => {
+    if (lerCacheTela(CACHE.mapa)?.fresco) return;
     void carregarMapa();
   }, [carregarMapa]);
   const clientesPorLoja = useMemo(() => {
@@ -1459,6 +1486,10 @@ const CarteiraDistribuicao: React.FC = () => {
       setConfirmAplicar(false);
       // A nova simulacao limpa o resultado: a mensagem vem depois dela
       // (antes sumia e o gestor ficava sem retorno).
+      // Tamanho das carteiras e ultima rodada mudaram: a proxima abertura
+      // busca de novo em vez de mostrar o guardado.
+      invalidarCacheTela(CACHE.porCobrador);
+      invalidarCacheTela(CACHE.ultimaRodada);
       await Promise.all([simular(), carregarMapa()]);
       setResultado(
         `Distribuição aplicada: ${r.clientes_atribuidos} cliente(s) atribuído(s) e ${r.clientes_retirados} sem cobrador agora. As outras telas mostram a mudança na próxima consulta.`,
