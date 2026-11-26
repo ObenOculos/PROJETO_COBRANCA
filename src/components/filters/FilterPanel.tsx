@@ -1,4 +1,5 @@
 import React from "react";
+import CampoData from "../common/CampoData";
 import {
   AlertCircle,
   MapPin,
@@ -84,54 +85,24 @@ const Field: React.FC<{
   </div>
 );
 
-/**
- * Input de data com estado local, para digitacao fluida.
- *
- * O <input type="date"> nativo e sensivel a reescrita da propriedade `value`
- * durante a edicao: cada vez que o React grava um `value` no DOM, o segmento
- * ativo/cursor volta para o fim. Como cada tecla dispara `onChange` -> estado do
- * pai -> re-filtragem pesada -> novo `value` de volta, na digitacao rapida esse
- * ciclo chega atrasado e sobrescreve o que o usuario esta digitando (cursor
- * "salta" e o ano vira algo como 200021). Mantendo um estado local que so
- * sincroniza com o `value` externo quando o campo NAO esta em foco, a digitacao
- * fica imune a esse round-trip; mudancas externas (limpar filtros, pills de
- * atraso) continuam refletidas quando o campo nao esta sendo editado.
- */
+/** Campo de data dos filtros: so aplica a data pronta (ver CampoData);
+ * apagar a data limpa o filtro ao sair do campo. */
 const DateInput: React.FC<{
   name: string;
   ariaLabel: string;
   value: string;
   onChange: (value: string) => void;
   className: string;
-}> = ({ name, ariaLabel, value, onChange, className }) => {
-  const [local, setLocal] = React.useState(value);
-  const focused = React.useRef(false);
-
-  React.useEffect(() => {
-    if (!focused.current) setLocal(value);
-  }, [value]);
-
-  return (
-    <input
-      type="date"
-      name={name}
-      aria-label={ariaLabel}
-      value={local}
-      onFocus={() => {
-        focused.current = true;
-      }}
-      onBlur={() => {
-        focused.current = false;
-        setLocal(value);
-      }}
-      onChange={(e) => {
-        setLocal(e.target.value);
-        onChange(e.target.value);
-      }}
-      className={className}
-    />
-  );
-};
+}> = ({ name, ariaLabel, value, onChange, className }) => (
+  <CampoData
+    name={name}
+    ariaLabel={ariaLabel}
+    valor={value}
+    onAplicar={onChange}
+    permiteVazio
+    className={className}
+  />
+);
 
 /**
  * Painel de filtros avancados compartilhado. Renderiza o grid de campos de
