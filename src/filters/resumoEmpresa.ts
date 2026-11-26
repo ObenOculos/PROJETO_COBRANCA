@@ -33,12 +33,20 @@ import {
   hasInstallmentBalance,
   parcelaNoPeriodo,
 } from "./clientStatus";
-import { inadimplenciaDe, Inadimplencia } from "./inadimplencia";
+import {
+  inadimplenciaDe,
+  Inadimplencia,
+  periodoAnterior,
+  recuperacaoDe,
+  Recuperacao,
+} from "./inadimplencia";
 import { toYYYYMMDD } from "./dates";
 import { criarCalculoAtraso } from "../utils/formatters";
 import { isVisitOpen } from "../config/visitStatus";
 
 export interface ResumoEmpresa {
+  /** Dia de referencia da conta (YYYY-MM-DD), para os rotulos de periodo. */
+  hoje: string;
   clientes: {
     total: number;
     emDia: number;
@@ -77,7 +85,17 @@ export interface ResumoEmpresa {
      * baixa no ERP. */
     cobrador: number;
   };
+  /** Inadimplencia do PERIODO (26/11): das parcelas que venceram dentro do
+   * filtro de datas, quanto segue sem pagar hoje. */
   inadimplencia: Inadimplencia;
+  /** % dos ultimos 12 meses (o numero da aba Inadimplencia), referencia na
+   * barra do card. */
+  inadimplencia12mPct: number | null;
+  /** Recuperacao do periodo (filters/inadimplencia, recuperacaoDe); null =
+   * periodo ainda nao comecou. */
+  recuperacao: Recuperacao | null;
+  /** % do periodo anterior de mesmo tamanho (referencia na barra). */
+  recuperacaoAnteriorPct: number | null;
   previsao: {
     /** Janela usada: de max(hoje, inicio) ate o fim; null = periodo ja passou. */
     de: string | null;
@@ -151,6 +169,18 @@ export const resumoEmpresa = ({
     if (!atual || d < atual) proximoAgendamento.set(v.clientDocument, d);
   });
 
+  // Inadimplencia e recuperacao seguem o filtro de datas (26/11). As
+  // referencias da barra: 12 meses (inadimplencia) e periodo anterior de
+  // mesmo tamanho (recuperacao).
+  const inad12m = inadimplenciaDe(titulos, { atrasoDias });
+  const recuperacao = recuperacaoDe(titulos, dateFrom, dateTo, today);
+  let recuperacaoAnteriorPct: number | null = null;
+  if (recuperacao) {
+    const ant = periodoAnterior(recuperacao.de, recuperacao.ate);
+    const r0 = recuperacaoDe(titulos, ant.de, ant.ate, today);
+    recuperacaoAnteriorPct = r0 && r0.base > 0.01 ? r0.pct : null;
+  }
+
   const prevDe = dateFrom && dateFrom > today ? dateFrom : today;
   const prevAte = dateTo || "9999-12-31";
   const janelaValida = prevDe <= prevAte;
@@ -158,6 +188,7 @@ export const resumoEmpresa = ({
     janelaValida && !!d && d >= prevDe && d <= prevAte;
 
   const r: ResumoEmpresa = {
+    hoje: today,
     clientes: {
       total: 0,
       emDia: 0,
@@ -179,7 +210,14 @@ export const resumoEmpresa = ({
       aVencerPeriodo: 0,
     },
     recebido: { erp: 0, soErp: 0, cobrador: 0 },
-    inadimplencia: inadimplenciaDe(titulos, { atrasoDias }),
+    inadimplencia: inadimplenciaDe(titulos, {
+      atrasoDias,
+      vencimentoDe: dateFrom,
+      vencimentoAte: dateTo,
+    }),
+    inadimplencia12mPct: inad12m.venceu > 0 ? inad12m.pct : null,
+    recuperacao,
+    recuperacaoAnteriorPct,
     previsao: {
       de: janelaValida ? prevDe : null,
       ate: prevAte,

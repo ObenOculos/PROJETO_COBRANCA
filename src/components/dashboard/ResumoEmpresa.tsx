@@ -27,17 +27,12 @@ import {
   formatarInadimplencia,
   INADIMPLENCIA_A_PARTIR_DIAS,
 } from "../../filters/inadimplencia";
-import { PERIODO_TUDO_ATE } from "../../filters/periodo";
 import {
-  formatarPct,
-  pctInadimplencia,
-  pctRecuperacao,
-} from "../../filters/inadimplenciaHistorico";
-import {
-  somarPontos,
-  useMesPassadoPorLoja,
-  usePontoPorLoja,
-} from "../../hooks/useInadimplenciaHistorico";
+  fimDoMes,
+  PERIODO_TUDO_ATE,
+  PERIODO_TUDO_DE,
+} from "../../filters/periodo";
+import { formatarPct, rotuloMes } from "../../filters/inadimplenciaHistorico";
 import { formatCurrency } from "../../utils/formatters";
 
 const fmtNum = (n: number): string => n.toLocaleString("pt-BR");
@@ -798,31 +793,53 @@ const BarraReferencia: React.FC<{
   );
 };
 
-/** 2. Inadimplencia (empresa/loja, 26/11): o numero que era um quadrinho da
- * Carteira, agora com card proprio e o mes passado na barra. */
+/** Rotulo curto do periodo efetivo (fim no maximo hoje): "nov/26 até hoje",
+ * "out/26", "ago–out/26", "01/08 a 15/10", "todo o histórico". */
+const rotuloPeriodo = (de: string, ate: string, hoje: string): string => {
+  if (de <= PERIODO_TUDO_DE) return "todo o histórico";
+  const mes = (s: string) => rotuloMes(s);
+  const diaUm = de.endsWith("-01");
+  if (diaUm && ate === hoje && de.slice(0, 7) === hoje.slice(0, 7))
+    return `${mes(de)} até hoje`;
+  if (diaUm && ate === fimDoMes(ate)) {
+    if (de.slice(0, 7) === ate.slice(0, 7)) return mes(de);
+    return de.slice(0, 4) === ate.slice(0, 4)
+      ? `${mes(de).split("/")[0]}–${mes(ate)}`
+      : `${mes(de)}–${mes(ate)}`;
+  }
+  return de === ate ? toBr(de) : `${toBr(de)} a ${toBr(ate)}`;
+};
+
+/** 2. Inadimplencia (empresa/loja, 26/11): segue o filtro de datas -- das
+ * parcelas que venceram no periodo, quanto segue sem pagar hoje. Tracinho:
+ * os ultimos 12 meses (o numero da aba Inadimplencia). */
 export const CardInadimplencia: React.FC<{
   r: Resumo;
-  /** % no fim do mes passado (RPC); null/undefined = sem tracinho. */
-  mesPassado?: number | null;
-  /** Recuperacao do mes das lojas do recorte (RPC); undefined = carregando,
-   * null = sem dado. 26/11: o Resumo nao mostrava a recuperacao da empresa. */
-  recuperacao?: { pct: number; recuperado: number; base: number } | null;
   onVerMesAMes?: () => void;
-}> = ({ r, mesPassado, recuperacao, onVerMesAMes }) => {
+}> = ({ r, onVerMesAMes }) => {
   const i = r.inadimplencia;
+  const rec = r.recuperacao && r.recuperacao.base > 0.01 ? r.recuperacao : null;
+  const periodo = r.recuperacao
+    ? rotuloPeriodo(r.recuperacao.de, r.recuperacao.ate, r.hoje)
+    : undefined;
   return (
     <CardSimples
       icon={AlertTriangle}
       titulo="Inadimplência"
       tema="red"
+      etiqueta={periodo}
       numero={formatarInadimplencia(i.pct, i.venceu)}
-      frase="do que venceu não foi pago"
+      frase={
+        i.venceu > 0
+          ? "do que venceu no período não foi pago"
+          : "nada venceu no período (3+ dias)"
+      }
       extra={
         <BarraReferencia
-          pct={i.pct}
+          pct={i.venceu > 0 ? i.pct : 0}
           escala={100}
-          referencia={mesPassado}
-          rotulo="mês passado"
+          referencia={r.inadimplencia12mPct}
+          rotulo="12 meses"
           cor="bg-red-500"
         />
       }
@@ -835,54 +852,58 @@ export const CardInadimplencia: React.FC<{
         },
         {
           valor: fmtValorCurto(i.venceu),
-          rotulo: "venceu em 12 meses",
+          rotulo: "venceu no período",
           tom: "gray",
           hint: fmtValor(i.venceu),
         },
-        ...(recuperacao !== null
+        ...(rec
           ? [
               {
-                valor: recuperacao ? formatarPct(recuperacao.pct) : "…",
-                loading: !recuperacao,
-                rotulo: "recuperação no mês",
+                valor: formatarPct(rec.pct),
+                rotulo: "recuperação",
                 tom: "green" as const,
-                hint: recuperacao
-                  ? `${fmtValor(recuperacao.recuperado)} pagos de ${fmtValor(recuperacao.base)} que estavam em atraso no início do mês (empresa inteira)`
-                  : undefined,
+                hint: `${fmtValor(rec.recuperado)} pagos de ${fmtValor(rec.base)} que estavam em atraso antes do período`,
               },
             ]
           : []),
       ]}
       info={
-        recuperacao ? (
-          <>
-            <strong>Recuperação</strong>: do atraso de antes do mês, quanto foi
-            pago no mês. Aqui é a <strong>empresa inteira</strong>; nos
-            cobradores, só a carteira deles.
-          </>
-        ) : undefined
+        <>
+          Conta só as parcelas que <strong>venceram no período</strong> do
+          filtro. O tracinho é o dos <strong>últimos 12 meses</strong>.{" "}
+          <strong>Recuperação</strong>: do atraso de antes do período, quanto
+          foi pago nele.
+        </>
       }
       detalhes={[
         {
           label: "Sem pagar",
           value: fmtValor(i.naoPago),
-          hint: `Atraso de ${INADIMPLENCIA_A_PARTIR_DIAS} dias ou mais, de parcelas que venceram nos últimos 12 meses`,
+          hint: `Atraso de ${INADIMPLENCIA_A_PARTIR_DIAS} dias ou mais, de parcelas que venceram no período`,
         },
-        { label: "Venceu em 12 meses", value: fmtValor(i.venceu) },
+        { label: "Venceu no período", value: fmtValor(i.venceu) },
         {
           label: `Atrasado há menos de ${INADIMPLENCIA_A_PARTIR_DIAS} dias`,
           value: fmtValor(i.atrasoRecente),
           hint: "Ainda não conta como inadimplência",
         },
-        ...(recuperacao
+        ...(r.inadimplencia12mPct != null
           ? [
               {
-                label: "Recuperado no mês",
-                value: fmtValor(recuperacao.recuperado),
+                label: "Inadimplência dos últimos 12 meses",
+                value: formatarPct(r.inadimplencia12mPct),
+              },
+            ]
+          : []),
+        ...(rec
+          ? [
+              {
+                label: "Recuperado no período",
+                value: fmtValor(rec.recuperado),
               },
               {
-                label: "Em atraso no início do mês",
-                value: fmtValor(recuperacao.base),
+                label: "Em atraso antes do período",
+                value: fmtValor(rec.base),
               },
             ]
           : []),
@@ -894,45 +915,42 @@ export const CardInadimplencia: React.FC<{
   );
 };
 
-/** Numeros do card Recuperacao (RPC inadimplencia_historico). */
-export interface DadosRecuperacao {
-  pct: number;
-  recuperado: number;
-  base: number;
-  mesPassado: number | null;
-  /** "nov/26 até hoje" */
-  mes: string;
-}
-
-/** 2. Recuperacao (cobradores, 26/11): do atraso que vinha de antes do mes,
- * quanto voltou. */
+/** 2. Recuperacao (cobradores, 26/11): do atraso que vinha de antes do
+ * periodo do filtro, quanto voltou nele. Tracinho: periodo anterior do
+ * mesmo tamanho. A inadimplencia da carteira fica secundaria: a carteira so
+ * recebe cliente atrasado, entao ela sai alta e nao mede o trabalho. */
 export const CardRecuperacao: React.FC<{
-  d: DadosRecuperacao | null;
-  /** Inadimplencia da carteira (espelho do card da empresa, 26/11): la o
-   * card grande e a inadimplencia com a recuperacao dentro; aqui o
-   * contrario. A carteira so recebe cliente atrasado, entao esse % sai
-   * alto e nao mede o trabalho do cobrador -- por isso fica secundario. */
-  inad?: { pct: number; venceu: number; naoPago: number };
+  r: Resumo;
   onVerMesAMes?: () => void;
-}> = ({ d, inad, onVerMesAMes }) => {
+}> = ({ r, onVerMesAMes }) => {
+  const d = r.recuperacao && r.recuperacao.base > 0.01 ? r.recuperacao : null;
+  const inad = r.inadimplencia;
+  const ant = r.recuperacaoAnteriorPct;
   const escala = d
-    ? Math.max(10, Math.ceil(Math.max(d.pct, d.mesPassado ?? 0) / 10) * 10)
+    ? Math.max(10, Math.ceil(Math.max(d.pct, ant ?? 0) / 10) * 10)
     : 10;
   return (
     <CardSimples
       icon={RotateCcw}
       titulo="Recuperação"
       tema="green"
-      etiqueta={d?.mes}
-      numero={d ? formatarPct(d.pct) : "…"}
-      numeroLoading={!d}
-      frase="do atraso da carteira foi pago no mês"
+      etiqueta={
+        r.recuperacao
+          ? rotuloPeriodo(r.recuperacao.de, r.recuperacao.ate, r.hoje)
+          : undefined
+      }
+      numero={d ? formatarPct(d.pct) : "—"}
+      frase={
+        d
+          ? "do atraso da carteira foi pago"
+          : "sem atraso antes do período"
+      }
       info={
         <>
+          Do atraso de <strong>antes do período</strong>, quanto foi pago nele.
           Só a <strong>carteira dos cobradores</strong>; na empresa entra todo
-          mundo, por isso o % muda.
-          {inad &&
-            " A inadimplência da carteira é alta porque só entra cliente atrasado."}
+          mundo, por isso o % muda. O tracinho é o período anterior, do mesmo
+          tamanho.
         </>
       }
       extra={
@@ -940,8 +958,8 @@ export const CardRecuperacao: React.FC<{
           <BarraReferencia
             pct={d.pct}
             escala={escala}
-            referencia={d.mesPassado}
-            rotulo="mês passado"
+            referencia={ant}
+            rotulo="período anterior"
             cor="bg-green-500"
           />
         ) : undefined
@@ -951,26 +969,22 @@ export const CardRecuperacao: React.FC<{
           ? [
               {
                 valor: fmtValorCurto(d.recuperado),
-                rotulo: "recuperados no mês",
+                rotulo: "recuperados",
                 tom: "green",
                 hint: fmtValor(d.recuperado),
               },
               {
                 valor: fmtValorCurto(d.base),
-                rotulo: "em atraso no início",
+                rotulo: "em atraso antes",
                 tom: "gray",
                 hint: fmtValor(d.base),
               },
-              ...(inad
-                ? [
-                    {
-                      valor: formatarInadimplencia(inad.pct, inad.venceu),
-                      rotulo: "inadimplência",
-                      tom: "gray" as const,
-                      hint: `${fmtValor(inad.naoPago)} sem pagar de ${fmtValor(inad.venceu)} que venceram em 12 meses (só a carteira). Alta porque a carteira só recebe cliente atrasado.`,
-                    },
-                  ]
-                : []),
+              {
+                valor: formatarInadimplencia(inad.pct, inad.venceu),
+                rotulo: "inadimplência",
+                tom: "gray" as const,
+                hint: `${fmtValor(inad.naoPago)} sem pagar de ${fmtValor(inad.venceu)} que venceram no período (só a carteira). Alta porque a carteira só recebe cliente atrasado.`,
+              },
             ]
           : []
       }
@@ -1047,39 +1061,6 @@ const ResumoEmpresa: React.FC<{
     ],
   );
 
-  // Tracinho "mes passado" do card Inadimplencia: fim do mes passado das
-  // lojas do filtro (guardado no banco, mesma regra).
-  const mesPassadoLojas = useMesPassadoPorLoja(today.slice(0, 7), aberta);
-  const inadMesPassado = useMemo(() => {
-    if (!mesPassadoLojas) return null;
-    const p = somarPontos(
-      [...mesPassadoLojas.entries()]
-        .filter(([loja]) => !lojasExcluidas.has(loja))
-        .map(([, ponto]) => ponto),
-    );
-    return p && p.venceu > 0 ? pctInadimplencia(p) : null;
-  }, [mesPassadoLojas, lojasExcluidas]);
-
-  // Recuperacao do mes da empresa (lojas do filtro), mesma conta da aba
-  // Inadimplencia. Uma consulta por loja (calculada na hora para o mes
-  // atual, cache de tela) serve qualquer filtro de loja.
-  const mesAtualLojas = usePontoPorLoja(today.slice(0, 7), aberta);
-  const recuperacaoEmpresa = useMemo(() => {
-    if (!mesAtualLojas) return undefined;
-    const p = somarPontos(
-      [...mesAtualLojas.entries()]
-        .filter(([loja]) => !lojasExcluidas.has(loja))
-        .map(([, ponto]) => ponto),
-    );
-    return p && p.atrasoInicioMes > 0
-      ? {
-          pct: pctRecuperacao(p),
-          recuperado: p.recuperadoMes,
-          base: p.atrasoInicioMes,
-        }
-      : null;
-  }, [mesAtualLojas, lojasExcluidas]);
-
   return (
     <div className="space-y-3">
       <div className="flex flex-col sm:flex-row sm:items-center gap-2">
@@ -1114,12 +1095,7 @@ const ResumoEmpresa: React.FC<{
       {aberta && (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
           <CardCarteira r={r} empresa />
-          <CardInadimplencia
-            r={r}
-            mesPassado={inadMesPassado}
-            recuperacao={recuperacaoEmpresa}
-            onVerMesAMes={onVerInadimplencia}
-          />
+          <CardInadimplencia r={r} onVerMesAMes={onVerInadimplencia} />
           <CardPrevisao r={r} />
           <CardRecebidoEmpresa
             r={r}

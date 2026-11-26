@@ -14,14 +14,6 @@ import {
   nivelInadimplencia,
 } from "../../filters/inadimplencia";
 import SortTh from "../common/SortTh";
-import {
-  useMesPassadoPorLoja,
-  usePontoPorLoja,
-} from "../../hooks/useInadimplenciaHistorico";
-import {
-  pctInadimplencia,
-  pctRecuperacao,
-} from "../../filters/inadimplenciaHistorico";
 import ModoVisualizacao, { Modo } from "../common/ModoVisualizacao";
 import QuemDeveLoja from "./QuemDeveLoja";
 import {
@@ -97,28 +89,6 @@ const ResumoPorLoja: React.FC<{
   const { collections, scheduledVisits, acordoAtivoOverdueMap, users } =
     useCollection();
   const [busca, setBusca] = useState("");
-  // Tracinho "mes passado" do card Inadimplencia (so no modo Cards).
-  const mesPassadoLojas = useMesPassadoPorLoja(
-    today.slice(0, 7),
-    modo === "cards",
-  );
-  const inadMesPassado = (loja: string): number | null => {
-    const p = mesPassadoLojas?.get(loja);
-    return p && p.venceu > 0 ? pctInadimplencia(p) : null;
-  };
-  // Recuperacao do mes de cada loja (26/11), mesma consulta da visao Geral.
-  const mesAtualLojas = usePontoPorLoja(today.slice(0, 7), modo === "cards");
-  const recuperacaoDaLoja = (loja: string) => {
-    if (!mesAtualLojas) return undefined;
-    const p = mesAtualLojas.get(loja);
-    return p && p.atrasoInicioMes > 0
-      ? {
-          pct: pctRecuperacao(p),
-          recuperado: p.recuperadoMes,
-          base: p.atrasoInicioMes,
-        }
-      : null;
-  };
   // Loja com o modal "Quem deve" aberto.
   const [quemDeve, setQuemDeve] = useState<string | null>(null);
   // Padrao: pior inadimplencia primeiro.
@@ -388,11 +358,7 @@ const ResumoPorLoja: React.FC<{
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <CardCarteira r={l.r} empresa />
-                  <CardInadimplencia
-                    r={l.r}
-                    mesPassado={inadMesPassado(l.loja)}
-                    recuperacao={recuperacaoDaLoja(l.loja)}
-                  />
+                  <CardInadimplencia r={l.r} />
                   <CardPrevisao r={l.r} />
                   <CardRecebidoEmpresa
                     r={l.r}

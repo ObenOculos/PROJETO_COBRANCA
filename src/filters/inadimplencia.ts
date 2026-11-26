@@ -24,6 +24,7 @@
 
 import { Collection } from "../types";
 import { calculateOverdueDays } from "../utils/formatters";
+import { addDiasStr } from "./periodo";
 
 export const INADIMPLENCIA_A_PARTIR_DIAS = 3;
 export const INADIMPLENCIA_CORTE_DIAS = INADIMPLENCIA_A_PARTIR_DIAS - 1;
@@ -47,6 +48,12 @@ export interface OpcoesInadimplencia {
   /** Dias de atraso de um vencimento. Padrao: calculateOverdueDays; telas
    * que somam a carteira inteira passam criarCalculoAtraso() (cache). */
   atrasoDias?: (vencimento: string | null | undefined) => number;
+  /** Recorte por vencimento (YYYY-MM-DD, inclusivo) do filtro de periodo da
+   * tela (26/11: "os dois acompanham o filtro"). Com ele a janela de 12
+   * meses nao vale: "das parcelas que venceram no periodo, quanto segue sem
+   * pagar hoje". */
+  vencimentoDe?: string;
+  vencimentoAte?: string;
 }
 
 const saldoAberto = (c: Collection) =>
@@ -60,15 +67,24 @@ export const inadimplenciaDe = (
     janelaDias = INADIMPLENCIA_JANELA_DIAS,
     corteDias = INADIMPLENCIA_CORTE_DIAS,
     atrasoDias = calculateOverdueDays,
+    vencimentoDe,
+    vencimentoAte,
   }: OpcoesInadimplencia = {},
 ): Inadimplencia => {
+  const recorte = !!(vencimentoDe || vencimentoAte);
   let venceu = 0;
   let naoPago = 0;
   let atrasoRecente = 0;
   titulos.forEach((c) => {
+    if (recorte) {
+      const v = c.data_vencimento?.slice(0, 10);
+      if (!v) return;
+      if (vencimentoDe && v < vencimentoDe) return;
+      if (vencimentoAte && v > vencimentoAte) return;
+    }
     const atraso = atrasoDias(c.data_vencimento);
     if (atraso <= 0) return;
-    if (janelaDias != null && atraso > janelaDias) return;
+    if (!recorte && janelaDias != null && atraso > janelaDias) return;
     const aberto = saldoAberto(c);
     if (atraso <= corteDias) {
       if (aberto > 0.01) atrasoRecente += aberto;
@@ -83,6 +99,88 @@ export const inadimplenciaDe = (
     pct: venceu > 0 ? (naoPago / venceu) * 100 : 0,
     atrasoRecente,
   };
+};
+
+// ---------------------------------------------------------------------------
+// Recuperacao de um periodo (26/11: acompanha o filtro de datas da tela).
+//
+// MESMA regra da RPC (inadimplencia_calculo, migration 20261125000003), so
+// que com qualquer inicio em vez do 1o dia do mes:
+//   S = vespera do inicio; D = fim do periodo (no maximo hoje)
+//   aberto em X = original - desconto, se a baixa foi depois de X;
+//                 original - recebido - desconto, se nao ha data ou foi ate X
+//   base       = aberto em S das parcelas ja em atraso (>= 3 dias) em S
+//   recuperado = (aberto em S - aberto em D) dessas mesmas parcelas
+// Com o inicio no dia 1 e o fim hoje, da o mesmo numero da aba
+// Inadimplencia (recuperacao do mes). Atraso de qualquer idade (decisao
+// 25/11). Fora da cobranca ja chega fora da base (isForaDaCobranca).
+// ---------------------------------------------------------------------------
+
+export interface Recuperacao {
+  /** Saldo em atraso na vespera do inicio. */
+  base: number;
+  /** Quanto desse saldo foi pago ate o fim do periodo. */
+  recuperado: number;
+  /** recuperado / base * 100 (0 sem base). */
+  pct: number;
+  /** Periodo efetivo (fim limitado a hoje). */
+  de: string;
+  ate: string;
+}
+
+/** Dias corridos de `de` ate `ate` (YYYY-MM-DD; sem fuso). */
+const diasEntre = (de: string, ate: string): number => {
+  const utc = (s: string) => {
+    const [y, m, d] = s.split("-").map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  return Math.round((utc(ate) - utc(de)) / 86400000);
+};
+
+/** Recuperacao do periodo [de, ate]; null quando o periodo ainda nao
+ * comecou (de > hoje). */
+export const recuperacaoDe = (
+  titulos: Collection[],
+  de: string,
+  ate: string,
+  hoje: string,
+): Recuperacao | null => {
+  const fim = ate < hoje ? ate : hoje;
+  if (!de || de > fim) return null;
+  const vespera = addDiasStr(de, -1);
+  const venceuAte = addDiasStr(vespera, -INADIMPLENCIA_A_PARTIR_DIAS);
+  let base = 0;
+  let recuperado = 0;
+  titulos.forEach((c) => {
+    const v = c.data_vencimento?.slice(0, 10);
+    if (!v || v > venceuAte) return;
+    const original = Number(c.valor_original || 0);
+    const desconto = Number(c.desconto || 0);
+    const cheio = original - desconto;
+    const resto = Math.max(original - Number(c.valor_recebido || 0) - desconto, 0);
+    const pago = c.data_de_recebimento?.slice(0, 10) || null;
+    const abertoS = !pago || pago <= vespera ? resto : cheio;
+    const abertoD = !pago || pago <= fim ? resto : cheio;
+    base += abertoS;
+    recuperado += abertoS - abertoD;
+  });
+  return {
+    base,
+    recuperado,
+    pct: base > 0.01 ? (recuperado / base) * 100 : 0,
+    de,
+    ate: fim,
+  };
+};
+
+/** Periodo anterior do mesmo tamanho (para a referencia na barra): termina
+ * na vespera do inicio e tem os mesmos dias corridos do periodo efetivo. */
+export const periodoAnterior = (
+  de: string,
+  ateEfetivo: string,
+): { de: string; ate: string } => {
+  const dias = diasEntre(de, ateEfetivo) + 1;
+  return { de: addDiasStr(de, -dias), ate: addDiasStr(de, -1) };
 };
 
 /**

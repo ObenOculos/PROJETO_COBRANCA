@@ -1,5 +1,4 @@
 import React, {
-  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -39,17 +38,7 @@ import ResumoEmpresa, {
   CardPrevisao,
   CardRecuperacao,
   CardSimples,
-  DadosRecuperacao,
 } from "./ResumoEmpresa";
-import {
-  somarPontos,
-  useHistorico,
-} from "../../hooks/useInadimplenciaHistorico";
-import {
-  pctRecuperacao,
-  rotuloMes,
-  somarMeses,
-} from "../../filters/inadimplenciaHistorico";
 import {
   resumoEmpresa,
   ResumoEmpresa as ResumoClientes,
@@ -613,7 +602,11 @@ const CollectorsSummary: React.FC<{
         const myCollections = collections.filter(
           (c) => c.user_id === collector.id,
         );
-        const inad = inadimplenciaDe(myCollections);
+        // Segue o filtro de datas, como o card (26/11).
+        const inad = inadimplenciaDe(myCollections, {
+          vencimentoDe: dateFrom,
+          vencimentoAte: dateTo,
+        });
 
         const clientesCarteiraSet = new Set<string>();
         // Cliente com pelo menos 1 titulo vencido (dentro do periodo) entra
@@ -821,44 +814,6 @@ const CollectorsSummary: React.FC<{
     estornados,
     acionados,
   ]);
-
-  // Card Recuperacao dos cobradores (gestor, 26/11): mes do fim do periodo
-  // (no maximo o mes atual) x mes anterior, da RPC por cobrador. A mesma
-  // consulta serve a visao geral e cada cobrador.
-  const mesRecuperacao = (dateTo < today ? dateTo : today).slice(0, 7);
-  const recPorCobrador = useHistorico(
-    somarMeses(mesRecuperacao, -1),
-    mesRecuperacao,
-    null,
-    "cobrador",
-    aba === "geral" || aba === "cobrador",
-  );
-  const recuperacaoDe = useCallback(
-    (ids: string[]): DadosRecuperacao | null => {
-      if (!recPorCobrador.dados) return null;
-      const set = new Set(ids);
-      const dias = [...new Set(recPorCobrador.dados.map((p) => p.dia))].sort();
-      const doDia = (dia: string | undefined) =>
-        somarPontos(
-          recPorCobrador.dados!.filter(
-            (p) => p.dia === dia && p.chave != null && set.has(p.chave),
-          ),
-        );
-      const ult = dias[dias.length - 1];
-      const atual = doDia(ult);
-      const ant = dias.length > 1 ? doDia(dias[dias.length - 2]) : null;
-      if (!atual) return null;
-      return {
-        pct: pctRecuperacao(atual),
-        recuperado: atual.recuperadoMes,
-        base: atual.atrasoInicioMes,
-        mesPassado: ant && ant.atrasoInicioMes > 0 ? pctRecuperacao(ant) : null,
-        mes:
-          ult === today ? `${rotuloMes(ult)} até hoje` : rotuloMes(ult),
-      };
-    },
-    [recPorCobrador.dados, today],
-  );
 
   // Secao dos cobradores somada: a MESMA conta do painel Empresa sobre os
   // titulos dos cobradores marcados (cliente com 2 cobradores conta 1 vez).
@@ -1415,8 +1370,7 @@ const CollectorsSummary: React.FC<{
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
               <CardCarteira r={resumoCobradores} />
               <CardRecuperacao
-                d={recuperacaoDe(rows.map((r) => r.id))}
-                inad={resumoCobradores.inadimplencia}
+                r={resumoCobradores}
                 onVerMesAMes={() => setAba("inadimplencia")}
               />
               <CardPrevisao r={resumoCobradores} />
@@ -1548,10 +1502,7 @@ const CollectorsSummary: React.FC<{
                           : []
                       }
                     />
-                    <CardRecuperacao
-                      d={recuperacaoDe([row.id])}
-                      inad={row.resumo.inadimplencia}
-                    />
+                    <CardRecuperacao r={row.resumo} />
                     <CardPrevisao r={row.resumo} />
                     <CardDesempenho
                       r={row.resumo}
