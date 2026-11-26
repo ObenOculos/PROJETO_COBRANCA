@@ -272,8 +272,14 @@ const Diferenca: React.FC<{ valor: number }> = ({ valor }) => {
 };
 
 const ConferenciaRecebimentos: React.FC = () => {
-  const { users, getClientGroups, clientesRegistry, salePayments } =
-    useCollection();
+  const {
+    users,
+    getClientGroups,
+    clientesRegistry,
+    salePayments,
+    requestCollections,
+    ensureSettledCollections,
+  } = useCollection();
   /** Código do cliente no Ciclone (cadastro), quando houver. */
   const codigoDe = (documento: string): string =>
     clientesRegistry.get(documento)?.codigo_cliente_erp?.trim() ?? "";
@@ -839,11 +845,24 @@ const ConferenciaRecebimentos: React.FC = () => {
     };
   };
 
-  // Ficha do cliente pelo documento; null se o cliente nao esta carregado.
-  const fichaDe = (documento: string): (() => void) | null => {
-    const grupo = getClientGroups().find((g) => g.document === documento);
-    return grupo ? () => setFicha(grupo) : null;
+  // Ficha do cliente pelo documento. A aba nao baixa a base inteira de
+  // titulos (26/11): o clique pede a carga completa (inclusive quitados --
+  // sem eles a Ficha sai incompleta) e a Ficha abre quando ela termina. Se
+  // ja estiver carregada, a promessa resolve na hora.
+  const [fichaPendente, setFichaPendente] = useState<string | null>(null);
+  const [baseCompleta, setBaseCompleta] = useState(false);
+  const fichaDe = (documento: string): (() => void) => () => {
+    setFichaPendente(documento);
+    void requestCollections()
+      .then(() => ensureSettledCollections())
+      .then(() => setBaseCompleta(true));
   };
+  useEffect(() => {
+    if (!fichaPendente || !baseCompleta) return;
+    const grupo = getClientGroups().find((g) => g.document === fichaPendente);
+    if (grupo) setFicha(grupo);
+    setFichaPendente(null);
+  }, [fichaPendente, baseCompleta, getClientGroups]);
 
   const pendenciasTotal = grupos.reduce((s, g) => s + g.pendencias, 0);
   const situacoesDoGrupo =
@@ -1402,6 +1421,7 @@ const ConferenciaRecebimentos: React.FC = () => {
                                 fim={limitesDoMes(mes).fim}
                                 nomePorId={nomePorId}
                                 onAbrirFicha={fichaDe(c.documento)}
+                                abrindoFicha={fichaPendente === c.documento}
                                 baseValor={c.baseValor}
                                 appValor={c.appValor}
                                 marcacoes={

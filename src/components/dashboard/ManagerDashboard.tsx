@@ -298,7 +298,11 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
       activeTab === "collectors-summary" &&
       summaryView === "resumo" &&
       resumoAba === "inadimplencia"
-    );
+    ) &&
+    // A Conferencia de recebimentos tem RPC propria (conferencia_recebimentos):
+    // a base inteira so servia para abrir a Ficha, que agora carrega sob
+    // demanda (26/11 -- antes cada entrada na aba baixava todos os titulos).
+    !(activeTab === "collectors-summary" && summaryView === "conferencia");
   const needsFullScope =
     tabNeedsFullScope ||
     (activeTab === "collections" &&

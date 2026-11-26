@@ -74,6 +74,8 @@ interface Props {
   fim: string;
   nomePorId: Map<string, string>;
   onAbrirFicha: (() => void) | null;
+  /** A Ficha esta sendo carregada (a aba nao baixa a base inteira). */
+  abrindoFicha?: boolean;
   // Etapa D: marcacao do gestor (valores da linha, historico do mes, gravar).
   baseValor: number;
   appValor: number;
@@ -263,6 +265,7 @@ const ConferenciaDetalhe: React.FC<Props> = ({
   fim,
   nomePorId,
   onAbrirFicha,
+  abrindoFicha = false,
   baseValor,
   appValor,
   marcacoes,
@@ -747,10 +750,11 @@ const ConferenciaDetalhe: React.FC<Props> = ({
         {onAbrirFicha ? (
           <button
             onClick={onAbrirFicha}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-dark-border px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
+            disabled={abrindoFicha}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-dark-border px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20 disabled:opacity-60 disabled:cursor-wait"
           >
             <ExternalLink className="h-3.5 w-3.5" />
-            Abrir ficha do cliente
+            {abrindoFicha ? "Carregando a ficha…" : "Abrir ficha do cliente"}
           </button>
         ) : (
           <span className="text-[11px] text-gray-400 dark:text-dark-text-secondary">
