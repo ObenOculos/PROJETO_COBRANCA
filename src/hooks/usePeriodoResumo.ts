@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   PERIODO_PRESETS,
   PeriodoPreset,
@@ -48,7 +48,7 @@ const ler = (today: string): Salvo => {
       const key = s.preset as PeriodoPreset;
       return { preset: key, ...periodoDoPreset(key, today) };
     }
-    if (s.de && s.ate && DATA.test(s.de) && DATA.test(s.ate)) {
+    if (s.de && s.ate && DATA.test(s.de) && DATA.test(s.ate) && s.de <= s.ate) {
       return { preset: "", de: s.de, ate: s.ate };
     }
   } catch {
@@ -67,16 +67,31 @@ const salvar = (s: Salvo) => {
 
 export function usePeriodoResumo(today: string): PeriodoResumo {
   const [estado, setEstado] = useState<Salvo>(() => ler(today));
-  const mudar = (novo: Salvo) => {
-    setEstado(novo);
-    salvar(novo);
-  };
+  useEffect(() => {
+    salvar(estado);
+  }, [estado]);
+  // Sempre a partir do estado MAIS RECENTE (26/11): com o Resumo ainda
+  // recalculando a mudanca do "De", o "Ate" aplicado em seguida usava a
+  // copia antiga e devolvia o "De" anterior.
   return {
     dateFrom: estado.de,
     dateTo: estado.ate,
     preset: estado.preset,
-    aplicarPreset: (key) => mudar({ preset: key, ...periodoDoPreset(key, today) }),
-    mudarDe: (valor) => mudar({ preset: "", de: valor, ate: estado.ate }),
-    mudarAte: (valor) => mudar({ preset: "", de: estado.de, ate: valor }),
+    aplicarPreset: (key) =>
+      setEstado({ preset: key, ...periodoDoPreset(key, today) }),
+    // "De" depois do "Ate" (ou o contrario) dava um periodo vazio: o outro
+    // campo acompanha.
+    mudarDe: (valor) =>
+      setEstado((atual) => ({
+        preset: "",
+        de: valor,
+        ate: atual.ate < valor ? valor : atual.ate,
+      })),
+    mudarAte: (valor) =>
+      setEstado((atual) => ({
+        preset: "",
+        de: atual.de > valor ? valor : atual.de,
+        ate: valor,
+      })),
   };
 }
