@@ -30,10 +30,12 @@ import { PERIODO_TUDO_ATE } from "../../filters/periodo";
 import {
   formatarPct,
   pctInadimplencia,
+  pctRecuperacao,
 } from "../../filters/inadimplenciaHistorico";
 import {
   somarPontos,
   useMesPassadoPorLoja,
+  usePontoPorLoja,
 } from "../../hooks/useInadimplenciaHistorico";
 import { formatCurrency } from "../../utils/formatters";
 
@@ -757,8 +759,11 @@ export const CardInadimplencia: React.FC<{
   r: Resumo;
   /** % no fim do mes passado (RPC); null/undefined = sem tracinho. */
   mesPassado?: number | null;
+  /** Recuperacao do mes das lojas do recorte (RPC); undefined = carregando,
+   * null = sem dado. 26/11: o Resumo nao mostrava a recuperacao da empresa. */
+  recuperacao?: { pct: number; recuperado: number; base: number } | null;
   onVerMesAMes?: () => void;
-}> = ({ r, mesPassado, onVerMesAMes }) => {
+}> = ({ r, mesPassado, recuperacao, onVerMesAMes }) => {
   const i = r.inadimplencia;
   return (
     <CardSimples
@@ -789,7 +794,33 @@ export const CardInadimplencia: React.FC<{
           tom: "gray",
           hint: fmtValor(i.venceu),
         },
+        ...(recuperacao !== null
+          ? [
+              {
+                valor: recuperacao ? formatarPct(recuperacao.pct) : "…",
+                loading: !recuperacao,
+                rotulo: "recuperação no mês",
+                tom: "green" as const,
+                hint: recuperacao
+                  ? `${fmtValor(recuperacao.recuperado)} pagos de ${fmtValor(recuperacao.base)} que estavam em atraso no início do mês (empresa inteira)`
+                  : undefined,
+              },
+            ]
+          : []),
       ]}
+      detalhesExtra={
+        recuperacao ? (
+          <p className="pt-1 text-[11px] leading-snug text-gray-500 dark:text-dark-text-secondary">
+            <strong className="font-semibold text-gray-700 dark:text-dark-text">
+              Recuperação
+            </strong>
+            : do atraso que vinha de antes do mês, quanto foi pago no mês. Aqui
+            é a <strong>empresa inteira</strong> (inclui clientes sem cobrador);
+            na parte dos cobradores conta só a carteira deles, por isso o
+            número muda.
+          </p>
+        ) : undefined
+      }
       detalhes={[
         {
           label: "Sem pagar",
@@ -802,6 +833,18 @@ export const CardInadimplencia: React.FC<{
           value: fmtValor(i.atrasoRecente),
           hint: "Ainda não conta como inadimplência",
         },
+        ...(recuperacao
+          ? [
+              {
+                label: "Recuperado no mês",
+                value: fmtValor(recuperacao.recuperado),
+              },
+              {
+                label: "Em atraso no início do mês",
+                value: fmtValor(recuperacao.base),
+              },
+            ]
+          : []),
       ]}
       acao={
         onVerMesAMes ? { rotulo: "mês a mês", onClick: onVerMesAMes } : undefined
@@ -837,7 +880,14 @@ export const CardRecuperacao: React.FC<{
       etiqueta={d?.mes}
       numero={d ? formatarPct(d.pct) : "…"}
       numeroLoading={!d}
-      frase="do atraso foi pago no mês"
+      frase="do atraso da carteira foi pago no mês"
+      detalhesExtra={
+        <p className="text-[11px] leading-snug text-gray-500 dark:text-dark-text-secondary">
+          Conta <strong>só os clientes na carteira dos cobradores</strong>. Na
+          visão da empresa e na aba Inadimplência entra a empresa inteira
+          (inclusive clientes sem cobrador), por isso o número muda.
+        </p>
+      }
       extra={
         d ? (
           <BarraReferencia
@@ -953,6 +1003,26 @@ const ResumoEmpresa: React.FC<{
     return p && p.venceu > 0 ? pctInadimplencia(p) : null;
   }, [mesPassadoLojas, lojasExcluidas]);
 
+  // Recuperacao do mes da empresa (lojas do filtro), mesma conta da aba
+  // Inadimplencia. Uma consulta por loja (calculada na hora para o mes
+  // atual, cache de tela) serve qualquer filtro de loja.
+  const mesAtualLojas = usePontoPorLoja(today.slice(0, 7), aberta);
+  const recuperacaoEmpresa = useMemo(() => {
+    if (!mesAtualLojas) return undefined;
+    const p = somarPontos(
+      [...mesAtualLojas.entries()]
+        .filter(([loja]) => !lojasExcluidas.has(loja))
+        .map(([, ponto]) => ponto),
+    );
+    return p && p.atrasoInicioMes > 0
+      ? {
+          pct: pctRecuperacao(p),
+          recuperado: p.recuperadoMes,
+          base: p.atrasoInicioMes,
+        }
+      : null;
+  }, [mesAtualLojas, lojasExcluidas]);
+
   return (
     <div className="space-y-3">
       <div className="flex flex-col sm:flex-row sm:items-center gap-2">
@@ -990,6 +1060,7 @@ const ResumoEmpresa: React.FC<{
           <CardInadimplencia
             r={r}
             mesPassado={inadMesPassado}
+            recuperacao={recuperacaoEmpresa}
             onVerMesAMes={onVerInadimplencia}
           />
           <CardPrevisao r={r} />

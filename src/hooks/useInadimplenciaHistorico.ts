@@ -96,6 +96,24 @@ export const somarPontos = (
   }));
 };
 
+/** Um mes por loja (ultimo dia do mes; o mes atual vale ate hoje e e
+ * calculado na hora). Uma consulta serve todas as lojas: o filtro de loja
+ * soma no navegador. */
+export function usePontoPorLoja(
+  mes: string,
+  ativo = true,
+): Map<string, PontoInadimplencia> | null {
+  const { dados } = useHistorico(mes, mes, null, "loja", ativo);
+  return useMemo(() => {
+    if (!dados) return null;
+    const m = new Map<string, PontoInadimplencia>();
+    dados.forEach((p) => {
+      if (p.chave) m.set(p.chave, p);
+    });
+    return m;
+  }, [dados]);
+}
+
 /** Fim do mes passado por loja (guardado no banco: consulta pequena, sem
  * calculo). Para o tracinho "mes passado" dos cards do Resumo Geral. */
 export function useMesPassadoPorLoja(

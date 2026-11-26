@@ -548,6 +548,8 @@ const CardVisual: React.FC<{
   /** Setas do mes (undefined = seta apagada). */
   onMesAnterior?: () => void;
   onMesSeguinte?: () => void;
+  /** De quem e o numero, ao lado do titulo ("empresa inteira"). */
+  escopo?: string;
   /** Observacao curta no fim do "ver detalhes". */
   nota?: string;
   hint: string;
@@ -566,6 +568,7 @@ const CardVisual: React.FC<{
   mes,
   onMesAnterior,
   onMesSeguinte,
+  escopo,
   nota,
   hint,
 }) => {
@@ -581,6 +584,13 @@ const CardVisual: React.FC<{
       <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-600 dark:text-dark-text-secondary">
         <Icon className={`h-4 w-4 ${t.icone}`} />
         {titulo}
+        {/* 26/11: de quem e o numero (o Resumo dos cobradores conta so a
+            carteira deles e da outro %). */}
+        {escopo && (
+          <span className="text-xs font-normal text-gray-400 dark:text-dark-text-secondary">
+            · {escopo}
+          </span>
+        )}
         {/* 25/11: deixar claro de que mes e o numero (o "ate"); o "de" so
             muda a media e o grafico. */}
         {/* 25/11: setas para ver o mes passado (ou outro) sem mexer no
@@ -943,6 +953,8 @@ const AcompanhamentoInadimplencia: React.FC = () => {
   const totalRecuperado = serie.reduce((s2, p) => s2 + p.recuperadoMes, 0);
   const rotuloPonto = (p: PontoInadimplencia) =>
     p.dia === hoje ? "hoje" : rotuloMes(p.dia);
+  const escopoCards =
+    lojasExcluidas.size === 0 ? "empresa inteira" : "lojas do filtro";
   const mesDoCard = atual
     ? atual.dia === hoje
       ? `${rotuloMes(atual.dia)} até hoje`
@@ -1147,6 +1159,7 @@ const AcompanhamentoInadimplencia: React.FC = () => {
             <CardVisual
               icon={AlertTriangle}
               titulo="Inadimplência"
+              escopo={escopoCards}
               tema="red"
               carregando={carregando}
               pct={pctHoje}
@@ -1200,6 +1213,7 @@ const AcompanhamentoInadimplencia: React.FC = () => {
             <CardVisual
               icon={RotateCcw}
               titulo="Recuperação"
+              escopo={escopoCards}
               tema="green"
               carregando={carregando}
               pct={recHoje}
@@ -1234,7 +1248,7 @@ const AcompanhamentoInadimplencia: React.FC = () => {
               mes={mesDoCard}
               onMesAnterior={podeVoltar ? () => andarMes(-1) : undefined}
               onMesSeguinte={podeAvancar ? () => andarMes(1) : undefined}
-              nota={NOTA_RECUPERACAO}
+              nota={`${lojasExcluidas.size === 0 ? "Empresa inteira" : "Lojas do filtro"}, inclusive clientes sem cobrador (no Resumo Geral, a parte dos cobradores conta só a carteira deles, por isso o % muda). ${NOTA_RECUPERACAO}`}
               detalhes={detalhesRec}
               hint={`Do atraso que vinha de antes (${atual ? fmtValor(atual.atrasoInicioMes) : "—"}), foram pagos ${atual ? fmtValor(atual.recuperadoMes) : "—"} no mês. Média dos meses anteriores: ${formatarPct(mediaRec)}.`}
             />
