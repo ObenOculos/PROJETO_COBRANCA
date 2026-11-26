@@ -42,6 +42,7 @@ import { parseAndNormalizeDate, toYYYYMMDD } from "../filters/dates";
 import {
   PERIODO_PRESETS,
   PeriodoPreset,
+  dicaDoPreset,
   periodoDoPreset,
   presetDoPeriodo,
 } from "../filters/periodo";
@@ -1596,11 +1597,7 @@ export const ClientAssignment = React.memo(
                   key={p.key}
                   type="button"
                   onClick={() => togglePresetVencimento(p.key)}
-                  title={
-                    p.key === "week" || p.key === "month30"
-                      ? `Parcelas em aberto que vencem de hoje até daqui a ${p.key === "week" ? 7 : 30} dias`
-                      : undefined
-                  }
+                  title={`Parcelas em aberto que vencem em ${dicaDoPreset(p.key, todayLocalStr())}`}
                   className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
                     presetVencimento === p.key
                       ? "bg-blue-600 border-blue-600 text-white shadow-sm"

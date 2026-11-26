@@ -6,6 +6,7 @@ import React, {
 import {
   PERIODO_PRESETS,
   PeriodoPreset,
+  dicaDoPreset,
   fimDoMes,
   inicioDoMes,
   periodoDoPreset,
@@ -1235,6 +1236,7 @@ const CollectorsSummary: React.FC<{
               <button
                 key={preset.key}
                 onClick={() => applyPreset(preset.key)}
+                title={dicaDoPreset(preset.key, today)}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors touch-manipulation ${
                   activePreset === preset.key
                     ? "bg-blue-600 text-white"
