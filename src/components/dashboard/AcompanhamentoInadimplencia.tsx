@@ -23,6 +23,7 @@ import {
 import { formatCurrency } from "../../utils/formatters";
 import { todayLocalStr } from "../../config/visitStatus";
 import { InfoDica, Pilula } from "./ResumoEmpresa";
+import { PERIODO_TUDO_DE } from "../../filters/periodo";
 import { METRICA } from "../common/pilulaEstilo";
 import FiltroMultiplo from "../common/FiltroMultiplo";
 import {
@@ -532,6 +533,8 @@ const CardVisual: React.FC<{
   pct: number;
   /** Texto do numero grande no lugar do % (ex.: "—" sem base). */
   numeroTexto?: string;
+  /** Frase curta embaixo do numero (ex.: por que nao ha %). */
+  aviso?: string;
   /** Onde fica o tracinho, em %; null = sem tracinho. */
   referencia: number | null;
   rotuloReferencia: string;
@@ -559,6 +562,7 @@ const CardVisual: React.FC<{
   carregando,
   pct,
   numeroTexto,
+  aviso,
   referencia,
   rotuloReferencia,
   escala,
@@ -605,6 +609,11 @@ const CardVisual: React.FC<{
       >
         {carregando ? "…" : (numeroTexto ?? formatarPct(pct))}
       </div>
+      {!carregando && aviso && (
+        <div className="text-sm text-gray-500 dark:text-dark-text-secondary">
+          {aviso}
+        </div>
+      )}
       <div className="relative mt-2 mb-4">
         <div className="h-3 rounded-full bg-gray-300/70 dark:bg-dark-border overflow-hidden">
           {!carregando && (
@@ -767,6 +776,8 @@ const AcompanhamentoInadimplencia: React.FC<{
   // periodo (tracinho: periodo anterior do mesmo tamanho). RPC
   // inadimplencia_periodo, mesma regra de filters/inadimplencia.
   const ateEfetivo = dateTo < today ? dateTo : today;
+  // "Tudo" comeca antes da 1a parcela: recuperacao sem base (26/11).
+  const periodoTudo = dateFrom <= PERIODO_TUDO_DE;
   const periodoAtual = useInadimplenciaPeriodo(dateFrom, dateTo, lojasFiltro);
   const antPeriodo =
     dateFrom && dateFrom <= ateEfetivo
@@ -1133,6 +1144,13 @@ const AcompanhamentoInadimplencia: React.FC<{
               carregando={carregandoPeriodo}
               pct={recPeriodo ?? 0}
               numeroTexto={recPeriodo == null ? "—" : undefined}
+              aviso={
+                pi && recPeriodo == null
+                  ? periodoTudo
+                    ? "não se aplica a Tudo"
+                    : "sem atraso antes do período"
+                  : undefined
+              }
               referencia={recAnterior}
               rotuloReferencia="período anterior"
               escala={escalaRecPeriodo}
@@ -1166,6 +1184,14 @@ const AcompanhamentoInadimplencia: React.FC<{
                     ? "a empresa inteira"
                     : "as lojas do filtro"}
                   , inclusive cliente sem cobrador e a dívida antiga (+1 ano).
+                  {periodoTudo && (
+                    <>
+                      {" "}
+                      Com <strong>Tudo</strong> não existe um "antes" (o período começa
+          antes da primeira parcela): escolha um período para ver a
+          recuperação.
+                    </>
+                  )}
                 </>
               }
             />

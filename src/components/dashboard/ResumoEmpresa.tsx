@@ -27,7 +27,7 @@ import {
   formatarInadimplencia,
   INADIMPLENCIA_A_PARTIR_DIAS,
 } from "../../filters/inadimplencia";
-import { PERIODO_TUDO_ATE } from "../../filters/periodo";
+import { PERIODO_TUDO_ATE, PERIODO_TUDO_DE } from "../../filters/periodo";
 import {
   formatarPct,
   rotuloPeriodo,
@@ -908,6 +908,8 @@ export const CardRecuperacao: React.FC<{
   onVerMesAMes?: () => void;
 }> = ({ r, onVerMesAMes }) => {
   const d = r.recuperacao && r.recuperacao.base > 0.01 ? r.recuperacao : null;
+  // "Tudo" comeca antes da 1a parcela: nao ha atraso "antes" (26/11).
+  const tudo = !!r.recuperacao && r.recuperacao.de <= PERIODO_TUDO_DE;
   const inad = r.inadimplencia;
   const ant = r.recuperacaoAnteriorPct;
   const escala = d
@@ -927,7 +929,9 @@ export const CardRecuperacao: React.FC<{
       frase={
         d
           ? "do atraso da carteira foi pago"
-          : "sem atraso antes do período"
+          : tudo
+            ? "não se aplica a Tudo"
+            : "sem atraso antes do período"
       }
       info={
         <>
@@ -935,6 +939,14 @@ export const CardRecuperacao: React.FC<{
           Só a <strong>carteira dos cobradores</strong>; na empresa entra todo
           mundo, por isso o % muda. O tracinho é o período anterior, do mesmo
           tamanho.
+          {tudo && (
+            <>
+              {" "}
+              Com <strong>Tudo</strong> não existe um "antes" (o período começa
+          antes da primeira parcela): escolha um período para ver a
+          recuperação.
+            </>
+          )}
         </>
       }
       extra={
