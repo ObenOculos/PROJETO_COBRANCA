@@ -7,6 +7,7 @@ import {
   Tag,
 } from "lucide-react";
 import SummaryCard from "../common/SummaryCard";
+import { gravarCacheTela, lerCacheTela } from "../../utils/cacheTela";
 import { SaldoAberto } from "../common/SaldoAberto";
 import { useCollection } from "../../contexts/CollectionContext";
 import { useAuth } from "../../contexts/AuthContext";
@@ -41,10 +42,15 @@ const ORDEM: GrupoCheque[] = [
   "sugestao",
 ];
 
+const CHAVE_CACHE_CHEQUES = "correcoes|cheques";
+
 const PainelCheques: React.FC = () => {
   const { users, getClientGroups, refreshCollections } = useCollection();
   const { user } = useAuth();
-  const [linhas, setLinhas] = useState<LinhaPainelCheque[] | null>(null);
+  // Cache de tela (26/11): voltar a aba mostra o ultimo carregado na hora.
+  const [linhas, setLinhas] = useState<LinhaPainelCheque[] | null>(
+    () => lerCacheTela<LinhaPainelCheque[]>(CHAVE_CACHE_CHEQUES)?.valor ?? null,
+  );
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [grupo, setGrupo] = useState<GrupoCheque>("cheque_conferir");
@@ -59,7 +65,9 @@ const PainelCheques: React.FC = () => {
   const carregar = useCallback(async () => {
     setErro(null);
     try {
-      setLinhas(await carregarPainelCheques());
+      const dados = await carregarPainelCheques();
+      setLinhas(dados);
+      gravarCacheTela(CHAVE_CACHE_CHEQUES, dados);
     } catch (e) {
       console.error("Erro ao carregar painel de cheques:", e);
       setErro(mensagemErroCheque(e));
@@ -68,6 +76,7 @@ const PainelCheques: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (lerCacheTela(CHAVE_CACHE_CHEQUES)?.fresco) return;
     void carregar();
   }, [carregar]);
 

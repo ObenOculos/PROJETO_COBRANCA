@@ -48,12 +48,30 @@ const AbaPedidosGestor: React.FC = () => {
       return "correcoes";
     }
   });
+  // Subabas ja abertas ficam montadas e so escondidas (26/11): trocar de
+  // subaba nao refaz a busca nem mostra "carregando" de novo. Cada uma ainda
+  // so carrega quando aparece pela primeira vez.
+  const [visitadas, setVisitadas] = useState<Set<Visao>>(
+    () => new Set([visao]),
+  );
+  const abrir = (v: Visao) => {
+    setVisao(v);
+    setVisitadas((s) => (s.has(v) ? s : new Set(s).add(v)));
+  };
+  const PAINEIS: Record<Visao, React.ReactNode> = {
+    correcoes: <PedidosCorrecao />,
+    loja: <PedidosAtribuicao />,
+    descontos: <PedidosDesconto />,
+    reincidentes: <CasosGestor />,
+    cheques: <PainelCheques />,
+    divergencias: <PainelDivergencias />,
+  };
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
       <div
         role="tablist"
-        className="inline-flex flex-wrap rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg-secondary p-1"
+        className="inline-flex flex-wrap gap-0.5 rounded-lg bg-gray-100 dark:bg-dark-bg p-0.5"
       >
         {VISOES.map((v) => (
           <button
@@ -61,11 +79,11 @@ const AbaPedidosGestor: React.FC = () => {
             type="button"
             role="tab"
             aria-selected={visao === v.key}
-            onClick={() => setVisao(v.key)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+            onClick={() => abrir(v.key)}
+            className={`px-3 py-1.5 rounded-md text-sm font-semibold transition-all touch-manipulation ${
               visao === v.key
-                ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900"
-                : "text-gray-600 hover:bg-gray-50 dark:text-dark-text-secondary dark:hover:bg-dark-bg"
+                ? "bg-white dark:bg-dark-bg-secondary text-blue-600 dark:text-blue-400 shadow-sm"
+                : "text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
             }`}
           >
             {v.label}
@@ -94,19 +112,11 @@ const AbaPedidosGestor: React.FC = () => {
           Conferência de recebimentos
         </button>
       </div>
-      {visao === "correcoes" ? (
-        <PedidosCorrecao />
-      ) : visao === "loja" ? (
-        <PedidosAtribuicao />
-      ) : visao === "descontos" ? (
-        <PedidosDesconto />
-      ) : visao === "cheques" ? (
-        <PainelCheques />
-      ) : visao === "divergencias" ? (
-        <PainelDivergencias />
-      ) : (
-        <CasosGestor />
-      )}
+      {VISOES.filter((v) => visitadas.has(v.key)).map((v) => (
+        <div key={v.key} className={visao === v.key ? "" : "hidden"}>
+          {PAINEIS[v.key]}
+        </div>
+      ))}
     </div>
   );
 };

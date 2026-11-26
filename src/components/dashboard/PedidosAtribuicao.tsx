@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { invalidarHistoricoCliente } from "../../utils/cacheHistoricoCliente";
+import { gravarCacheTela, lerCacheTela } from "../../utils/cacheTela";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -48,10 +49,22 @@ interface Lote {
   total: number;
 }
 
+const CHAVE_CACHE_LOJA = "correcoes|pagosNaLoja";
+type CacheLoja = {
+  lista: AtribuicaoPagamento[];
+  linhas: LinhaPainelAtribuicao[];
+};
+
 const PedidosAtribuicao: React.FC = () => {
   const { users } = useCollection();
-  const [pedidos, setPedidos] = useState<AtribuicaoPagamento[] | null>(null);
-  const [painel, setPainel] = useState<LinhaPainelAtribuicao[]>([]);
+  // Cache de tela (26/11): voltar a aba mostra o ultimo carregado na hora
+  // (o painel leva ~0,4-0,9 s no banco). Acao do gestor recarrega sempre.
+  const [pedidos, setPedidos] = useState<AtribuicaoPagamento[] | null>(
+    () => lerCacheTela<CacheLoja>(CHAVE_CACHE_LOJA)?.valor.lista ?? null,
+  );
+  const [painel, setPainel] = useState<LinhaPainelAtribuicao[]>(
+    () => lerCacheTela<CacheLoja>(CHAVE_CACHE_LOJA)?.valor.linhas ?? [],
+  );
   const [erro, setErro] = useState<string | null>(null);
   const [aberto, setAberto] = useState<string | null>(null);
   const [acao, setAcao] = useState<"aprovar" | "recusar">("aprovar");
@@ -81,6 +94,7 @@ const PedidosAtribuicao: React.FC = () => {
       ]);
       setPedidos(lista);
       setPainel(linhas);
+      gravarCacheTela<CacheLoja>(CHAVE_CACHE_LOJA, { lista, linhas });
     } catch (e) {
       console.error("Erro ao carregar pagos na loja:", e);
       setErro(e instanceof Error ? e.message : "Falha ao carregar.");
@@ -89,6 +103,7 @@ const PedidosAtribuicao: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (lerCacheTela(CHAVE_CACHE_LOJA)?.fresco) return;
     void carregar();
   }, [carregar]);
 
