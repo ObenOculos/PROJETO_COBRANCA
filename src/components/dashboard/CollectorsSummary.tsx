@@ -1247,7 +1247,6 @@ const CollectorsSummary: React.FC<{
   const linhaAtendimentos = (
     clientesAtendidos: number,
     clientesConversaram: number,
-    acionamentosQtd: number,
     visita = false,
   ) => {
     const t = atendimentoTexto(visita);
@@ -1258,12 +1257,9 @@ const CollectorsSummary: React.FC<{
         hint: atendimentosSub(clientesConversaram, visita),
         loading: atendimentos === null && !atendimentosErro,
       },
-      {
-        label: t.registros,
-        value: atendimentosValor(acionamentosQtd),
-        hint: t.registrosHint,
-        loading: atendimentos === null && !atendimentosErro,
-      },
+      // 26/11: saiu a linha "Acionamentos" -- contava um registro por
+      // PARCELA (contato com cliente de 9 parcelas = 9), ex.: 15 mil no mes
+      // para ~1,8 mil clientes. O usuario so quer a quantidade de clientes.
     ];
   };
 
@@ -1416,6 +1412,7 @@ const CollectorsSummary: React.FC<{
               <CardCarteira r={resumoCobradores} />
               <CardRecuperacao
                 d={recuperacaoDe(rows.map((r) => r.id))}
+                inad={resumoCobradores.inadimplencia}
                 onVerMesAMes={() => setAba("inadimplencia")}
               />
               <CardPrevisao r={resumoCobradores} />
@@ -1427,7 +1424,6 @@ const CollectorsSummary: React.FC<{
                 atendimentos={linhaAtendimentos(
                   totals.clientesAtendidos,
                   totals.clientesConversaram,
-                  totals.acionamentosQtd,
                   rows.length > 0 && rows.every((r) => ehExterno(r.type)),
                 )}
               />
@@ -1548,7 +1544,10 @@ const CollectorsSummary: React.FC<{
                           : []
                       }
                     />
-                    <CardRecuperacao d={recuperacaoDe([row.id])} />
+                    <CardRecuperacao
+                      d={recuperacaoDe([row.id])}
+                      inad={row.resumo.inadimplencia}
+                    />
                     <CardPrevisao r={row.resumo} />
                     <CardDesempenho
                       r={row.resumo}
@@ -1558,7 +1557,6 @@ const CollectorsSummary: React.FC<{
                       atendimentos={linhaAtendimentos(
                         row.clientesAtendidos,
                         row.clientesConversaram,
-                        row.acionamentosQtd,
                         ehExterno(row.type),
                       )}
                     />
@@ -1937,18 +1935,6 @@ const CollectorsSummary: React.FC<{
                               row.clientesConversaram,
                               ehExterno(row.type),
                             )}
-                          </div>
-                        )}
-                        {row.acionamentosQtd > 0 && (
-                          <div
-                            className="text-[10px] text-gray-400 dark:text-dark-text-secondary"
-                            title={
-                              atendimentoTexto(ehExterno(row.type))
-                                .registrosHint
-                            }
-                          >
-                            {atendimentosValor(row.acionamentosQtd)}{" "}
-                            {atendimentoTexto(ehExterno(row.type)).registrosMin}
                           </div>
                         )}
                       </td>

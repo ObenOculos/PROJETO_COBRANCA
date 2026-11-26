@@ -522,18 +522,18 @@ export const CardPrevisao: React.FC<{ r: Resumo }> = ({ r }) => {
           ? [
               {
                 label: "Parcelas que vencem",
-                value: fmtValor(p.parcelas),
-                hint: clientesTxt(p.parcelasClientes),
+                value: `${fmtValor(p.parcelas)} · ${clientesTxt(p.parcelasClientes)}`,
               },
               {
                 label: "Parcelas de acordo",
-                value: fmtValor(p.acordo),
-                hint: clientesTxt(p.acordoClientes),
+                value: `${fmtValor(p.acordo)} · ${clientesTxt(p.acordoClientes)}`,
               },
               {
+                // 26/11: a quantidade de clientes agendados so aparecia ao
+                // passar o mouse -- agora fica na linha.
                 label: "Agendados (valor vencido)",
-                value: fmtValor(p.agendados),
-                hint: `${clientesTxt(p.agendadosClientes)} em atraso com visita ou contato marcado`,
+                value: `${fmtValor(p.agendados)} · ${clientesTxt(p.agendadosClientes)}`,
+                hint: "Clientes em atraso com visita ou contato marcado; o valor é o vencido deles",
               },
             ]
           : []
@@ -869,8 +869,13 @@ export interface DadosRecuperacao {
  * quanto voltou. */
 export const CardRecuperacao: React.FC<{
   d: DadosRecuperacao | null;
+  /** Inadimplencia da carteira (espelho do card da empresa, 26/11): la o
+   * card grande e a inadimplencia com a recuperacao dentro; aqui o
+   * contrario. A carteira so recebe cliente atrasado, entao esse % sai
+   * alto e nao mede o trabalho do cobrador -- por isso fica secundario. */
+  inad?: { pct: number; venceu: number; naoPago: number };
   onVerMesAMes?: () => void;
-}> = ({ d, onVerMesAMes }) => {
+}> = ({ d, inad, onVerMesAMes }) => {
   const escala = d
     ? Math.max(10, Math.ceil(Math.max(d.pct, d.mesPassado ?? 0) / 10) * 10)
     : 10;
@@ -888,6 +893,14 @@ export const CardRecuperacao: React.FC<{
           Conta <strong>só os clientes na carteira dos cobradores</strong>. Na
           visão da empresa e na aba Inadimplência entra a empresa inteira
           (inclusive clientes sem cobrador), por isso o número muda.
+          {inad && (
+            <>
+              {" "}A <strong>inadimplência da carteira</strong> é maior que a
+              da empresa porque o cliente só entra na carteira quando já está
+              atrasado: ela mostra o tamanho do problema que o cobrador
+              recebeu, não o trabalho dele.
+            </>
+          )}
         </p>
       }
       extra={
@@ -916,6 +929,16 @@ export const CardRecuperacao: React.FC<{
                 tom: "gray",
                 hint: fmtValor(d.base),
               },
+              ...(inad
+                ? [
+                    {
+                      valor: formatarInadimplencia(inad.pct, inad.venceu),
+                      rotulo: "inadimplência da carteira",
+                      tom: "gray" as const,
+                      hint: `${fmtValor(inad.naoPago)} sem pagar de ${fmtValor(inad.venceu)} que venceram em 12 meses (só a carteira). Alta porque a carteira só recebe cliente atrasado.`,
+                    },
+                  ]
+                : []),
             ]
           : []
       }

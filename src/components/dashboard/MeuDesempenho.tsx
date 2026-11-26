@@ -498,12 +498,8 @@ const MeuDesempenho: React.FC<Props> = ({
                 hint: atendimentosHint(),
                 loading: atendimentos === null && !atendimentosErro,
               },
-              {
-                label: "Acionamentos",
-                value: atendimentosValor(meusAtendimentos?.tentativas),
-                hint: "Total de registros no período, sem deduplicar por cliente",
-                loading: atendimentos === null && !atendimentosErro,
-              },
+              // 26/11: sem "Acionamentos" (contava por parcela, nao por
+              // contato); vale a quantidade de clientes.
             ]}
           >
             <div className="flex items-center gap-1 mt-1 mb-0.5">
