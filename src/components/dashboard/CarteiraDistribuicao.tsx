@@ -137,6 +137,17 @@ const COLUNAS_COBERTURA: { ini: number; fim: number }[] = [
 ];
 const COLUNAS_VISIVEIS = 7;
 
+/** Leitura em anos das colunas acima de 1 ano (26/11, usuario: com muitos
+ * dias nao dava para saber quantos anos sao). As faixas sao anos inteiros
+ * (366-730 = 1 a 2 anos ... 1826+ = mais de 5 anos). null = ate 1 ano. */
+const anosDaColuna = (col: { ini: number; fim: number }): string | null => {
+  if (col.ini <= 365) return null;
+  const de = Math.floor((col.ini - 1) / 365);
+  return col.fim === Infinity
+    ? `${de}+ anos`
+    : `${de}–${Math.round(col.fim / 365)} anos`;
+};
+
 // Rodada automatica diaria (pg_cron 10:00 UTC = 7h, migration
 // 20261116000001): usa as regras salvas. "Aplicar" so adianta.
 const HORA_DISTRIBUICAO_AUTOMATICA = "7h";
@@ -2119,7 +2130,15 @@ const CarteiraDistribuicao: React.FC = () => {
                             </button>
                           )}
                         </div>
-                        <div className="font-normal text-[10px] text-gray-400">dias</div>
+                        <div className="font-normal text-[10px] text-gray-400">
+                          dias
+                          {anosDaColuna(col) && (
+                            <span className="text-gray-500 dark:text-dark-text-secondary">
+                              {" "}
+                              · {anosDaColuna(col)}
+                            </span>
+                          )}
+                        </div>
                       </th>
                     );
                   })}
