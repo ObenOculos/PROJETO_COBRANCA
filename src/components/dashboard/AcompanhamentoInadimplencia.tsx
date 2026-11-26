@@ -25,7 +25,7 @@ import {
 import { formatCurrency } from "../../utils/formatters";
 import { todayLocalStr } from "../../config/visitStatus";
 import { Pilula } from "./ResumoEmpresa";
-import { PILULA } from "../common/pilulaEstilo";
+import { METRICA } from "../common/pilulaEstilo";
 import FiltroMultiplo from "../common/FiltroMultiplo";
 import {
   INADIMPLENCIA_A_PARTIR_DIAS,
@@ -575,7 +575,7 @@ const CardVisual: React.FC<{
     `${Math.max(0, Math.min(100, (v / escala) * 100))}%`;
   return (
     <div
-      className={`min-w-0 rounded-xl border border-gray-200 border-t-4 ${t.faixa} dark:border-dark-border bg-gray-100 dark:bg-dark-bg px-4 py-3`}
+      className={`min-w-0 rounded-xl border-t-4 ${t.faixa} bg-gray-100 dark:bg-dark-bg px-4 pt-3 pb-2.5`}
       title={hint}
     >
       <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-600 dark:text-dark-text-secondary">
@@ -618,7 +618,7 @@ const CardVisual: React.FC<{
         )}
       </div>
       <div
-        className={`mt-1 text-4xl font-extrabold leading-tight ${t.numero} ${carregando ? "animate-pulse" : ""}`}
+        className={`mt-1 text-4xl font-extrabold leading-tight tracking-tight text-gray-900 dark:text-dark-text ${carregando ? "animate-pulse" : ""}`}
       >
         {carregando ? "…" : formatarPct(pct)}
       </div>
@@ -647,20 +647,20 @@ const CardVisual: React.FC<{
           </div>
         )}
       </div>
+      {/* Metricas secundarias em texto, sem caixa (26/11: hierarquia --
+          mesmo estilo dos cards do Resumo). */}
       {!carregando && pilulas.length > 0 && (
         <div
-          className={`grid gap-1 ${pilulas.length === 3 ? "grid-cols-3" : "grid-cols-2"}`}
+          className={`grid gap-x-3 gap-y-2 border-t border-gray-200 dark:border-dark-border/60 pt-2.5 ${pilulas.length === 3 ? "grid-cols-3" : "grid-cols-2"}`}
         >
           {pilulas.map((p) => (
-            <div
-              key={p.rotulo}
-              title={p.hint}
-              className={`min-w-0 rounded-md px-2 py-1 ${PILULA[p.tom]}`}
-            >
-              <div className="text-sm font-bold leading-tight truncate">
+            <div key={p.rotulo} title={p.hint} className="min-w-0">
+              <div
+                className={`text-base font-bold leading-tight truncate tabular-nums ${METRICA[p.tom]}`}
+              >
                 {p.valor}
               </div>
-              <div className="text-[10px] font-medium leading-tight truncate opacity-90">
+              <div className="text-[11px] leading-tight truncate text-gray-500 dark:text-dark-text-secondary">
                 {p.rotulo}
               </div>
             </div>
@@ -704,7 +704,7 @@ const CardVisual: React.FC<{
           <button
             type="button"
             onClick={() => setAberto((v) => !v)}
-            className="inline-flex items-center gap-0.5 text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400"
+            className="inline-flex items-center gap-0.5 text-xs font-medium text-gray-500 hover:text-gray-800 dark:text-dark-text-secondary dark:hover:text-dark-text"
           >
             {aberto ? "menos detalhes" : "ver detalhes"}
             {aberto ? (

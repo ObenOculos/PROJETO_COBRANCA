@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { SummaryCardRow } from "../common/SummaryCard";
 import FiltroMultiplo from "../common/FiltroMultiplo";
-import { PILULA, TomPilula } from "../common/pilulaEstilo";
+import { METRICA, TomPilula } from "../common/pilulaEstilo";
 import { useCollection } from "../../contexts/CollectionContext";
 import {
   resumoEmpresa,
@@ -164,21 +164,29 @@ export const CardSimples: React.FC<{
   const [aberto, setAberto] = useState(false);
   const lado = faixa && !faixaEmpilhada;
   const t = TEMA[tema];
-  const cols = faixa ? 4 : colunas;
   const temDetalhes = detalhes.length > 0 || !!detalhesExtra;
+  // Hierarquia (26/11): 1o o numero grande (tinta neutra -- a cor do
+  // assunto fica so no icone e na borda do topo); 2o a barra/partes; 3o as
+  // metricas secundarias, em texto sem caixa (cor so quando e alerta);
+  // 4o os links. Antes tudo tinha caixa, borda e cor e disputava atencao.
+  // 2 colunas no card normal (3 lado a lado cortava o rotulo); 4 so no
+  // card da largura toda.
+  const colsMetricas =
+    pilulas.length >= 4 && colunas === 4
+      ? "grid-cols-2 sm:grid-cols-4"
+      : "grid-cols-2";
   return (
     <div
-      className={`min-w-0 flex flex-col rounded-xl border border-gray-200 border-t-4 ${t.faixa} dark:border-dark-border bg-gray-100 dark:bg-dark-bg px-4 py-3`}
+      className={`min-w-0 flex flex-col rounded-xl border-t-4 ${t.faixa} bg-gray-100 dark:bg-dark-bg px-4 pt-3 pb-2.5`}
     >
-      {/* Faixa: quadrinhos com a mesma altura do bloco do numero (26/11). */}
-      <div className={lado ? "lg:flex lg:items-stretch lg:gap-6" : ""}>
+      <div className={lado ? "lg:flex lg:items-center lg:gap-8" : ""}>
         <div className={lado ? "lg:w-56 lg:shrink-0" : ""}>
           <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-600 dark:text-dark-text-secondary">
             <Icon className={`h-4 w-4 ${t.icone}`} />
             {titulo}
             {etiqueta && (
               <span
-                className="ml-auto inline-flex items-center gap-1 rounded-full bg-white dark:bg-dark-bg-secondary border border-gray-200 dark:border-dark-border px-2 py-0.5 text-[11px] font-semibold"
+                className="ml-auto inline-flex items-center gap-1 text-[11px] font-medium text-gray-500 dark:text-dark-text-secondary"
                 title="Mês do número grande"
               >
                 <CalendarRange className="h-3 w-3" />
@@ -188,50 +196,44 @@ export const CardSimples: React.FC<{
           </div>
           <div
             title={numeroHint}
-            className={`mt-1 text-3xl font-extrabold leading-tight truncate ${t.numero} ${numeroLoading ? "animate-pulse" : ""}`}
+            className={`mt-1 text-3xl font-extrabold leading-tight tracking-tight truncate text-gray-900 dark:text-dark-text ${numeroLoading ? "animate-pulse" : ""}`}
           >
             {numero}
           </div>
-          <div className="text-sm text-gray-700 dark:text-dark-text">
+          <div className="text-sm text-gray-500 dark:text-dark-text-secondary">
             {frase}
           </div>
         </div>
-        {extra}
+        {extra && <div className={lado ? "lg:flex-1 min-w-0" : ""}>{extra}</div>}
 
-      {pilulas.length > 0 && (
-        // Grade fixa de 2 colunas (25/11: etiquetas soltas quebravam em
-        // varias linhas e o card ficava alto). Numero em cima, rotulo
-        // embaixo; item impar no fim vira retangulo da largura toda.
-        <div
-          className={`mt-2 grid grid-cols-2 gap-1 ${cols === 4 ? (faixa && pilulas.length === 3 ? "sm:grid-cols-3" : "sm:grid-cols-4") : ""} ${lado ? "lg:mt-0 lg:flex-1" : ""}`}
-        >
-          {pilulas.map((p, i) => (
-            <div
-              key={p.rotulo}
-              title={p.hint}
-              onClick={p.onClick}
-              role={p.onClick ? "button" : undefined}
-              className={`min-w-0 rounded-md px-2 py-1 ${lado ? "lg:flex lg:flex-col lg:justify-center lg:px-3" : ""} ${PILULA[p.tom]} ${pilulas.length % 2 === 1 && i === pilulas.length - 1 ? `col-span-2 ${cols === 4 ? "sm:col-span-1" : ""}` : ""} ${p.onClick ? "cursor-pointer hover:opacity-90" : ""}`}
-            >
+        {pilulas.length > 0 && (
+          <div
+            className={`mt-3 grid ${colsMetricas} gap-x-3 gap-y-2 border-t border-gray-200 dark:border-dark-border/60 pt-2.5 ${lado ? "lg:mt-0 lg:flex-1 lg:border-t-0 lg:pt-0" : ""}`}
+          >
+            {pilulas.map((p) => (
               <div
-                className={`text-sm font-bold leading-tight truncate ${lado ? "lg:text-2xl" : ""} ${p.loading ? "animate-pulse" : ""}`}
+                key={p.rotulo}
+                title={p.hint}
+                onClick={p.onClick}
+                role={p.onClick ? "button" : undefined}
+                className={`min-w-0 ${p.onClick ? "cursor-pointer group" : ""}`}
               >
-                {p.valor}
+                <div
+                  className={`text-base font-bold leading-tight truncate tabular-nums ${METRICA[p.tom]} ${p.onClick ? "group-hover:underline decoration-dotted" : ""} ${p.loading ? "animate-pulse" : ""}`}
+                >
+                  {p.valor}
+                </div>
+                <div className="text-[11px] leading-tight truncate text-gray-500 dark:text-dark-text-secondary">
+                  {p.rotulo}
+                </div>
               </div>
-              <div
-                className={`text-[10px] font-medium leading-tight truncate opacity-90 ${lado ? "lg:text-xs lg:mt-0.5" : ""}`}
-              >
-                {p.rotulo}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
+            ))}
+          </div>
+        )}
       </div>
 
       {(temDetalhes || acao) && (
-        <div className="mt-auto pt-2">
+        <div className="mt-auto pt-3">
           {temDetalhes && aberto && (
             <div className="mb-1.5 space-y-1 border-t border-gray-300 dark:border-dark-border/60 pt-2">
               {detalhes.map((r) => (
@@ -262,7 +264,7 @@ export const CardSimples: React.FC<{
               <button
                 type="button"
                 onClick={() => setAberto((v) => !v)}
-                className="inline-flex items-center gap-0.5 text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                className="inline-flex items-center gap-0.5 text-xs font-medium text-gray-500 hover:text-gray-800 dark:text-dark-text-secondary dark:hover:text-dark-text"
               >
                 {aberto ? "menos detalhes" : "ver detalhes"}
                 {aberto ? (
@@ -295,6 +297,54 @@ export const CardSimples: React.FC<{
 // Os 4 cards. Empresa = base inteira; cobradores (`cobrador`) = so os titulos
 // da carteira deles (sem cobrador e sempre 0, e quitados viram "pagaram").
 // ---------------------------------------------------------------------------
+
+const COR_PARTE: Record<TomPilula, string> = {
+  gray: "bg-gray-300 dark:bg-gray-600",
+  green: "bg-green-500",
+  amber: "bg-amber-400",
+  red: "bg-red-500",
+};
+
+/** Partes que somam o total (26/11): uma barra so dividida + legenda com
+ * os numeros. Mostra a proporcao sem quatro caixas coloridas disputando
+ * atencao com o numero principal. */
+const BarraPartes: React.FC<{
+  partes: (Pilula & { qtd: number })[];
+  total: number;
+}> = ({ partes, total }) => (
+  <div className="mt-3">
+    <div className="flex h-2.5 gap-0.5 overflow-hidden rounded-full bg-gray-200 dark:bg-dark-border">
+      {total > 0 &&
+        partes
+          .filter((p) => p.qtd > 0)
+          .map((p) => (
+            <div
+              key={p.rotulo}
+              title={`${p.rotulo}: ${p.valor}`}
+              className={`h-full ${COR_PARTE[p.tom]}`}
+              style={{ width: `${(p.qtd / total) * 100}%` }}
+            />
+          ))}
+    </div>
+    <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5">
+      {partes.map((p) => (
+        <div key={p.rotulo} title={p.hint} className="flex items-baseline gap-1.5">
+          <span
+            className={`h-2 w-2 shrink-0 translate-y-[-1px] rounded-full ${COR_PARTE[p.tom]}`}
+          />
+          <span
+            className={`text-base font-bold tabular-nums ${METRICA[p.tom]}`}
+          >
+            {p.valor}
+          </span>
+          <span className="text-xs text-gray-500 dark:text-dark-text-secondary">
+            {p.rotulo}
+          </span>
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
 /** 1. Clientes: o TOTAL e o numero principal e as etiquetas sao as PARTES
  * que somam o total (pedido do gestor 25/11: "quando somar vai bater com o
@@ -376,7 +426,7 @@ export const CardClientes: React.FC<{
       tema="indigo"
       numero={fmtNum(total)}
       frase={cobrador ? "clientes com saldo na carteira" : "clientes no total"}
-      pilulas={partes}
+      extra={<BarraPartes partes={partes} total={total} />}
       faixa={faixa}
       faixaEmpilhada={faixaEmpilhada}
       detalhes={[
