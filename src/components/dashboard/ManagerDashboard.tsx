@@ -68,6 +68,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     collections,
     ensureSettledCollections,
     loadingSettledCollections,
+    loadingFullScope,
     collectionsRequested,
     requestCollections,
     loading,
@@ -333,6 +334,10 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
+  // Base inteira ainda carregando: a carga "all" (loadingFullScope) ou o
+  // complemento dos quitados (loadingSettledCollections). 26/11: so o segundo
+  // era olhado e o Resumo aparecia zerado durante a carga "all".
+  const baseCarregando = loadingSettledCollections || loadingFullScope;
   // Abas da Atribuicao ja abertas (ficam montadas). A Manual so conta como
   // aberta depois da base carregada (ela precisa dos titulos todos).
   const [atribuicaoVisitadas, setAtribuicaoVisitadas] = useState({
@@ -341,19 +346,19 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   });
   useEffect(() => {
     if (activeTab !== "clients") return;
-    if (atribuicaoView === "manual" && loadingSettledCollections) return;
+    if (atribuicaoView === "manual" && baseCarregando) return;
     setAtribuicaoVisitadas((v) =>
       v[atribuicaoView] ? v : { ...v, [atribuicaoView]: true },
     );
-  }, [activeTab, atribuicaoView, loadingSettledCollections]);
+  }, [activeTab, atribuicaoView, baseCarregando]);
 
   const mostrarResumo =
     activeTab === "collectors-summary" &&
     summaryView === "resumo" &&
     resumoAba !== "inadimplencia";
   useEffect(() => {
-    if (mostrarResumo && !loadingSettledCollections) setResumoMontado(true);
-  }, [mostrarResumo, loadingSettledCollections]);
+    if (mostrarResumo && !baseCarregando) setResumoMontado(true);
+  }, [mostrarResumo, baseCarregando]);
 
   const renderTabContent = () => {
     // Segurar e melhor do que exibir total subestimado: sem os clientes
@@ -385,7 +390,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
         </div>
       </div>
     );
-    const carregandoTudo = needsFullScope && loadingSettledCollections;
+    const carregandoTudo = needsFullScope && baseCarregando;
     // 26/11: Atribuicao e Cobradores mostram a barra de abas durante a carga
     // da base -- antes a tela inteira virava "Carregando" e quem queria a
     // Automatica (ou a Conferencia) tinha de esperar a Manual (ou o Resumo).

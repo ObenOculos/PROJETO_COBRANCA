@@ -705,6 +705,7 @@ export type Database = {
       };
       BANCO_DADOS: {
         Row: {
+          alterado_em: string;
           acrescimo: number | null;
           bairro: string | null;
           cep: string | null;
@@ -746,6 +747,7 @@ export type Database = {
           venda_n: number | null;
         };
         Insert: {
+          alterado_em?: string;
           acrescimo?: number | null;
           bairro?: string | null;
           cep?: string | null;
@@ -787,6 +789,7 @@ export type Database = {
           venda_n?: number | null;
         };
         Update: {
+          alterado_em?: string;
           acrescimo?: number | null;
           bairro?: string | null;
           cep?: string | null;
@@ -985,6 +988,21 @@ export type Database = {
             referencedColumns: ["id_parcela"];
           },
         ];
+      };
+      banco_dados_excluidos: {
+        Row: {
+          excluido_em: string;
+          id_parcela: number;
+        };
+        Insert: {
+          excluido_em?: string;
+          id_parcela: number;
+        };
+        Update: {
+          excluido_em?: string;
+          id_parcela?: number;
+        };
+        Relationships: [];
       };
       ciclone_renegociacoes: {
         Row: {
@@ -2645,6 +2663,7 @@ export type Database = {
         };
         Returns: Json;
       };
+      agora_servidor: { Args: never; Returns: string };
       _saldo_para_desconto: {
         Args: { p_documento: string; p_parcelas: number[] };
         Returns: number;

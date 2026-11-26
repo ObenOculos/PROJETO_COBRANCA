@@ -91,6 +91,11 @@ import {
 } from "../utils/supabasePagination";
 import { comRetentativa } from "../utils/supabaseRetry";
 import { fetchAllRows } from "../utils/fetchAllRows";
+import {
+  baseLocalDisponivel,
+  carregarBaseGestor,
+  separarPorSaldo,
+} from "../utils/baseLocal";
 import { todayLocalStr } from "../config/visitStatus";
 
 // Linha crua de BANCO_DADOS. Nao ha tipos gerados para o schema, entao o alias
@@ -1318,6 +1323,46 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
         // Manter os dados existentes ou um array vazio se não houver nada
         setAllCollections((prev) => (prev.length > 0 ? prev : []));
         return;
+      }
+
+      // Gestor (item 94, 26/11): base guardada no navegador + so o que mudou
+      // desde a ultima abertura (utils/baseLocal). Antes, cada F5 baixava a
+      // base inteira (~133 MB, egress do Supabase). Os escopos saem da copia
+      // local com a mesma regra das views (ativos = cliente com saldo). Se a
+      // base local falhar por qualquer motivo, segue a carga de rede abaixo.
+      if (user.type === "manager" && baseLocalDisponivel()) {
+        try {
+          const inicio = Date.now();
+          const registryLocal = await loadClientesRegistry(!useCache);
+          // Recarga forcada (useCache=false, ex.: depois de pagamento) tambem
+          // e incremental: alterado_em pega o que mudou.
+          const base = await carregarBaseGestor({
+            onProgresso: (carregadas, total) => {
+              if (total && reportLoadProgressRef.current && sessaoAtiva()) {
+                setGlobalLoading(
+                  true,
+                  `Carregando títulos... ${carregadas.toLocaleString("pt-BR")} de ${total.toLocaleString("pt-BR")}`,
+                );
+              }
+            },
+          });
+          if (!sessaoAtiva()) return;
+          const linhasEscopo =
+            scope === "all" ? base.linhas : separarPorSaldo(base.linhas).ativas;
+          const dados = linhasEscopo.map((row) =>
+            mapRowToCollection(row, registryLocal),
+          );
+          setAllCollections(dados);
+          collectionsCache.set(cacheKey, dados);
+          invalidateCollections();
+          applyCollectionsScope(scope);
+          console.log(
+            `Collections da base local: ${dados.length} (${scope}), ${base.origem}, ${base.baixadas} linhas pela rede, ${Date.now() - inicio}ms`,
+          );
+          return;
+        } catch (err) {
+          console.warn("Base local indisponível; carregando pela rede.", err);
+        }
       }
 
       // A view expoe exatamente as colunas de BANCO_DADOS (SELECT b.*), entao o

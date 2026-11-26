@@ -17,7 +17,10 @@ type BancoDadosInsert = Database["public"]["Tables"]["BANCO_DADOS"]["Insert"];
 // Apelido, telefones e e-mail nao existem mais em BANCO_DADOS (migration
 // 20260904000002): sao campos de `clientes`, entao o formulario cobre a uniao
 // dos dois conjuntos e `handleSubmit` separa o que vai para cada tabela.
-type TituloFormField = keyof BancoDadosInsert | CadastroContatoColumn;
+// alterado_em e do banco (gatilho, item 94): nao e campo de formulario.
+type TituloFormField =
+  | Exclude<keyof BancoDadosInsert, "alterado_em">
+  | CadastroContatoColumn;
 type TituloFormData = Partial<Record<TituloFormField, string | number | null>>;
 
 const isCadastroField = (key: string): key is CadastroContatoColumn =>
