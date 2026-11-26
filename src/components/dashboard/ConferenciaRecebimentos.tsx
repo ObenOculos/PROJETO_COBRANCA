@@ -182,54 +182,27 @@ const GRUPOS: GrupoTela[] = [
   "conferido",
 ];
 
-const SITUACAO_TONE: Record<ConferenciaSituacao, string> = {
-  confere:
-    "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300",
-  sem_registro_app:
-    "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300",
-  base_maior:
-    "bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300",
-  sem_baixa_base:
-    "bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300",
-  app_maior: "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300",
-  so_data:
-    "bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-300",
-  pago_direto:
-    "bg-slate-100 text-slate-600 dark:bg-slate-800/40 dark:text-slate-300",
+// Situacao na linha: bolinha da cor + texto neutro (26/11, hierarquia
+// visual -- o chip colorido repetido em toda linha virava ruido).
+const SITUACAO_DOT: Record<ConferenciaSituacao, string> = {
+  confere: "bg-green-500",
+  sem_registro_app: "bg-red-500",
+  base_maior: "bg-orange-500",
+  sem_baixa_base: "bg-amber-400",
+  app_maior: "bg-blue-500",
+  so_data: "bg-violet-500",
+  pago_direto: "bg-gray-400",
 };
 
-// Card de grupo: borda/numero quando selecionado e quando nao.
-const GRUPO_TONE: Record<GrupoTela, { ativo: string; numero: string }> = {
-  conferido: {
-    ativo:
-      "border-teal-300 bg-teal-50 ring-1 ring-teal-200 dark:border-teal-700 dark:bg-teal-900/20 dark:ring-teal-800/50",
-    numero: "text-teal-600 dark:text-teal-400",
-  },
-  acao: {
-    ativo:
-      "border-red-300 bg-red-50 ring-1 ring-red-200 dark:border-red-700 dark:bg-red-900/20 dark:ring-red-800/50",
-    numero: "text-red-600 dark:text-red-400",
-  },
-  juros: {
-    ativo:
-      "border-blue-300 bg-blue-50 ring-1 ring-blue-200 dark:border-blue-700 dark:bg-blue-900/20 dark:ring-blue-800/50",
-    numero: "text-blue-600 dark:text-blue-400",
-  },
-  data: {
-    ativo:
-      "border-violet-300 bg-violet-50 ring-1 ring-violet-200 dark:border-violet-700 dark:bg-violet-900/20 dark:ring-violet-800/50",
-    numero: "text-violet-600 dark:text-violet-400",
-  },
-  direto: {
-    ativo:
-      "border-slate-300 bg-slate-50 ring-1 ring-slate-200 dark:border-slate-600 dark:bg-slate-800/30 dark:ring-slate-700/50",
-    numero: "text-slate-600 dark:text-slate-300",
-  },
-  confere: {
-    ativo:
-      "border-green-300 bg-green-50 ring-1 ring-green-200 dark:border-green-700 dark:bg-green-900/20 dark:ring-green-800/50",
-    numero: "text-green-600 dark:text-green-400",
-  },
+// Grupo (filtro da lista): bolinha da cor; o numero so fica vermelho em
+// "Precisa conferir" (e o unico que pede acao).
+const GRUPO_DOT: Record<GrupoTela, string> = {
+  conferido: "bg-teal-500",
+  acao: "bg-red-500",
+  juros: "bg-blue-500",
+  data: "bg-violet-500",
+  direto: "bg-gray-400",
+  confere: "bg-green-500",
 };
 
 const POR_PAGINA = 50;
@@ -1048,13 +1021,15 @@ const ConferenciaRecebimentos: React.FC = () => {
               onClick={() => setCobradorSel(null)}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 cobradorAtual === null
-                  ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900"
+                  ? "bg-blue-600 text-white"
                   : "bg-gray-100 dark:bg-dark-bg text-gray-700 dark:text-dark-text-secondary hover:bg-gray-200 dark:hover:bg-dark-border"
               }`}
             >
               Todos
               {pendenciasTotal > 0 && (
-                <span className="rounded-full bg-red-500 px-1.5 text-[10px] font-semibold text-white">
+                <span
+                  className={`tabular-nums text-[11px] font-bold ${cobradorAtual === null ? "text-white/90" : "text-gray-500 dark:text-dark-text-secondary"}`}
+                >
                   {pendenciasTotal}
                 </span>
               )}
@@ -1072,13 +1047,15 @@ const ConferenciaRecebimentos: React.FC = () => {
                   }
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                     ativo
-                      ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900"
+                      ? "bg-blue-600 text-white"
                       : "bg-gray-100 dark:bg-dark-bg text-gray-700 dark:text-dark-text-secondary hover:bg-gray-200 dark:hover:bg-dark-border"
                   } ${g.id ? "" : "italic"}`}
                 >
                   {g.nome}
                   {g.pendencias > 0 && (
-                    <span className="rounded-full bg-red-500 px-1.5 text-[10px] font-semibold not-italic text-white">
+                    <span
+                      className={`not-italic tabular-nums text-[11px] font-bold ${ativo ? "text-white/90" : "text-gray-500 dark:text-dark-text-secondary"}`}
+                    >
                       {g.pendencias}
                     </span>
                   )}
@@ -1087,57 +1064,51 @@ const ConferenciaRecebimentos: React.FC = () => {
             })}
           </div>
 
-          {/* Totais do recorte */}
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
-            <div className="rounded-xl border border-gray-100 dark:border-dark-border/40 bg-gray-50/60 dark:bg-dark-bg/30 px-3 sm:px-4 py-2.5">
-              <div className="text-[11px] sm:text-xs font-semibold text-gray-500 dark:text-dark-text-secondary">
+          {/* Totais do recorte: um card, tres colunas (26/11). A
+              diferenca e a resposta; base e app explicam. Notas em cinza. */}
+          <div className="grid grid-cols-3 divide-x divide-gray-200 dark:divide-dark-border rounded-xl border border-gray-200 dark:border-dark-border bg-gray-100 dark:bg-dark-bg">
+            <div className="px-3 sm:px-4 py-3">
+              <div className="text-xs font-semibold text-gray-600 dark:text-dark-text-secondary">
                 Baixado na base
               </div>
-              <div className="mt-0.5 text-base sm:text-xl font-bold text-gray-900 dark:text-dark-text">
+              <div className="mt-1 text-lg sm:text-2xl font-extrabold tracking-tight tabular-nums text-gray-900 dark:text-dark-text">
                 {formatCurrency(resumo.base)}
               </div>
             </div>
-            <div className="rounded-xl border border-gray-100 dark:border-dark-border/40 bg-gray-50/60 dark:bg-dark-bg/30 px-3 sm:px-4 py-2.5">
-              <div className="text-[11px] sm:text-xs font-semibold text-gray-500 dark:text-dark-text-secondary">
+            <div className="px-3 sm:px-4 py-3">
+              <div className="text-xs font-semibold text-gray-600 dark:text-dark-text-secondary">
                 Registrado no app
               </div>
               {/* Total com os juros: o mesmo valor do Desempenho no Resumo
                   por Cobrador. A diferenca ao lado usa so o principal. */}
-              <div className="mt-0.5 text-base sm:text-xl font-bold text-gray-900 dark:text-dark-text">
+              <div className="mt-1 text-lg sm:text-2xl font-extrabold tracking-tight tabular-nums text-gray-900 dark:text-dark-text">
                 {formatCurrency(resumo.app + resumo.juros)}
               </div>
-              {resumo.cedrus !== 0 && (
-                <div className="text-[11px] text-gray-400 dark:text-dark-text-secondary">
-                  {formatCurrency(resumo.cedrus)} do Cedrus
-                </div>
-              )}
-              {resumo.loja > 0 && (
-                <div
-                  className="text-[11px] text-teal-600 dark:text-teal-400"
-                  title="Pagos na loja depois da cobrança, aprovados em Correções: contam como registrados pelo cobrador."
-                >
-                  {formatCurrency(resumo.loja)} pago na loja (aprovado)
-                </div>
-              )}
-              {Math.abs(resumo.juros) > 0.005 && (
-                <div
-                  className="text-[11px] text-indigo-600 dark:text-indigo-400"
-                  title="Juros que o cobrador recebeu junto com as parcelas: entram no total (como no Desempenho do Resumo por Cobrador), mas ficam fora da diferença, porque a base só guarda o principal."
-                >
-                  {formatCurrency(resumo.juros)} de juros (fora da diferença)
-                </div>
-              )}
-            </div>
-            <div className="rounded-xl border border-gray-100 dark:border-dark-border/40 bg-gray-50/60 dark:bg-dark-bg/30 px-3 sm:px-4 py-2.5">
-              <div className="text-[11px] sm:text-xs font-semibold text-gray-500 dark:text-dark-text-secondary">
-                Diferença (app − base)
+              <div className="mt-0.5 space-y-0.5 text-[11px] leading-tight text-gray-500 dark:text-dark-text-secondary">
+                {resumo.cedrus !== 0 && (
+                  <div>{formatCurrency(resumo.cedrus)} do Cedrus</div>
+                )}
+                {resumo.loja > 0 && (
+                  <div title="Pagos na loja depois da cobrança, aprovados em Correções: contam como registrados pelo cobrador.">
+                    {formatCurrency(resumo.loja)} pago na loja (aprovado)
+                  </div>
+                )}
+                {Math.abs(resumo.juros) > 0.005 && (
+                  <div title="Juros que o cobrador recebeu junto com as parcelas: entram no total (como no Desempenho do Resumo por Cobrador), mas ficam fora da diferença, porque a base só guarda o principal.">
+                    {formatCurrency(resumo.juros)} de juros (fora da diferença)
+                  </div>
+                )}
               </div>
-              {Math.abs(resumo.juros) > 0.005 && (
-                <div className="text-[11px] text-gray-400 dark:text-dark-text-secondary">
-                  sem os juros
-                </div>
-              )}
-              <div className="mt-0.5 text-base sm:text-xl font-bold">
+            </div>
+            <div className="px-3 sm:px-4 py-3">
+              <div className="text-xs font-semibold text-gray-600 dark:text-dark-text-secondary">
+                Diferença{" "}
+                <span className="font-normal text-gray-500 dark:text-dark-text-secondary">
+                  (app − base
+                  {Math.abs(resumo.juros) > 0.005 ? ", sem os juros" : ""})
+                </span>
+              </div>
+              <div className="mt-1 text-lg sm:text-2xl font-extrabold tracking-tight tabular-nums">
                 <Diferenca valor={resumo.app - resumo.base} />
               </div>
             </div>
@@ -1153,45 +1124,42 @@ const ConferenciaRecebimentos: React.FC = () => {
             </div>
           )}
 
-          {/* Grupos (filtro da lista) */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-            {GRUPOS.map((gr) => {
-              const ativo = grupoFiltro === gr;
-              return (
-                <button
-                  key={gr}
-                  onClick={() => escolherGrupo(gr)}
-                  title={GRUPO_TELA_DICA[gr]}
-                  className={`rounded-xl border px-3 py-2 text-left transition-colors ${
-                    ativo
-                      ? GRUPO_TONE[gr].ativo
-                      : "border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/40"
-                  }`}
-                >
-                  <div className={`text-xl font-bold ${GRUPO_TONE[gr].numero}`}>
-                    {resumo.porGrupo[gr]}
-                  </div>
-                  <div className="text-xs font-medium text-gray-600 dark:text-dark-text-secondary">
-                    {GRUPO_TELA_LABEL[gr]}
-                  </div>
-                </button>
-              );
-            })}
-            <button
-              onClick={() => escolherGrupo("todos")}
-              className={`rounded-xl border px-3 py-2 text-left transition-colors ${
-                grupoFiltro === "todos"
-                  ? "border-gray-400 bg-gray-50 ring-1 ring-gray-300 dark:border-dark-text-secondary dark:bg-dark-bg/40 dark:ring-dark-border"
-                  : "border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-bg/40"
-              }`}
-            >
-              <div className="text-xl font-bold text-gray-900 dark:text-dark-text">
-                {escopo.length}
-              </div>
-              <div className="text-xs font-medium text-gray-600 dark:text-dark-text-secondary">
-                Todos os clientes
-              </div>
-            </button>
+          {/* Grupos (filtro da lista): controle segmentado com contagem
+              (26/11). Antes eram 7 cards com numero colorido -- pareciam
+              indicadores e disputavam com os totais de cima. */}
+          <div className="overflow-x-auto -mx-1 px-1">
+            <div className="inline-flex min-w-full sm:min-w-0 gap-0.5 rounded-lg bg-gray-100 dark:bg-dark-bg p-0.5">
+              {[...GRUPOS, "todos" as const].map((gr) => {
+                const ativo = grupoFiltro === gr;
+                const qtd = gr === "todos" ? escopo.length : resumo.porGrupo[gr];
+                return (
+                  <button
+                    key={gr}
+                    onClick={() => escolherGrupo(gr)}
+                    title={gr === "todos" ? "Todos os clientes" : GRUPO_TELA_DICA[gr]}
+                    className={`flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm transition-all ${
+                      ativo
+                        ? "bg-white dark:bg-dark-bg-secondary text-gray-900 dark:text-dark-text font-semibold shadow-sm"
+                        : "text-gray-600 dark:text-dark-text-secondary hover:text-gray-900 dark:hover:text-dark-text"
+                    }`}
+                  >
+                    {gr !== "todos" && (
+                      <span className={`h-2 w-2 rounded-full ${GRUPO_DOT[gr]}`} />
+                    )}
+                    {gr === "todos" ? "Todos" : GRUPO_TELA_LABEL[gr]}
+                    <span
+                      className={`tabular-nums font-bold ${
+                        gr === "acao" && qtd > 0
+                          ? "text-red-600 dark:text-red-400"
+                          : "text-gray-900 dark:text-dark-text"
+                      }`}
+                    >
+                      {qtd}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Busca + situacao dentro do grupo */}
@@ -1251,11 +1219,13 @@ const ConferenciaRecebimentos: React.FC = () => {
                 title="Só clientes que conversaram com um cobrador nos 30 dias antes do pagamento (ex.: o cobrador tratou e o cliente pagou na loja)."
                 className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
                   soComConversa
-                    ? "bg-teal-600 text-white"
-                    : "bg-teal-50 text-teal-700 hover:bg-teal-100 dark:bg-teal-900/20 dark:text-teal-300"
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 dark:bg-dark-bg text-gray-600 dark:text-dark-text-secondary hover:bg-gray-200 dark:hover:bg-dark-border"
                 }`}
               >
-                <MessageCircle className="h-3 w-3" />
+                <MessageCircle
+                  className={`h-3 w-3 ${soComConversa ? "" : "text-teal-600 dark:text-teal-400"}`}
+                />
                 Com conversa de cobrador ({resumo.comConversa})
               </button>
             )}
@@ -1342,8 +1312,11 @@ const ConferenciaRecebimentos: React.FC = () => {
                           <td className="px-3 py-2">
                             <span
                               title={CONFERENCIA_SITUACAO_DICA[c.situacao]}
-                              className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ${SITUACAO_TONE[c.situacao]}`}
+                              className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-gray-700 dark:text-dark-text"
                             >
+                              <span
+                                className={`h-2 w-2 shrink-0 rounded-full ${SITUACAO_DOT[c.situacao]}`}
+                              />
                               {CONFERENCIA_SITUACAO_LABEL[c.situacao]}
                             </span>
                             {c.marcacao === "conferido" && (
