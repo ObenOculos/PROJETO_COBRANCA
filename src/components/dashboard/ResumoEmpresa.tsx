@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
   Building2,
   CalendarRange,
+  Info,
   RotateCcw,
   Users,
   Wallet,
@@ -121,6 +122,39 @@ const TEMA: Record<Tema, { faixa: string; numero: string; icone: string }> = {
   },
 };
 
+/** (i) que abre uma explicacao curta (clique; fecha ao clicar fora). */
+const InfoDica: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [aberta, setAberta] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!aberta) return;
+    const fechar = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setAberta(false);
+      }
+    };
+    document.addEventListener("mousedown", fechar);
+    return () => document.removeEventListener("mousedown", fechar);
+  }, [aberta]);
+  return (
+    <span className="relative inline-flex" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setAberta((v) => !v)}
+        aria-label="O que significa"
+        className="text-gray-400 hover:text-blue-600 dark:text-dark-text-secondary dark:hover:text-blue-400"
+      >
+        <Info className="h-4 w-4" />
+      </button>
+      {aberta && (
+        <span className="absolute right-0 top-6 z-20 w-64 rounded-xl border border-blue-100 dark:border-blue-800/40 bg-blue-50 dark:bg-blue-900/30 px-3 py-2 text-xs font-normal leading-snug text-blue-800 dark:text-blue-200 shadow-lg">
+          {children}
+        </span>
+      )}
+    </span>
+  );
+};
+
 export const CardSimples: React.FC<{
   icon: React.ElementType;
   titulo: string;
@@ -139,6 +173,9 @@ export const CardSimples: React.FC<{
   extra?: React.ReactNode;
   /** Etiqueta no canto do titulo (ex.: mes do numero). */
   etiqueta?: string;
+  /** Explicacao curta atras de um (i) no canto (26/11: texto no card
+   * ficava grande demais). */
+  info?: React.ReactNode;
   /** Link ao lado do "ver detalhes" (ex.: abrir a aba Inadimplencia). */
   acao?: { rotulo: string; onClick: () => void };
   /** Faixa larga e baixa (Clientes, 26/11): numero a esquerda e quadrinhos
@@ -161,6 +198,7 @@ export const CardSimples: React.FC<{
   detalhesExtra,
   extra,
   etiqueta,
+  info,
   acao,
   faixa = false,
   faixaEmpilhada = false,
@@ -195,6 +233,11 @@ export const CardSimples: React.FC<{
               >
                 <CalendarRange className="h-3 w-3" />
                 {etiqueta}
+              </span>
+            )}
+            {info && (
+              <span className={etiqueta ? "" : "ml-auto"}>
+                <InfoDica>{info}</InfoDica>
               </span>
             )}
           </div>
@@ -810,17 +853,13 @@ export const CardInadimplencia: React.FC<{
             ]
           : []),
       ]}
-      detalhesExtra={
+      info={
         recuperacao ? (
-          <p className="pt-1 text-[11px] leading-snug text-gray-500 dark:text-dark-text-secondary">
-            <strong className="font-semibold text-gray-700 dark:text-dark-text">
-              Recuperação
-            </strong>
-            : do atraso que vinha de antes do mês, quanto foi pago no mês. Aqui
-            é a <strong>empresa inteira</strong> (inclui clientes sem cobrador);
-            na parte dos cobradores conta só a carteira deles, por isso o
-            número muda.
-          </p>
+          <>
+            <strong>Recuperação</strong>: do atraso de antes do mês, quanto foi
+            pago no mês. Aqui é a <strong>empresa inteira</strong>; nos
+            cobradores, só a carteira deles.
+          </>
         ) : undefined
       }
       detalhes={[
@@ -888,20 +927,13 @@ export const CardRecuperacao: React.FC<{
       numero={d ? formatarPct(d.pct) : "…"}
       numeroLoading={!d}
       frase="do atraso da carteira foi pago no mês"
-      detalhesExtra={
-        <p className="text-[11px] leading-snug text-gray-500 dark:text-dark-text-secondary">
-          Conta <strong>só os clientes na carteira dos cobradores</strong>. Na
-          visão da empresa e na aba Inadimplência entra a empresa inteira
-          (inclusive clientes sem cobrador), por isso o número muda.
-          {inad && (
-            <>
-              {" "}A <strong>inadimplência da carteira</strong> é maior que a
-              da empresa porque o cliente só entra na carteira quando já está
-              atrasado: ela mostra o tamanho do problema que o cobrador
-              recebeu, não o trabalho dele.
-            </>
-          )}
-        </p>
+      info={
+        <>
+          Só a <strong>carteira dos cobradores</strong>; na empresa entra todo
+          mundo, por isso o % muda.
+          {inad &&
+            " A inadimplência da carteira é alta porque só entra cliente atrasado."}
+        </>
       }
       extra={
         d ? (
@@ -933,7 +965,7 @@ export const CardRecuperacao: React.FC<{
                 ? [
                     {
                       valor: formatarInadimplencia(inad.pct, inad.venceu),
-                      rotulo: "inadimplência da carteira",
+                      rotulo: "inadimplência",
                       tom: "gray" as const,
                       hint: `${fmtValor(inad.naoPago)} sem pagar de ${fmtValor(inad.venceu)} que venceram em 12 meses (só a carteira). Alta porque a carteira só recebe cliente atrasado.`,
                     },
