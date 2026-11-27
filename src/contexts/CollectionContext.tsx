@@ -95,6 +95,7 @@ import {
   baseLocalDisponivel,
   carregarBaseGestor,
   separarPorSaldo,
+  type LinhaBase,
 } from "../utils/baseLocal";
 import { todayLocalStr } from "../config/visitStatus";
 
@@ -416,6 +417,15 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
   // estado à parte: nao ha um valor de escopo para conferir "ja e esse
   // escopo", so "ja pedi" ou nao.
   const settledCollectionsLoadedRef = React.useRef(false);
+  // Quitados separados da base local na ultima carga do gestor (item 94,
+  // 27/11). ensureSettledCollections usa estas linhas em vez de baixar a view
+  // banco_dados_clientes_quitados (~74 MB a cada abertura do Resumo) -- e
+  // saem da MESMA copia dos ativos, entao nenhum cliente fica nos dois
+  // conjuntos nem em nenhum. Consumido (null) assim que vira estado.
+  const quitadosDaBaseRef = React.useRef<{
+    linhas: LinhaBase[];
+    sessao: number;
+  } | null>(null);
 
   const applyCollectionsScope = (scope: CollectionsScope) => {
     collectionsScopeRef.current = scope;
@@ -1113,6 +1123,7 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
       setAllCollections([]);
       setSettledCollections([]);
       settledCollectionsLoadedRef.current = false;
+      quitadosDaBaseRef.current = null;
       // As travas de "ja carreguei" tambem voltam ao zero. O provider nao
       // desmonta no logout: sem isto, sair e entrar de novo na mesma aba
       // deixava collectionsRequestedRef=true (e o escopo em "all"), entao
@@ -1347,8 +1358,27 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
             },
           });
           if (!sessaoAtiva()) return;
-          const linhasEscopo =
-            scope === "all" ? base.linhas : separarPorSaldo(base.linhas).ativas;
+          let linhasEscopo = base.linhas;
+          quitadosDaBaseRef.current = null;
+          if (scope !== "all") {
+            const partes = separarPorSaldo(base.linhas);
+            linhasEscopo = partes.ativas;
+            if (
+              settledCollectionsLoadedRef.current &&
+              !loadingSettledCollectionsRef.current
+            ) {
+              // Quitados ja na tela: recalcula junto, da mesma copia. Antes so
+              // os ativos eram relidos e quem quitava depois de um pagamento
+              // sumia dos dois conjuntos ate o proximo F5.
+              setSettledCollections(
+                partes.quitadas.map((row) =>
+                  mapRowToCollection(row, registryLocal),
+                ),
+              );
+            } else {
+              quitadosDaBaseRef.current = { linhas: partes.quitadas, sessao };
+            }
+          }
           const dados = linhasEscopo.map((row) =>
             mapRowToCollection(row, registryLocal),
           );
@@ -1699,6 +1729,35 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({
     const sessaoAtiva = () => sessao === sessaoRef.current;
 
     try {
+      // Gestor (item 94, 27/11): os quitados saem da base guardada no
+      // navegador, da mesma copia dos ativos -- sem rede. Qualquer falha cai
+      // na busca pela view logo abaixo, como antes.
+      if (user?.type === "manager" && baseLocalDisponivel()) {
+        try {
+          const inicio = Date.now();
+          await activeLoad;
+          if (!sessaoAtiva()) return;
+          const guardado = quitadosDaBaseRef.current;
+          const linhas =
+            guardado && guardado.sessao === sessao
+              ? guardado.linhas
+              : separarPorSaldo((await carregarBaseGestor()).linhas).quitadas;
+          quitadosDaBaseRef.current = null;
+          const registryLocal = await loadClientesRegistry();
+          if (!sessaoAtiva()) return;
+          setSettledCollections(
+            linhas.map((row) => mapRowToCollection(row, registryLocal)),
+          );
+          invalidateCollections();
+          console.log(
+            `Quitados da base local: ${linhas.length}, ${guardado ? "mesma carga dos ativos" : "base relida"}, ${Date.now() - inicio}ms`,
+          );
+          return;
+        } catch (err) {
+          console.warn("Base local indisponível para os quitados; carregando pela rede.", err);
+        }
+      }
+
       const source = SETTLED_COLLECTIONS_SOURCE as "BANCO_DADOS";
       const registry = await loadClientesRegistry();
 
