@@ -16,7 +16,7 @@ Senhas e chaves: **só** no `.env` da raiz (fora do git) — `VITE_SUPABASE_URL`
 
 | Tarefa do Windows | Quando | Script | O que faz | Destino | Log |
 |---|---|---|---|---|---|
-| `Cobranca_Sync_Financeiro_Ciclone` | 5h, 12h, 17h | `ciclone/sync_financeiro.py` | Financeiro da Focco (títulos, baixas, cadastro) do Ciclone para o app | app (`BANCO_DADOS`, `clientes`) | `ciclone/saida/sync_<data>.log` |
+| `Cobranca_Sync_Financeiro_Ciclone` | 5h, 8h30, 12h, 17h | `ciclone/sync_financeiro.py` | Financeiro da Focco (títulos, baixas, cadastro) do Ciclone para o app | app (`BANCO_DADOS`, `clientes`) | `ciclone/saida/sync_<data>.log` |
 | `Cobranca_Atualizar_SSOtica` | 6h | `ssotica/atualizar_ssotica.py` | 1) contas a receber das lojas → planilhas `BD_Contasareceber_*` + app (`importar_parcelas_ssotica`); 2) vendas canceladas → app; 3) parcelas em aberto no app que sumiram do relatório → confere na ficha do cliente e cancela as confirmadas | Power BI `Oticas Luana\Contas a Receber` + app | `ssotica/saida/*.log` |
 | `Cobranca_Clientes_SSOtica` | a cada 14 dias, 7h30 | `ssotica/clientes_ssotica.py --gravar` | Exporta o cadastro de clientes da SSÓtica (salva no Dropbox `4 - Relação_Óticas_CPF`), liga o Cliente ID e completa telefone/nascimento/e-mail vazios | app (`clientes`) | `ssotica/saida/clientes_ssotica.log` |
 | `BI_ContasReceber_Focco` | 19h | `focco/contas_receber_bi.py` | Planilha mestre `_CONTAS A RECEBER OBEN.xlsx` (Dropbox, com senha) → layout fixo do Power BI | Power BI `Focco Brasil\Contas a Receber` | `focco/saida/excel_extractor.log` |

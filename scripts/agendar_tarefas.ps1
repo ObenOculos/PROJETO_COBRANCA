@@ -5,7 +5,7 @@
 #   powershell -ExecutionPolicy Bypass -File scripts/agendar_tarefas.ps1
 #
 # Rotinas (detalhes em docs/ATUALIZACOES.md):
-#   Cobranca_Sync_Financeiro_Ciclone  5h,12h,17h  Ciclone -> app (Focco)
+#   Cobranca_Sync_Financeiro_Ciclone  5h,8h30,12h,17h  Ciclone -> app (Focco)
 #   Cobranca_Atualizar_SSOtica        6h          SSOtica -> app + Power BI (contas a receber,
 #                                                 cancelados, parcelas sumidas)
 #   Cobranca_Clientes_SSOtica         14 em 14 d  cadastro de clientes SSOtica -> app
@@ -43,7 +43,8 @@ function Registrar($nome, $script, $argumentos, $gatilhos, $horas, $descricao) {
 }
 
 Registrar 'Cobranca_Sync_Financeiro_Ciclone' 'ciclone\sync_financeiro.py' '' `
-  @((New-ScheduledTaskTrigger -Daily -At 5:00), (New-ScheduledTaskTrigger -Daily -At 12:00),
+  @((New-ScheduledTaskTrigger -Daily -At 5:00), (New-ScheduledTaskTrigger -Daily -At 8:30),
+    (New-ScheduledTaskTrigger -Daily -At 12:00),
     (New-ScheduledTaskTrigger -Daily -At 17:00)) 1 `
   'Ciclone -> Sistema de Cobranca: financeiro da Focco Brasil (PROJETO_COBRANCA/scripts/ciclone).'
 
